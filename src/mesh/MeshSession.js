@@ -4,6 +4,7 @@ import { Mesh, MeshBuilder, accumulateRows, finishAggregates } from "./MeshBuild
 import { migrateMapData, pinsToCells, regionsToOwners } from "./Migration.js";
 import { OwnerLayer, decodeOwners, encodeOwners, mergePatchList } from "./OwnerLayer.js";
 import { nodesMarkedLine, resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
+import { Influences } from "./Influences.js";
 import { routeRuns } from "./RouteMerge.js";
 import { routePolyline } from "./RoutePath.js";
 import { RiverNetwork } from "../generation/RiverNetwork.js";
@@ -12,7 +13,8 @@ import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor,
 /**
  * The mesh of the map that is open, and everything derived from it that drawing and hit-testing
  * read: one OwnerLayer per level, the terrain summaries per cell, and caches of border arcs,
- * label anchors, region bounds and route lines.
+ * label anchors, region bounds and route lines. The influences painted on the map (see Influences)
+ * are per display cell too, so they live here beside the owners and move with the mesh.
  *
  * MeshSession.open brings a saved map into this shape: it builds (or loads) the mesh, migrates a
  * map saved before vector schema version 4, decodes the owner arrays saved beside a newer one,
@@ -68,9 +70,12 @@ export class MeshSession {
      * @param {Array} params.layerSets
      * @param {Object<string, Int32Array>} params.owners - By level id.
      * @param {import("./MeshBuilder.js").CellAggregates|null} [params.aggregates]
+     * @param {object|null} [params.influences] - The map's saved `influences` (see Influences).
      */
-    constructor({ mesh, meshBlock, layerSets, owners, aggregates = null }) {
+    constructor({ mesh, meshBlock, layerSets, owners, aggregates = null, influences = null }) {
         this.mesh = mesh;
+        /** The influences painted on the map's cells (see Influences). */
+        this.influences = influences instanceof Influences ? influences : new Influences(mesh.cellCount, influences);
         this.meshBlock = { ...meshBlock, cells: mesh.cellCount };
         this.aggregates = aggregates;
         this.layers = new Map();
@@ -114,7 +119,7 @@ export class MeshSession {
 
         onProgress?.({ stage: "aggregates" });
         const aggregates = buffers ? result.mesh.aggregate(buffers) : null;
-        const session = new MeshSession({ mesh: result.mesh, meshBlock: result.mapData.mesh, layerSets: result.mapData.layerSets ?? [], owners: result.owners, aggregates });
+        const session = new MeshSession({ mesh: result.mesh, meshBlock: result.mapData.mesh, layerSets: result.mapData.layerSets ?? [], owners: result.owners, aggregates, influences: result.influences ?? result.mapData.influences ?? null });
         result.mapData.mesh = session.meshBlock;
         session.#checkData(result.mapData, result.warnings);
         return { session, mapData: result.mapData, migrated: result.migrated, rebuilt: result.rebuilt, changed: result.migrated || result.rebuilt, warnings: result.warnings };
@@ -744,6 +749,9 @@ async function rebuildMesh(mapData, encodedOwners, meshFor, warnings) {
     const mesh = await meshFor(MeshBuilder.paramsFor(mapData));
     const oldMesh = buildOldMesh(oldBlock, mapData);
     const oldOwners = oldMesh ? decodeLevels(mapData, encodedOwners, []) : {};
+    // The influences follow the land they were painted on, as the owners do; without the old mesh they are lost with them
+    const influences = oldMesh ? new Influences(oldMesh.cellCount, mapData.influences).resampled(oldMesh, mesh) : null;
+    delete mapData.influences;
 
     const owners = {};
     for (const set of mapData.layerSets ?? []) {
@@ -752,7 +760,7 @@ async function rebuildMesh(mapData, encodedOwners, meshFor, warnings) {
     mapData.mapRoutes = (mapData.mapRoutes ?? []).flatMap((route) => carryRoute(route, oldMesh, mesh));
     mapData.mapPins = pinsToCells(mapData.mapPins, mesh);
     warnings.unshift({ key: SESSION_WARNINGS.REBUILT });
-    return { mapData, owners, mesh, migrated: false, rebuilt: true, warnings };
+    return { mapData, owners, mesh, migrated: false, rebuilt: true, warnings, influences };
 }
 
 function buildOldMesh(block, mapData) {

@@ -4,6 +4,7 @@ import { labelFontGroups } from "../data/fonts.js";
 import { InspectorFields } from "./InspectorFields.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { PinStyles } from "./PinStyles.js";
+import { RiverLabels } from "./RiverLabels.js";
 import { regionFillColor } from "../mesh/Schema.js";
 import { ROUTE_CLASSES, ROUTE_THICKNESS_STEP } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
@@ -27,6 +28,13 @@ const JUSTIFY = Object.freeze([
     Object.freeze({ value: "left", label: "FILRODENSWMB.UI.JustifyLeft" }),
     Object.freeze({ value: "center", label: "FILRODENSWMB.UI.JustifyCenter" }),
     Object.freeze({ value: "right", label: "FILRODENSWMB.UI.JustifyRight" }),
+]);
+/** A custom river's widths (as its inspector's; see RiverEditor). */
+const RIVER_WIDTHS = Object.freeze([
+    Object.freeze({ value: "2", label: "FILRODENSWMB.UI.SizeSmall" }),
+    Object.freeze({ value: "4", label: "FILRODENSWMB.UI.SizeMedium" }),
+    Object.freeze({ value: "6", label: "FILRODENSWMB.UI.SizeLarge" }),
+    Object.freeze({ value: "8", label: "FILRODENSWMB.UI.SizeXLarge" }),
 ]);
 const CLASSES = Object.freeze([
     Object.freeze({ value: "", label: "FILRODENSWMB.UI.RouteClassNone" }),
@@ -62,7 +70,7 @@ const labelFields = (store) => [
  * inspector's fields for several items at once, so a field here names the inspector fields it
  * stands for (`inspector`), and a test checks every field of a kind's inspector is here, except
  * those that belong to each item (`perItem`: its name, description, text, rotation, how its new
- * legs are found).
+ * legs are found, and whether a lone duchy or county is a state of its own, which only such regions offer).
  *
  * A field is `{ key, store, type, label, inspector, ... }`:
  * - `store`: "item" (the object's own field) or "label" (its label's).
@@ -114,7 +122,7 @@ export class FieldSpecs {
             legend: "FILRODENSWMB.UI.MassEditFieldsRegions",
             hasLabel: true,
             style: { type: "Region", key: "quickStyle", none: "custom", write: (_app, style) => ({ quickStyle: style.id, fillColor: style.fillColor, fillStyle: style.fillStyle ?? "solid" }) },
-            perItem: ["regionName", "regionDesc", "labelRotation"],
+            perItem: ["regionName", "regionDesc", "regionIndependent", "labelRotation"],
             fields: [
                 { key: "quickStyle", store: "item", type: "style", styleType: "Region", label: "FILRODENSWMB.UI.InspectorStyle", inspector: ["regionQuickStyle"], options: styleOptions("customRegionStyles") },
                 { key: "visibility", store: "item", type: "visibility", label: "FILRODENSWMB.UI.Visibility", inspector: ["regionVisibility"] },
@@ -123,6 +131,19 @@ export class FieldSpecs {
                 ...labelFields("label"),
             ],
             current: (app, region) => ({ ...region, visibility: region.visibility ?? "all", fillColor: region.fillColor ?? regionFillColor(region) ?? "#000000", fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region) }),
+        }),
+        // Custom rivers (Rivers and faults): their width, which carves them again (`terrainFields`),
+        // and their names on the map (see RiverLabels); a river with no label yet starts hidden
+        river: Object.freeze({
+            legend: "FILRODENSWMB.UI.MassEditFieldsRivers",
+            hasLabel: true,
+            style: { type: "Label", key: "unused", none: null, write: () => ({}) },
+            perItem: ["riverName", "riverCorridor", "riverCutThrough", "labelRotation"],
+            terrainFields: ["width"],
+            // A river drawn before rivers had labels has its name hidden until shown
+            newLabel: () => ({ visibility: "none" }),
+            fields: [{ key: "width", store: "item", type: "select", label: "FILRODENSWMB.UI.RiverWidth", inspector: ["riverWidth"], options: () => RIVER_WIDTHS }, ...labelFields("label")],
+            current: (app, river) => ({ ...river, width: river.width == null ? null : String(river.width), label: RiverLabels.label(app, river) }),
         }),
         label: Object.freeze({
             legend: "FILRODENSWMB.UI.MassEditFieldsLabels",

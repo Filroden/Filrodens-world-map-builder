@@ -23,8 +23,10 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @property {string} nameBase - A name base of the name generator.
  * @property {number} openness - 0 closed to 1 open.
  * @property {number} density - Population multiplier.
- * @property {object} habitat - Soft ranges: temperature and moisture [lo, hi] (0 to 1), heightM
- *     and reliefM [lo, hi] (metres), coast and river affinity (-1 avoids to 1 seeks).
+ * @property {object} habitat - Soft ranges: the climate as temperature and moisture [lo, hi] (0 to
+ *     1) and heightM [lo, hi] (metres), or as `zones` (each { temperature, moisture, heightM }, a
+ *     list of such ranges per measure or null for none; the best zone counts); reliefM [lo, hi]
+ *     (metres); coast and river affinity (-1 avoids to 1 seeks).
  * @property {number[]} [homelandCells] - Model cells it starts from (all at once), or none to
  *     place one automatically. (`homelandCell`, a single cell, is read as a list of one.)
  */
@@ -68,14 +70,41 @@ function affinityFactor(affinity, present) {
     return present ? 1 + AFFINITY_RAISE * affinity : 1 - AFFINITY_LOWER * Math.max(0, affinity);
 }
 
+/** The best of an axis's soft bands at a value; 1 with no bands (no limit on that axis). */
+function axisFit(value, bands, soft) {
+    if (!bands) return 1;
+    let best = 0;
+    for (const range of bands) best = Math.max(best, band(value, range, soft));
+    return best;
+}
+
+/**
+ * How well a cell's climate suits a culture, 0 to 1. A culture with zones (its chosen biomes, or
+ * zones set by hand; see CultureClimate) fits as well as its best zone, each zone's three measures
+ * multiplied as single bands are; one with its older single bands, by those, exactly as before
+ * zones existed; one with neither fits every climate.
+ */
+function climateFit(habitat, cells, cell, soft) {
+    if (!habitat.zones) {
+        return band(cells.temperature[cell], habitat.temperature, soft.temperature)
+            * band(cells.moisture[cell], habitat.moisture, soft.moisture)
+            * band(cells.heightM[cell], habitat.heightM, soft.heightM);
+    }
+    let best = 0;
+    for (const zone of habitat.zones) {
+        const fit = axisFit(cells.temperature[cell], zone.temperature, soft.temperature)
+            * axisFit(cells.moisture[cell], zone.moisture, soft.moisture)
+            * axisFit(cells.heightM[cell], zone.heightM, soft.heightM);
+        best = Math.max(best, fit);
+    }
+    return best;
+}
+
 /** How well a land cell suits a culture, FIT_FLOOR to 1 (1 everywhere for a generalist). */
 export function habitatFit(culture, cells, cell) {
     const { FIT_FLOOR, SOFT } = FILRODENSWMB.GENERATOR.CULTURES;
     const habitat = culture.habitat;
-    let fit = band(cells.temperature[cell], habitat.temperature, SOFT.temperature)
-        * band(cells.moisture[cell], habitat.moisture, SOFT.moisture)
-        * band(cells.heightM[cell], habitat.heightM, SOFT.heightM)
-        * band(cells.reliefM[cell], habitat.reliefM, SOFT.reliefM);
+    let fit = climateFit(habitat, cells, cell, SOFT) * band(cells.reliefM[cell], habitat.reliefM, SOFT.reliefM);
     fit *= affinityFactor(habitat.coast, cells.coastal[cell] === 1);
     fit *= affinityFactor(habitat.river, cells.riverKm[cell] > 0);
     return Math.min(1, Math.max(FIT_FLOOR, fit));
@@ -152,11 +181,13 @@ function byShare(a, b) {
  * Stage 1b: spreads the cultures and works out each cell's shares.
  * @param {import("./CellGraph.js").CellGraph} graph
  * @param {Culture[]} cultures
- * @param {{invader?: number}} [options] - invader: the index of a culture invading in this age (see
- *     Pipeline's ages), which spreads at AGES.INVASION.SPREAD of the cost, taking land.
+ * @param {{invader?: number, scales?: Map<number, Float64Array>}} [options] - invader: the index of a
+ *     culture invading in this age (see Pipeline's ages), which spreads at AGES.INVASION.SPREAD of
+ *     the cost, taking land; scales: a culture's scale on its spreading cost per cell, by its index
+ *     (a migrant or colonist finding others' land harder; see AgeEvents).
  * @returns {CultureData}
  */
-export function spreadCultures(graph, cultures, { invader = -1 } = {}) {
+export function spreadCultures(graph, cultures, { invader = -1, scales = null } = {}) {
     const cells = graph.cells;
     const base = graph.costs(travelCost(graph, { portKm: portCost(cells) }));
     const land = landCells(cells);
@@ -165,7 +196,7 @@ export function spreadCultures(graph, cultures, { invader = -1 } = {}) {
     const placed = placeHomelands(graph, cultures, fits, land, base);
     const homelands = placed.map((entry) => entry.cells);
     const homelandNotes = placed.map(({ auto, offLand }) => ({ auto, offLand }));
-    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index], index === invader ? FILRODENSWMB.GENERATOR.AGES.INVASION.SPREAD : 1));
+    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index], index === invader ? FILRODENSWMB.GENERATOR.AGES.INVASION.SPREAD : 1, scales?.get(index) ?? null));
     return { cultures, homelands, homelandNotes, ...shareCells(cells, cultures, fits, distances, land) };
 }
 
@@ -334,10 +365,10 @@ function bestHomeland(cells, fit, land, taken) {
 }
 
 /** A culture's arrival cost at every cell, spreading from all its homelands at once. */
-function spreadCost(graph, base, fit, mean, homelands, advantage = 1) {
+function spreadCost(graph, base, fit, mean, homelands, advantage = 1, scale = null) {
     const { FIT_COST, SPECIALIST_BONUS } = FILRODENSWMB.GENERATOR.CULTURES;
     const bonus = (1 - SPECIALIST_BONUS * (1 - mean)) * advantage;
-    const cost = graph.costs((edge) => base[edge] * (1 + FIT_COST * (1 - 0.5 * (fit[graph.edgeA[edge]] + fit[graph.edgeB[edge]]))) * bonus);
+    const cost = graph.costs((edge) => base[edge] * (1 + FIT_COST * (1 - 0.5 * (fit[graph.edgeA[edge]] + fit[graph.edgeB[edge]]))) * bonus * (scale ? 0.5 * (scale[graph.edgeA[edge]] + scale[graph.edgeB[edge]]) : 1));
     return searchAll(graph, Array.from(homelands), cost).best;
 }
 

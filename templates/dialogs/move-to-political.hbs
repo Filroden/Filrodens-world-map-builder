@@ -1,0 +1,19 @@
+<div class="fwmb-dialog-content">
+    {{!--
+        Move to Political set (see RegionPanel.moveToPolitical): which of the Political set's layers
+        the region (or every region of a layer) joins, as a realm, duchy or county. A choice the set
+        has no layer for is disabled; with no Political set yet, the hint says one is made.
+    --}}
+    <div class="fwmb-hint">{{hint}}</div>
+    {{#if creates}}<div class="fwmb-hint">{{localize "FILRODENSWMB.UI.MoveToPoliticalNewSet"}}</div>{{/if}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-move-to-political">{{localize "FILRODENSWMB.UI.MoveToPoliticalAs"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-move-to-political" name="moveAs" autofocus>
+                {{#each choices}}
+                <option value="{{this.depth}}" {{#if this.selected}}selected{{/if}} {{#unless this.available}}disabled{{/unless}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>

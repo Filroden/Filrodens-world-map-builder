@@ -65,6 +65,74 @@ export function mergeRegion(session, levelId, fromId, intoId) {
     return { levelId, patch };
 }
 
+/**
+ * Moves regions from one level to another (Move to Political set): each region leaves its level
+ * (its cells there become unclaimed; child regions under it keep theirs, as when it is deleted) and
+ * joins `toLevelId` under a new key, taking its land cells there. It wins them, as painting does:
+ * the regions of that level it overlaps lose them, and the cells under them at the constrained
+ * levels below are cleared (see clearBelow), since a child region there belonged to the cell's
+ * old owner. The regions are moved in the order given, so where two of them overlap the later
+ * wins. Each moved region then belongs to the region of the parent level holding most of its
+ * cells, or to none (a lone region, where its level allows one; see mayStandAlone). Every level
+ * changed claims its waters again (see claimWaters).
+ *
+ * The region objects keep their id, name, look and everything else; only key and parentKey change.
+ *
+ * @param {import("./MeshSession.js").MeshSession} session
+ * @param {Array} layerSets
+ * @param {string} fromLevelId
+ * @param {string[]} regionIds
+ * @param {string} toLevelId
+ * @returns {{patches: {levelId: string, patch: import("./OwnerLayer.js").OwnerPatch}[], moved: object[]}|null} null when either level is missing or they are the same.
+ */
+export function moveRegions(session, layerSets, fromLevelId, regionIds, toLevelId) {
+    const from = session.level(fromLevelId);
+    const to = session.level(toLevelId);
+    if (!from || !to || from === to) return null;
+    const land = session.aggregates?.land ?? null;
+    const patches = [];
+    const record = (levelId, patch) => {
+        if (!patch.cells.length) return;
+        patches.push({ levelId, patch });
+        session.ownersChanged(levelId, patch);
+    };
+    const moved = [];
+    for (const id of regionIds) {
+        const region = from.regions.find((candidate) => candidate.id === id);
+        if (!region) continue;
+        const cells = session.layer(from.id).cellsOf(region.key).filter((cell) => !land || land[cell] === 1);
+        from.regions.splice(from.regions.indexOf(region), 1);
+        record(from.id, session.layer(from.id).reassign(region.key, UNCLAIMED));
+        region.key = to.nextKey;
+        to.nextKey += 1;
+        region.parentKey = null;
+        delete region.parentFromRun;
+        to.regions.push(region);
+        const patch = session.layer(to.id).set(cells, region.key);
+        record(to.id, patch);
+        clearBelow(session, layerSets, to.id, patch.cells, record);
+        moved.push(region);
+    }
+    settleMovedParents(session, to, moved);
+    for (const levelId of new Set([from.id, ...patches.map((entry) => entry.levelId)])) {
+        const claimed = claimWaters(session, session.level(levelId));
+        if (claimed?.patch.cells.length) patches.push(claimed);
+    }
+    return { patches, moved };
+}
+
+/** Each moved region belongs to the parent region holding most of its cells, or none. */
+function settleMovedParents(session, level, moved) {
+    const parent = parentLevelOf(session, level);
+    if (!parent) return;
+    const majority = parentAssignments(session.layer(level.id).owners, session.layer(parent.id).owners);
+    for (const region of moved) {
+        const key = majority.get(region.key) ?? UNCLAIMED;
+        region.parentKey = key === UNCLAIMED ? null : key;
+        delete region.parentFromRun;
+    }
+}
+
 function childLevelsOf(session, levelId) {
     return [...session.levels()].filter((level) => level.parentLevelId === levelId);
 }
@@ -118,6 +186,17 @@ export function parentLevelOf(session, level) {
     return level?.parentLevelId ? session.level(level.parentLevelId) : null;
 }
 
+/**
+ * Whether a level's regions may stand alone, outside every region of its parent level: on a
+ * constrained child level of a Political set, where a duchy in no realm or a county in no duchy
+ * is a unit of its own that Generate builds round (see UserRealms), as an independent state or
+ * one it may place in a realm. Such a lone region has no parentKey, and is painted only on land
+ * no parent region holds. Elsewhere a child region always lies inside a parent region.
+ */
+export function mayStandAlone(session, level) {
+    return !!parentLevelOf(session, level) && level.nestingMode !== "free" && session.setOf?.(level.id)?.kind === "political";
+}
+
 /** Whether a key belongs to one of a level's regions. */
 function hasKey(level, key) {
     return Number.isInteger(key) && level.regions.some((region) => region.key === key);
@@ -140,8 +219,10 @@ export function settleParentKey(session, level, region, cell) {
     if (!parent || level.nestingMode === "free") return { allowed: true, changed: false };
     if (hasKey(parent, region.parentKey)) return { allowed: true, changed: false };
     const under = cell >= 0 ? session.layer(parent.id).owners[cell] : UNCLAIMED;
-    if (under === UNCLAIMED) return { allowed: false, changed: false };
+    // A region painted first on land no parent region holds stands alone where it may
+    if (under === UNCLAIMED) return { allowed: cell >= 0 && mayStandAlone(session, level), changed: false };
     region.parentKey = under;
+    delete region.parentFromRun;
     return { allowed: true, changed: true };
 }
 
@@ -157,7 +238,8 @@ export function paintAllow(session, level, region, startCell = -1) {
     if (!parent || level.nestingMode === "free" || !region) return null;
     const parentOwners = session.layer(parent.id).owners;
     const key = hasKey(parent, region.parentKey) ? region.parentKey : startCell >= 0 ? parentOwners[startCell] : UNCLAIMED;
-    if (key === UNCLAIMED) return () => false;
+    // A lone region (see mayStandAlone) keeps to land no parent region holds
+    if (key === UNCLAIMED) return mayStandAlone(session, level) ? (cell) => parentOwners[cell] === UNCLAIMED : () => false;
     return (cell) => parentOwners[cell] === key;
 }
 
@@ -213,13 +295,15 @@ export function regionParents(session, level) {
 
 /**
  * The cells of a level lying outside the parent region their region belongs to (see
- * regionParents), including cells over unclaimed parent ground. Empty for a top level.
+ * regionParents), including cells over unclaimed parent ground; for a lone region (one mostly
+ * outside every parent region, where regions may stand alone; see mayStandAlone), its cells inside
+ * a parent region. Empty for a top level.
  * @returns {Int32Array}
  */
 export function nestingProblems(session, level) {
     const parent = parentLevelOf(session, level);
     if (!parent) return new Int32Array(0);
-    return nestingViolations(session.layer(level.id).owners, session.layer(parent.id).owners, regionParents(session, level));
+    return nestingViolations(session.layer(level.id).owners, session.layer(parent.id).owners, regionParents(session, level), { lone: mayStandAlone(session, level) });
 }
 
 /**
@@ -234,6 +318,7 @@ export function assignToParents(session, level) {
     for (const region of level.regions) {
         const key = assignments.get(region.key);
         region.parentKey = key === UNCLAIMED ? null : key;
+        delete region.parentFromRun;
     }
     const patch = session.layer(level.id).erase(nestingProblems(session, level));
     session.ownersChanged(level.id, patch);

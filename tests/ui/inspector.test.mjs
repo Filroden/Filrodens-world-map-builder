@@ -953,6 +953,22 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
 });
 
+test("while a culture's climate is chosen biomes, a custom biome's placement and its deletion mark a run out of date", async () => {
+    const app = await biomeStudio({ behavesLike: null });
+    await BiomeEditor.open(app, 14);
+    await commit(app, "biomePlacement", "landUnderwater");
+    assert.equal(app.stale, 0, "no culture reads where biomes show");
+    app.uiState.cultures = [{ id: "c1", name: "Moorfolk", habitat: { climate: "biomes", biomes: [14] } }];
+    await commit(app, "biomePlacement", "land");
+    assert.equal(app.stale, 1, "where it may show is where the culture's climate comes from");
+    await commit(app, "biomeColor", "#654321");
+    assert.equal(app.stale, 1, "its colour is not");
+    form(app).querySelector('[data-inspector-action="delete"]').click();
+    await settle();
+    await settle();
+    assert.equal(app.stale, 2, "its land shows the biome beneath now");
+});
+
 // ------------------------------------------------------------------ random names
 
 const { RandomNames } = await import("../../src/applications/RandomNames.js");
@@ -1103,4 +1119,59 @@ test("a random name is in the Name style its culture has now, not the one the ru
     assert.equal(suggested(), expect("Arabic"), "and again after it changes, with no Generate again");
     app.uiState.cultures = [];
     assert.equal(suggested(), expect("English"), "a culture since deleted keeps the run's record");
+});
+
+test("a moved pin label offers Place automatically, in the pin's and the label's inspector: one undo step, its look kept; a standalone label never", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    assert.equal(form(app).querySelector('[data-inspector-action="placeLabel"]'), null, "a label the map places offers nothing");
+    pin.label = { ...pin.label, x: 120, y: 80, rotation: 15 };
+    Inspector.refresh(app);
+    await settle();
+    assert.match(form(app).textContent, /InspectorLabelMoved/);
+    await press(app, "placeLabel");
+    assert.ok(!("x" in pin.label) && !("y" in pin.label), "its own position gone");
+    assert.equal(pin.label.rotation, 15, "its turn kept");
+    await undo(app);
+    const restored = () => app.mapPins.find((each) => each.id === "keep");
+    assert.deepEqual([restored().label.x, restored().label.y], [120, 80], "one undo step");
+
+    await LabelEditor.open(app, { type: "pin", id: "keep" });
+    await press(app, "placeLabel");
+    assert.ok(!("x" in restored().label), "from the label's own inspector too");
+
+    await LabelEditor.open(app, { type: "custom", id: "sea" });
+    assert.equal(form(app).querySelector('[data-inspector-action="placeLabel"]'), null, "a standalone label's position is its own");
+});
+
+test("a custom river's label: hidden for a river drawn before, shown as one undo step, its look its own; Random name, Place automatically, and its label's own inspector", async () => {
+    const { app } = await studio();
+    const river = () => app.manualRivers.find((each) => each.id === "silver");
+    await RiverEditor.open(app, "silver");
+    assert.equal(field(app, "labelVisibility").value, "none", "a river drawn before rivers had labels has its name hidden");
+    await commit(app, "labelVisibility", "all");
+    assert.equal(river().label.visibility, "all");
+    assert.equal(app.terrainUpdates, 0, "a label carves nothing");
+    await commit(app, "labelFontSize", "2.5");
+    assert.equal(river().label.fontSize, 2.5);
+    assert.equal(steps(app), 2);
+    await undo(app);
+    assert.notEqual(river().label?.fontSize, 2.5, "one undo step each");
+
+    const named = river().name;
+    await press(app, "randomName");
+    assert.notEqual(river().name, named, "Random name");
+    assert.equal(river().nameSource, "random");
+
+    river().label = { ...river().label, x: 40, y: 50 };
+    Inspector.refresh(app);
+    await settle();
+    await press(app, "placeLabel");
+    assert.ok(!("x" in river().label), "Place automatically");
+
+    await LabelEditor.open(app, { type: "river", id: "silver" });
+    assert.ok(form(app).querySelector(".fwmb-inspector-owner").textContent.includes(river().name), "the label's own inspector names its river");
+    await commit(app, "labelVisibility", "gm");
+    assert.equal(river().label.visibility, "gm");
 });

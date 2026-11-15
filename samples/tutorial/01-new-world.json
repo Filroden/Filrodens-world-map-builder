@@ -10,6 +10,7 @@
   "world": null,
   "mapUnit": "km",
   "generatorStale": false,
+  "generatorRevision": 2,
   "generatorSettings": {
     "seed": "",
     "nameBase": "Human Generic",
@@ -21,9 +22,10 @@
     },
     "ages": [
       {
+        "id": "age-1",
         "era": "highMedieval",
         "strife": "troubled",
-        "event": null
+        "events": []
       }
     ],
     "output": {
@@ -49,7 +51,9 @@
   "upwindMargin": null,
   "parentRun": null,
   "infillPending": false,
+  "infillInputs": null,
   "riverRoutes": false,
+  "shoresPlaced": false,
   "terrainUpgradeDismissed": false,
   "springsBaked": true,
   "mapWidth": 2000,
@@ -776,17 +780,6 @@
       "name": "Place"
     },
     {
-      "id": "label-style-water",
-      "fontFamily": "EB Garamond",
-      "fontSize": 2.4,
-      "fillColor": "#E0F0FA",
-      "maxChars": 0,
-      "justify": "center",
-      "bold": false,
-      "italic": true,
-      "name": "Water"
-    },
-    {
       "id": "label-style-note",
       "fontFamily": "Kalam",
       "fontSize": 1.6,
@@ -862,6 +855,72 @@
       "bold": false,
       "italic": false,
       "name": "Settlement"
+    },
+    {
+      "id": "label-style-ocean-sea",
+      "fontFamily": "Cormorant Garamond",
+      "fontSize": 3.2,
+      "fillColor": "#E0F0FA",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true,
+      "name": "Ocean and sea"
+    },
+    {
+      "id": "label-style-gulf-bay-lake",
+      "fontFamily": "Cormorant Garamond",
+      "fontSize": 1.8,
+      "fillColor": "#E0F0FA",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true,
+      "name": "Gulf, bay and lake"
+    },
+    {
+      "id": "label-style-river",
+      "fontFamily": "Cormorant Garamond",
+      "fontSize": 1.3,
+      "fillColor": "#C4DDEE",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": true,
+      "italic": true,
+      "name": "River"
+    },
+    {
+      "id": "label-style-mountains",
+      "fontFamily": "Alegreya Sans SC",
+      "fontSize": 2.2,
+      "fillColor": "#A9CC8F",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": true,
+      "italic": false,
+      "name": "Mountains"
+    },
+    {
+      "id": "label-style-hills",
+      "fontFamily": "Alegreya Sans SC",
+      "fontSize": 1.7,
+      "fillColor": "#A9CC8F",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": false,
+      "name": "Hills and highlands"
+    },
+    {
+      "id": "label-style-land",
+      "fontFamily": "Alegreya SC",
+      "fontSize": 1.9,
+      "fillColor": "#CDD98C",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true,
+      "name": "Forest, desert and plains"
     }
   ],
   "customRegionStyles": [],
@@ -1512,4 +1571,4 @@
   "owners": {
     "mFIG6tmH96BRprtT": "7KcHAeynBw=="
   }
-}
+}

@@ -1,0 +1,33 @@
+{{!--
+    The rule editor on a culture's climate zones (see RuleEditorDialog.editZones): the culture's
+    rows, filled in once the dialogue is open, then the built-in land biomes for reference.
+--}}
+<div class="fwmb-rule-editor fwmb-scrollable">
+
+    <p class="fwmb-hint fwmb-rule-editor-intro">
+        {{localize "FILRODENSWMB.UI.CultureZonesIntro"}}
+    </p>
+
+    <div class="fwmb-rule-editor-legend">
+        <div class="fwmb-rule-editor-legend-item">
+            <span class="fwmb-rule-editor-swatch fwmb-rule-editor-swatch--active"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendActive"}}
+        </div>
+        <div class="fwmb-rule-editor-legend-item">
+            <span class="fwmb-rule-editor-swatch fwmb-is-locked"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendLocked"}}
+        </div>
+        <div class="fwmb-rule-editor-legend-item">{{localize "FILRODENSWMB.UI.CultureZonesSeaLevel"}}</div>
+    </div>
+
+    <div class="fwmb-rule-editor-section-heading">
+        <h3>{{localize "FILRODENSWMB.UI.CultureZones"}}</h3>
+        <span class="fwmb-rule-editor-count" id="fwmb-rule-custom-count"></span>
+    </div>
+    <div class="fwmb-rule-editor-flow" id="fwmb-rule-custom-rows"></div>
+
+    <div class="fwmb-rule-editor-section-heading">
+        <h3 class="fwmb-heading--muted">{{localize "FILRODENSWMB.UI.RuleEditorDefaultsHeading"}}</h3>
+        <span class="fwmb-rule-editor-count">{{localize "FILRODENSWMB.UI.CultureZonesDefaultsHint"}}</span>
+    </div>
+    <div class="fwmb-rule-editor-flow fwmb-is-locked" id="fwmb-rule-default-rows"></div>
+
+</div>

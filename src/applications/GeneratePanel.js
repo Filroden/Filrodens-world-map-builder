@@ -1,9 +1,26 @@
 import { FILRODENSWMB } from "../config.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { nameBaseNames } from "../generator/Names.js";
+import { AgeEditor } from "./AgeEditor.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../platform/index.js";
 import { Generation } from "./Generation.js";
+import { Inspector } from "./Inspector.js";
+import { MapStateManager } from "./MapStateManager.js";
+import { isKept } from "./Regeneration.js";
+import { RunInputs } from "./RunInputs.js";
+
+/** Why a run could not build on a settlement pin as its style asked (see Pipeline.markSeatPlaces), in the order the notices list them. */
+const SEAT_REASONS = Object.freeze(["water", "islet", "dry", "notCapital", "noPlace"]);
+/** Each reason's notice: its heading and its tooltip. */
+const SEAT_NOTICE = Object.freeze({
+    water: { heading: "FILRODENSWMB.UI.GenerateSeatWaterHeading", hint: "FILRODENSWMB.UI.GenerateSeatWaterHint" },
+    islet: { heading: "FILRODENSWMB.UI.GenerateSeatIsletHeading", hint: "FILRODENSWMB.UI.GenerateSeatIsletHint" },
+    dry: { heading: "FILRODENSWMB.UI.GenerateSeatDryHeading", hint: "FILRODENSWMB.UI.GenerateSeatDryHint" },
+    notCapital: { heading: "FILRODENSWMB.UI.GenerateSeatNotCapitalHeading", hint: "FILRODENSWMB.UI.GenerateSeatNotCapitalHint" },
+    noPlace: { heading: "FILRODENSWMB.UI.GenerateSeatNoPlaceHeading", hint: "FILRODENSWMB.UI.GenerateSeatNoPlaceHint" },
+});
 
 /**
  * The Generate tool's panel (templates/tools-generate.hbs): the settings a run is made with, kept
@@ -48,20 +65,30 @@ export class GeneratePanel {
     static context(app) {
         const settings = this.settings(app);
         const hasRun = !!app.modelRun;
-        const stale = hasRun && app.uiState.generatorStale === true;
+        // Out of date: what the run read has changed, the map's own routes, pins, regions and rivers included
+        const stale = RunInputs.stale(app);
+        // A map made with an older generator keeps its rules (in Travel and Fill in too) until it
+        // is generated again: one notice for every change since (see GeneratorRevision)
+        const older = GeneratorRevision.isOlder(app.uiState);
+        // On a regional map holding its parent's run, Fill in only: the settings carried from the
+        // parent are shown read only, for when the map leaves its parent (see Generation.heldByParent)
+        const held = Generation.heldByParent(app);
         return {
+            held,
             seed: settings.seed,
             mapSeed: String(app.uiState.mapSeed ?? ""),
             nameBases: this.nameBaseChoices(settings.nameBase),
             estimate: this.#estimate(app),
             stale,
-            // The Generation section's badge: Out of date once what the last run read has changed
-            runBadge: stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : null,
+            older,
+            // The Generation section's badge: Out of date once what the last run read has changed,
+            // else Older generator while the map keeps an older generator's rules
+            runBadge: held ? "FILRODENSWMB.UI.GenerateHeldBadge" : stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : older ? "FILRODENSWMB.UI.GenerateOlderRevision" : null,
             notices: this.#notices(app),
             hasRun,
             world: WORLD_FIELDS.map(({ key, label, hint }) => {
                 const range = FILRODENSWMB.GENERATOR.WORLD[key];
-                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP, resetTo: String(range.default) };
+                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP, resetTo: held ? null : String(range.default), disabled: held };
             }),
             output: {
                 duchies: settings.output.duchies,
@@ -74,7 +101,7 @@ export class GeneratePanel {
                 places: Object.entries(PLACE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.places.${field}`, label, checked: settings.output.places[field] })),
                 routes: Object.entries(ROUTE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.routes.${field}`, label, checked: settings.output.routes[field] })),
             },
-            ages: this.#ages(app, settings.ages),
+            ages: this.#ages(app, settings.ages, held),
             results: hasRun ? this.results(app) : null,
             // Remove generated content, while anything a run made is on the map
             canRemove: Object.values(Generation.counts(app)).some((count) => count > 0),
@@ -82,61 +109,61 @@ export class GeneratePanel {
     }
 
     /**
-     * The Ages section's rows, oldest first (the last is the present): each age's era, strife and
-     * culture event (offered only while the map has cultures), and whether it can move or go.
+     * The Ages section's rows, oldest first (the last is the present): each age's name, its era,
+     * strife and how many events in brief (see AgeEditor.summary), whether the inspector shows it,
+     * and whether it can move or go.
      */
-    static #ages(app, ages) {
-        const G = FILRODENSWMB.GENERATOR;
-        const cultures = app.uiState.cultures ?? [];
-        const choices = (presets, chosen, prefix) => Object.keys(presets).map((value) => ({ value, label: `${prefix}${value.charAt(0).toUpperCase()}${value.slice(1)}`, selected: value === chosen }));
-        const eventValue = (event) => (event ? `${event.kind}:${event.culture}` : "");
+    static #ages(app, ages, held = false) {
+        const shown = Inspector.current(app);
         return {
+            // Read only: each row still opens its age in the inspector, read only too
+            held,
             rows: ages.map((age, index) => ({
                 index,
-                label: platform.i18n.format(index === ages.length - 1 && ages.length > 1 ? "FILRODENSWMB.UI.GenerateAgePresent" : "FILRODENSWMB.UI.GenerateAgeNumber", { number: index + 1 }),
-                eras: choices(G.ERAS, age.era, "FILRODENSWMB.UI.GenerateEra"),
-                strifes: choices(G.STRIFES, age.strife, "FILRODENSWMB.UI.GenerateStrife"),
-                events: cultures.length
-                    ? [
-                          { value: "", label: platform.i18n.localize("FILRODENSWMB.UI.GenerateEventNone"), selected: !age.event },
-                          ...cultures.flatMap((culture) => G.AGES.EVENTS.map((kind) => {
-                              const value = `${kind}:${culture.id}`;
-                              return { value, label: platform.i18n.format(`FILRODENSWMB.UI.GenerateEvent${kind.charAt(0).toUpperCase()}${kind.slice(1)}`, { name: culture.name }), selected: value === eventValue(age.event) };
-                          })),
-                      ]
-                    : null,
-                // An event naming a culture since deleted is shown as none, and ignored by the run
+                id: age.id,
+                label: AgeEditor.label(ages, index),
+                summary: AgeEditor.summary(age),
+                selected: shown?.kind === AgeEditor.KIND && shown.ref.id === age.id,
                 canUp: index > 0,
                 canDown: index < ages.length - 1,
                 canRemove: ages.length > 1,
+                held,
             })),
-            canAdd: ages.length < G.MAX_AGES,
+            canAdd: !held && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES,
             count: ages.length,
         };
     }
 
     /**
-     * The Ages section's commands: add an age (a copy of the present, which it becomes), remove
-     * one, or move one earlier or later. Saved with the map; a run made before is out of date.
+     * The Ages section's commands: add an age (a copy of the present's era and strife, with no
+     * events, which becomes the present and opens in the inspector), remove one, or move one
+     * earlier or later; each one undo step. Saved with the map; a run made before is out of date.
      * @param {object} app
      * @param {"add"|"remove"|"up"|"down"} command
      * @param {number} [index]
      */
     static editAges(app, command, index = -1) {
+        if (Generation.heldByParent(app)) return;
         const settings = this.settings(app);
         const ages = settings.ages.map((age) => ({ ...age }));
-        if (command === "add" && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES) ages.push({ ...ages.at(-1), event: null });
-        else if (command === "remove" && ages.length > 1 && ages[index]) ages.splice(index, 1);
+        let opened = null;
+        if (command === "add" && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES) {
+            const { id: _id, ...present } = ages.at(-1);
+            ages.push({ ...present, events: [] });
+            opened = ages.length - 1;
+        } else if (command === "remove" && ages.length > 1 && ages[index]) ages.splice(index, 1);
         else if ((command === "up" || command === "down") && ages[index]) {
             const other = command === "up" ? index - 1 : index + 1;
             if (!ages[other]) return;
             [ages[index], ages[other]] = [ages[other], ages[index]];
         } else return;
+        MapStateManager.pushVectorState(app);
         settings.ages = ages;
         app.uiState.generatorSettings = panelSettings(settings);
         app.markGeneratorStale?.();
         app.markDirty();
         app.view?.render(["context"]);
+        if (opened !== null) AgeEditor.open(app, app.uiState.generatorSettings.ages[opened].id, { keepFocus: true });
     }
 
     /** The name styles, by their localised names, with the chosen one marked (also a culture's Name style). */
@@ -181,17 +208,20 @@ export class GeneratePanel {
      * The notices the panel shows: on a regional map holding content generated on the map it was
      * cut from, that in-fill is the way to refine it; on a map covering a small area, that it will
      * get few realms and only the larger settlements; and, after a run, each culture whose
-     * homelands were not all on land (some left out, and one placed for it when none was left).
-     * @returns {(string|{text: string})[]} Localisation keys, or text already put together.
+     * homelands were not all on land (some left out, and one placed for it when none was left),
+     * and the settlement pins it could not build on as their styles asked, grouped by why.
+     * @returns {(string|{text: string, hint?: string, items?: string[]})[]} Localisation keys, or
+     *     text already put together (with a group's tooltip and the names it lists).
      */
     static #notices(app) {
         const notices = [];
         const ownRun = app.modelRun?.run ?? null;
         const inherited = (item) => item?.generated && item.generated.run !== ownRun;
         const regions = (app.layerSets ?? []).flatMap((set) => set.levels ?? []).flatMap((level) => level.regions ?? []);
-        if (app.currentParentId && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
+        // Held by its parent, the map cannot be generated, so the notice has nothing to warn of
+        if (app.currentParentId && !Generation.heldByParent(app) && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
         const land = this.landModelCells(app.meshSession);
-        if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
+        if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS && !Generation.heldByParent(app)) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
         const ages = app.modelRun?.ages;
         if (ages && ages.run < ages.asked) notices.push({ text: platform.i18n.format("FILRODENSWMB.UI.GenerateAgesStoppedNotice", { run: ages.run, asked: ages.asked }) });
         for (const culture of app.modelRun?.cultures ?? []) {
@@ -199,7 +229,31 @@ export class GeneratePanel {
             const key = culture.homelandsAuto ? "FILRODENSWMB.UI.GenerateHomelandsPlacedNotice" : "FILRODENSWMB.UI.GenerateHomelandsLeftOutNotice";
             notices.push({ text: platform.i18n.format(key, { name: culture.name, count: culture.homelandsLeftOut }) });
         }
+        notices.push(...this.#seatNotices(app));
         return notices;
+    }
+
+    /**
+     * The settlement pins the last run could not build on as their styles asked, one notice per
+     * reason (in SEAT_REASONS' order): a heading saying why, a tooltip with the detail, and the
+     * pins' names in alphabetical order. Pins deleted since are left out, and a reason with none
+     * left gives no notice.
+     */
+    static #seatNotices(app) {
+        const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
+        const unnamed = platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed");
+        const names = new Map(SEAT_REASONS.map((reason) => [reason, []]));
+        for (const { pin, reason } of app.modelRun?.seats?.unhonoured ?? []) {
+            if (byId.has(pin) && names.has(reason)) names.get(reason).push(byId.get(pin).name || unnamed);
+        }
+        return SEAT_REASONS.filter((reason) => names.get(reason).length).map((reason) => {
+            const { heading, hint } = SEAT_NOTICE[reason];
+            return {
+                text: platform.i18n.localize(heading),
+                hint: platform.i18n.localize(hint),
+                items: names.get(reason).sort((a, b) => a.localeCompare(b)),
+            };
+        });
     }
 
     /**
@@ -248,6 +302,9 @@ export class GeneratePanel {
             ["FILRODENSWMB.UI.GenerateResultOldRoads", count(routes, (route) => route.generated.oldRoad === true)],
         ];
         if (former.some(([, value]) => value > 0)) rows.push(...former);
+        // The settlement pins it built on, when there were any
+        const seats = (app.mapPins ?? []).filter((pin) => pin.modelled?.run === run || (pin.generated?.run === run && isKept(pin))).length;
+        if (seats > 0) rows.push(["FILRODENSWMB.UI.GenerateResultSeats", seats]);
         const population = Number(app.modelRun?.stats?.population) || 0;
         return {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),
@@ -294,16 +351,14 @@ export class GeneratePanel {
         if (!name.startsWith(FIELD_PREFIX)) return false;
         const isText = target.type === "text";
         if ((target.type === "range" || isText) && event.type === "input") return true;
+        // The settings carried from the parent are read only while the map holds its parent's run,
+        // bar the default name style, which names what Fill in and Name all add there too
+        if (Generation.heldByParent(app) && name !== `${FIELD_PREFIX}nameBase`) return true;
         const path = name.slice(FIELD_PREFIX.length).split(".");
         const settings = this.settings(app);
         let value = target.value;
         if (target.type === "checkbox") value = target.checked;
         else if (target.type === "range" || target.type === "number") value = Number(target.value);
-        // An age's event: "kind:culture id", or none
-        if (path[0] === "ages" && path[2] === "event") {
-            const [kind, culture] = String(value).split(":");
-            value = kind && culture ? { kind, culture } : null;
-        }
         setPath(settings, path, value);
         app.uiState.generatorSettings = panelSettings(settings);
         app.markDirty();
@@ -316,6 +371,7 @@ export class GeneratePanel {
 
     /** Randomise: a new seed for the next run. */
     static randomizeSeed(app) {
+        if (Generation.heldByParent(app)) return;
         this.settings(app).seed = platform.utils.randomID();
         app.markDirty();
         app.view?.render(["context"]);

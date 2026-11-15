@@ -42,7 +42,7 @@ test("the rail holds the stages in order (the optional one last), then the occas
         STAGES.map((stage) => [stage.id, stage.tools]),
         [
             ["shape", ["scene", "terrain", "biomes", "features"]],
-            ["populate", ["generate", "regions", "infrastructure", "labels"]],
+            ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
             ["finish", ["cartography", "export"]],
             ["explore", ["history", "travel"]],
         ],

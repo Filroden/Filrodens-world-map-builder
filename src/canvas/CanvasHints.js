@@ -32,6 +32,8 @@ export class CanvasHints {
      *   faults, land masks, decorations).
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
      * @param {boolean} [state.pickingHomeland]  Whether the next click adds a culture's homeland (see CultureMarkers).
+     * @param {boolean} [state.pickingEventPlace]  Whether the next click sets an age's event's place (see AgeEventRows).
+     * @param {string|null} [state.influenceMode]  The Influences tool's mode (see InfluencePainter).
      * @param {boolean} [state.travelPicking]  Whether a click sets the Travel tool's start (see TravelView).
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
@@ -43,6 +45,7 @@ export class CanvasHints {
         const held = CanvasHints.#heldContext(state.heldItem);
         if (held) return held;
         if (state.pickingHomeland) return "homeland";
+        if (state.pickingEventPlace) return "eventPlace";
         if (state.travelPicking) return "travel";
         if (state.isReferenceMode) return "reference";
         if (state.isCropMode) return "crop";
@@ -69,6 +72,8 @@ export class CanvasHints {
                 return state.infraMode === "route" ? CanvasHints.#modeContext("route", state.routeMode, "draw") : CanvasHints.#modeContext("pin", state.pickMode, "place");
             case "regions":
                 return CanvasHints.#modeContext("region", state.regionMode, "select");
+            case "influences":
+                return CanvasHints.#modeContext("influence", state.influenceMode, "raise");
             case "labels":
                 return CanvasHints.#modeContext("label", state.pickMode, "place");
             case "cartography":

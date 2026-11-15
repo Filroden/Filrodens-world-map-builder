@@ -25,7 +25,9 @@ import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getP
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
+import { ShoreRelay } from "./ShoreRelay.js";
 import { RunCells } from "./RunCells.js";
+import { RunInputs } from "./RunInputs.js";
 import { Infilling } from "./Infilling.js";
 import { RandomNames } from "./RandomNames.js";
 import { FeatureNames } from "./FeatureNames.js";
@@ -54,8 +56,12 @@ import { StyleLists } from "./StyleLists.js";
 import { CultureEditor } from "./CultureEditor.js";
 import { BiomeEditor } from "./BiomeEditor.js";
 import { CultureLists } from "./CultureLists.js";
+import { AgeEditor } from "./AgeEditor.js";
+import { AgeEventRows } from "./AgeEventRows.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
+import { InfluencePainter } from "./InfluencePainter.js";
+import { InfluenceView } from "./InfluenceView.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
@@ -65,10 +71,12 @@ import { PinEditor } from "./PinEditor.js";
 import { LabelEditor } from "./LabelEditor.js";
 import { PickTool } from "./PickTool.js";
 import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
+import { RiverLabels } from "./RiverLabels.js";
 import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
 import { GeneratePanel } from "./GeneratePanel.js";
 import { ListQuery } from "./ListQuery.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
@@ -219,11 +227,18 @@ export class MapStudio {
         massEditLevel(_e, t)        { this.#massEditLevel(RegionPanel.levelIdOf(t)); },
         selectRegion(e, t)          { if (!MapStudio.#fromRowControl(e, t)) this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
+        moveRegionToPolitical(_e, t) { const [levelId, regionId] = RegionPanel.regionIdsOf(t); RegionPanel.moveToPolitical(this, levelId, [regionId]); },
+        changeRegionRank(_e, t)     { RegionPanel.changeRank(this, ...RegionPanel.regionIdsOf(t)); },
+        moveLevelToPolitical(_e, t) { RegionPanel.moveToPolitical(this, RegionPanel.levelIdOf(t), null); },
+        // --- INFLUENCES (see InfluenceView, InfluencePainter) ---
+        chooseInfluenceKind(_e, t)  { InfluenceView.chooseKind(this, t.dataset.kind); },
+        clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message)); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
         addAge()                    { GeneratePanel.editAges(this, "add"); },
+        openAge(e, t)               { if (!MapStudio.#fromRowControl(e, t)) AgeEditor.open(this, t.dataset.id, MapStudio.#FROM_LIST); },
         removeAge(_e, t)            { GeneratePanel.editAges(this, "remove", Number(t.dataset.age)); },
         moveAgeUp(_e, t)            { GeneratePanel.editAges(this, "up", Number(t.dataset.age)); },
         moveAgeDown(_e, t)          { GeneratePanel.editAges(this, "down", Number(t.dataset.age)); },
@@ -276,6 +291,7 @@ export class MapStudio {
         setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
         setRegionMode(_e, t)            { RegionPainter.setMode(this, t); this.#modeChosen(RegionPainter.mode(this) !== "select"); },
+        setInfluenceMode(_e, t)         { InfluencePainter.setMode(this, t); this.#modeChosen(true); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
         setRouteMode(_e, t)             { RouteTool.setMode(this, t); this.#modeChosen(RouteTool.mode(this) !== "select"); },
         setInfrastructureIcon(_e, t)    { this.#choosePinIcon(t.dataset.icon); },
@@ -297,6 +313,8 @@ export class MapStudio {
         chooseHistoryAge(_e, t)         { this.#chooseHistoryAge(Number(t.dataset.age)); },
         focusHistoryRealm(_e, t)        { HistoryView.focusRealm(this, Number(t.dataset.realm)); },
         chooseTravelMode(_e, t)         { TravelView.chooseMode(this, t.dataset.mode); },
+        chooseTravelSeason(_e, t)       { TravelView.chooseSeason(this, t.dataset.season); },
+        toggleTravelWay()               { TravelView.toggleWay(this); },
         resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
         clearTravelStart()              { TravelView.clearStart(this); },
         fillIn()                        { Infilling.run(this); },
@@ -487,8 +505,8 @@ export class MapStudio {
         // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
         // same reason: which items are checked for a batch edit has nothing to do with the map
         // itself, and should reset (not persist) whenever the Studio app is reopened.
-        this.massEditMode = { pin: false, route: false, region: false, label: false };
-        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
+        this.massEditMode = { pin: false, route: false, region: false, label: false, river: false };
+        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set(), river: new Set() };
         // The level whose regions Mass Edit is choosing from (see #massEditLevel)
         this.massEditLevelId = null;
         // The Regions lists: the region chosen in each level's list, the levels whose Unassigned row
@@ -571,8 +589,12 @@ export class MapStudio {
         this.parentRun = null;
         // A regional map asked to be filled in when it was cut, until it has been (see Infilling)
         this.infillPending = false;
+        // What the last fill-in read, for its Out of date (see Infilling.inputs); null with none
+        this.infillInputs = null;
         // Whether a regional map's inherited river routes have been laid over its own rivers (see RiverRelay)
         this.riverRoutesLaid = false;
+        // Whether a regional map's inherited ports and river towns stand on its own shore (see ShoreRelay)
+        this.shoresPlaced = false;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -969,6 +991,8 @@ export class MapStudio {
                 if (!canCrop) return [];
                 return [group(ui("ModesMask"), "scene", [mode("setBrushTool", "tool", "crop", ui("ModeCrop"), cropTip, "crop", true)])];
             }
+            case "influences":
+                return [group(ui("ModesInfluence"), "influences", InfluencePainter.toolbarContext(this).modes.map((entry) => mode("setInfluenceMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
             case "regions":
                 return [group(ui("ModesRegion"), "regions", RegionPainter.toolbarContext(this).modes.map((entry) => mode("setRegionMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
             case "infrastructure": {
@@ -1224,6 +1248,8 @@ export class MapStudio {
 
         context.tectonicFaults = [...(this.tectonicFaults || [])].sort(alphaSort);
         context.manualRivers = [...(this.manualRivers || [])].sort(alphaSort);
+        // The custom rivers Mass Edit has chosen, by id (see tools-features.hbs)
+        context.riverSelection = Object.fromEntries([...this.massEditSelection.river].map((id) => [id, true]));
 
         context.uiState = this.uiState;
         context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
@@ -1271,6 +1297,7 @@ export class MapStudio {
         context.pinStyles = PinStyles.choices(this, this.uiState.activePinStyle);
 
         if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
+        if (this.activeTool === "influences") context.influenceToolbar = InfluencePainter.toolbarContext(this);
         if (this.activeTool === "infrastructure") context.routeToolbar = RouteTool.toolbarContext(this);
 
         context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
@@ -1298,6 +1325,7 @@ export class MapStudio {
                 route: this.massEditSelection.route.size,
                 region: this.massEditSelection.region.size,
                 label: this.massEditSelection.label.size,
+                river: this.massEditSelection.river.size,
             };
             context.massEditBlocked = Object.fromEntries(Object.keys(this.massEditMode).map((type) => [type, this.#isMassEditBlocked(type)]));
 
@@ -1326,6 +1354,7 @@ export class MapStudio {
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
             if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
+            if (this.activeTool === "influences") context.influences = InfluenceView.context(this);
             if (this.activeTool === "generate") {
                 context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this) };
                 context.cultureList = CultureLists.context(this);
@@ -1389,7 +1418,9 @@ export class MapStudio {
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
         RouteTool.updateOverlays(this);
-        CultureMarkers.update(this);
+        // An event's place is picked only while the Generate tool is open
+        if (this.activeTool !== "generate") AgeEventRows.stopPick(this);
+        CultureMarkers.update(this, AgeEventRows.markers(this));
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
@@ -1412,7 +1443,7 @@ export class MapStudio {
     /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
     static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
     static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
-    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", river: "FILRODENSWMB.UI.LabelFilter_river", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
 
     /**
      * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
@@ -1465,7 +1496,7 @@ export class MapStudio {
     #labelRows(selected) {
         const owner = (key) => platform.i18n.localize(key);
         const named = (item) => !!item.name;
-        const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
+        const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute"), river: owner("FILRODENSWMB.UI.InspectorOwnerRiver") };
         // A name the map had no room for at its last draw is marked, and found with the No room filter
         const withoutRoom = this.canvasEngine?.labelsWithoutRoom ?? new Set();
         const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: [...(row.also ?? []), "noRoom"] } : row);
@@ -1476,6 +1507,8 @@ export class MapStudio {
             ...this.regionLevels.flatMap((level) =>
                 level.regions.filter(named).map((region) => ({ id: region.id, name: region.name, type: "region", kind: "region", generated: !!region.generated, labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
             ),
+            // Custom rivers' names (see RiverLabels), hidden until shown for a river drawn before they had labels
+            ...(this.manualRivers || []).filter(named).map((river) => ({ id: river.id, name: river.name, type: "river", kind: "river", labelKey: "labelriver", meta: ownerMeta.river, visibility: RiverLabels.label(this, river).visibility })),
         ].map(marked);
     }
 
@@ -1650,14 +1683,19 @@ export class MapStudio {
             event.preventDefault();
             return;
         }
+        // The Influences tool takes Escape for a stroke left hanging
+        if (this.activeTool === "influences" && InfluencePainter.handleKey(this, event)) {
+            event.preventDefault();
+            return;
+        }
         // The Routes tool takes Enter, Backspace and Escape while a route is placed or picked
         if (this.#isRouteMode() && RouteTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
-        // A homeland pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
+        // A homeland or event place pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
         // inspector on what it picked
-        if (CultureMarkers.handleKey(this, event) || PickTool.handleKey(this, event)) {
+        if (CultureMarkers.handleKey(this, event) || AgeEventRows.handleKey(this, event) || PickTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -2331,6 +2369,7 @@ export class MapStudio {
         // the Infrastructure tool is in Route mode, it places and edits routes (see RouteTool)
         this.canvasEngine.pointerToolProvider = () => {
             if (this.activeTool === "regions") return RegionPainter.tool(this);
+            if (this.activeTool === "influences") return InfluencePainter.tool(this);
             if (this.#isRouteMode()) return RouteTool.tool(this);
             return PickTool.tool(this);
         };
@@ -2546,12 +2585,14 @@ export class MapStudio {
             featureMode: this.uiState.activeFeatureMode,
             infraMode: this.uiState.activeInfraMode,
             regionMode: RegionPainter.mode(this),
+            influenceMode: InfluencePainter.mode(this),
             routeMode: RouteTool.mode(this),
             pickMode: PickTool.mode(this),
             selecting: PickTool.selecting(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
             pickingHomeland: CultureMarkers.picking(this),
+            pickingEventPlace: AgeEventRows.picking(this),
             travelPicking: TravelView.picking(this),
         });
 
@@ -2788,7 +2829,7 @@ export class MapStudio {
         }
 
         if (this.activeTool === "labels") {
-            this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isEdit, this.meshSession);
+            this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isEdit, this.meshSession, RiverLabels.items(this));
         }
 
         if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
@@ -3268,13 +3309,21 @@ export class MapStudio {
                 if (river) river.points.push(finalPos);
             } else {
                 this.activeRiverId = platform.utils.randomID();
-                this.manualRivers.push({
+                const river = {
                     id: this.activeRiverId,
-                    name: `Manual River ${this.manualRivers.length + 1}`,
+                    name: "",
                     points: [finalPos],
                     width: this.uiState.riverWidth,
                     visibility: "all",
-                });
+                    // Its name is drawn along it (see RiverLabels), in the River label style when the map has it
+                    label: RiverLabels.newLabel(this),
+                };
+                // A name in the language of the people living there, as Random name gives
+                // (its number in the list only when none can be made)
+                river.name = RandomNames.suggest(this, "river", river) || platform.i18n.format("FILRODENSWMB.UI.RiverDefaultName", { number: this.manualRivers.length + 1 });
+                river.nameSource = "random";
+                river.nameRoll = 0;
+                this.manualRivers.push(river);
                 RiverEditor.open(this, this.activeRiverId, { created: true });
             }
             activeEntity = this.manualRivers.find((r) => r.id === this.activeRiverId);
@@ -3717,7 +3766,7 @@ export class MapStudio {
 
         // 5. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession);
+        this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession, RiverLabels.items(this));
 
         // 6. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -4037,12 +4086,17 @@ export class MapStudio {
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
         this.uiState.generatorStale = payload.generatorStale === true;
+        // The generator rules the map follows; a map saved before they were recorded reads as the
+        // oldest (see GeneratorRevision)
+        this.uiState.generatorRevision = GeneratorRevision.of(payload);
         this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
         this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
         this.upwindMargin = payload.upwindMargin ?? null;
         this.parentRun = payload.parentRun ?? null;
         this.infillPending = payload.infillPending === true;
+        this.infillInputs = payload.infillInputs ?? null;
         this.riverRoutesLaid = payload.riverRoutes === true;
+        this.shoresPlaced = payload.shoresPlaced === true;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -4570,12 +4624,15 @@ export class MapStudio {
             world: this.uiState.world,
             mapUnit: cleanUnit(this.uiState.mapUnit),
             generatorStale: this.uiState.generatorStale === true,
+            generatorRevision: GeneratorRevision.of(this.uiState),
             generatorSettings: panelSettings(this.uiState.generatorSettings),
             cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
             upwindMargin: this.upwindMargin ?? null,
             parentRun: this.parentRun ?? null,
             infillPending: this.infillPending === true,
+            infillInputs: this.infillInputs ?? null,
             riverRoutes: this.riverRoutesLaid === true,
+            shoresPlaced: this.shoresPlaced === true,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
             mapWidth: this.mapWidth,
@@ -4701,6 +4758,20 @@ export class MapStudio {
 
         const overlay = this.root?.querySelector(".fwmb-processing-overlay");
         if (overlay) overlay.classList.add("fwmb-hidden");
+        this.#showRunInputs();
+    }
+
+    /**
+     * Brings what says a run is out of date up to date once a refresh has finished. The rivers are
+     * traced again in the refresh, after the edit or undo that asked for it has already drawn the
+     * Generate panel and the legends, and a run is out of date by its rivers (see RunInputs), so
+     * without this an undo that restores them would leave Out of date showing until the panel is
+     * next drawn.
+     */
+    #showRunInputs() {
+        if (!this.modelRun) return;
+        if (this.activeTool === "generate") this.view?.render(["context"]);
+        ThematicView.renderLegend(this);
     }
 
     /**
@@ -4714,7 +4785,10 @@ export class MapStudio {
      * @param {Function} generate - The debounced generator to run when updates are live.
      */
     requestTerrainUpdate(bounds = null, generate = this.debouncedCanvasTerrain) {
-        this.#markGeneratorStale();
+        // Every change routed here is to the drawn features (faults, custom rivers, land masks, river
+        // sources). A run that keeps their fingerprint shows out of date by it, so undoing the change
+        // clears it again; an older run needs the lasting flag
+        this.#markGeneratorStale({ lasting: !RunInputs.tracksFeatures(this) });
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
             generate();
@@ -4733,10 +4807,16 @@ export class MapStudio {
     /**
      * Marks the last generator run out of date (the Generate panel says so) once what it read has
      * changed. A map without a run has nothing to be out of date.
+     * @param {{lasting?: boolean}} [options] - lasting: false when the run's fingerprint of the
+     *     map's own items already shows the change (see RunInputs), so only Travel's input moves.
      */
-    #markGeneratorStale() {
+    #markGeneratorStale({ lasting = true } = {}) {
         // The Travel tool's network is built from the same input (see TravelNetwork)
         this.travelInputs = (this.travelInputs ?? 0) + 1;
+        if (!lasting) {
+            if (this.activeTool === "generate") this.view?.render(["context"]);
+            return;
+        }
         if (!this.modelRun || this.uiState.generatorStale) return;
         this.uiState.generatorStale = true;
         if (this.activeTool === "generate") this.view?.render(["context"]);
@@ -4832,7 +4912,7 @@ export class MapStudio {
 
         // Painted cells: their bounds, labelled as a region edit
         const painted = VectorHistory.patchBounds(this, entry);
-        if (painted) return { bounds: this.#calculatePointBounds([{ x: painted.minX, y: painted.minY }, { x: painted.maxX, y: painted.maxY }], VECTOR_PREVIEW_PADDING), label: this.#getActionLabel("layerSets") };
+        if (painted) return { bounds: this.#calculatePointBounds([{ x: painted.minX, y: painted.minY }, { x: painted.maxX, y: painted.maxY }], VECTOR_PREVIEW_PADDING), label: this.#getActionLabel(VectorHistory.touchesInfluences(entry) ? "influences" : "layerSets") };
 
         const targetSnapshot = VectorHistory.snapshotOf(entry);
         if (!targetSnapshot) return null;
@@ -4946,6 +5026,7 @@ export class MapStudio {
             manualRivers: "FILRODENSWMB.UI.ActionCustomRiver",
             routes: "FILRODENSWMB.UI.ActionRoute",
             layerSets: "FILRODENSWMB.UI.ActionRegion",
+            influences: "FILRODENSWMB.UI.ActionInfluence",
             landMasks: "FILRODENSWMB.UI.ActionLandMask",
             mapLabels: "FILRODENSWMB.UI.ActionLabel",
             mapDecorations: "FILRODENSWMB.UI.ActionDecoration",
@@ -5256,7 +5337,9 @@ export class MapStudio {
         this.upwindMargin = null;
         this.parentRun = null;
         this.infillPending = false;
+        this.infillInputs = null;
         this.riverRoutesLaid = false;
+        this.shoresPlaced = false;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -5383,6 +5466,7 @@ export class MapStudio {
             if (config.activeKey) this[config.activeKey] = null;
         }
         RegionPainter.cancel(this);
+        InfluencePainter.cancel(this);
         RouteTool.cancel(this);
         RouteTool.updateOverlays(this);
 
@@ -6081,6 +6165,13 @@ export class MapStudio {
                 const { laid, removed } = RiverRelay.run(this);
                 if (laid + removed) this._repaintVectors();
             }
+            // Its inherited ports onto its own coast, and river towns beside its own rivers, once
+            // (kept with its next save), before a fill-in reads them
+            if (ShoreRelay.needed(this)) {
+                this.shoresPlaced = true;
+                const { ports, rivers } = ShoreRelay.run(this);
+                if (ports + rivers) this._repaintVectors();
+            }
             // Filled in now when asked for as it was cut; the map then has changes to save
             if (this.infillPending) {
                 this.infillPending = false;
@@ -6739,6 +6830,8 @@ export class MapStudio {
                     .map((row) => row.id);
             case "region":
                 return RegionPanel.listedRegionIds(this, this.massEditLevelId);
+            case "river":
+                return (this.manualRivers ?? []).map((river) => river.id);
             default:
                 return [];
         }
@@ -6836,6 +6929,8 @@ export class MapStudio {
             if (type === "custom") {
                 obj.visibility = this.#cycleVisibilityState(obj.visibility);
             } else {
+                // A custom river with no label yet (drawn before rivers had labels) has its name hidden
+                if (!obj.label && type === "river") obj.label = { visibility: "none" };
                 if (!obj.label) obj.label = { visibility: "all" };
                 obj.label.visibility = this.#cycleVisibilityState(obj.label.visibility);
             }
@@ -6854,6 +6949,7 @@ export class MapStudio {
             pin: this.mapPins,
             route: this.mapRoutes,
             fault: this.tectonicFaults,
+            river: this.manualRivers,
         };
 
         if (collections[type]) {

@@ -52,7 +52,7 @@ export function syntheticMap() {
     }
     const buffers = { elevation, moisture, temperature, waterMask: new Float32Array(size) };
     const rivers = river(elevation);
-    const makePayload = (settings = {}) => buildGeneratorPayload({ mesh, buffers, seaLevel: SEA_LEVEL, kmPerPx: KM_PER_PX, riverData: rivers, mapSeed: "SYNTH", settings });
+    const makePayload = (settings = {}, seats = []) => buildGeneratorPayload({ mesh, buffers, seaLevel: SEA_LEVEL, kmPerPx: KM_PER_PX, riverData: rivers, mapSeed: "SYNTH", settings, seats });
     cached = { mesh, buffers, rivers, makePayload };
     return cached;
 }

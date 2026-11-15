@@ -122,7 +122,7 @@ function change(form, name, value) {
 test("every inspector field of a kind is in its mass edit, or listed as each item's own", () => {
     const names = (file) => [...readFileSync(join(ROOT, "templates/parts", file), "utf8").matchAll(/name="([a-zA-Z]+)"/g)].map((match) => match[1]);
     const label = [...names("label-fields.hbs"), "labelBold", "labelItalic"];
-    const inspectors = { pin: [...names("inspector-pin.hbs"), ...label], route: [...names("inspector-route.hbs"), ...label], region: [...names("inspector-region.hbs"), ...label], label: [...names("inspector-label.hbs"), ...label] };
+    const inspectors = { pin: [...names("inspector-pin.hbs"), ...label], route: [...names("inspector-route.hbs"), ...label], region: [...names("inspector-region.hbs"), ...label], label: [...names("inspector-label.hbs"), ...label], river: [...names("inspector-river.hbs"), ...label] };
     for (const [type, fields] of Object.entries(inspectors)) {
         const kind = FieldSpecs.KINDS[type];
         const offered = new Set([...kind.fields.flatMap((field) => field.inspector), ...kind.perItem]);
@@ -261,4 +261,66 @@ test("No fill on every region, then cleared: the regions get their colours from 
     await MassEdit.open(app, "region");
     assert.equal(shown, "#aa0000", "the colour box shows the first region's colour from before");
     assert.deepEqual(app.regionLevels[0].regions.map((region) => region.fillColor), ["#aa0000", "#aa0000"], "clearing No fill applies it to all, as one colour for the items chosen");
+});
+
+test("Place automatically: offered once any chosen label was moved, it hands every chosen label back to the map's placement, their looks kept, as one undo step", async () => {
+    const app = studio();
+    dialogue.drive = (form) => assert.equal(row(form, "label.placement"), null, "no label moved, no Position row");
+    await MassEdit.open(app, "route");
+
+    const again = studio();
+    again.mapRoutes[0].label = { ...again.mapRoutes[0].label, x: 50, y: 60, rotation: 20 };
+    let offered = null;
+    dialogue.drive = (form) => {
+        offered = row(form, "label.placement")?.textContent ?? null;
+        change(form, "label.placement", "auto");
+        change(form, "label.fontSize", "2");
+    };
+    assert.equal(await MassEdit.open(again, "route"), true);
+    assert.match(offered, /MassEditLabelPosition \{"count":"1"\}/);
+    const [one, two] = again.mapRoutes;
+    assert.ok(!("x" in one.label) && !("y" in one.label), "its own position gone");
+    assert.equal(one.label.rotation, 20, "its turn kept");
+    assert.deepEqual([one.label.fontSize, two.label.fontSize], [2, 2], "the other label changes still apply");
+    assert.equal(again.pinHistory.length, 1);
+    VectorHistory.step(again, true);
+    assert.deepEqual([again.mapRoutes[0].label.x, again.mapRoutes[0].label.y], [50, 60], "one undo step");
+
+    // Left as is, the moved label stays where it was put
+    const kept = studio();
+    kept.mapRoutes[0].label = { ...kept.mapRoutes[0].label, x: 50, y: 60 };
+    dialogue.drive = (form) => change(form, "label.fontSize", "2");
+    await MassEdit.open(kept, "route");
+    assert.deepEqual([kept.mapRoutes[0].label.x, kept.mapRoutes[0].label.y], [50, 60]);
+});
+
+test("custom rivers: their width carves them again, and their names start hidden unless shown; Place automatically for a moved one", async () => {
+    const app = studio();
+    let terrain = 0;
+    app.requestTerrainUpdate = () => terrain++;
+    app.manualRivers = [
+        { id: "old", name: "Old", width: 4, points: [{ x: 0, y: 0 }, { x: 50, y: 0 }] },
+        { id: "new", name: "New", width: 2, points: [{ x: 0, y: 10 }, { x: 50, y: 10 }], label: { visibility: "all", x: 30, y: 40 } },
+    ];
+    app.massEditMode.river = true;
+    app.massEditSelection.river = new Set(["old", "new"]);
+    dialogue.drive = (form) => {
+        assert.ok(row(form, "label.placement"), "one of their labels was moved");
+        change(form, "label.fontSize", "3");
+        change(form, "label.placement", "auto");
+    };
+    assert.equal(await MassEdit.open(app, "river"), true);
+    const [old, made] = app.manualRivers;
+    assert.equal(old.label.visibility, "none", "a river with no label yet keeps its name hidden");
+    assert.deepEqual([old.label.fontSize, made.label.fontSize], [3, 3]);
+    assert.equal(made.label.visibility, "all");
+    assert.ok(!("x" in made.label), "the moved one placed again");
+    assert.equal(terrain, 0, "a label carves nothing");
+
+    app.massEditMode.river = true;
+    app.massEditSelection.river = new Set(["old", "new"]);
+    dialogue.drive = (form) => change(form, "item.width", "8");
+    await MassEdit.open(app, "river");
+    assert.deepEqual(app.manualRivers.map((river) => river.width), [8, 8]);
+    assert.equal(terrain, 1, "a new width carves them again");
 });

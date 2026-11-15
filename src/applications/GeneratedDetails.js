@@ -29,13 +29,14 @@ const TIER_NAMES = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [styl
 
 export class GeneratedDetails {
     /**
-     * A generated pin's rows, or null for a pin no run made.
+     * A generated pin's rows, or a hand-placed settlement pin's from what the last run gave it as a
+     * seat (`modelled`, see Generation.seats); null for a pin no run made or built on.
      * @param {object} app
      * @param {object} pin
      * @returns {{label: string, value: string}[]|null}
      */
     static forPin(app, pin) {
-        const generated = pin.generated;
+        const generated = pin.generated ?? pin.modelled;
         if (!generated) return null;
         const tierName = TIER_NAMES.get(generated.tier);
         return this.#rows([
@@ -47,7 +48,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedFormerCapital", Number.isInteger(generated.formerCapital) ? platform.i18n.format("FILRODENSWMB.UI.GeneratedInAge", { age: generated.formerCapital }) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
             ["FILRODENSWMB.UI.GeneratedNameShownFrom", this.#nameLevel(app, pin)],
-            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
+            ["FILRODENSWMB.UI.GeneratedNextRun", pin.generated ? this.#fate(pin) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptSeat")],
         ]);
     }
 
@@ -59,14 +60,16 @@ export class GeneratedDetails {
     }
 
     /**
-     * A generated region's rows, or null for a region no run made: its rank (realms), population,
-     * the duchies and counties beneath it, and the detail level it is shown from.
+     * A generated region's rows, or a drawn region's from what the last run made of it (`modelled`,
+     * see Regeneration.merge); null for a region no run made or built round: its rank (realms), population,
+     * a realm's ruling culture (its capital's people) and its cultures, the duchies and counties
+     * beneath it, and the detail level it is shown from.
      * @param {object} app
      * @param {object} region
      * @returns {{label: string, value: string}[]|null}
      */
     static forRegion(app, region) {
-        const generated = region.generated;
+        const generated = region.generated ?? region.modelled;
         if (!generated) return null;
         const place = this.#placeOf(app, region);
         const below = place ? this.#beneath(place.set, place.depth, region.key) : [];
@@ -74,11 +77,12 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedTitle", place ? this.#titleOf(region, place) : null],
             ["FILRODENSWMB.UI.GeneratedRank", RANKS[generated.tier] ? platform.i18n.localize(RANKS[generated.tier]) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
+            ["FILRODENSWMB.UI.GeneratedRulingCulture", this.cultureName(app, generated.rulingCulture)],
             [generated.mix ? "FILRODENSWMB.UI.GeneratedCultures" : "FILRODENSWMB.UI.GeneratedCulture", this.#cultures(app, generated)],
             ["FILRODENSWMB.UI.GeneratedDuchies", place?.depth === REALMS ? this.#count(below[0]) : null],
             ["FILRODENSWMB.UI.GeneratedCounties", place ? this.#count(below[COUNTIES - place.depth - 1]) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", place ? this.#levelName(DetailLevel.ofLevel(place.set, place.level)) : null],
-            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(region, place)],
+            ["FILRODENSWMB.UI.GeneratedNextRun", region.generated ? this.#fate(region, place) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRegion")],
         ]);
     }
 
@@ -145,7 +149,7 @@ export class GeneratedDetails {
      * is drawn, its level's look showing its rank. An independent duchy takes the duchy title.
      */
     static #titleOf(region, place) {
-        const independent = place.depth === REALMS && region.generated?.tier === "independent";
+        const independent = place.depth === REALMS && (region.generated ?? region.modelled)?.tier === "independent";
         const template = (independent ? place.set.levels[REALMS + 1]?.titleTemplate : null) ?? place.level.titleTemplate;
         return template?.includes("{name}") ? template.replaceAll("{name}", region.name) : null;
     }

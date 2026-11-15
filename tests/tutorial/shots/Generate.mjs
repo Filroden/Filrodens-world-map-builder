@@ -13,9 +13,13 @@ export default [
     {
         slug: "generate-ages",
         start: MAP.generated,
-        caption: "The Ages section: an early medieval age of peace, then the present, troubled, with the Hillfolk invading.",
-        action: [{ do: "openSection", section: "generateAges" }],
-        screenshot: { region: { selector: 'details.fwmb-section[data-section="generateAges"]' }, pad: 8 },
+        caption: "The Ages list: an early medieval age of peace, then the present, troubled, open in the inspector with the Hillfolk invading.",
+        action: [
+            { do: "openSection", section: "generateAges" },
+            { do: "click", target: '.fwmb-age-row:has-text("the present")' },
+        ],
+        screenshot: { region: "studio" },
+        after: [{ do: "click", target: "dialog.fwmb-inspector[open] .fwmb-overlay-close" }],
     },
     {
         slug: "generate-name-all",

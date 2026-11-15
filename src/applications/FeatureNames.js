@@ -8,6 +8,7 @@ import { platform } from "../platform/index.js";
 import { FieldSpecs } from "./FieldSpecs.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { RandomNames } from "./RandomNames.js";
+import { RiverLabels } from "./RiverLabels.js";
 
 const { FEATURE_NAMES } = FILRODENSWMB;
 
@@ -30,7 +31,9 @@ const reports = new WeakMap();
  * - a label the reader moved, turned, resized, renamed or restyled is edited, and kept as it is;
  * - a label whose feature is no longer found stays, and is counted in the report;
  * - a feature not yet labelled is labelled, unless a label in one of the geographic styles
- *   already lies inside it (the reader's own name for it).
+ *   already lies inside it (the reader's own name for it);
+ * - a river a custom river names (its name shown along it; see RiverLabels) is left to it: it is
+ *   not labelled, and a label an earlier run gave it is taken away unless the reader changed it.
  *
  * The first run on a map adds the geographic styles it lacks, and retires the old Water style:
  * labels in it become Custom, keeping their look, and the style goes. One undo step.
@@ -120,9 +123,18 @@ export class FeatureNames {
         const own = app.mapLabels.filter((label) => !label.feature && FAMILY.has(label.quickStyle));
         // A new name is not one the map's labels already have
         const used = new Set(app.mapLabels.map((label) => label.name));
+        // The custom rivers whose names are shown, which name their own rivers
+        const named = RiverLabels.items(app);
+        const dropped = new Set();
 
         features.forEach((feature, index) => {
             const label = matched.has(index) ? made[matched.get(index)] : null;
+            if (feature.kind === "river" && RiverLabels.covers(app, feature, named)) {
+                if (label && !this.edited(label)) dropped.add(label.id);
+                if (label && this.edited(label)) report.kept += 1;
+                else report.skipped += 1;
+                return;
+            }
             if (label) {
                 if (this.edited(label)) report.kept += 1;
                 else {
@@ -143,6 +155,7 @@ export class FeatureNames {
             app.mapLabels.push(created);
             report.added += 1;
         });
+        if (dropped.size) app.mapLabels = app.mapLabels.filter((label) => !dropped.has(label.id));
         return report;
     }
 

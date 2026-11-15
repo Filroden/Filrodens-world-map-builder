@@ -4,7 +4,7 @@
 
 **Goal:** Draw a road and a sea lane of your own by their waypoints, and reshape a route by moving a waypoint.
 
-**Opening narration:** In this tutorial we're going to draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.
+**Opening narration:** Next we'll draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.
 
 ## 1. Open Routes and pins
 
@@ -72,7 +72,7 @@
 
 ## 5. Draw a sea lane
 
-**Narration:** Now we're going to add a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water. Name it The Islemark Crossing.
+**Narration:** Now we're going to add a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's west coast. The lane keeps to the water. Name it The Islemark Crossing.
 
 **On screen:**
 
@@ -87,7 +87,7 @@
 - Wait for the map to update.
 - Zoom in to look at the sea lane.
 
-**Camera:** the map from 1300, 700 to 1560, 1060
+**Camera:** the map from 1300, 700 to 1600, 1260
 
 **Hold:** 4 s after the action
 

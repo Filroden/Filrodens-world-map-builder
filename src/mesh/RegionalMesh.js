@@ -16,6 +16,9 @@ import { resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
  * Routes are cut to the crop and traced again on the regional mesh along their old line; a route
  * that leaves the crop and comes back becomes one route per stretch inside.
  *
+ * The influences painted on the parent (see Influences) are carried as the owners are: each
+ * regional cell takes the value of the parent cell under its site.
+ *
  * Positions on the regional map are (parent - crop corner) x zoom.
  */
 
@@ -25,14 +28,15 @@ import { resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
  * @param {Array} options.layerSets - The parent's layer sets.
  * @param {Array} options.routes - The parent's routes.
  * @param {Array} options.pins - The regional map's pins (already moved into its pixels).
+ * @param {import("./Influences.js").Influences|null} [options.influences] - The parent's painted influences.
  * @param {object} options.childMapData - The regional map's data so far: mapWidth, mapHeight,
  *     seed, params.latTop/latBottom and world.
  * @param {{x: number, y: number}} options.crop - The crop's top-left corner in parent pixels.
  * @param {number} options.zoom
  * @param {Function} [options.idFactory]
- * @returns {{fields: {vectorSchemaVersion: number, mesh: object, layerSets: Array, mapRoutes: Array, mapPins: Array}, owners: Object<string, string>, mesh: import("./MeshBuilder.js").Mesh}}
+ * @returns {{fields: {vectorSchemaVersion: number, mesh: object, layerSets: Array, mapRoutes: Array, mapPins: Array, influences: object|null}, owners: Object<string, string>, mesh: import("./MeshBuilder.js").Mesh}}
  */
-export function extractRegionalVectors({ session, layerSets, routes, pins, childMapData, crop, zoom, idFactory = randomId }) {
+export function extractRegionalVectors({ session, layerSets, routes, pins, childMapData, crop, zoom, influences = null, idFactory = randomId }) {
     const block = createMeshBlock(childMapData);
     const mesh = MeshBuilder.fromMapData({ ...childMapData, mesh: block });
     block.cells = mesh.cellCount;
@@ -50,7 +54,15 @@ export function extractRegionalVectors({ session, layerSets, routes, pins, child
 
     const mapRoutes = (routes ?? []).flatMap((route) => carryRoute(route, session.mesh, mesh, toChild, idFactory));
     return {
-        fields: { vectorSchemaVersion: VECTOR_SCHEMA_VERSION, mesh: block, layerSets: sets, mapRoutes, mapPins: pinsToCells(pins, mesh) },
+        fields: {
+            vectorSchemaVersion: VECTOR_SCHEMA_VERSION,
+            mesh: block,
+            layerSets: sets,
+            mapRoutes,
+            mapPins: pinsToCells(pins, mesh),
+            // None when the parent has none painted on the crop (a map never painted saves no field)
+            influences: influences?.any() ? influences.resampled(session.mesh, mesh, toParent).encode() : null,
+        },
         owners,
         mesh,
     };

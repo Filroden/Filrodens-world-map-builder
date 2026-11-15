@@ -44,9 +44,13 @@ export class InfillInput {
      * @param {Uint8Array} [source.land] - Each display cell's land flag (the mesh's aggregates).
      * @param {Uint8Array} [source.riverImage] - The river image the map is painted from (see dryCell).
      * @param {object} [source.grid] - The in-fill cells, when already worked out.
+     * @param {object[]} [source.pinStyles] - The map's pin styles, for each pin's tier (see places).
+     * @param {{seats?: boolean, idNames?: boolean}} [source.rules] - The generator rules the map
+     *     follows (see GeneratorRevision.rules): seats, every settlement pin a place in-fill builds
+     *     round; idNames, each place named from a stream of its own.
      * @returns {{input: object, grid: object}}
      */
-    static gather({ mesh, parentRun, payload, pins, routes, speeds, seed, nameBase, areaFactor, land = null, riverImage = null, grid = this.grid(mesh) }) {
+    static gather({ mesh, parentRun, payload, pins, routes, speeds, seed, nameBase, areaFactor, land = null, riverImage = null, grid = this.grid(mesh), pinStyles = [], rules = {} }) {
         const reliefScale = Math.max(1, FILRODENSWMB.MESH.MODEL_SPACING_KM / (grid.spacingPx * mesh.kmPerPx));
         const finePayload = { ...payload, modelSites: Float64Array.from(grid.sites), modelOf: travelCellOfPixels(mesh, grid), reliefScale };
         // Each in-fill cell's parent cell: the one its site's display cell lies in
@@ -59,10 +63,9 @@ export class InfillInput {
             return display >= 0 ? grid.of[display] : -1;
         };
         const towns = [];
-        for (const pin of pins ?? []) {
-            if (pin?.generated?.kind !== "town") continue;
-            const cell = cellOf(pin.x, pin.y);
-            if (cell >= 0) towns.push({ cell, population: Number(pin.generated.population) || 0, x: pin.x, y: pin.y });
+        for (const place of this.places(pins, pinStyles, rules)) {
+            const cell = cellOf(place.x, place.y);
+            if (cell >= 0) towns.push({ cell, population: place.population, x: place.x, y: place.y });
         }
         const fineRoutes = (routes ?? []).map((route) => ({
             transport: route.transport ?? "road",
@@ -90,8 +93,45 @@ export class InfillInput {
             areaFactor,
             dry: land && riverImage ? this.#dryCells(mesh, grid, land, riverImage) : null,
             names: (pins ?? []).map((pin) => pin?.name).filter(Boolean),
+            idNames: rules.idNames === true,
         };
         return { input, grid };
+    }
+
+    /**
+     * The places in-fill builds round, each holding its people (none of them shared out again as
+     * villages, and no village or market town on it), where it stands.
+     *
+     * From generator revision 2 (`rules.seats`), every pin whose style's tier is a settlement or
+     * castle (SETTLEMENT_TIERS): a town the parent's run made, a settlement pin the parent's run
+     * built on (with its `modelled` figures), one drawn on the regional map, and the villages and
+     * market towns of an earlier fill-in the reader kept, whatever made them. Its people are its
+     * figures (`generated`, else `modelled`), else its tier's least (INFILL.PIN_PEOPLE). A
+     * generated town whose style has no tier counts by its own. Before, only the generated towns,
+     * by their figures.
+     * @param {object[]} pins
+     * @param {object[]} pinStyles
+     * @param {{seats?: boolean}} [rules]
+     * @returns {{pin: object, tier: string|null, population: number, x: number, y: number}[]}
+     */
+    static places(pins, pinStyles = [], rules = {}) {
+        const places = [];
+        if (rules.seats !== true) {
+            for (const pin of pins ?? []) if (pin?.generated?.kind === "town") places.push({ pin, tier: pin.generated.tier ?? null, population: Number(pin.generated.population) || 0, x: pin.x, y: pin.y });
+            return places;
+        }
+        const styles = new Map((pinStyles ?? []).map((style) => [style.id, style]));
+        const people = FILRODENSWMB.INFILL.PIN_PEOPLE;
+        for (const pin of pins ?? []) {
+            if (!pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+            const styled = styles.get(pin.pinStyle)?.tier ?? null;
+            const tier = styled ?? (pin.generated?.kind === "town" ? (pin.generated.tier ?? null) : null);
+            if (!SETTLEMENT_TIERS.has(tier) && !(styled == null && pin.generated?.kind === "town")) continue;
+            const figures = Number(pin.generated?.population ?? pin.modelled?.population);
+            const population = Number.isFinite(figures) && figures >= 0 ? figures : (people[tier] ?? 0);
+            places.push({ pin, tier, population, x: pin.x, y: pin.y });
+        }
+        return places;
     }
 
     /**
@@ -122,6 +162,9 @@ export class InfillInput {
         return dry;
     }
 }
+
+/** The pin style tiers in-fill builds round from revision 2: the settlements and castles (see places). */
+const SETTLEMENT_TIERS = new Set(Object.keys(FILRODENSWMB.INFILL.PIN_PEOPLE));
 
 /** Each parent cell's main culture (the largest share), or -1. */
 function mainCultures({ shareStart, shareCulture, shareValue }, count) {

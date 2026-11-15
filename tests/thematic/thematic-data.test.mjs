@@ -232,6 +232,18 @@ test("the culture layer: each model cell in its dominant culture's colour, faint
     assert.deepEqual(source.cultureClasses().map((entry) => entry.name), ["Westfolk", "Eastfolk"]);
     assert.equal(source.cultureAt(-1), null);
 
+    // The map's cultures now name and colour the run's of the same id: only the colours are drawn again
+    const values = source.displayBytes("culture");
+    const key = source.useCultures([{ id: "cultureAAAAAAAAA", name: "West folk", color: "#00ff00" }]);
+    assert.equal(source.useCultures([{ id: "cultureAAAAAAAAA", name: "West folk", color: "#00ff00" }]), key, "the same names and colours, the same key");
+    assert.equal(source.displayBytes("culture"), values, "the cells' values are kept");
+    const recoloured = source.lookup("culture");
+    assert.notEqual(recoloured, lookup);
+    assert.deepEqual([...recoloured.slice(4, 7)], [0, 255, 0], "the first culture's first step in its new colour");
+    assert.deepEqual(source.cultureClasses().map((entry) => [entry.name, entry.color]), [["West folk", "#00ff00"], ["Eastfolk", source.cultureColor(1)]], "a culture the map no longer has keeps what the run recorded");
+    source.useCultures([]);
+    assert.equal(source.cultureClasses()[0].color, "#ff0000");
+
     // With only the run's default culture, the layer says why it cannot be shown
     const single = ThematicSource.of(runOf(mesh, { culture: () => 0 }), mesh);
     assert.equal(single.missing("culture"), "cultures");
@@ -278,4 +290,29 @@ test("trade: saved per edge, drawn along the generated route joining its cells o
     const moved = decodeModelRun(resampleModelRun(run, all, (cell) => (cell === far ? -1 : cell)));
     assert.deepEqual([...moved.tradeFrom], [a, b]);
     assert.deepEqual([...moved.tradeKind], [0, 1]);
+});
+
+test("trade: drawn along a hand-drawn route between the cells it passes, after the generated routes, when the run used the map's own routes", () => {
+    const mesh = smallMesh();
+    const sites = [...Array(mesh.modelCount).keys()];
+    const near = (x, y) => sites.reduce((a, b) => (Math.hypot(mesh.siteX(a) - x, mesh.siteY(a) - y) < Math.hypot(mesh.siteX(b) - x, mesh.siteY(b) - y) ? a : b));
+    const [a, b] = [near(100, 150), near(115, 150)];
+    const trade = { from: Int32Array.of(a), to: Int32Array.of(b), kind: Uint8Array.of(0), value: Float32Array.of(1) };
+    // A hand-drawn road from a's site to b's, its line every display cell it passes
+    const line = [];
+    const steps = Math.ceil(Math.hypot(mesh.siteX(b) - mesh.siteX(a), mesh.siteY(b) - mesh.siteY(a)));
+    for (let step = 0; step <= steps; step++) {
+        const cell = mesh.cellAt(mesh.siteX(a) + ((mesh.siteX(b) - mesh.siteX(a)) * step) / steps, mesh.siteY(a) + ((mesh.siteY(b) - mesh.siteY(a)) * step) / steps);
+        if (line.at(-1) !== cell) line.push(cell);
+    }
+    const inA = line.filter((cell) => mesh.parentOf[cell] === a).length;
+    assert.ok(inA >= 2 && line.slice(inA).every((cell) => mesh.parentOf[cell] === b), "the line runs through a's cells, then b's");
+    const mine = { id: "m", waypoints: [line[0], line.at(-1)], legs: [line] };
+    const along = tradeLines(trade, mesh, [mine], { userRoutes: true })[0];
+    assert.ok(along.points.length > 4, "along the hand-drawn line");
+    const [from, to] = [line[Math.floor((inA - 1) / 2)], line[Math.floor((inA + line.length - 1) / 2)]];
+    assert.deepEqual([along.points[0], along.points[1], along.points.at(-2), along.points.at(-1)], [mesh.siteX(from), mesh.siteY(from), mesh.siteX(to), mesh.siteY(to)], "from the middle of a's stretch to the middle of b's");
+    assert.equal(tradeLines(trade, mesh, [mine])[0].points.length, 4, "a run that did not use the map's own routes: straight");
+    const generated = { id: "g", generated: { run: "x" }, waypoints: [a, b], legs: [[a, mesh.cellAt(107, 151), b]] };
+    assert.equal(tradeLines(trade, mesh, [mine, generated], { userRoutes: true })[0].points.length, 12, "a generated route's leg first");
 });

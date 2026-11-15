@@ -4,7 +4,7 @@
 
 **Goal:** Create the map the whole tutorial builds on: a Guided map with the seed P0JBVA, 2,000 by 1,600 pixels, from 60° north to 60° south, with one large continent, three islands and an inland sea.
 
-**Opening narration:** In this first tutorial we're going to create the map the whole tutorial builds on: a Guided map, where we'll draw where the land goes and let the engine do the rest.
+**Opening narration:** First, we'll create the map the whole tutorial builds on: a Guided map, where we draw where the land goes and let the engine do the rest.
 
 ## 1. Open the studio
 

@@ -1,14 +1,15 @@
 {{!--
-    The inspector's river (see RiverEditor): its name and width, on a map from terrain revision 3
-    on its corridor width and whether it cuts through high ground, and Focus view and Delete. Every
-    field applies when committed, one undo step each (see Inspector); all but the name carve the
-    river again.
+    The inspector's river (see RiverEditor): its name (with Random name) and width, on a map from
+    terrain revision 3 on its corridor width and whether it cuts through high ground, its label
+    (drawn along it; see RiverLabels), and Focus view and Delete. Every field applies when
+    committed, one undo step each (see Inspector); the width and corridor carve the river again.
 --}}
 <div class="fwmb-group">
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
             <input type="text" id="fwmb-inspector-name" name="riverName" maxlength="{{fwmbTextLimit 'name'}}" value="{{river.name}}" />
+            <button type="button" class="fwmb-btn fwmb-btn--square" data-inspector-action="randomName" aria-label="{{localize 'FILRODENSWMB.UI.RandomName'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomNameHint'}}"><i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i></button>
         </div>
     </div>
     <div class="fwmb-form-group">
@@ -29,6 +30,13 @@
     </label>
     {{/if}}
 </div>
+
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+{{> "modules/filrodens-world-map-builder/templates/parts/label-fields.hbs" label=label choices=labelChoices styleName=labelStyleName visibilities=labelVisibilities sectionId="inspectorLabel" sectionTitle="FILRODENSWMB.UI.InspectorLabel" closed=true}}
 
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>

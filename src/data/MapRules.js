@@ -26,7 +26,8 @@ import { FEATURE_KINDS } from "../names/FeatureDetection.js";
  *   `ref` (another object's id, with `also` for extra words such as "custom");
  * - `num` (`min`, `max`, `int`), `bool`, `null`, `font`, `image`, `base64`;
  * - `points` (`[{x, y}]`, or an older map's pairs or flat numbers), `cells` (cell ids), `legs`;
- * - `segment` (a biome rule segment, `[min, max, openMin, openMax]`);
+ * - `segment` (a biome rule segment, `[min, max, openMin, openMax]`), `biomeId` (a biome's id,
+ *   dropped when it names none, rather than kept in range as a number would be);
  * - `obj` (`fields`), `list` (`of`), `record` (`keys`: id | biome, `of`);
  * - `numTree` (derived data of numbers, booleans and nesting only, kept as stored).
  * Any rule may be `nullable`. A `text` rule may carry `where`, the localisation key of the kind of
@@ -81,7 +82,8 @@ const nameRoll = int(0, 1e6);
  * What the generator records on everything it makes: its run, what it is (a realm, duchy or
  * county; a town or castle; a route), its tier (kingdom or independent, a pin style tier, a route
  * class), its index in the run, its people, its dominant culture and culture mix (by the map
- * culture's id; a number is an older run's index into its own cultures), and whether the user has
+ * culture's id; a number is an older run's index into its own cultures), a realm's ruling culture,
+ * and whether the user has
  * edited or locked it (which a re-run reads).
  */
 const GENERATED = obj(
@@ -93,6 +95,8 @@ const GENERATED = obj(
         population: num(RANGE.COUNT, { nullable: true }),
         culture: { t: "cultureRef", nullable: true },
         mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        // A realm's ruling culture: its capital's people (the others in its mix are its subjects)
+        rulingCulture: { t: "cultureRef", nullable: true },
         // With ages (see Pipeline): the tier in each age (-1 for none), the age last a realm's seat,
         // and for what the age before left: the age, its tier and people then, and an old road
         ages: list(int(-1, 10)),
@@ -105,6 +109,49 @@ const GENERATED = obj(
         infill: bool,
         edited: bool,
         locked: bool,
+    },
+    { nullable: true },
+);
+
+/**
+ * What the last run gave a hand-placed settlement pin it built on as a seat (see Generation.seats):
+ * the run, the place's index in it, its pin style tier, people, culture and mix, its past with
+ * several ages, and whether it was a realm's seat, walled or a port. Read only: the pin stays the
+ * reader's.
+ */
+const MODELLED = obj(
+    {
+        run: { t: "key" },
+        sourceId: int(0),
+        tier: { t: "key", nullable: true },
+        population: num(RANGE.COUNT, { nullable: true }),
+        culture: { t: "cultureRef", nullable: true },
+        mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        ages: list(int(-1, 10)),
+        formerCapital: int(1, 100, { nullable: true }),
+        capital: bool,
+        fortified: bool,
+        port: bool,
+    },
+    { nullable: true },
+);
+
+/**
+ * What the last run made of a region the reader drew in its Political set and the run built round
+ * (see Regeneration.merge): the run, the unit's index in it, what it is (a realm, duchy or
+ * county), a realm's rank, its people, culture and mix, and a realm's ruling culture. Read only:
+ * the region stays the reader's.
+ */
+const MODELLED_REGION = obj(
+    {
+        run: { t: "key" },
+        kind: enumOf(["realm", "duchy", "county"]),
+        tier: { t: "key", nullable: true },
+        sourceId: int(0),
+        population: num(RANGE.COUNT, { nullable: true }),
+        culture: { t: "cultureRef", nullable: true },
+        mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        rulingCulture: { t: "cultureRef", nullable: true },
     },
     { nullable: true },
 );
@@ -149,6 +196,7 @@ const PIN = obj({
     pinStyle: custom,
     cell: int(0, 1e9, { nullable: true }),
     generated: GENERATED,
+    modelled: MODELLED,
     type: enumOf(["spring", "block_spring"]),
     radius: num(RANGE.SIZE),
     inflow: num(RANGE.SIGNED),
@@ -275,11 +323,16 @@ const REGION = obj({
     fillStyle,
     quickStyle: custom,
     parentKey: int(0, 1e9, { nullable: true }),
+    // A lone duchy or county of the Political set: a state of its own when a run builds round it (see UserRealms)
+    independent: bool,
+    // The parent a run gave a lone region, which the next run may change (see Regeneration.merge)
+    parentFromRun: bool,
     visibility,
     hidden,
     label: OWNED_LABEL,
     journalPageId: ref(),
     generated: GENERATED,
+    modelled: MODELLED_REGION,
     legacy: REGION_LEGACY,
 });
 
@@ -325,9 +378,14 @@ const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerato
 /** A habitat band: [lo, hi] (see CultureInput), or null for no limit. */
 const band = { t: "band", nullable: true };
 
+/** One row of a custom biome's rules, or one of a culture's climate zones: ranges on each axis. */
+const RULE_ROW = obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) });
+
 /**
  * A culture (the Cultures section and the culture inspector; see CultureInput): its look, name
- * base, how open and how dense it is, its habitat, and its homelands as map points.
+ * base, how open and how dense it is, its habitat (its climate from chosen biomes or from zones,
+ * or, saved before that choice, from its temperature, moisture and height bands; see
+ * CultureClimate), and its homelands as map points.
  */
 const CULTURE = obj({
     id,
@@ -336,19 +394,28 @@ const CULTURE = obj({
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     openness: num(RANGE.UNIT),
     density: num({ min: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.min, max: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.max }),
-    habitat: obj({ temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
+    habitat: obj({
+        climate: enumOf(Object.values(FILRODENSWMB.GENERATOR.CULTURES.CLIMATES)),
+        biomes: list({ t: "biomeId" }),
+        zones: list(RULE_ROW),
+        temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
     homelands: list({ t: "xy" }),
 });
 
-/** An age's culture event (see GeneratorSettings.resolveEvent): a culture arriving or invading, or none. */
-const AGE_EVENT = obj({ kind: enumOf(FILRODENSWMB.GENERATOR.AGES.EVENTS), culture: key }, { nullable: true });
+/**
+ * An age's event (see GeneratorSettings.resolveEvent): its kind, the culture a peoples event names,
+ * and the place on the map an event that acts somewhere may name (none for the largest realm or
+ * town). An age saved before ages held several keeps its one `event` (or none), read as a list of one.
+ */
+const AGE_EVENT = obj({ kind: enumOf(Object.values(FILRODENSWMB.GENERATOR.EVENTS.GROUPS).flat()), culture: key, place: { t: "xy", nullable: true } }, { nullable: true });
+const AGE_EVENTS = list(AGE_EVENT);
 
 /** The settings a run was made with (see GeneratorSettings.resolveSettings). */
 const GENERATOR_SETTINGS = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
-    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT), event: AGE_EVENT })),
+    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), urbanisation: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE), capacity: num(RANGE.SCALE), frontier: num(RANGE.SCALE), strifeName: key, strife: num(RANGE.UNIT), event: AGE_EVENT, events: AGE_EVENTS })),
     cultures: list(CULTURE),
 });
 
@@ -360,8 +427,8 @@ const GENERATOR_PANEL = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: GENERATOR_SETTINGS.fields.world,
-    // The ages as the panel keeps them: each age's era and strife presets, and its event
-    ages: list(obj({ era: enumOf(Object.keys(FILRODENSWMB.GENERATOR.ERAS)), strife: enumOf(Object.keys(FILRODENSWMB.GENERATOR.STRIFES)), event: AGE_EVENT })),
+    // The ages as the panel keeps them: each age's id, era and strife presets, and its events
+    ages: list(obj({ id: key, era: enumOf(Object.keys(FILRODENSWMB.GENERATOR.ERAS)), strife: enumOf(Object.keys(FILRODENSWMB.GENERATOR.STRIFES)), event: AGE_EVENT, events: AGE_EVENTS })),
     output: obj({
         duchies: bool,
         counties: bool,
@@ -434,6 +501,10 @@ const FAULT = obj({
 const RIVER = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindRiver"),
+    // Where its name came from (see RandomNames), and its label: its name drawn along it (see RiverLabels)
+    nameSource,
+    nameRoll,
+    label: OWNED_LABEL,
     points,
     // Rivers drawn before the width was kept as a number carry it as text ("4"), so a numeric
     // string is read as its number
@@ -490,7 +561,7 @@ const CUSTOM_BIOME = obj({
     behavesLike: enumOf(Object.keys(FILRODENSWMB.GENERATOR.BIOMES), { nullable: true }),
     // Numbers of its own for the generator (see ModelBiomes); null: those of behavesLike
     properties: obj(Object.fromEntries(FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => [property.key, num({ min: property.min, max: property.max })])), { nullable: true }),
-    rules: list(obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) })),
+    rules: list(RULE_ROW),
 });
 
 const styleName = name("FILRODENSWMB.UI.LimitKindStyle");
@@ -628,6 +699,27 @@ const RUN_CULTURE = obj({ id: { ...key, nullable: true }, name: generatorText("F
  * cultures, with each cell's site in the regional map's pixels. MapImport also checks that every
  * array holds a value per cell.
  */
+const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
+
+/** An earlier age of a run, in brief (see ModelRun); MapImport checks that its names run with its places, castles and seats, and its arrays with the run's cells. */
+const RUN_AGE = obj({
+    development: num(RANGE.UNIT),
+    plague: num(RANGE.UNIT),
+    strife: num(RANGE.UNIT),
+    places: { t: "cells" },
+    placeNames: list(HISTORY_NAME),
+    castles: { t: "cells" },
+    castleNames: list(HISTORY_NAME),
+    castleKeeps: list(HISTORY_NAME),
+    seats: { t: "cellSlots" },
+    realmNames: list(HISTORY_NAME),
+    realmPeople: list(int(0, 1e12)),
+    realm: PACKED_ARRAY,
+    culture: PACKED_ARRAY,
+    roadFrom: PACKED_ARRAY,
+    roadTo: PACKED_ARRAY,
+});
+
 const PARENT_RUN = obj(
     {
         version: int(0, 1000),
@@ -640,6 +732,10 @@ const PARENT_RUN = obj(
         sites: obj({ x: PACKED_ARRAY, y: PACKED_ARRAY }),
         spacingKm: num({ min: 1e-6, max: 1e6 }),
         spacingPx: num({ min: 1e-6, max: 1e6 }),
+        // The parent run's settings and earlier ages on the regional map's cells, for its History (see ParentRun)
+        settings: GENERATOR_SETTINGS,
+        ages: obj({ asked: int(1, 100), run: int(1, 100) }),
+        history: list(RUN_AGE),
     },
     { nullable: true },
 );
@@ -671,6 +767,11 @@ const MAP = obj({
     // The name every distance shown is labelled with (see MapUnit)
     mapUnit: text("name", "FILRODENSWMB.UI.LimitKindMap", "FILRODENSWMB.UI.LimitFieldMapUnit"),
     generatorStale: bool,
+    // The generator rules the map follows (see GeneratorRevision); absent on maps made before it was kept
+    generatorRevision: int(0, 1000),
+    // The influences painted on the map's cells (see Influences): each kind painted, its steps
+    // encoded as the level owners are; a kind that does not decode to the mesh's cells is unpainted
+    influences: obj({ capacity: { t: "base64" }, security: { t: "base64" } }, { nullable: true }),
     generatorSettings: GENERATOR_PANEL,
     cultures: list(CULTURE),
     upwindMargin: obj(
@@ -690,7 +791,11 @@ const MAP = obj({
     parentRun: PARENT_RUN,
     // A regional map asked to be filled in when cut, not yet filled in (see Infilling)
     infillPending: bool,
+    // A fingerprint of what the last fill-in read, as it left the map (see Infilling.inputs)
+    infillInputs: obj({ places: key, routes: key, influences: key }, { nullable: true }),
     riverRoutes: bool,
+    // A regional map's inherited ports and river towns stand on its own shore and rivers (see ShoreRelay)
+    shoresPlaced: bool,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,
     mapWidth: num(RANGE.SIZE),
@@ -706,9 +811,10 @@ const MAP = obj({
     hiddenLevels: list(key),
     hideRegionFills: bool,
     // The Travel tool's way of travel, the map's speeds (km a day), its band width in days (null
-    // for automatic) and its start (see TravelView)
+    // for automatic), its start and its season (see TravelView)
     travel: obj({
         mode: enumOf(FILRODENSWMB.TRAVEL_TIME.MODES),
+        season: enumOf(FILRODENSWMB.TRAVEL_TIME.SEASONS),
         speeds: obj(Object.fromEntries(Object.keys(FILRODENSWMB.TRAVEL_TIME.SPEEDS).map((key) => [key, num({ min: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN, max: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX })]))),
         interval: enumOf(FILRODENSWMB.TRAVEL_TIME.INTERVALS, { nullable: true }),
         start: { t: "xy", nullable: true },
@@ -759,7 +865,6 @@ const MAP = obj({
 // ------------------------------------------------------------------ the generator's outputs
 
 /** A name an earlier age gave a place, castle or realm, or a kind of keep (empty for none). */
-const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
 
 
 /**
@@ -778,25 +883,13 @@ const MODEL_RUN = obj({
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
+    // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
+    // A fingerprint of the map's own items the run read, as it left them (see RunInputs)
+    inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key, influences: key }, { nullable: true }),
+    seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
-    history: list(obj({
-        development: num(RANGE.UNIT),
-        plague: num(RANGE.UNIT),
-        strife: num(RANGE.UNIT),
-        places: { t: "cells" },
-        placeNames: list(HISTORY_NAME),
-        castles: { t: "cells" },
-        castleNames: list(HISTORY_NAME),
-        castleKeeps: list(HISTORY_NAME),
-        seats: { t: "cellSlots" },
-        realmNames: list(HISTORY_NAME),
-        realmPeople: list(int(0, 1e12)),
-        realm: PACKED_ARRAY,
-        culture: PACKED_ARRAY,
-        roadFrom: PACKED_ARRAY,
-        roadTo: PACKED_ARRAY,
-    })),
+    history: list(RUN_AGE),
 });
 
 /** The rules, by kind. `map` is a whole saved map; the rest are the objects inside it. */
@@ -904,6 +997,7 @@ const CLEANERS = {
     cellSlots: (value) => (Array.isArray(value) && value.every((cell) => cell === -1 || isCell(cell)) ? value : DROP),
     legs: (value) => (Array.isArray(value) ? value.map((leg) => (Array.isArray(leg) ? leg.filter(isCell) : [])) : DROP),
     segment: (value) => cleanSegment(value),
+    biomeId: (value) => (Number.isInteger(value) && value >= 1 && value <= MAX_BIOME_ID ? value : DROP),
     // A map point: finite x and y within the coordinate range, and nothing else
     xy: (value) => (value && typeof value === "object" && !Array.isArray(value) && [value.x, value.y].every((n) => Number.isFinite(n) && Math.abs(n) <= RANGE.COORD.max) ? { x: value.x, y: value.y } : DROP),
     cultureRef: (value) => (Number.isInteger(value) && value >= 0 && value < 1e6 ? value : orDrop(Sanitize.id(value))),

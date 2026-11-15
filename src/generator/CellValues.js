@@ -1,6 +1,8 @@
 import { Delaunay } from "../../vendor/d3-delaunay/d3-delaunay.js";
 import { FILRODENSWMB } from "../config.js";
+import { GeneratorRevision } from "./GeneratorRevision.js";
 import { biomeProperties } from "./ModelBiomes.js";
+import { MAX_LEVEL, clampLevel, influenceLevels, levelFactors } from "./InfluenceLevels.js";
 
 /**
  * Stage 1, the base layer: what each model cell holds. The model cells are the display mesh's
@@ -13,6 +15,12 @@ import { biomeProperties } from "./ModelBiomes.js";
  * wettest ground), times the biome's farming factor and cover; pasture feeds a share of the peak
  * where crops fail; land near a river or lake is watered; relief halves a cell's farmland at
  * RELIEF_HALF_M; a coastal cell adds fishing.
+ *
+ * Influences painted on the map (see InfluenceLevels) are read in the same pass: a food capacity
+ * value multiplies the food each land pixel grows by its factor, and the cell's fishing by the mean factor over
+ * its land, so a cell painted in part changes in part; security values become each land cell's
+ * strife scale and painted threat, which the feedback pass reads (see Feedback). Without any, the
+ * sums are exactly those of a map never painted.
  */
 
 /**
@@ -37,6 +45,15 @@ import { biomeProperties } from "./ModelBiomes.js";
  * @property {Uint8Array} navigable
  * @property {Float64Array} mouthKm - Upstream length of a river reaching the sea here, or 0.
  * @property {Float64Array} landCost - Off-road travel cost per km (cover and relief).
+ * @property {Float64Array} waterShare - The share of the cell's own pixels that are sea or lake.
+ * @property {Int32Array} [shorePixel] - With the shore pins rule (see GeneratorRevision.rules): a land
+ *     cell's land pixel beside sea or lake nearest its site, or -1.
+ * @property {Int32Array} [riverPixel] - Likewise its navigable river pixel nearest its site, or -1.
+ * @property {Float64Array} [strifeScale] - With security influences painted: the mean factor of the
+ *     values over the cell's land, by which the strife felt there is multiplied (1 unpainted).
+ * @property {Float64Array} [dangerThreat] - Likewise the mean of the more dangerous values (those
+ *     below 0) over its land, as a share of the most dangerous (0 to 1), for the threat the
+ *     painted land poses.
  * @property {Int32Array} neighbourStart - Compressed neighbour rows.
  * @property {Int32Array} neighbourList
  */
@@ -57,13 +74,16 @@ export function smooth(a, b, value) {
  * Builds the model cells.
  * @param {import("./GeneratorInput.js").GeneratorInput} input
  * @param {{density?: number}} [world] - The world settings (density scales the peak density).
+ * @param {object} [rules] - The model's rules (GeneratorRevision.rules); the input's revision's by default.
  * @returns {ModelCells}
  */
-export function buildModelCells(input, world = {}) {
+export function buildModelCells(input, world = {}, rules = GeneratorRevision.rules(GeneratorRevision.ofPayload(input))) {
     const raster = rasterContext(input);
     const neighbours = modelNeighbours(input.modelSites);
     const sums = sumPixels(input, raster, (world.density ?? 1) * FILRODENSWMB.GENERATOR.VALUES.PEAK_DENSITY);
-    return finishCells(input, raster, sums, neighbours);
+    const cells = finishCells(input, raster, sums, neighbours, rules);
+    if (rules.shorePins) markShorePixels(cells, input, raster);
+    return cells;
 }
 
 /** Per-pixel helpers shared by the passes: scale, the pixel classes, rivers and shelter. */
@@ -227,7 +247,7 @@ function sumPixels(input, raster, peakDensity) {
         biomes: new Float64Array(count * biomeSlots),
         biomeSlots,
     };
-    const context = { input, raster, properties, peakDensity };
+    const context = { input, raster, properties, peakDensity, ...influenceContext(input, sums, count) };
     const { modelOf } = input;
     for (let pixel = 0; pixel < modelOf.length; pixel++) {
         const cell = modelOf[pixel];
@@ -239,28 +259,106 @@ function sumPixels(input, raster, peakDensity) {
     return sums;
 }
 
-function addLandPixel(sums, cell, pixel, { input, raster, properties, peakDensity }) {
+function addLandPixel(sums, cell, pixel, { input, raster, properties, peakDensity, capacity, security, factors }) {
     const metres = raster.metres(input.elevation[pixel]);
     sums.land[cell]++;
     sums.temperature[cell] += input.temperature[pixel];
     sums.moisture[cell] += input.moisture[pixel];
     sums.height[cell] += metres;
-    sums.food[cell] += pixelDensity(input, raster, pixel, properties, peakDensity) * raster.pixelKm2;
+    const grown = pixelDensity(input, raster, pixel, properties, peakDensity) * raster.pixelKm2;
+    sums.food[cell] += capacity ? grown * factors[clampLevel(capacity[pixel]) + MAX_LEVEL] : grown;
+    if (capacity) sums.capacityFactor[cell] += factors[clampLevel(capacity[pixel]) + MAX_LEVEL];
+    if (security) addSecurityPixel(sums, cell, clampLevel(security[pixel]), factors);
     if (metres < sums.low[cell]) sums.low[cell] = metres;
     if (metres > sums.high[cell]) sums.high[cell] = metres;
     sums.biomes[cell * sums.biomeSlots + input.biome[pixel]]++;
     if (raster.riverKm[pixel] > sums.river[cell]) sums.river[cell] = raster.riverKm[pixel];
 }
 
+/**
+ * The painted influences the pass reads (see InfluenceLevels), with the sums they add to: only for
+ * a kind that is painted, so an unpainted map's pass does exactly what it always did.
+ */
+function influenceContext(input, sums, count) {
+    const capacity = influenceLevels(input, "capacity");
+    const security = influenceLevels(input, "security");
+    if (capacity) sums.capacityFactor = new Float64Array(count);
+    if (security) {
+        sums.strifeScale = new Float64Array(count);
+        sums.dangerThreat = new Float64Array(count);
+    }
+    return { capacity, security, factors: capacity || security ? levelFactors() : null };
+}
+
+/**
+ * A land pixel's security value (above 0 safer, below more dangerous): its strife factor (a safer
+ * value divides the strife felt, a more dangerous one multiplies it), and its share of the most
+ * dangerous value's threat.
+ */
+function addSecurityPixel(sums, cell, level, factors) {
+    sums.strifeScale[cell] += factors[MAX_LEVEL - level];
+    if (level < 0) sums.dangerThreat[cell] += -level / MAX_LEVEL;
+}
+
 /** Turns the sums into the per-cell values. */
-function finishCells(input, raster, sums, neighbours) {
+function finishCells(input, raster, sums, neighbours, rules) {
     const count = input.modelSites.length / 2;
     const cells = allocateCells(count, input, neighbours);
     for (let cell = 0; cell < count; cell++) classifyCell(cells, sums, cell);
     const mouthAt = mouthsByCell(input, raster);
     const properties = biomeProperties(input.customBiomes);
-    for (let cell = 0; cell < count; cell++) finishCell(cells, sums, cell, raster, mouthAt, properties);
+    for (let cell = 0; cell < count; cell++) finishCell(cells, sums, cell, raster, mouthAt, properties, rules);
+    if (sums.strifeScale) finishSecurity(cells, sums);
     return cells;
+}
+
+/** Each cell's mean security influence over its land (see ModelCells.strifeScale); 1 and 0 where it has none. */
+function finishSecurity(cells, sums) {
+    cells.strifeScale = new Float64Array(cells.count).fill(1);
+    cells.dangerThreat = new Float64Array(cells.count);
+    for (let cell = 0; cell < cells.count; cell++) {
+        const land = sums.land[cell];
+        if (!land) continue;
+        cells.strifeScale[cell] = sums.strifeScale[cell] / land;
+        cells.dangerThreat[cell] = sums.dangerThreat[cell] / land;
+    }
+}
+
+/**
+ * Where a port's place and a river town's stand (see Materialise): each land cell's land pixel
+ * beside sea or lake (a 4-neighbour) nearest its site, and its navigable river pixel nearest its
+ * site, so a port stands on its own shore and a river town on its river rather than up to half a
+ * cell inland. Each is -1 where the cell has none.
+ */
+function markShorePixels(cells, input, raster) {
+    const { width, height, modelOf } = input;
+    const navigableKm = FILRODENSWMB.GENERATOR.VALUES.NAVIGABLE_KM;
+    const count = cells.count;
+    const shorePixel = new Int32Array(count).fill(-1);
+    const riverPixel = new Int32Array(count).fill(-1);
+    const shoreD = new Float64Array(count).fill(Infinity);
+    const riverD = new Float64Array(count).fill(Infinity);
+    const wet = (pixel) => raster.isSea(pixel) || raster.isLake(pixel);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pixel = y * width + x;
+            const cell = modelOf[pixel];
+            if (cells.water[cell] || wet(pixel)) continue;
+            const d = (x + 0.5 - cells.x[cell]) ** 2 + (y + 0.5 - cells.y[cell]) ** 2;
+            if (raster.riverKm[pixel] >= navigableKm && d < riverD[cell]) {
+                riverD[cell] = d;
+                riverPixel[cell] = pixel;
+            }
+            if (d >= shoreD[cell]) continue;
+            const shore = (x > 0 && wet(pixel - 1)) || (x < width - 1 && wet(pixel + 1)) || (y > 0 && wet(pixel - width)) || (y < height - 1 && wet(pixel + width));
+            if (shore) {
+                shoreD[cell] = d;
+                shorePixel[cell] = pixel;
+            }
+        }
+    }
+    cells.shorePixel = shorePixel;
+    cells.riverPixel = riverPixel;
 }
 
 function allocateCells(count, input, neighbours) {
@@ -297,6 +395,7 @@ function allocateCells(count, input, neighbours) {
         navigable: flag(),
         mouthKm: real(),
         landCost: real().fill(1),
+        waterShare: real(),
         neighbourStart: neighbours.start,
         neighbourList: neighbours.list,
     };
@@ -310,6 +409,7 @@ function classifyCell(cells, sums, cell) {
     else if (sums.lake[cell] > sums.sea[cell]) kind = CELL_KIND.LAKE;
     cells.kind[cell] = kind;
     cells.water[cell] = kind === CELL_KIND.LAND ? 0 : 1;
+    cells.waterShare[cell] = sums.pixels[cell] ? (sums.sea[cell] + sums.lake[cell]) / sums.pixels[cell] : 0;
 }
 
 /** The largest river mouth in each cell (upstream km), as a Map cell -> km. */
@@ -322,7 +422,7 @@ function mouthsByCell(input, raster) {
     return at;
 }
 
-function finishCell(cells, sums, cell, raster, mouthAt, properties) {
+function finishCell(cells, sums, cell, raster, mouthAt, properties, rules) {
     const V = FILRODENSWMB.GENERATOR.VALUES;
     const land = sums.land[cell];
     cells.riverKm[cell] = sums.river[cell];
@@ -333,7 +433,9 @@ function finishCell(cells, sums, cell, raster, mouthAt, properties) {
     const relief = sums.high[cell] - sums.low[cell];
     const landKm2 = land * raster.pixelKm2;
     const biome = dominantBiome(sums, cell, properties);
-    const fishing = coastal ? V.FISHING_DENSITY * landKm2 : 0;
+    // Fishing follows the cell's mean food capacity influence, as its land's food does pixel by pixel
+    const fishFactor = sums.capacityFactor ? sums.capacityFactor[cell] / land : 1;
+    const fishing = coastal ? rules.fishingDensity * landKm2 * fishFactor : 0;
     const food = sums.food[cell] / (1 + (relief / V.RELIEF_HALF_M) ** 2) + fishing;
     cells.landKm2[cell] = landKm2;
     cells.temperature[cell] = sums.temperature[cell] / land;

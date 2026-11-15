@@ -103,6 +103,7 @@
 </div>
 
 <div class="fwmb-inspector-actions">
+    {{#if canMoveToPolitical}}<button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="moveToPolitical" data-tooltip="{{localize 'FILRODENSWMB.UI.MoveLevelToPoliticalHint'}}"><i class="fwmb-icon fwmb-icon--palace" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button>{{/if}}
     <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
 </div>
 <p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

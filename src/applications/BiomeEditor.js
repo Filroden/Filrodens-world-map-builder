@@ -4,6 +4,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { Sanitize } from "../data/Sanitize.js";
+import { anyUsesBiomes } from "../generator/CultureClimate.js";
 import { startingNumbers } from "../generator/ModelBiomes.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
@@ -19,7 +20,9 @@ const TEMPLATE = "modules/filrodens-world-map-builder/templates/parts/inspector-
  * Each field applies when committed, as one undo step (the undo history keeps the custom biomes,
  * see MapStateManager.getVectorStateSnapshot). The map is repainted, since a biome's colour and
  * placement show on it, and the panel's list and the bar's biome choices are drawn again, since
- * they name it. A change to what Generate reads of the biome marks a run Out of date.
+ * they name it. A change to what Generate reads of the biome marks a run Out of date: its Behaves
+ * like and own numbers, and, while a culture's climate is chosen biomes (see CultureClimate), its
+ * placement too, since that changes where each biome shows and so the climates worked out from them.
  *
  * Until Own numbers is ticked its sliders are hidden and hold Behaves like's numbers, so ticking
  * it starts from the numbers the biome has been using; clearing it drops the biome's own numbers.
@@ -75,9 +78,13 @@ export class BiomeEditor {
         return [{ value: "", label: "FILRODENSWMB.UI.BiomeBehavesLikeUnderlying", selected: current === "" }, ...keys.map((key) => ({ value: key, label: `FILRODENSWMB.BIOMES.${key}`, selected: key === current }))];
     }
 
-    /** What Generate reads of a custom biome (its Behaves like and own numbers), to compare. */
-    static #generatorReading(biome) {
-        return JSON.stringify([biome?.behavesLike ?? null, biome?.properties ?? null]);
+    /**
+     * What Generate reads of a custom biome, to compare: its Behaves like and own numbers, and, when
+     * a culture's climate is chosen biomes, its placement (where it may show).
+     */
+    static #generatorReading(app, biome) {
+        const placement = anyUsesBiomes(app.uiState.cultures) ? BiomePlacement.placementOfCustom(biome) : null;
+        return JSON.stringify([biome?.behavesLike ?? null, biome?.properties ?? null, placement]);
     }
 
     /** The biome's fields as the form holds them, checked as an import is (see MapRules.typed). */
@@ -109,14 +116,14 @@ export class BiomeEditor {
         const values = BiomeEditor.#read(biome, elements);
         const current = { name: biome.name, code: biome.code ?? null, color: biome.color, placement: BiomePlacement.placementOfCustom(biome), behavesLike: biome.behavesLike ?? null, properties: biome.properties ?? null };
         if (JSON.stringify(current) === JSON.stringify({ ...current, ...values })) return false;
-        const readBefore = BiomeEditor.#generatorReading(biome);
+        const readBefore = BiomeEditor.#generatorReading(app, biome);
         MapStateManager.pushVectorState(app);
         Object.assign(biome, values);
         // Superseded by `placement`, which takes priority over it anyway (see
         // BiomePlacement.placementOfCustom); dropped so an older map's flag is not carried forward
         // once the biome has been edited
         delete biome.solidOverWater;
-        if (BiomeEditor.#generatorReading(biome) !== readBefore) app.markGeneratorStale?.();
+        if (BiomeEditor.#generatorReading(app, biome) !== readBefore) app.markGeneratorStale?.();
         BiomeEditor.#redraw(app);
         return true;
     }
@@ -164,8 +171,9 @@ export class BiomeEditor {
         if (!confirmed) return false;
         MapStateManager.pushVectorState(app);
         // Its land now behaves as the biome beneath, so a run made while it behaved as another, or
-        // with numbers of its own, is out of date
-        if (biome.behavesLike || biome.properties) app.markGeneratorStale?.();
+        // with numbers of its own, is out of date; and so is one with a culture whose climate is
+        // chosen biomes, since its land now shows the biome beneath
+        if (biome.behavesLike || biome.properties || anyUsesBiomes(app.uiState.cultures)) app.markGeneratorStale?.();
         app.uiState.customBiomes = app.uiState.customBiomes.filter((each) => each.id !== biome.id);
         if (Number(app.uiState.brushBiome) === biome.id) app.uiState.brushBiome = FILRODENSWMB.BIOME_IDS.GRASSLAND;
         if (Inspector.shows(app, "biome", biome.id)) Inspector.close(app);

@@ -1173,6 +1173,36 @@
     align-items: center;
     gap: 0.5rem;
 }
+/* The Influences tool (tools-influences.hbs): the scale of the painting's tints, from the most
+   lowered (red) through none (white) to the most raised (blue), matching InfluenceView's TINTS and
+   running the other way in a right-to-left layout, as its ticks do; and a row per kind with its
+   Clear button */
+.fwmb-influence-scale {
+    margin: 0.25rem 0 0.5rem;
+}
+.fwmb-influence-ramp {
+    block-size: 0.75rem;
+    margin-block: 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: linear-gradient(to right, #b2182b, #ffffff, #2166ac);
+}
+.fwmb-influence-ramp:dir(rtl) {
+    background: linear-gradient(to left, #b2182b, #ffffff, #2166ac);
+}
+.fwmb-influence-ticks {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-influence-painted {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block: 0.25rem;
+}
 /* A way of travel is one line, so its row is shorter than an age's */
 .fwmb .fwmb-travel-modes .fwmb-list-item {
     min-block-size: 2rem;
@@ -1752,6 +1782,16 @@
 /* The Generate panel (tools-generate.hbs): its notices and the last run's figures */
 .fwmb-generate-notice {
     color: var(--fwmb-color-warning);
+}
+/* A notice that lists items (the settlement pins a run could not build on): its heading, then the
+   names, both in the hint's colour as the other notices are */
+.fwmb-generate-notice--list .fwmb-hint {
+    margin-block-end: 0.125rem;
+}
+.fwmb-generate-notice-items {
+    margin-block: 0 0.5rem;
+    padding-inline-start: 1.25rem;
+    font-size: var(--fwmb-size-12);
 }
 .fwmb-generate-action {
     display: flex;
@@ -5608,23 +5648,60 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-block: var(--fwmb-size-4) var(--fwmb-size-2);
     cursor: default;
 }
-/* The Generate panel's ages, oldest first, each with its era, strife and event */
-.fwmb-age-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+/* The Generate panel's ages, oldest first: each its name over its era, strife and events in brief */
+.fwmb-age-row {
+    min-height: 2.5rem;
+}
+.fwmb-age-row-text {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-8);
+    min-width: 0;
 }
-.fwmb-age-row + .fwmb-age-row {
-    border-block-start: 1px solid var(--fwmb-border-subtle);
-    padding-block-start: var(--fwmb-size-8);
+.fwmb-age-row-text .fwmb-name,
+.fwmb-age-row-text .fwmb-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.fwmb-age-head {
+/* An age in the inspector: what the chosen era, strife or event does, under its choice */
+.fwmb-age-choice-note {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    margin: 0.25rem 0 0.5rem;
+}
+/* An age's events in its inspector: each a folding fieldset of its own, in the order added, its
+   summary naming it over a line in brief (its group, and its culture or place) */
+.fwmb details.fwmb-fieldset.fwmb-age-event {
+    padding-inline: var(--fwmb-size-8);
+}
+.fwmb details.fwmb-fieldset.fwmb-age-event[open] {
+    padding-block-end: var(--fwmb-size-8);
+}
+.fwmb details.fwmb-fieldset > summary.fwmb-age-event-heading {
+    padding-block: var(--fwmb-size-6);
+}
+.fwmb-age-event-titles {
     display: flex;
-    align-items: center;
-    gap: var(--fwmb-size-2);
+    flex-direction: column;
+    min-width: 0;
+}
+.fwmb-age-event-title {
+    font-weight: 600;
+}
+.fwmb-age-event-summary {
+    color: var(--fwmb-text-muted);
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-age-event-place {
+    color: var(--fwmb-text-muted);
 }
 
 /* A culture's homelands in its inspector, each with its remove button */
@@ -5638,6 +5715,42 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     align-items: center;
     gap: var(--fwmb-size-4);
     font-variant-numeric: tabular-nums;
+}
+/* A culture's chosen biomes (its climate): a check box per land biome, with its colour, as many
+   to a row as fit (names wrapping); and the warning when its climate takes in most of the map's land */
+.fwmb-culture-biomes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--fwmb-size-2) var(--fwmb-size-8);
+    margin: 0 0 var(--fwmb-size-8);
+    padding: 0;
+    border: none;
+}
+.fwmb-culture-biome {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-4);
+    min-width: 0;
+    white-space: normal;
+}
+/* A culture's climate zones, each its name over its three axes' ranges */
+.fwmb-culture-zones {
+    list-style: none;
+    margin: 0 0 var(--fwmb-size-8);
+    padding: 0;
+}
+.fwmb-culture-zone-name {
+    font-weight: 600;
+}
+.fwmb-culture-biome-swatch {
+    flex: none;
+    width: var(--fwmb-size-12);
+    height: var(--fwmb-size-12);
+    border-radius: var(--fwmb-size-2);
+    border: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-culture-climate-wide {
+    color: var(--fwmb-color-warning);
 }
 .fwmb-range-band-ends {
     display: flex;

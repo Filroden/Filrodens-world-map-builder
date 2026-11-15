@@ -2,9 +2,9 @@
 // inspector, and a label held and turned.
 import { MAP } from "./_common.mjs";
 
-/** The tutorial's standalone label, The Morning Sea, and the sea round it. */
-const SEA = [1540, 800];
-const SEA_VIEW = [1380, 600, 1700, 1000];
+/** A natural feature's name the tutorial's page 8 gives, Bunrithes Ocean, and the sea round it. */
+const SEA = [1630, 810];
+const SEA_VIEW = [1450, 600, 1800, 1000];
 
 /** The sea east of the continent, where several natural features' names show at once. */
 const EAST_SEA = [1150, 400, 1950, 1050];
@@ -36,18 +36,18 @@ export default [
     {
         slug: "labels-overview",
         start: MAP.places,
-        caption: "Labels, searched for \"mo\": standalone and owned labels, each owned one with what it belongs to, and The Morning Sea in the inspector.",
+        caption: "Labels, searched for \"bu\": standalone and owned labels, each owned one with what it belongs to, and Bunrithes Ocean in the inspector.",
         action: [
             { do: "set", field: KIND_FILTER, value: "all" },
-            { do: "set", field: 'input[name="listSearch-label"]', value: "mo" },
-            { do: "click", target: '.fwmb-list-item:has(.fwmb-name:text-is("The Morning Sea"))' },
+            { do: "set", field: 'input[name="listSearch-label"]', value: "bu" },
+            { do: "click", target: '.fwmb-list-item:has(.fwmb-name:text-is("Bunrithes Ocean"))' },
         ],
         screenshot: { region: "studio" },
     },
     {
         slug: "labels-place-rotate",
         start: MAP.places,
-        caption: "In Place mode, The Morning Sea held and turned with the mouse wheel; the hint lists what a held label can do.",
+        caption: "In Place mode, Bunrithes Ocean held and turned with the mouse wheel; the hint lists what a held label can do.",
         action: [
             { do: "click", target: "dialog.fwmb-inspector[open] .fwmb-overlay-close" },
             { do: "mode", action: "setPickMode", mode: "place" },

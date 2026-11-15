@@ -39,7 +39,7 @@ export default {
     start: "02-shaping-the-land",
     goal: "See how the biomes are worked out from the climate, add a biome of your own with a rule for where it grows, and paint it by hand.",
     intro: `The module works out a biome for every point of the map from four things: its height, how wet it is, how warm it is, and the latitude. Moisture follows the prevailing winds, so mountains cast rain shadows; temperature falls with latitude and with height. The **Biomes** tool sets the climate these come from, and lets you add biomes of your own.`,
-    narration: "In this tutorial we're going to look at how biomes are worked out, add a biome of our own, give it a rule so it appears automatically, and paint it by hand in an area it would not normally appear.",
+    narration: "Next, biomes: how they're worked out, how to add one of our own with a rule so it appears automatically, and how to paint it by hand where it wouldn't normally appear.",
 
     steps: [
         {

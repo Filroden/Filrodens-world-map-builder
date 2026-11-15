@@ -4,7 +4,7 @@
 
 **Goal:** Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.
 
-**Opening narration:** In this tutorial we're going to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
+**Opening narration:** Time to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
 
 ## 1. Open Rivers and faults
 
@@ -54,7 +54,7 @@
 
 ## 4. Draw a river
 
-**Narration:** The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own.
+**Narration:** The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own, with a name of its own too.
 
 **On screen:**
 

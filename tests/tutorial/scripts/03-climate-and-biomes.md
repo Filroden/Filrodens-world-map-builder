@@ -4,7 +4,7 @@
 
 **Goal:** See how the biomes are worked out from the climate, add a biome of your own with a rule for where it grows, and paint it by hand.
 
-**Opening narration:** In this tutorial we're going to look at how biomes are worked out, add a biome of our own, give it a rule so it appears automatically, and paint it by hand in an area it would not normally appear.
+**Opening narration:** Next, biomes: how they're worked out, how to add one of our own with a rule so it appears automatically, and how to paint it by hand where it wouldn't normally appear.
 
 ## 1. Open Biomes
 

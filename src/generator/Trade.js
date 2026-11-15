@@ -19,6 +19,16 @@ import { SearchSpace, leastCostPerKm } from "./Search.js";
  * that loses its trade fades away; towns are re-tiered by population but never below their base
  * tier. The next round re-links with the new sizes over the roads already built.
  *
+ * A long passage by sea puts in on the way (with the ports of call rule, see GeneratorRevision.rules):
+ * every CALL_KM of sailing without a landing, the link calls at the best shore cell beside the lane
+ * it has passed since, which takes a share of the link's volume as transfer, so open coasts along
+ * the great sea lanes gain ports (and, by the trade-town rule, towns) where the gravity links alone
+ * would sail past.
+ *
+ * The map's own roads and sea routes (with the userRoutes rule) are built before the first link is
+ * laid, and its river routes are rivers in the graph itself (see UserRoutes), so trade takes them
+ * where they make the way cheaper, as it does a road the model built.
+ *
  * The final round (after the feedback pass) starts from the roads and lanes already built and the
  * towns as the feedback pass left them, their trade share removed so it is recomputed, and traders
  * avoid insecure ground.
@@ -37,9 +47,12 @@ const REPORT_EVERY = 32;
  * @param {number} context.totalPop
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {{urbanisation: number}} context.world
- * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set }
+ * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set,
+ *     tradeWar (an age's trade war, or null; see AgeEvents) }
  * @param {Uint8Array} [context.built] - Edges the age before built as roads and lanes (see Pipeline):
  *     the first round starts from them.
+ * @param {Uint8Array} [context.userBuilt] - Edges the map's own routes make roads and lanes (see
+ *     UserRoutes): built from the start of every round, so no new road is counted on them.
  * @returns {Generator<number, {towns: object[], traffic: Float64Array, newRoadKm: number}>}
  */
 export function* tradeRounds(graph, context) {
@@ -71,6 +84,8 @@ function createState(graph, context) {
     };
     if (final) preloadRoads(state, final.traffic);
     else if (context.built) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.built[edge]) state.road[edge] = 1;
+    // The map's own roads and lanes are built from the start, in every round (see UserRoutes)
+    if (context.userBuilt) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.userBuilt[edge]) state.road[edge] = 1;
     indexTowns(state);
     return state;
 }
@@ -79,7 +94,7 @@ function createState(graph, context) {
 function finalTowns(towns, royalSeats) {
     return towns.map((town) => {
         const base = Math.max(0, town.population - (town.tradePop ?? 0));
-        return { ...town, population: base, stage2Pop: base, tier: royalSeats.has(town.cell) ? 0 : Math.max(town.tier, tierOfPopulation(base)), baseTier: undefined };
+        return { ...town, population: base, stage2Pop: base, tier: royalSeats.has(town.cell) ? 0 : Math.min(town.seatTier ?? Infinity, Math.max(town.tier, tierOfPopulation(base))), baseTier: undefined };
     });
 }
 
@@ -108,7 +123,29 @@ function edgeCostFunction(state) {
     if (!security) return base;
     const { edgeA, edgeB } = state.graph;
     const danger = FILRODENSWMB.GENERATOR.TRADE.DANGER;
-    return (edge) => base(edge) * (1 + danger * (1 - 0.5 * ((security[edgeA[edge]] || 1) + (security[edgeB[edge]] || 1))));
+    const withDanger = (edge) => base(edge) * (1 + danger * (1 - 0.5 * ((security[edgeA[edge]] || 1) + (security[edgeB[edge]] || 1))));
+    // A trade war: a step across the warring realms' border costs more
+    const war = tradeWar(state);
+    if (!war) return withDanger;
+    return (edge) => withDanger(edge) * (war.split(edgeA[edge], edgeB[edge]) ? war.cost : 1);
+}
+
+/**
+ * The final round's trade war (see AgeEvents), or null: its volume and cost factors, and whether two
+ * cells lie on opposite sides of it (in different realms, one of them the war's realm when it
+ * has one).
+ */
+function tradeWar(state) {
+    const war = state.final?.tradeWar;
+    if (!war) return null;
+    const realm = war.realmOfCell;
+    const split = (a, b) => {
+        const ra = realm[a];
+        const rb = realm[b];
+        if (ra < 0 || rb < 0 || ra === rb) return false;
+        return war.only < 0 || ra === war.only || rb === war.only;
+    };
+    return { volume: war.volume, cost: war.cost, split };
 }
 
 /** One trade round: pick the links, lay them, turn trade into townspeople. */
@@ -122,7 +159,9 @@ function* tradeRound(state, progress) {
     const { SEA_COST, LANE_FACTOR } = FILRODENSWMB.GENERATOR.TRAVEL;
     state.estimatePerKm = Math.min(leastCostPerKm(state.graph, state.cost), SEA_COST * LANE_FACTOR);
     const mixes = state.mixed ? state.towns.map((town) => townMix(state.context.cultures, state.cells, state.context.cellPop, town.cell, 3 - town.tier)) : null;
-    const gravity = (i, j, cost) => (state.towns[i].population * state.towns[j].population) / Math.max(cost, FILRODENSWMB.GENERATOR.TRADE.GRAVITY_FLOOR_KM) ** 2 * (mixes ? affinity(state.context.cultures.cultures, mixes[i], mixes[j]) : 1);
+    const war = tradeWar(state);
+    const apart = (i, j) => (war?.split(state.towns[i].cell, state.towns[j].cell) ? war.volume : 1);
+    const gravity = (i, j, cost) => (state.towns[i].population * state.towns[j].population) / Math.max(cost, FILRODENSWMB.GENERATOR.TRADE.GRAVITY_FLOOR_KM) ** 2 * (mixes ? affinity(state.context.cultures.cultures, mixes[i], mixes[j]) : 1) * apart(i, j);
     const pairs = new Map();
     yield* cityPairs(state, pairs, gravity, (done) => progress(0.2 * done));
     largeTownPairs(state, pairs, gravity);
@@ -289,6 +328,8 @@ function layLink(state, link, flows) {
     state.space.run([from], state.cost, { target: to, estimatePerKm: state.estimatePerKm });
     const path = state.space.path(from, to);
     if (!path) return;
+    const callKm = state.context.rules?.callKm ?? null;
+    if (!link.local && callKm !== null) portsOfCall(state, link, path, from, flows, callKm);
     let cell = from;
     for (const edge of path) {
         state.traffic[edge] += link.volume;
@@ -302,6 +343,51 @@ function layLink(state, link, flows) {
         cell = next;
     }
 }
+
+/**
+ * A link's ports of call: along its path, each sea step adds to the sailing since the last landing
+ * and offers the land cells beside it that may load ships as places to put in (a town's first, else
+ * the most food); once the sailing reaches callKm, the best of them takes callShare of the link's
+ * volume as transfer and the count starts again. A port step (a landing) starts it again too.
+ */
+function portsOfCall(state, link, path, from, flows, callKm) {
+    const { graph, cells } = state;
+    const share = state.context.rules.callShare;
+    let cell = from;
+    let sailed = 0;
+    let best = -1;
+    let bestScore = -1;
+    for (const edge of path) {
+        const next = graph.other(edge, cell);
+        const kind = graph.edgeKind[edge];
+        if (kind === EDGE.PORT) {
+            sailed = 0;
+            best = -1;
+            bestScore = -1;
+        } else if (kind === EDGE.SEA) {
+            sailed += graph.edgeKm[edge];
+            for (let slot = graph.adjStart[next]; slot < graph.adjStart[next + 1]; slot++) {
+                const shore = graph.adjCell[slot];
+                if (cells.water[shore] || (cells.wet && !cells.wet[shore])) continue;
+                const score = (state.townAt[shore] >= 0 ? CALL_TOWN_FIRST : 0) + cells.food[shore];
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = shore;
+                }
+            }
+            if (sailed >= callKm && best >= 0) {
+                flows.transfer[best] += link.volume * share;
+                sailed = 0;
+                best = -1;
+                bestScore = -1;
+            }
+        }
+        cell = next;
+    }
+}
+
+/** Added to a shore cell's food when it holds a town, so a town is always the call chosen over empty shore. */
+const CALL_TOWN_FIRST = 1e12;
 
 /** Marks an edge as built (rivers need no road) and makes it cheaper for the links after it. */
 function buildRoad(state, edge) {
@@ -364,8 +450,9 @@ function tradeToTownspeople(state, flows) {
         recordTrade(state, score, flows);
         return;
     }
-    const budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * state.context.totalPop;
+    let budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * (state.context.world.tradeBoom ?? 1) * state.context.totalPop;
     for (const town of state.towns) town.population = town.stage2Pop;
+    budget -= supplySeats(state, budget);
     const byScore = [];
     for (let cell = 0; cell < score.length; cell++) if (score[cell] > 0) byScore.push(cell);
     byScore.sort((a, b) => score[b] - score[a] || a - b);
@@ -379,6 +466,38 @@ function tradeToTownspeople(state, flows) {
     indexTowns(state);
     retier(state);
     recordTrade(state, score, flows);
+}
+
+/**
+ * A seat short of its tier's minimum (a city the reader placed in a desert) lives by trade: before
+ * the round's townspeople are shared among the towns, each such seat draws what it lacks, all of
+ * them together at most SEAT_SUPPLY_SHARE of the round's, so the townspeople in all stay what
+ * trade supports. Returns what the seats drew.
+ */
+function supplySeats(state, budget) {
+    const short = [];
+    let wanted = 0;
+    for (const town of state.towns) {
+        if (town.seatTier === undefined) continue;
+        const lack = state.tierMin[town.seatTier] - town.population;
+        if (lack > 0) {
+            short.push([town, lack]);
+            wanted += lack;
+        }
+    }
+    if (!wanted) return 0;
+    const scale = Math.min(1, (SEAT_SUPPLY_SHARE * budget) / wanted);
+    for (const [town, lack] of short) town.population += lack * scale;
+    return wanted * scale;
+}
+
+/** The most of a round's townspeople the seats short of their tier's minimum may draw between them. */
+const SEAT_SUPPLY_SHARE = 0.5;
+
+/** A port seat (a pin on the Port style) is a port on any cell that may load ships. */
+function portSeat(cells, cell) {
+    if (cells.seats?.get(cell)?.kind !== "port" || cells.coastal[cell] !== 1) return false;
+    return !cells.wet || cells.wet[cell] === 1;
 }
 
 function createTradeTown(state, cell, population, flows) {
@@ -400,7 +519,7 @@ function retier(state) {
 function recordTrade(state, score, flows) {
     for (const town of state.towns) {
         town.trade = score[town.cell];
-        town.port = flows.transfer[town.cell] > 0;
+        town.port = flows.transfer[town.cell] > 0 || portSeat(state.cells, town.cell);
         town.transfer = flows.transfer[town.cell];
         town.through = flows.through[town.cell];
     }

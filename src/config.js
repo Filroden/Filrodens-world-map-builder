@@ -486,8 +486,8 @@ export const FILRODENSWMB = {
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
-        EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "infrastructure", "regions", "labels", "cartography"],
-        VECTOR_TOOLS: ["scene", "features", "infrastructure", "regions", "labels", "cartography"],
+        EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
+        VECTOR_TOOLS: ["scene", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
         // How far (in screen pixels) the pointer must travel after pressing on a node, pin, label or
         // decoration before it counts as a drag. A press-and-release below this - such as either
         // half of a double-click - is a click and must not move the item, record an undo step or
@@ -550,12 +550,19 @@ export const FILRODENSWMB = {
                 crop: ["CropDraw", "CropMove", "CropResize"],
                 // A culture's homeland being picked on the map (see CultureMarkers)
                 homeland: ["PlaceHomeland", "StopHomeland"],
-                // The Travel tool: a click sets where the journey starts (see TravelView)
-                travel: ["SetTravelStart"],
+                // An age's event's place being picked on the map (see AgeEventRows)
+                eventPlace: ["PlaceEventPlace", "StopEventPlace"],
+                // The Travel tool: a click sets where the journey starts, Shift+click shows or hides
+                // the way to the pointer (see TravelView)
+                travel: ["SetTravelStart", "ToggleTravelWay"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
+                // The Influences tool, by mode (see InfluencePainter)
+                influenceRaise: ["InfluenceRaise", "InfluenceRaiseShift"],
+                influenceLower: ["InfluenceLower", "InfluenceLowerShift"],
+                influenceErase: ["InfluenceErase"],
                 // The Regions tool, by edit mode (see RegionPainter)
                 regionSelect: ["SelectRegion"],
                 regionPaint: ["RegionPaint", "RegionPaintShift"],
@@ -623,6 +630,7 @@ export const FILRODENSWMB = {
                 DropMask: "DropMaskTouch",
                 SetTravelStart: "SetTravelStartTouch",
                 PlaceHomeland: "PlaceHomelandTouch",
+                PlaceEventPlace: "PlaceEventPlaceTouch",
             },
         },
         // The keyboard shortcuts sheet (see CanvasHints.sheet and dialogs/shortcuts.hbs). KEYS lists,
@@ -630,13 +638,16 @@ export const FILRODENSWMB = {
         // `FILRODENSWMB.UI.Shortcut…` keys; "everywhere" holds those that work in every tool. SHEET
         // is the sheet's order: one table per tool, a caption per mode, each naming the hint
         // context whose actions it lists. Keep KEYS in step with the key handling in MapStudio
-        // (#handleStudioKeydown), RegionPainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
+        // (#handleStudioKeydown), RegionPainter.handleKey, InfluencePainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
         SHORTCUTS: {
             KEYS: {
                 everywhere: ["Undo", "Redo", "Sheet", "Escape"],
                 regionSelect: ["RegionLetGo"],
                 regionPaint: ["RegionStopStroke"],
                 regionErase: ["RegionStopStroke"],
+                influenceRaise: ["InfluenceStopStroke"],
+                influenceLower: ["InfluenceStopStroke"],
+                influenceErase: ["InfluenceStopStroke"],
                 routeSelect: ["RouteLetGo"],
                 pinSelect: ["PickClose"],
                 labelSelect: ["PickClose"],
@@ -664,7 +675,15 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
                     ],
                 },
-                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolInfluences",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsRaise", context: "influenceRaise" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsLower", context: "influenceLower" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsErase", context: "influenceErase" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }, { caption: "FILRODENSWMB.UI.ShortcutsEventPlace", context: "eventPlace" }] },
                 {
                     title: "FILRODENSWMB.UI.ToolRegions",
                     tables: [
@@ -761,6 +780,7 @@ export const FILRODENSWMB = {
             terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
             biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
             features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
+            influences: { icon: "tune", label: "FILRODENSWMB.UI.ToolInfluences" },
             generate: { icon: "generate", label: "FILRODENSWMB.UI.ToolGenerate" },
             regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
             infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
@@ -775,7 +795,7 @@ export const FILRODENSWMB = {
         },
         STAGES: [
             { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
-            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
+            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["influences", "generate", "regions", "infrastructure", "labels"] },
             { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
             // Tools to look at a finished map with, outside the order of work (no Next leads to them)
             { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history", "travel"], optional: true },
@@ -799,7 +819,8 @@ export const FILRODENSWMB = {
             scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
             terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
             biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
-            features: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            features: { tool: "influences", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            influences: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonInfluences" },
             generate: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonGenerate" },
             regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
             infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
@@ -822,6 +843,7 @@ export const FILRODENSWMB = {
             biomes: "painting",
             // Select starts editing in River (see PickTool.settleForEditing)
             features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
+            influences: "painting",
             generate: null,
             regions: "painting",
             infrastructure: { pin: "placing", route: "drawing" },
@@ -914,6 +936,11 @@ export const FILRODENSWMB = {
         // the area factor, as it serves more of them), and has at least MARKET_MIN_POP
         MARKET_SHARE: 0.06,
         MARKET_MIN_POP: 300,
+        // The people a settlement pin with no figures of its own (drawn on the regional map, or
+        // carried without them) holds, by its style's tier, from generator revision 2 (see
+        // InfillInput.places): each tier's least (a town tier's the generator's minimum, a castle
+        // none of its own)
+        PIN_PEOPLE: Object.freeze({ capital: 15000, city: 15000, largeTown: 4000, town: 1500, fortifiedTown: 1500, port: 1500, marketTown: 300, largeVillage: 1000, village: 100, castle: 0 }),
         // A market needs at least this many people within its reach that no town or market serves yet
         MARKET_MIN_SERVED: 4000,
         // A cell with fewer country people than this has hamlets and farms, not a village
@@ -982,6 +1009,28 @@ export const FILRODENSWMB = {
         MAX_CELLS: 40000,
         // Edges longer than this many cell spacings are not travelled (see TravelTime.edgeDays)
         MAX_EDGE_SPACINGS: 2.5,
+        // From generator revision 2 (see GeneratorRevision.rules, travelCosts): the lie of the
+        // land, the winds and the seasons (see TravelTime.travelConditions).
+        // Climbing: the metres climbed that cost a day of travel, on top of the step's time
+        // (Naismith's hour per 600 m over a six-hour day; a wagon twice as slow). Descent is free.
+        CLIMB_M: Object.freeze({ foot: 3600, mount: 3600, wagon: 1800 }),
+        // Winds at sea, from the climate's prevailing winds (latitude bands, see
+        // ProceduralEngine.getMoistureAt): a ship's speed rises by WITH straight downwind and
+        // falls by AGAINST straight upwind (tacking), scaled by the band's strength; a small boat
+        // feels BOAT of that. Unchanged across the wind, and none when the climate has no wind.
+        WIND: Object.freeze({ WITH: 0.25, AGAINST: 0.4, BOAT: 0.5 }),
+        // The seasons the Travel tool offers: the map's temperatures as drawn, or warmer or
+        // colder by the climate's own season swing (SWING at the poles, none at the equator,
+        // as the Season slider at its ends). Land below freezing is snowbound and closed; within
+        // SNOW_BAND above it, travel goes at SNOW_PACE. A river below freezing has no boats. Sea
+        // or lake below freezing is ice, closed; within COLD_SEA_BAND above it, boats and ships
+        // are up to COLD_SEA_SLOW slower (storms), the most at freezing.
+        SEASONS: Object.freeze(["year", "summer", "winter"]),
+        SEASON_SWING: 0.35,
+        SNOW_BAND: 0.1,
+        SNOW_PACE: 0.5,
+        COLD_SEA_BAND: 0.25,
+        COLD_SEA_SLOW: 0.3,
     }),
     THEMATIC: Object.freeze({
         OPACITY: 0.7,
@@ -1119,8 +1168,8 @@ export const FILRODENSWMB = {
         LICENCE: "https://github.com/Filroden/Filrodens-world-map-builder/blob/main/LICENSE.md",
         SPONSOR: "https://github.com/sponsors/Filroden",
         CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
-        WIKI: "https://github.com/Filroden/Filrodens-world-map-builder/wiki",
-        TUTORIAL: "https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world",
+        WIKI: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/",
+        TUTORIAL: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/tutorial-01-a-new-world/",
         ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
         // The other host: the web version from Foundry, the Foundry module from the web
         WEB_VERSION: "https://fwmb.filroden.com",
@@ -1911,6 +1960,11 @@ export const FILRODENSWMB = {
         NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
         NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
     }),
+    // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the
+    // guide read every COURSE_STEP_PX and each point moved onto the traced river within SNAP_PX;
+    // Name natural features leaves a river to a custom river whose name is shown when at least
+    // COVER_SHARE of that river's course lies within SNAP_PX of it
+    RIVER_LABELS: Object.freeze({ COURSE_STEP_PX: 4, SNAP_PX: 12, COVER_SHARE: 0.5 }),
     // Natural features named by the Labels tool (see FeatureDetection and FeatureNames): the
     // label style each group is named in, how each kind is written ({name} is the proper name),
     // and the old Water style the family replaces
@@ -2348,16 +2402,30 @@ export const FILRODENSWMB = {
     // The figures are tuned to give believable medieval places at world scale, not to be realistic.
     GENERATOR: {
         // Stored with every run so an old run stays explainable after the model changes. Any change
-        // that alters the output for the same seed and settings must bump it.
-        REVISION: 1,
+        // that alters the output for the same seed and settings must bump it. A map records the
+        // revision it was last generated with (or made at, before any run), and what is worked out
+        // live from the map rather than saved with the run (Travel's network, a regional map's
+        // Fill in) follows that map's revision (see GeneratorRevision).
+        REVISION: 2,
+        // Each revision by name, so every rule that differs between them is gated on its own
+        // name: LEGACY for every map made before maps recorded a revision
+        REVISIONS: Object.freeze({ LEGACY: 1, REVISION_2: 2 }),
         // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
         // troubled, the world multipliers at 1, Human Generic names.
         DEFAULT_NAME_BASE: "Human Generic",
         // Era: development is the share of the land's food capacity actually farmed; plague the share
         // of people lost to a recent great pandemic (the Black Death took 30 to 50%).
+        // An era may also carry world multipliers (urbanisation, fragmentation: a dark age has fewer,
+        // smaller towns and more, smaller realms), a capacity multiplier (an age of advancement's
+        // better farming, tools and boats: land and sea feed more) and a frontier lift (an age of
+        // expansion: marginal land, growing less food per km² than the median, fed up to 1 + frontier
+        // times as many). Listed in the Ages list in this order.
         ERAS: Object.freeze({
+            darkAge: Object.freeze({ development: 0.35, plague: 0, urbanisation: 0.6, fragmentation: 1.5 }),
             earlyMedieval: Object.freeze({ development: 0.45, plague: 0 }),
             highMedieval: Object.freeze({ development: 0.7, plague: 0 }),
+            expansion: Object.freeze({ development: 0.7, plague: 0, frontier: 0.8 }),
+            advancement: Object.freeze({ development: 0.75, plague: 0, capacity: 1.3 }),
             afterPlague: Object.freeze({ development: 0.75, plague: 0.35 }),
         }),
         DEFAULT_ERA: "highMedieval",
@@ -2373,7 +2441,46 @@ export const FILRODENSWMB = {
         AGES: Object.freeze({
             INERTIA: 0.6,
             INVASION: Object.freeze({ SPREAD: 0.5, STRIFE: 0.35 }),
-            EVENTS: Object.freeze(["arrival", "invasion"]),
+        }),
+        // An age's events (see AgeEvents), at most one of each kind, grouped and ordered by scale as
+        // the Ages list offers them. Peoples events name a culture (it is absent from the ages before
+        // its first); the others may name a place on the map (a realm event acts on the realm holding
+        // it, a disaster centres on it, a trade war sets that realm against the rest), else the
+        // largest realm (or the largest coastal or river town of the age before).
+        EVENTS: Object.freeze({
+            GROUPS: Object.freeze({
+                peoples: Object.freeze(["invasion", "arrival", "migration", "colonisation"]),
+                hardship: Object.freeze(["plague", "famine", "disaster"]),
+                realms: Object.freeze(["collapse", "civilWar", "union"]),
+                prosperity: Object.freeze(["tradeBoom", "tradeWar"]),
+            }),
+            PEOPLES: Object.freeze(["invasion", "arrival", "migration", "colonisation"]),
+            PLACED: Object.freeze(["disaster", "collapse", "civilWar", "union", "tradeWar"]),
+            // A plague takes PLAGUE more of the people, on top of the era's
+            PLAGUE: 0.35,
+            // A famine takes FAMINE_BASE everywhere, and up to FAMINE_MARGINAL more on marginal land
+            FAMINE_BASE: 0.1,
+            FAMINE_MARGINAL: 0.4,
+            // A disaster: within DISASTER_KM of its centre (over the cells, not by travel) the land
+            // feeds up to DISASTER_LOSS fewer, fading; no town stands within DISASTER_BAR_KM
+            DISASTER_KM: 50,
+            DISASTER_LOSS: 0.7,
+            DISASTER_BAR_KM: 15,
+            // A trade boom multiplies the age's trade budget
+            TRADE_BOOM: 2,
+            // A trade war (the final trade round): trade between realms carries TRADE_WAR_VOLUME of its
+            // volume, and a step across their border costs TRADE_WAR_COST times as much
+            TRADE_WAR_VOLUME: 0.25,
+            TRADE_WAR_COST: 3,
+            // A civil war: the realm splits between its richest duchy and the rival splitting it most
+            // evenly; strife rises by CIVIL_WAR_STRIFE in its land
+            CIVIL_WAR_STRIFE: 0.3,
+            // A collapse: strife rises by COLLAPSE_STRIFE in the realm's land
+            COLLAPSE_STRIFE: 0.3,
+            // A migrant people spreads into land another people held in the age before at
+            // MIGRATION_SPREAD times the cost; a colonist into land a realm held at COLONY_SPREAD
+            MIGRATION_SPREAD: 2,
+            COLONY_SPREAD: 3,
         }),
         // What a run writes onto the map, as the Generate panel's Output section starts: the levels
         // below Realms, the settlement tiers given pins (capitals always are), the kinds of route,
@@ -2476,10 +2583,12 @@ export const FILRODENSWMB = {
         // Stage 1, the base layer: what each model cell holds.
         VALUES: Object.freeze({
             // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds
-            // this many per km² of a coastal cell's land
+            // this many per km² of a coastal cell's land (LEGACY_FISHING_DENSITY before revision 2,
+            // see GeneratorRevision.rules), enough for open coasts to hold fishing towns
             PEAK_DENSITY: 60,
             PASTURE_SHARE: 0.2,
-            FISHING_DENSITY: 8,
+            FISHING_DENSITY: 30,
+            LEGACY_FISHING_DENSITY: 8,
             // Crops: no harvest below the first temperature, full by the second, losing HOT_LOSS
             // towards the hottest (leached soils); moisture likewise, losing WET_LOSS when waterlogged
             CROP_TEMPERATURE: Object.freeze([0.25, 0.5]),
@@ -2520,6 +2629,16 @@ export const FILRODENSWMB = {
             ROAD_FACTOR: 0.5,
             LANE_FACTOR: 0.6,
         }),
+        // Ports, from revision 2 (see GeneratorRevision.rules). A land cell loads ships only when at
+        // least WATER_SHARE of its own pixels are sea or lake, so trade walks overland to such a cell
+        // and that cell becomes the port. A trade link that sails CALL_KM without landing puts in at
+        // the best shore cell beside the lane it has passed since (a town's first, else the most
+        // food), which takes CALL_SHARE of the link's volume as transfer: a port of call.
+        PORTS: Object.freeze({
+            WATER_SHARE: 0.02,
+            CALL_KM: 150,
+            CALL_SHARE: 0.25,
+        }),
         // Cultures. With the single default culture every culture effect is neutral.
         CULTURES: Object.freeze({
             DEFAULT: Object.freeze({ name: "", color: "#8a8a8a", nameBase: "Human Generic", openness: 0.5, density: 1, habitat: Object.freeze({}) }),
@@ -2533,6 +2652,12 @@ export const FILRODENSWMB = {
                 coast: Object.freeze({ min: -1, max: 1, default: 0 }),
                 river: Object.freeze({ min: -1, max: 1, default: 0 }),
             }),
+            // Where a culture's climate comes from (see CultureClimate): its chosen biomes, or
+            // zones set by hand. Saved with cultures, so they must never be renamed
+            CLIMATES: Object.freeze({ BIOMES: "biomes", ZONES: "zones" }),
+            // The share of the map's land a culture's climate may take in before the culture
+            // inspector warns that it does little
+            CLIMATE_WIDE: 0.6,
             // The most cultures a map holds, and the most homelands each may have
             MAX: 24,
             MAX_HOMELANDS: 12,
@@ -2664,6 +2789,27 @@ export const FILRODENSWMB = {
             CASTLE_PASS_RELIEF_M: 400,
             CASTLE_BORDER_KM: 30,
             CASTLE_SCORE: 1.5,
+        }),
+        // Influences (see Influences): a value painted on the map's land with a brush, from
+        // -LEVELS to LEVELS (0 is none; LEVELS for the most), so a feathered stroke fades into the
+        // land round it. A value v (as a share of LEVELS, -1 to 1) stands for the factor
+        // MAX_FACTOR to the power v: food capacity multiplies what the land feeds by it (above 0
+        // more, below less); security above 0 (safer) divides the strife felt there by it, below 0
+        // (more dangerous) multiplies it. A more dangerous value also makes the painted land a
+        // source of threat, DANGER_THREAT at the most dangerous and in proportion above it, fading
+        // with distance as unclaimed wild land's does (FEEDBACK.WILD_KM), since scaling the strife
+        // alone does nothing where nothing threatens (a heartland by its seat). BRUSH holds the
+        // Influences bar's strength (the share of LEVELS one stroke adds at the brush's core) and
+        // feather (the solid share of its radius, as the terrain brush's), with their ranges.
+        INFLUENCES: Object.freeze({
+            KINDS: Object.freeze(["capacity", "security"]),
+            LEVELS: 100,
+            MAX_FACTOR: 3.375,
+            DANGER_THREAT: 1,
+            BRUSH: Object.freeze({
+                STRENGTH: Object.freeze({ MIN: 0.05, MAX: 1, STEP: 0.05, DEFAULT: 0.25 }),
+                FEATHER: Object.freeze({ MIN: 0, MAX: 0.9, STEP: 0.1, DEFAULT: 0.4 }),
+            }),
         }),
         // Generated routes are classed by traffic: the busiest TRUNK_SHARE of their steps trunk,
         // up to MAIN_SHARE main, the rest minor.

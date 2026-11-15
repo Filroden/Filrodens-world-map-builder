@@ -15,12 +15,16 @@ const TITLES = Object.freeze({
     route: "FILRODENSWMB.UI.MassEditRoutesTitle",
     region: "FILRODENSWMB.UI.MassEditRegionsTitle",
     label: "FILRODENSWMB.UI.MassEditLabelsTitle",
+    river: "FILRODENSWMB.UI.MassEditRiversTitle",
 });
 /** The value of a select left as is. */
 const KEEP = "";
+/** The label section's Position row (see #placementRow), and its one choice. */
+const PLACEMENT = "placement";
+const PLACE_AUTOMATICALLY = "auto";
 
 /**
- * Mass edit: the inspector's fields for several pins, routes, regions or standalone labels at once
+ * Mass edit: the inspector's fields for several pins, routes, regions, custom rivers or standalone labels at once
  * (see FieldSpecs), in one dialogue drawn from the kind's field descriptions: the item's fields,
  * then (for a pin, route or region) its label's.
  *
@@ -34,6 +38,11 @@ const KEEP = "";
  * **Styles** follow the inspector's rules (InspectorFields.settleStyle): a style picked writes its
  * fields (the dialogue shows them at once, in the rows it fills), and a styled field changed by
  * hand makes the items Custom (the dialogue moves the style to Custom as it is touched).
+ *
+ * **Place automatically:** when any chosen pin's, route's or region's label has been moved (a
+ * position of its own), the label section ends with a Position row (Leave as is, Place
+ * automatically) that hands every chosen label back to the map's placement (see
+ * InspectorFields.placeLabel), their looks kept.
  */
 export class MassEdit {
     /**
@@ -75,6 +84,8 @@ export class MassEdit {
                 return app.regionLevels.flatMap((level) => level.regions).filter((region) => ids.has(region.id));
             case "label":
                 return app.mapLabels.filter((label) => ids.has(label.id));
+            case "river":
+                return (app.manualRivers ?? []).filter((river) => ids.has(river.id));
             default:
                 return [];
         }
@@ -89,8 +100,29 @@ export class MassEdit {
         const currents = items.map((item) => kind.current(app, item));
         const rows = (store) => kind.fields.filter((field) => field.store === store).map((field) => this.#row(app, field, currents, items));
         const sections = [{ legend: kind.legend, rows: rows("item") }];
-        if (kind.hasLabel) sections.push({ legend: "FILRODENSWMB.UI.InspectorLabel", rows: rows("label") });
+        if (kind.hasLabel) {
+            const labelRows = rows("label");
+            const placement = this.#placementRow(items);
+            if (placement) labelRows.push(placement);
+            sections.push({ legend: "FILRODENSWMB.UI.InspectorLabel", rows: labelRows });
+        }
         return { count: items.length, sections, palette: FILRODENSWMB.LABELS?.PRESETS || [] };
+    }
+
+    /** The Position row, offered when any chosen item's label has a position of its own; null otherwise. */
+    static #placementRow(items) {
+        const moved = items.filter((item) => Number.isFinite(item.label?.x) || Number.isFinite(item.label?.y)).length;
+        if (!moved) return null;
+        return {
+            name: `label.${PLACEMENT}`,
+            id: `fwmb-mass-label-${PLACEMENT}`,
+            label: platform.i18n.format("FILRODENSWMB.UI.MassEditLabelPosition", { count: moved.toLocaleString(platform.i18n.lang) }),
+            isSelect: true,
+            mixed: true,
+            options: [{ value: PLACE_AUTOMATICALLY, label: "FILRODENSWMB.UI.InspectorLabelPlace", selected: false }],
+            value: KEEP,
+            initial: JSON.stringify({ value: KEEP, none: false }),
+        };
     }
 
     /** One field's row: its control's choices, and the value the items share (or Mixed). */
@@ -312,16 +344,25 @@ export class MassEdit {
             if (substantive) GeneratedEdits.mark(item);
             if (kind.hasLabel) {
                 this.#applyStore(app, item, kind.style, changes.filter((change) => change.store === "item"), fields, "item", type);
-                const label = { ...(item.label ?? {}) };
-                if (changes.some((change) => change.store === "label")) {
-                    this.#applyStore(app, label, FieldSpecs.labelStyle, changes.filter((change) => change.store === "label"), fields, "label", "ownedLabel");
-                    item.label = { ...(item.label ?? {}), ...label };
+                // A kind's label it has none of yet starts as the kind says (a custom river's hidden)
+                const label = { ...(item.label ?? kind.newLabel?.(app) ?? {}) };
+                const labelChanges = changes.filter((change) => change.store === "label" && change.key !== PLACEMENT);
+                if (labelChanges.length) {
+                    this.#applyStore(app, label, FieldSpecs.labelStyle, labelChanges, fields, "label", "ownedLabel");
+                    item.label = { ...(item.label ?? kind.newLabel?.(app) ?? {}), ...label };
+                }
+                // Place automatically: the label's own position goes, so the map places it
+                if (item.label && changes.some((change) => change.store === "label" && change.key === PLACEMENT && change.value === PLACE_AUTOMATICALLY)) {
+                    const { x: _x, y: _y, ...rest } = item.label;
+                    item.label = rest;
                 }
             } else {
                 this.#applyStore(app, item, kind.style, changes, fields, "item", type);
             }
         }
         app._repaintVectors();
+        // A custom river's width carves it again
+        if (kind.terrainFields && changes.some((change) => change.store === "item" && kind.terrainFields.includes(change.key))) app.requestTerrainUpdate?.();
         app.markDirty();
         return true;
     }

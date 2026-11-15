@@ -58,6 +58,13 @@ const FAMILIES = [
     { prefix: "FILRODENSWMB.UI.GenerateEra", values: CONFIG.replace(/(\w+):/g, '"$1":') },
     { prefix: "FILRODENSWMB.UI.GenerateStrife", values: CONFIG.replace(/(\w+):/g, '"$1":') },
     "FILRODENSWMB.UI.GenerateEvent",
+    // What an era, strife or event does, and an event's kind and group, by the era's, kind's or group's id
+    // (GENERATOR.ERAS, GENERATOR.EVENTS)
+    { prefix: "FILRODENSWMB.UI.GenerateEraHint", values: CONFIG.replace(/(\w+):/g, '"$1":') },
+    { prefix: "FILRODENSWMB.UI.GenerateStrifeHint", values: CONFIG.replace(/(\w+):/g, '"$1":') },
+    { prefix: "FILRODENSWMB.UI.GenerateEventKind", values: CONFIG },
+    { prefix: "FILRODENSWMB.UI.GenerateEventHint", values: CONFIG },
+    { prefix: "FILRODENSWMB.UI.GenerateEventGroup", values: CONFIG.replace(/(\w+):/g, '"$1":') },
     "FILRODENSWMB.BIOMES.",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
@@ -108,7 +115,7 @@ const US_GB = {
     initialization: "initialisation", randomize: "randomise", randomized: "randomised", recognized: "recognised",
     neighbor: "neighbour", neighbors: "neighbours", neighboring: "neighbouring", dialog: "dialogue", dialogs: "dialogues",
     license: "licence", gray: "grey", urbanization: "urbanisation", behavior: "behaviour", favorite: "favourite", customize: "customise", organize: "organise",
-    kilometer: "kilometre", kilometers: "kilometres",
+    kilometer: "kilometre", kilometers: "kilometres", colonize: "colonise", colonization: "colonisation",
 };
 const swap = (text, table) => text.replace(/[A-Za-z]+/g, (word) => {
     const swapped = table[word.toLowerCase()];
@@ -134,7 +141,7 @@ test("en.json is US English, and en-gb.json gives the British spelling of every 
 const PROPER = new Set(
     `Foundry VTT Filroden Filroden's World Map Builder Delaunay Pixi Three Handlebars Material Symbols Pinhead Atkinson Hyperlegible
     Sora Barlow Semi Condensed Noto Serif Sans Ko-fi GitHub Sponsors Ctrl Shift Alt Enter Escape Esc Backspace Tab Space Home End
-    American`.split(/\s+/),
+    American Political`.split(/\s+/),
 );
 /**
  * Strings that are the pattern of a proper name rather than a label: the generator names a castle

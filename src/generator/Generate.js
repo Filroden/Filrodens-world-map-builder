@@ -3,6 +3,7 @@ import { payloadTransfer } from "./GeneratorInput.js";
 import { runGenerator } from "./Pipeline.js";
 import { buildTravelGraph } from "../travel/TravelGraph.js";
 import { runInfill } from "./Infill.js";
+import { landCapacity } from "./LandCapacity.js";
 
 /**
  * Runs the generator in the background worker (the `generate` task), or on the main thread where
@@ -47,6 +48,20 @@ export function travelGraphInBackground(makePayload) {
     return GenerationWorkers.runOne("travelGraph", payload, {
         transfer: payloadTransfer(payload),
         alone: () => buildTravelGraph(isDetached(payload) ? makePayload() : payload),
+    });
+}
+
+/**
+ * The food the land feeds per model cell (see LandCapacity) in the background worker, or on the
+ * main thread as generateInBackground does.
+ * @param {function(): import("./GeneratorInput.js").GeneratorPayload} makePayload
+ * @returns {Promise<{capacity: Float32Array, landArea: Float32Array, water: Uint8Array}>}
+ */
+export function capacityInBackground(makePayload) {
+    const payload = makePayload();
+    return GenerationWorkers.runOne("capacity", payload, {
+        transfer: payloadTransfer(payload),
+        alone: () => landCapacity(isDetached(payload) ? makePayload() : payload),
     });
 }
 

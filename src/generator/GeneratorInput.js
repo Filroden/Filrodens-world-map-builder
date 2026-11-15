@@ -25,6 +25,19 @@ import { FILRODENSWMB } from "../config.js";
  * @property {{pixelsPerBaseline: number, list: {merges: boolean, x: Int32Array, y: Int32Array, lake: Uint8Array, flow: Float32Array|null}[]}} rivers
  * @property {string} mapSeed
  * @property {object} settings - The user's settings (see GeneratorSettings).
+ * @property {{cell: number, kind: string, pin: string, x: number|null, y: number|null, land: boolean|null}[]} seats -
+ *   The map's settlement pins the run must build on, each by its model cell and its style's tier,
+ *   with the pin's map point and whether it stands on land (see Pipeline.seatsOf).
+ * @property {number} revision - The generator rules to follow (see GeneratorRevision): the current
+ *   ones for a run, the map's own for what is worked out live from the map (Travel, Fill in).
+ * @property {{realms: object[], duchies: object[], counties: object[]}|null} userRegions - The map's
+ *   own realms, duchies and counties a run builds round (see Generation.userRegions and
+ *   UserRealms), each `{ key, cells, independent? }` by model cell; null for none.
+ * @property {{transport: string, cells: number[]}[]} routes - The map's own routes the run's trade
+ *   may use (see Generation.userRoutes and UserRoutes), each by its transport and the model cells
+ *   its drawn line passes through, in order.
+ * @property {{capacity: Int8Array|null, security: Int8Array|null}|null} influences - The values
+ *   painted on the map's land (see InfluenceLevels), one per pixel for each kind painted; null for none.
  */
 
 /**
@@ -38,9 +51,14 @@ import { FILRODENSWMB } from "../config.js";
  * @param {object[]} [source.customBiomes]
  * @param {string} source.mapSeed
  * @param {object} [source.settings]
+ * @param {{cell: number, kind: string, pin: string, x?: number, y?: number, land?: boolean}[]} [source.seats] - Settlement pins as seats.
+ * @param {number} [source.revision] - The generator rules to follow; the current ones when left out.
+ * @param {object|null} [source.userRegions] - The map's own realms, duchies and counties (see GeneratorPayload).
+ * @param {{transport: string, cells: number[]}[]} [source.routes] - The map's own routes (see GeneratorPayload).
+ * @param {{capacity?: Int8Array|null, security?: Int8Array|null}|null} [source.influences] - The painted influences per pixel (see GeneratorPayload).
  * @returns {GeneratorPayload}
  */
-export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {} }) {
+export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {}, seats = [], revision = FILRODENSWMB.GENERATOR.REVISION, userRegions = null, routes = [], influences = null }) {
     return {
         width: mesh.width,
         height: mesh.height,
@@ -59,7 +77,19 @@ export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverD
         rivers: riverList(riverData),
         mapSeed: String(mapSeed ?? ""),
         settings: structuredClone(settings ?? {}),
+        seats: seats.map(({ cell, kind, pin, x = null, y = null, land = null }) => ({ cell, kind, pin, x, y, land })),
+        revision,
+        userRegions: userRegions ? structuredClone(userRegions) : null,
+        routes: routes.map(({ transport, cells }) => ({ transport, cells: Array.from(cells) })),
+        influences: influencesOf(influences),
     };
+}
+
+/** The painted influences as the payload carries them: a copy of each kind painted, or null when none is. */
+function influencesOf(influences) {
+    const capacity = influences?.capacity ? Int8Array.from(influences.capacity) : null;
+    const security = influences?.security ? Int8Array.from(influences.security) : null;
+    return capacity || security ? { capacity, security } : null;
 }
 
 /** The model cell under every pixel: the parent of the display cell there. */
@@ -76,7 +106,7 @@ function modelOfPixels(mesh) {
  * a lake), its flow at each point (upstream length in baseline pixels), and whether it ends by
  * joining another river.
  */
-function riverList(riverData) {
+export function riverList(riverData) {
     const flows = riverData?.network?.flows;
     const list = (riverData?.vectors ?? []).map((river) => {
         const path = river.path ?? [];
@@ -96,6 +126,7 @@ function riverList(riverData) {
 export function payloadTransfer(payload) {
     const buffers = [payload.modelSites, payload.modelOf, payload.elevation, payload.moisture, payload.temperature, payload.waterMask, payload.biomeOverrides];
     for (const river of payload.rivers.list) buffers.push(river.x, river.y, river.lake, river.flow);
+    if (payload.influences) buffers.push(payload.influences.capacity, payload.influences.security);
     return [...new Set(buffers.filter(Boolean).map((array) => array.buffer))];
 }
 

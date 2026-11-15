@@ -27,7 +27,7 @@ export default {
     intro: `Over these twelve pages you build one complete map, using nearly every tool in the studio. Each page ends with the map saved, and the next page starts from it, so you can follow the whole tutorial on one map. If you skip a page, or your map has drifted from the pictures, each page links the map as it should be at its start.
 
 The tutorial's map uses the **Guided** engine: you draw where the land goes and the engine makes the terrain inside your shapes. Your shapes will not match the pictures exactly, and that is fine. To have exactly the tutorial's map, import the file in **Start from** at the top of the next page.`,
-    narration: "In this first tutorial we're going to create the map the whole tutorial builds on: a Guided map, where we'll draw where the land goes and let the engine do the rest.",
+    narration: "First, we'll create the map the whole tutorial builds on: a Guided map, where we draw where the land goes and let the engine do the rest.",
 
     steps: [
         {

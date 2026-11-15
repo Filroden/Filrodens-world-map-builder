@@ -1,7 +1,8 @@
 {{!--
     Travel (tool id "travel"; see TravelView): how long a journey takes from a start clicked on the
-    map. The way of travel over land, the map's speeds (rivers and the sea at their own, whichever
-    way over land), the start with the place nearest it, and the journey exported as an image.
+    map. The way of travel over land, the season (or, on a map made with an older generator, how
+    to bring the seasons), the map's speeds (rivers and the sea at their own, whichever way over
+    land), the start with the place nearest it, and the journey exported as an image.
 --}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelStart" title="FILRODENSWMB.UI.SectionTravelStart"}}
     {{#unless travel.ready}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelBuilding"}}</p>{{/unless}}
@@ -11,10 +12,12 @@
         <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="clearTravelStart">{{localize "FILRODENSWMB.UI.TravelStartClear"}}</button>
     </div>
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelStartMove"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="toggleTravelWay" aria-pressed="{{#if travel.wayShown}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.TravelWayHint'}}">{{#if travel.wayShown}}{{localize "FILRODENSWMB.UI.TravelWayHide"}}{{else}}{{localize "FILRODENSWMB.UI.TravelWayShow"}}{{/if}}</button>
     {{else}}
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelStartHint"}}</p>
     {{/if}}
     {{#if travel.noRoads}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelNoRoads"}}</p>{{/if}}
+    {{#if travel.startClosed}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelStartClosed"}}</p>{{/if}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelMode" title="FILRODENSWMB.UI.SectionTravelMode"}}
@@ -26,6 +29,21 @@
         {{/each}}
     </div>
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelModeHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelSeason" title="FILRODENSWMB.UI.SectionTravelSeason"}}
+    {{#if travel.seasons}}
+    <div role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.SectionTravelSeason'}}" class="fwmb-list-container fwmb-history-ages fwmb-travel-modes">
+        {{#each travel.seasons}}
+        <button type="button" role="radio" aria-checked="{{#if this.chosen}}true{{else}}false{{/if}}" class="fwmb-list-item fwmb-history-age" data-action="chooseTravelSeason" data-season="{{this.id}}">
+            <span class="fwmb-history-age-name">{{localize this.label}}</span>
+        </button>
+        {{/each}}
+    </div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelSeasonHint"}}</p>
+    {{else}}
+    <p class="fwmb-hint">{{localize travel.older}}</p>
+    {{/if}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelBands" title="FILRODENSWMB.UI.SectionTravelBands"}}

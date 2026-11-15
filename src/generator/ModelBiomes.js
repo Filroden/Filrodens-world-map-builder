@@ -128,9 +128,12 @@ export function behavesLikeTable(customBiomes = []) {
  * @param {object} input.biomeParams - { customBiomeRules, biomePalette, biomeSides }, as
  *     MapStateManager.getDerivedMapParameters compiles them for the biome layer.
  * @param {object[]} [input.customBiomes]
+ * @param {Uint8Array|null} [shown] - Filled, when given, with the biome each land pixel shows (a
+ *     custom biome as itself, whatever it behaves as; 0 for water), in the same pass, for the
+ *     cultures whose climate is chosen biomes (see CultureClimate).
  * @returns {Uint8Array}
  */
-export function modelBiomeRaster(input) {
+export function modelBiomeRaster(input, shown = null) {
     const { elevation, moisture, temperature, waterMask, biomeOverrides, seaLevel, biomeParams } = input;
     const behaves = behavesLikeTable(input.customBiomes);
     const out = new Uint8Array(elevation.length);
@@ -141,6 +144,7 @@ export function modelBiomeRaster(input) {
         const override = biomeOverrides ? biomeOverrides[pixel] : 0;
         const { land } = ProceduralEngine.resolveBiomeLookup(override, height, moisture[pixel], temperature[pixel], seaLevel, waterMask, pixel, rules, biomeParams?.biomePalette, biomeParams?.biomeSides);
         out[pixel] = modelIdOf(land, behaves, () => ProceduralEngine.getBiomeKey(height, moisture[pixel], temperature[pixel], seaLevel));
+        if (shown) shown[pixel] = typeof land === "string" ? (FILRODENSWMB.BIOME_IDS[land] ?? 0) : Number(land) || 0;
     }
     return out;
 }

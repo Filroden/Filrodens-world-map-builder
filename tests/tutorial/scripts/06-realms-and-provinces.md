@@ -4,7 +4,7 @@
 
 **Goal:** Make the generated realms your own, merging, renaming and recolouring them, and paint a region of your own in a set of its own.
 
-**Opening narration:** In this tutorial we're going to make the generated realms our own, and paint a region of our own.
+**Opening narration:** The generator has made its realms. Now we'll make them our own, then paint a region by hand.
 
 ## 1. Open Regions
 
@@ -23,12 +23,12 @@
 
 ## 2. Find the island realms
 
-**Narration:** The big island in the east is split between two realms. Choose Dudge, and Focus view zooms the map to it.
+**Narration:** The big island in the east is split between two realms. Choose Shershoveria, and Focus view zooms the map to it.
 
 **On screen:**
 
-- Click Dudge.
-- Point at Dudge's row.
+- Click Shershoveria.
+- Point at Shershoveria's row.
 - Click Focus view.
 
 **Camera:** the whole studio
@@ -39,15 +39,15 @@
 
 ## 3. Merge the realms
 
-**Narration:** Unite the island: merge Stansteria into Dudge.
+**Narration:** Unite the island: merge Chister into Shershoveria.
 
 **On screen:**
 
-- Point at Stansteria's row.
-- Click ⋮ on Stansteria.
+- Point at Chister's row.
+- Click ⋮ on Chister.
 - Click Merge into.
 - The dialogue opens.
-- Set Merge into to Dudge.
+- Set Merge into to Shershoveria.
 
 **Camera:** the dialog
 

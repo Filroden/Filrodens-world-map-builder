@@ -4,7 +4,7 @@
 
 **Goal:** Read what the generator worked out about your world, see it as it was in an earlier age, and time a journey across it.
 
-**Opening narration:** In this tutorial we're going to explore the world the generator made: its people and trade, its history, and how long it takes to travel.
+**Opening narration:** Let's explore the world the generator made: its people and trade, its history, and how long it takes to travel.
 
 ## 1. Show the population
 
@@ -18,7 +18,7 @@
 - Click Thematic layers in the map controls.
 - Click Population.
 - Press Escape to close the menu.
-- Point at the land near Golenduos.
+- Point at the land near Kineley.
 
 **Camera:** the whole studio
 
@@ -95,14 +95,15 @@
 
 ## 6. Time a journey
 
-**Narration:** Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Dudgeton, and the way is drawn: by road to the coast, and then by ship.
+**Narration:** Open Travel, choose By wagon, and click Pickermouth to start. The bands show the days to reach every part of the land. Shift-click to show the way, point at Shershover, and it's drawn: by road to the coast, and then by ship. The information bar gives the time there, and back.
 
 **On screen:**
 
 - Click Travel on the rail.
 - Click By wagon.
-- Click Kansmarda to start the journey.
-- Point at Dudgeton.
+- Click Pickermouth to start the journey.
+- Shift+Click the map to show the way to the pointer.
+- Point at Shershover.
 
 **Camera:** the whole studio
 

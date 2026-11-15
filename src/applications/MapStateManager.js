@@ -111,6 +111,9 @@ export class MapStateManager {
             world: null,
             // Whether the generator's outputs were made with a different km scale than the map has now (see MapStudio's area factor setting)
             generatorStale: false,
+            // A new map follows the current generator rules (see GeneratorRevision); a regional map
+            // takes its parent's (see RegionalExtractor)
+            generatorRevision: FILRODENSWMB.GENERATOR.REVISION,
             // The Generate panel's settings: the run's seed (empty for the map's), name style,
             // world multipliers and output switches (see GeneratePanel)
             generatorSettings: panelSettings(),
@@ -139,6 +142,11 @@ export class MapStateManager {
             brushSize: 20,
             brushStrength: 0.02,
             brushFeather: 0.4,
+            // The Influences tool's kind, mode and brush (see InfluenceView and InfluencePainter)
+            influenceKind: "capacity",
+            influencePaintMode: "raise",
+            influenceStrength: FILRODENSWMB.GENERATOR.INFLUENCES.BRUSH.STRENGTH.DEFAULT,
+            influenceFeather: FILRODENSWMB.GENERATOR.INFLUENCES.BRUSH.FEATHER.DEFAULT,
             brushBiome: FILRODENSWMB.BIOME_IDS.GRASSLAND,
             customBiomes: [],
             nextCustomBiomeId: FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID,
@@ -265,7 +273,7 @@ export class MapStateManager {
             historyAge: null,
             // The Travel tool's way of travel, speeds (km a day), band width (null for automatic) and
             // start (see TravelView)
-            travel: { mode: "foot", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
+            travel: { mode: "foot", season: "year", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
             // The map's unit (see MapUnit): the name every distance shown is labelled with
             mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,
@@ -323,6 +331,10 @@ export class MapStateManager {
             customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
             // The Generate panel's cultures, edited as the styles are (see CultureLists)
             cultures: platform.utils.deepClone(app.uiState?.cultures ?? []),
+            // The Generate panel's ages, edited in their inspector (see AgeEditor)
+            ages: platform.utils.deepClone(app.uiState?.generatorSettings?.ages ?? null),
+            // What the last fill-in read (see Infilling.inputs), so undoing a fill-in gives back the one before
+            infill: app.infillInputs ? { ...app.infillInputs } : null,
             styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
         };
     }
@@ -356,6 +368,8 @@ export class MapStateManager {
         app.activeRegionId = state.activeRegionId || null;
         app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
         if (Array.isArray(state.cultures)) app.uiState.cultures = state.cultures;
+        if ("infill" in state) app.infillInputs = state.infill;
+        if (Array.isArray(state.ages)) app.uiState.generatorSettings = { ...(app.uiState.generatorSettings ?? {}), ages: state.ages };
         for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
     }
 

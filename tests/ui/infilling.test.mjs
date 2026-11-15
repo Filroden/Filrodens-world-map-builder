@@ -144,7 +144,7 @@ test("the Fill in section: shown on regional maps, offered when the parent's cel
     assert.equal(Infilling.context({ ...app, parentRun: null }).reason, "FILRODENSWMB.UI.InfillNoParentRun");
 
     const fine = { ...app, parentRun: { ...app.parentRun, spacingPx: FILRODENSWMB.INFILL.MIN_PARENT_PX } };
-    assert.deepEqual(Infilling.context(fine), { offered: true, reason: null, counts: { markets: 0, villages: 0, lanes: 0 }, shown: { markets: "0", villages: "0", lanes: "0" }, again: false });
+    assert.deepEqual(Infilling.context(fine), { offered: true, reason: null, counts: { markets: 0, villages: 0, lanes: 0 }, shown: { markets: "0", villages: "0", lanes: "0" }, again: false, stale: false, badge: null });
 
     const { result, grid } = infillOf(app);
     const made = Infilling.apply(app, result, grid);
@@ -178,4 +178,65 @@ test("a fill-in starts the map at the most detailed level whose new places stand
     assert.equal(Infilling.startLevel(app, places("village", fits)), DETAIL.EVERYTHING, "all far enough apart");
     assert.equal(Infilling.startLevel(app, [...places("village", fits * 4), ...places("marketTown", fits)]), DETAIL.LOCAL, "only the market towns and large villages");
     assert.ok(Infilling.startLevel(app, [...places("village", fits * 4), ...places("largeVillage", fits * 2)]) < DETAIL.LOCAL, "not even those");
+});
+
+test("Fill in shows out of date once the places, routes or food capacity it read change, and undo clears it", () => {
+    const app = studio();
+    const { result, grid } = infillOf(app);
+    assert.equal(Infilling.stale(app), false, "no fill-in, never out of date");
+    Infilling.apply(app, result, grid);
+    assert.ok(app.infillInputs && typeof app.infillInputs.places === "string", "the fingerprint kept with the map");
+    assert.equal(Infilling.stale(app), false, "the map just filled in");
+    assert.equal(Infilling.context(app).badge, null);
+
+    const town = app.mapPins.find((pin) => pin.id === "inherited-town");
+    town.name = "Ashby Magna";
+    assert.equal(Infilling.stale(app), false, "a name is not read");
+    town.x += 20;
+    assert.equal(Infilling.stale(app), true, "a place it built round moved");
+    assert.equal(Infilling.context(app).badge, "FILRODENSWMB.UI.GenerateOutOfDate");
+    town.x -= 20;
+    assert.equal(Infilling.stale(app), false, "moved back, up to date again");
+
+    app.mapRoutes.push({ id: "road", transport: "road", waypoints: [1, 2], legs: [[1, 2]] });
+    assert.equal(Infilling.stale(app), true, "a route added");
+    app.mapRoutes.pop();
+    assert.equal(Infilling.stale(app), false);
+
+    const influences = app.meshSession.influences;
+    influences.layer("security").set([10, 11, 12], -50);
+    assert.equal(Infilling.stale(app), false, "security is not read");
+    influences.layer("capacity").set([10, 11, 12], 50);
+    assert.equal(Infilling.stale(app), true, "food capacity painted");
+    influences.layer("capacity").set([10, 11, 12], 0);
+    influences.layer("security").set([10, 11, 12], 0);
+
+    // Undoing the fill-in gives back the fingerprint before it (none), and redo this one's
+    const kept = app.infillInputs;
+    VectorHistory.step(app, true);
+    assert.equal(app.infillInputs, null);
+    VectorHistory.step(app, false);
+    assert.deepEqual(app.infillInputs, kept);
+});
+
+test("from revision 2, a fill-in reads the reader's kept villages and markets too, and every settlement pin", () => {
+    const app = studio();
+    const { result, grid } = infillOf(app);
+    Infilling.apply(app, result, grid);
+    const [locked] = infillPins(app);
+    locked.generated.locked = true;
+    const style = { id: "styleCity", tier: "city" };
+    app.uiState.customPinStyles.push(style);
+    app.mapPins.find((pin) => pin.id === "own-pin").pinStyle = style.id;
+    const read = (revision) => {
+        app.uiState.generatorRevision = revision;
+        const { pins } = Infilling.readItems(app);
+        return { ids: pins.map((pin) => pin.id), places: InfillInput.places(pins, app.uiState.customPinStyles, Infilling.rules(app)).map(({ pin }) => pin.id) };
+    };
+    const legacy = read(1);
+    assert.ok(!legacy.ids.includes(locked.id), "revision 1: the last fill-in is never read");
+    assert.deepEqual(legacy.places, ["inherited-town"]);
+    const now = read(2);
+    assert.ok(now.ids.includes(locked.id));
+    assert.deepEqual(now.places.sort(), ["inherited-town", locked.id, "own-pin"].sort(), "the kept village, the inherited town and the drawn city");
 });

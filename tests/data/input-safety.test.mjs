@@ -20,6 +20,7 @@ const { createMeshBlock, createLayerSet, createLevel, addRegion, normaliseAreaFa
 const { decodeOwners, encodeOwners } = await import("../../src/mesh/OwnerLayer.js");
 const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
 const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+const GeneratorRevisionModule = await import("../../src/generator/GeneratorRevision.js");
 const webUtils = await import("../../src/platform/web/utils.js");
 const { registerHelpers } = await import("../../src/platform/web/templates.js");
 
@@ -52,6 +53,7 @@ function v4Map() {
     mapData.customLabelStyles = [{ id: "label-style-realm", name: "Realm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#dedcd3", maxChars: 0, justify: "center", bold: true, italic: false }];
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
+    mapData.generatorRevision = FILRODENSWMB.GENERATOR.REVISION;
     mapData.mapUnit = "leagues";
     mapData.thematic = { fill: "population", opacity: 0.6 };
     mapData.params = { ...mapData.params, cartography: { ...mapData.params.cartography, scaleMatchWorld: true } };
@@ -302,17 +304,21 @@ test("a regional map's copy of its parent's run passes the importer whole, and a
 test("a fill-in's marks pass the importer, and a hostile one is dropped", () => {
     const file = v4Map();
     file.infillPending = true;
+    file.shoresPlaced = true;
     file.mapPins[0].generated = { run: "runAAAAAAAAAAAAA", kind: "town", tier: "marketTown", sourceId: 0, population: 400, infill: true, edited: false, locked: false };
     const kept = MapImport.read(file);
     assert.equal(kept.mapData.infillPending, true);
+    assert.equal(kept.mapData.shoresPlaced, true);
     assert.equal(kept.mapData.mapPins[0].generated.infill, true);
     assert.equal(kept.mapData.mapPins[0].generated.tier, "marketTown");
 
     const hostile = v4Map();
     hostile.infillPending = SCRIPT;
+    hostile.shoresPlaced = SCRIPT;
     hostile.mapPins[0].generated = { run: "runAAAAAAAAAAAAA", kind: "town", infill: SCRIPT };
     const cleaned = MapImport.read(hostile);
     assert.notEqual(cleaned.mapData.infillPending, SCRIPT);
+    assert.notEqual(cleaned.mapData.shoresPlaced, SCRIPT);
     assert.notEqual(cleaned.mapData.mapPins[0].generated?.infill, SCRIPT);
 });
 
@@ -368,6 +374,115 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
 
 // ------------------------------------------------------------------ colors, enums, numbers, fonts, images
 
+test("the map's generator revision is a whole number in range, and a map without one reads as the oldest", () => {
+    const { GeneratorRevision } = GeneratorRevisionModule;
+    for (const [value, kept] of [[2, 2], [5000, 1000], [-4, 0]]) {
+        const file = v4Map();
+        file.generatorRevision = value;
+        assert.equal(MapImport.read(file).mapData.generatorRevision, kept, String(value));
+    }
+    for (const bad of ["2", "<b>2</b>", null, { revision: 2 }]) {
+        const file = v4Map();
+        file.generatorRevision = bad;
+        const { mapData } = MapImport.read(file);
+        assert.ok(!("generatorRevision" in mapData), JSON.stringify(bad));
+        assert.equal(GeneratorRevision.of(mapData), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY);
+    }
+    for (const odd of [0, 2.6]) assert.equal(GeneratorRevision.of({ generatorRevision: odd }), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY, `${odd}: not a revision, so read as the oldest`);
+});
+
+test("an age's events keep to their rules: known kinds, a culture's id, a place as a point; an older age's one event is kept as it was", () => {
+    const file = v4Map();
+    file.generatorSettings = {
+        ...file.generatorSettings,
+        ages: [
+            { era: "darkAge", strife: "troubled", events: [{ kind: "civilWar", place: { x: 10, y: 20 } }, { kind: "arrival", culture: "elves" }, { kind: "conquest" }, { kind: "disaster", place: { x: "<b>", y: 1 } }, { kind: "famine", place: { x: 1e9, y: 0 }, extra: "<script>" }] },
+            { era: "highMedieval", strife: "troubled", event: { kind: "invasion", culture: "elves" } },
+            { era: "goldenAge", strife: "troubled", events: "many" },
+        ],
+    };
+    const ages = MapImport.read(file).mapData.generatorSettings.ages;
+    assert.deepEqual(ages[0].events[0], { kind: "civilWar", place: { x: 10, y: 20 } });
+    assert.deepEqual(ages[0].events[1], { kind: "arrival", culture: "elves" });
+    assert.ok(!ages[0].events.some((event) => event?.kind === "conquest"), "an unknown kind goes");
+    assert.ok(ages[0].events.every((event) => !event || (!("extra" in event) && !(event.place && !Number.isFinite(event.place.x)))), "unknown fields and a bad place go");
+    assert.equal(ages[0].era, "darkAge", "the new eras are known");
+    assert.deepEqual(ages[1].event, { kind: "invasion", culture: "elves" });
+    assert.ok(!("events" in ages[2]), "events that are not a list go");
+    assert.ok(!("era" in ages[2]), "an unknown era goes");
+});
+
+test("the map's painted influences keep to their rules: each kind encoded text, anything else dropped", () => {
+    const file = v4Map();
+    file.influences = { capacity: "BQYC", security: "AA==", extra: "BQYC", __proto__: { polluted: true } };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.influences, { capacity: "BQYC", security: "AA==" });
+    file.influences = { capacity: SCRIPT, security: 3 };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.influences, {}, "text that is not encoded steps is dropped");
+    for (const bad of ["BQYC", 7, ["BQYC"]]) {
+        file.influences = bad;
+        assert.ok(!("influences" in MapImport.read(structuredClone(file)).mapData), JSON.stringify(bad));
+    }
+    file.influences = null;
+    assert.equal(MapImport.read(structuredClone(file)).mapData.influences, null);
+    assert.equal({}.polluted, undefined);
+    // Text that passes as encoded but is not the map's cells is read as no painting (see tests/mesh/influences.test.mjs)
+});
+
+test("what a run gave a settlement pin, and the run's report of its seats, keep to their rules", () => {
+    const file = v4Map();
+    file.mapPins[0].modelled = { run: "runAAAAAAAAAAAAA", sourceId: 3, tier: "city", population: 15000, culture: "cultureAAAAAAAAA", mix: [{ culture: "cultureAAAAAAAAA", share: 1 }], capital: false, fortified: true, port: false };
+    file.modelRun = { ...savedModelRun(), seats: { used: 2, unhonoured: [{ pin: "pinAAAAAAAAAAAAA", kind: "port", reason: "dry" }] } };
+    const kept = MapImport.read(structuredClone(file));
+    assert.deepEqual(kept.mapData.mapPins[0].modelled, file.mapPins[0].modelled);
+    assert.deepEqual(kept.modelRun.seats, file.modelRun.seats);
+    assert.equal(kept.corrected, 0);
+
+    file.mapPins[0].modelled = { run: "<b>x</b>", population: -5, tier: SCRIPT, capital: "yes", port: true, __proto__: { polluted: true } };
+    file.modelRun.seats = { used: 2, unhonoured: [{ pin: "pinAAAAAAAAAAAAA", kind: "dragon", reason: "dry" }, { pin: "pinAAAAAAAAAAAAA", kind: "port", reason: SCRIPT }] };
+    const { mapData, modelRun } = MapImport.read(file);
+    const modelled = mapData.mapPins[0].modelled;
+    assert.ok(!("capital" in modelled), "a flag that is no flag is dropped");
+    assert.equal(modelled.port, true);
+    assert.equal(modelled.population, 0, "people are kept in range");
+    assert.equal({}.polluted, undefined);
+    assert.deepEqual(modelRun?.seats?.unhonoured.map((entry) => Object.keys(entry).sort()) ?? [], [["pin", "reason"], ["kind", "pin"]], "an unknown kind or reason is dropped");
+});
+
+test("a run's fingerprint of the map's own items it read keeps to its rules", () => {
+    const file = v4Map();
+    const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" };
+    file.modelRun = { ...savedModelRun(), inputs };
+    const kept = MapImport.read(structuredClone(file)).modelRun;
+    assert.deepEqual(kept.inputs, { routes: "302dc36a", seats: "ea11758b", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" }, "an empty value is no key, so dropped");
+    file.modelRun.inputs = { routes: SCRIPT, seats: 7, rivers: "5c5cca25", extra: "x", __proto__: { polluted: true } };
+    const { modelRun } = MapImport.read(file);
+    assert.deepEqual(modelRun.inputs, { rivers: "5c5cca25" }, "what is no key is dropped, and nothing else is kept");
+    assert.equal({}.polluted, undefined);
+});
+
+test("a custom river's label and the source of its name keep to their rules", () => {
+    const file = v4Map();
+    file.manualRivers = [{ id: "riverAAAAAAAAAAA", name: "Silverrun", points: [{ x: 0, y: 0 }], width: 4, nameSource: "random", nameRoll: 2, label: { visibility: "gm", fontSize: 2, x: 10, y: 20, quickStyle: "label-style-river" } }];
+    const kept = MapImport.read(structuredClone(file)).mapData.manualRivers[0];
+    assert.deepEqual([kept.nameSource, kept.nameRoll, kept.label.visibility, kept.label.fontSize, kept.label.x, kept.label.quickStyle], ["random", 2, "gm", 2, 10, "label-style-river"]);
+    file.manualRivers[0].nameSource = SCRIPT;
+    file.manualRivers[0].label = { visibility: "everyone", fontFamily: SCRIPT, x: "far", __proto__: { polluted: true } };
+    const cleaned = MapImport.read(file).mapData.manualRivers[0];
+    assert.notEqual(cleaned.nameSource, SCRIPT);
+    assert.ok(!("visibility" in (cleaned.label ?? {})) && !("x" in (cleaned.label ?? {})), "an unknown visibility and a position that is no number are dropped");
+    assert.notEqual(cleaned.label?.fontFamily, SCRIPT);
+    assert.equal({}.polluted, undefined);
+});
+
+test("a fill-in's fingerprint of what it read keeps to its rules", () => {
+    const file = v4Map();
+    file.infillInputs = { places: "302dc36a", routes: "ea11758b", influences: "811c9dc5" };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.infillInputs, file.infillInputs);
+    file.infillInputs = { places: SCRIPT, routes: 7, influences: "811c9dc5", extra: "x", __proto__: { polluted: true } };
+    assert.deepEqual(MapImport.read(file).mapData.infillInputs, { influences: "811c9dc5" }, "what is no key is dropped, and nothing else is kept");
+    assert.equal({}.polluted, undefined);
+});
+
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();
     file.mapPins[0].color = HOSTILE_COLOUR;
@@ -410,7 +525,7 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.cultures[0].openness = 7;
     file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
     file.thematic = { fill: "__proto__", opacity: 40 };
-    file.travel = { mode: "dragon", speeds: { foot: 5000, sea: -3, riverUp: "fast" }, start: { x: 10, y: "2" } };
+    file.travel = { mode: "dragon", season: "monsoon", speeds: { foot: 5000, sea: -3, riverUp: "fast" }, start: { x: 10, y: "2" } };
     file.manualRivers = [
         { id: "riverAAAAAAAAAAA", name: "Text width", points: [{ x: 0, y: 0 }], width: "6" },
         { id: "riverBBBBBBBBBBB", name: "Word width", points: [{ x: 0, y: 0 }], width: "wide" },
@@ -418,7 +533,7 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     const { mapData } = MapImport.read(file);
     assert.equal(mapData.manualRivers[0].width, 6, "a river's width saved as text by an older version is read as its number");
     assert.ok(!("width" in mapData.manualRivers[1]), "a width that is no number is dropped");
-    assert.deepEqual(mapData.travel, { speeds: { foot: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX, sea: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN } }, "an unknown way of travel, a speed that is no number and a broken start are dropped; speeds are kept in range");
+    assert.deepEqual(mapData.travel, { speeds: { foot: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX, sea: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN } }, "an unknown way of travel or season, a speed that is no number and a broken start are dropped; speeds are kept in range");
     assert.deepEqual(mapData.thematic, { opacity: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }, "an unknown thematic layer is dropped and the opacity kept in range");
     assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");
     assert.equal(mapData.cultures[0].openness, 1);
@@ -594,6 +709,49 @@ test("where a name came from and its roll are kept to their rules", () => {
     // A map saved before names had sources reads as it did: no field, nothing added
     const older = MapImport.read(v4Map()).mapData;
     assert.ok(!("nameSource" in older.mapPins[0]) && !("nameSource" in older.layerSets[0].levels[0].regions[0]));
+});
+
+test("a region's Independent choice and the parent a run gave it are true or false, and absent on older maps", () => {
+    const file = v4Map();
+    const [region] = file.layerSets[0].levels[0].regions;
+    Object.assign(region, { independent: true, parentFromRun: "<b>yes</b>" });
+    const { mapData } = MapImport.read(file);
+    const kept = mapData.layerSets[0].levels[0].regions[0];
+    assert.equal(kept.independent, true);
+    assert.ok(!("parentFromRun" in kept), "a value that is not true or false is dropped");
+    assert.equal(typed("region", { independent: "true" }, { independent: false }).independent, false, "the inspector keeps the region's own");
+    const older = MapImport.read(v4Map()).mapData.layerSets[0].levels[0].regions[0];
+    assert.ok(!("independent" in older) && !("parentFromRun" in older), "nothing is added to a region saved before");
+});
+
+test("a culture's climate is biomes or zones, its biomes ids and its zones rule rows; a realm's ruling culture is a culture's id; a drawn region's figures keep to their rules; an older culture reads as it did", () => {
+    const file = v4Map();
+    Object.assign(file.cultures[0].habitat, {
+        climate: "<script>",
+        biomes: [7, "8", -2, 999, 10.5, 40],
+        zones: [{ elevation: [[0.2, 0.8, false, false]], moisture: [[0, 1, true, true]], temperature: [[0.1, 0.4, false, false], ["x", 1]] }, "zone"],
+    });
+    const [region] = file.layerSets[0].levels[0].regions;
+    region.generated = { run: "r1", kind: "realm", sourceId: 0, rulingCulture: "<b>c</b>", edited: false, locked: false };
+    const { mapData } = MapImport.read(file);
+    const habitat = mapData.cultures[0].habitat;
+    assert.ok(!("climate" in habitat), "an unknown climate is dropped");
+    assert.deepEqual(habitat.biomes, [7, 40], "whole biome ids in range only");
+    assert.deepEqual(habitat.zones, [{ elevation: [[0.2, 0.8, false, false]], moisture: [[0, 1, true, true]], temperature: [[0.1, 0.4, false, false]] }]);
+    assert.ok(!("rulingCulture" in mapData.layerSets[0].levels[0].regions[0].generated), "not an id");
+    file.cultures[0].habitat.climate = "biomes";
+    region.generated.rulingCulture = "cultureAAAAAAAAA";
+    const again = MapImport.read(file).mapData;
+    assert.equal(again.cultures[0].habitat.climate, "biomes");
+    assert.equal(again.layerSets[0].levels[0].regions[0].generated.rulingCulture, "cultureAAAAAAAAA");
+    // What a run made of a drawn region: its figures, to their rules
+    region.modelled = { run: "r1", kind: "realm", tier: "kingdom", sourceId: 2, population: -5, culture: "cultureAAAAAAAAA", rulingCulture: 7, edited: true };
+    const modelled = MapImport.read(file).mapData.layerSets[0].levels[0].regions[0].modelled;
+    assert.deepEqual({ ...modelled, population: undefined }, { run: "r1", kind: "realm", tier: "kingdom", sourceId: 2, population: undefined, culture: "cultureAAAAAAAAA", rulingCulture: 7 }, "an unknown field is dropped");
+    assert.ok(modelled.population >= 0, "a count is never negative");
+    const older = MapImport.read(v4Map()).mapData.cultures[0].habitat;
+    assert.ok(!("climate" in older) && !("biomes" in older) && !("zones" in older), "nothing is added to a culture saved before");
+    assert.deepEqual(older.temperature, [0, 0.4]);
 });
 
 test("a natural feature's label keeps its feature record within its rules", () => {

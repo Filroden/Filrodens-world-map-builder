@@ -657,13 +657,14 @@ export class MapDialogManager {
         pin: "FILRODENSWMB.UI.MassDeletePins",
         route: "FILRODENSWMB.UI.MassDeleteRoutes",
         label: "FILRODENSWMB.UI.MassDeleteLabels",
+        river: "FILRODENSWMB.UI.MassDeleteRivers",
     });
 
     /**
-     * Mass Edit's Delete: every pin, route or standalone label chosen in its list, after a
+     * Mass Edit's Delete: every pin, route, standalone label or custom river chosen in its list, after a
      * confirmation giving how many, as one undo step. The choice is cleared afterwards.
      * @param {object} app
-     * @param {string} type - "pin", "route" or "label".
+     * @param {string} type - "pin", "route", "label" or "river" (whose terrain is shaped again).
      * @returns {Promise<boolean>} Whether anything was deleted.
      */
     static async massDelete(app, type) {
@@ -681,6 +682,7 @@ export class MapDialogManager {
         selection.clear();
 
         app._repaintVectors();
+        if (config.triggersTerrain) app.requestTerrainUpdate(null, app.debouncedGenerateTerrain);
         app.view?.render(["context"]);
         app.markDirty();
         return true;

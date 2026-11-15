@@ -48,7 +48,7 @@ export default {
     fixture: "tests/mesh/fixtures/p0jbva.json",
     goal: "Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.",
     intro: `Rivers are worked out by themselves: they rise where the land is high and wet enough, and run downhill to the sea or into another river, pooling into lakes in hollows on the way. The **Rivers and faults** tool lets you move where they rise, draw rivers of your own, and draw tectonic features that reshape the land around a line.`,
-    narration: "In this tutorial we're going to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.",
+    narration: "Time to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.",
 
     steps: [
         {
@@ -95,7 +95,7 @@ export default {
         {
             id: "custom-river",
             title: "Draw a river",
-            instruction: "The southern forests have no rivers. Choose **River** on the bar and set **River width** to **Medium**. Then click from the hills in the south of the continent eastwards to the coast, and right-click to finish. A custom river follows the land within a corridor around your line, from its higher end to its lower: it starts as a stream and widens to its width along the line, in a broad valley lowered into the land.",
+            instruction: "The southern forests have no rivers. Choose **River** on the bar and set **River width** to **Medium**. Then click from the hills in the south of the continent eastwards to the coast, and right-click to finish. A custom river follows the land within a corridor around your line, from its higher end to its lower: it starts as a stream and widens to its width along the line, in a broad valley lowered into the land. It is given a name of its own, drawn along its course: here **River Scorcros**.",
             action: [
                 { do: "mode", action: "setFeatureMode", mode: "river", label: "River" },
                 { do: "set", field: '[data-region="editToolbar"] select[name="riverWidth"]', value: "Medium", label: "River width" },
@@ -105,9 +105,9 @@ export default {
                 { do: "zoom", at: [1070, 1300], notches: 10, label: "Zoom in to look at the river." },
             ],
             screenshot: { name: "custom-river", region: { map: [840, 1180, 1300, 1420] }, mapOnly: true },
-            caption: "The custom river across the southern forests.",
-            note: "The new river opens in the inspector as you place its first point; **Reset view** in the map controls shows the whole map beside it. In the inspector, **Corridor width** sets how far the river may wander from your line, and **Cut through high ground** lets it cut a gorge where your line crosses higher ground. If your line ends on land, the river carries on downhill from its end by itself.",
-            narration: "The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own.",
+            caption: "The custom river across the southern forests: River Scorcros.",
+            note: "The new river opens in the inspector as you place its first point; **Reset view** in the map controls shows the whole map beside it. In the inspector, **Corridor width** sets how far the river may wander from your line, and **Cut through high ground** lets it cut a gorge where your line crosses higher ground. If your line ends on land, the river carries on downhill from its end by itself. **Random name** beside its **Name** gives it another name, and its **Label** section hides or styles the name on the map.",
+            narration: "The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own, with a name of its own too.",
             pause: 4,
         },
         {

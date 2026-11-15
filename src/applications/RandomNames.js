@@ -304,8 +304,14 @@ export class RandomNames {
         return value;
     }
 
-    /** The display cells a pin or route is read at: a pin's own, a route's first and last waypoints. */
+    /** The display cells a pin, route or custom river is read at: a pin's own, a route's first and last waypoints, a river's first and last points. */
     static #cellsOf(app, kind, item) {
+        if (kind === "river") {
+            const points = item.points ?? [];
+            const ends = points.length ? [points[0], points.at(-1)] : [];
+            const cells = ends.map((point) => app.meshSession?.cellAt(point.x, point.y) ?? -1).filter((cell) => cell >= 0);
+            return [...new Set(cells)];
+        }
         if (kind === "pin") {
             const cell = Number.isInteger(item.cell) && item.cell >= 0 ? item.cell : (app.meshSession?.cellAt(item.x, item.y) ?? -1);
             return cell >= 0 ? [cell] : [];
@@ -327,6 +333,8 @@ export class RandomNames {
             return { forms: forms(region ? landKind(region) : null), realm: top, short: true };
         }
         if (kind === "pin") return { forms: forms(settlementKind(item, PinStyles.find(app, item.pinStyle)?.tier ?? null)) };
+        // A custom river's name always says what it is, as Name natural features names a river
+        if (kind === "river") return { forms: (FILRODENSWMB.FEATURE_NAMES.FORMS.river ?? []).map((form) => platform.i18n.localize(form)), always: true, short: true };
         return { forms: forms(Object.hasOwn(PLACE_NAMES.FORMS, item.transport) ? item.transport : "road"), short: true };
     }
 

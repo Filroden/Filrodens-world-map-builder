@@ -1,5 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
+import { anyUsesBiomes } from "../generator/CultureClimate.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { platform } from "../platform/index.js";
 import { RangeTrack } from "../ui/RangeTrack.js";
@@ -103,10 +105,60 @@ export class RuleEditorDialog {
         // consume a step in the same undo stack as paint strokes and vector edits, which is
         // confusing when the two are unrelated actions. Rules still mark the map dirty (a
         // save is still needed), they just don't occupy an undo slot.
+        // The rules decide where each custom biome shows, so a culture whose climate is chosen
+        // biomes (worked out from where they show) lives elsewhere once they change
+        if (anyUsesBiomes(app.uiState.cultures) && JSON.stringify(customBiomes) !== JSON.stringify(app.uiState.customBiomes || [])) app.markGeneratorStale?.();
         app.uiState.customBiomes = customBiomes;
         app._repaintCanvas(); // customBiomeRules is recompiled fresh from uiState.customBiomes on every repaint (see MapStateManager.getDerivedMapParameters) - no separate cache to invalidate.
         app.view?.render(["context"]);
         app.markDirty();
+    }
+
+    /**
+     * Opens the rule editor on a culture's climate zones: the same rows and tracks as a custom
+     * biome's rules (elevation, moisture and temperature, each a list of ranges), for one culture,
+     * with the built-in land biomes below for reference. Works on a copy; nothing changes on Cancel.
+     * @param {object} app - The MapStudio instance.
+     * @param {{name: string, color: string, zones: object[]}} culture - Its name, colour (hex) and zones.
+     * @returns {Promise<object[]|null>} The zones on Accept, or null.
+     */
+    static async editZones(app, { name, color, zones }) {
+        const working = { name, code: null, color: ColorMath.hexToRgb(color ?? "#808080"), rules: platform.utils.deepClone(zones ?? []) };
+        const seaLevel = app.uiState.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+        // A culture lives on land, so only the land biomes are worth comparing its zones with
+        const defaultBiomes = BiomeRuleEngine.getDefaultBiomeReferenceRows(seaLevel).filter((biome) => BiomePlacement.placementOfBuiltIn(biome.key) === FILRODENSWMB.BIOME_PLACEMENT.LAND);
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/culture-zones-editor.hbs", {});
+        const action = await platform.dialogs.choose({
+            classes: ["fwmb", "fwmb-rule-editor-dialog"],
+            title: platform.i18n.format("FILRODENSWMB.UI.CultureZonesTitle", { name }),
+            icon: "fwmb-icon fwmb-icon--tune",
+            resizable: true,
+            content,
+            buttons: [
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
+                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true },
+            ],
+            dismissed: "cancel",
+            onRender: (element) => RuleEditorDialog.#renderZones(element, working, defaultBiomes, seaLevel),
+        });
+        return action === "accept" ? working.rules : null;
+    }
+
+    /**
+     * The zones dialogue's content: the culture's one group of rows (no priority, since a culture
+     * fits as well as its best zone whatever their order, and land quick picks only, since a
+     * culture lives on land), then the built-in land biomes for reference.
+     */
+    static #renderZones(root, working, defaultBiomes, seaLevel) {
+        const host = root.querySelector("#fwmb-rule-custom-rows");
+        const countEl = root.querySelector("#fwmb-rule-custom-count");
+        const render = () =>
+            RuleEditorDialog.#preserveScroll(host, () => {
+                host.replaceChildren(RuleEditorDialog.#buildCustomGroup(working, 0, [working], seaLevel, render, { ranked: false, landOnly: true }));
+                countEl.textContent = platform.i18n.format("FILRODENSWMB.UI.CultureZonesCount", { count: working.rules.length });
+            });
+        render();
+        RuleEditorDialog.#renderDefaults(root.querySelector("#fwmb-rule-default-rows"), defaultBiomes, seaLevel);
     }
 
     /** Populates the dialogue's two (otherwise empty) host elements once it's in the DOM. */
@@ -119,6 +171,11 @@ export class RuleEditorDialog {
             RuleEditorDialog.#preserveScroll(customHost, () => RuleEditorDialog.#renderCustomSection(customHost, countEl, customBiomes, seaLevel, renderCustom));
         renderCustom();
 
+        RuleEditorDialog.#renderDefaults(defaultHost, defaultBiomes, seaLevel);
+    }
+
+    /** The read-only built-in biomes, one group each. */
+    static #renderDefaults(defaultHost, defaultBiomes, seaLevel) {
         defaultHost.replaceChildren();
         for (const biome of defaultBiomes) {
             defaultHost.appendChild(
@@ -159,12 +216,17 @@ export class RuleEditorDialog {
         });
     }
 
-    /** One custom biome's card: priority stepper + label, then one row per rule (or the empty-state row), then the "add independent rule" strip. */
-    static #buildCustomGroup(biome, index, customBiomes, seaLevel, rerender) {
+    /**
+     * One custom biome's card: priority stepper + label, then one row per rule (or the empty-state
+     * row), then the "add independent rule" strip. `ranked` false leaves out the stepper and rank
+     * (a group with no priority, such as a culture's zones); `landOnly` leaves the Underwater quick
+     * pick out of the elevation tracks.
+     */
+    static #buildCustomGroup(biome, index, customBiomes, seaLevel, rerender, { ranked = true, landOnly = false } = {}) {
         const group = document.createElement("div");
         group.className = "fwmb-rule-group";
 
-        const stepper = RuleEditorDialog.#buildPriorityStepper(index, customBiomes, rerender);
+        const stepper = ranked ? RuleEditorDialog.#buildPriorityStepper(index, customBiomes, rerender) : null;
         const buildLabel = () =>
             RuleEditorDialog.#buildGroupLabel({
                 color: ColorMath.rgbToHex(biome.color),
@@ -189,6 +251,7 @@ export class RuleEditorDialog {
                 RuleEditorDialog.#buildCustomRuleRow(rule, {
                     seaLevel,
                     rerender,
+                    landOnly,
                     labelContent: rowIndex === 0 ? buildLabel() : null,
                     // Removing a biome's last rule is allowed - it just falls back to the
                     // empty-state row above (rules: [] is already a valid, meaningful state:
@@ -269,7 +332,7 @@ export class RuleEditorDialog {
     }
 
     /** One interactive rule row: a label cell (only populated for a biome's first row), the three axis tracks, and a remove-row button. */
-    static #buildCustomRuleRow(rule, { seaLevel, labelContent, onRemoveRow, rerender }) {
+    static #buildCustomRuleRow(rule, { seaLevel, labelContent, onRemoveRow, rerender, landOnly = false }) {
         const row = document.createElement("div");
         row.className = "fwmb-rule-row fwmb-rule-row-custom";
 
@@ -286,7 +349,7 @@ export class RuleEditorDialog {
         row.appendChild(labelCell);
 
         for (const axis of RuleEditorDialog.#AXES) {
-            row.appendChild(RuleEditorDialog.#buildInteractiveAxis(axis, rule[axis.key], seaLevel, rerender));
+            row.appendChild(RuleEditorDialog.#buildInteractiveAxis(axis, rule[axis.key], seaLevel, rerender, landOnly));
         }
 
         row.appendChild(RuleEditorDialog.#buildRemoveRowButton(onRemoveRow));
@@ -326,7 +389,7 @@ export class RuleEditorDialog {
      * called after every structural change (segment count, zone-pick) but never during a
      * drag - see #buildInteractiveSegment.
      */
-    static #buildInteractiveAxis(axisDef, segments, seaLevel, rerender) {
+    static #buildInteractiveAxis(axisDef, segments, seaLevel, rerender, landOnly = false) {
         const wrap = document.createElement("div");
         wrap.className = "fwmb-rule-axis";
 
@@ -381,7 +444,7 @@ export class RuleEditorDialog {
         wrap.appendChild(track);
 
         if (axisDef.key === "elevation") {
-            wrap.appendChild(RuleEditorDialog.#buildZonePicker(segments, seaLevel, rerender));
+            wrap.appendChild(RuleEditorDialog.#buildZonePicker(segments, seaLevel, rerender, landOnly));
         }
 
         return wrap;
@@ -478,17 +541,18 @@ export class RuleEditorDialog {
 
     /**
      * Elevation-only quick pick: snaps a range onto a named sea-level-relative zone
-     * (including "Underwater", for custom water biomes) instead of dragging it by hand.
+     * (including "Underwater", for custom water biomes, unless `landOnly`) instead of dragging it by hand.
      * Overwrites the range when there's just one (the common case); adds a new one
      * alongside existing ranges otherwise, same as the per-axis "+" control, so it never
      * silently clobbers a range the user kept. Not an enforcement mechanism - a GM remains
      * free to set any elevation range by hand regardless of these presets.
      */
-    static #buildZonePicker(segments, seaLevel, rerender) {
+    static #buildZonePicker(segments, seaLevel, rerender, landOnly = false) {
         const picker = document.createElement("div");
         picker.className = "fwmb-rule-zone-picker";
 
         for (const zone of RuleEditorDialog.elevationZones(seaLevel)) {
+            if (landOnly && zone.key === "Underwater") continue;
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "fwmb-rule-zone-chip";

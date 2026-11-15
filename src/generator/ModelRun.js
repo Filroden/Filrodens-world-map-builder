@@ -153,6 +153,7 @@ export function encodeModelRun(result, runId) {
         stats: { ...result.stats },
         cells,
         ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
+        seats: result.seats ? { used: result.seats.used, unhonoured: result.seats.unhonoured.map(({ pin, kind, reason }) => ({ pin, kind, reason })) } : null,
         history: (result.history ?? []).map(encodeAge),
     };
 }
@@ -237,6 +238,22 @@ export function resampleModelRun(modelRun, sourceOf, targetOf) {
     const history = (modelRun.history ?? []).map((age) => movedAge(age, take, targetOf));
     const cultures = (modelRun.cultures ?? []).map((culture) => ({ ...culture, homelands: moveCells(culture.homelands) }));
     return { ...modelRun, cultures, cells, history };
+}
+
+/**
+ * A run's earlier ages on some of its cells (a regional map's copy; see ParentRun.cropRun): each
+ * age as movedAge gives it, each kept cell's values taken from it, and its places, castles, seats
+ * and roads on the kept cells (those on cells not kept dropped, a seat left as -1 so each realm
+ * keeps its index).
+ * @param {object[]} history - A saved run's history.
+ * @param {number[]} kept - The kept cells, in their new order.
+ * @param {Int32Array} newIndex - Each old cell's new index, or -1.
+ * @returns {object[]}
+ */
+export function cropHistory(history, kept, newIndex) {
+    const take = (values, empty) => Float64Array.from(kept, (cell) => values[cell] ?? empty);
+    const targetOf = (cell) => (Number.isInteger(cell) && cell >= 0 && cell < newIndex.length ? newIndex[cell] : -1);
+    return (history ?? []).map((age) => movedAge(age, take, targetOf));
 }
 
 /**
