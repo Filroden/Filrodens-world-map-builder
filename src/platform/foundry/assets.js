@@ -1,4 +1,4 @@
-import { IMAGE_TYPES, ImageCheck } from "../../data/ImageCheck.js";
+import { IMAGE_TYPES, ImageCheck } from "../../kernel/data/ImageCheck.js";
 
 /**
  * Asset paths in Foundry (the platform's `assets` service), and reading and storing the images a

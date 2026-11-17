@@ -6,8 +6,8 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { resolveEvents, resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { resolveEvents, resolveSettings } = await import("../../src/studios/world/generator/GeneratorSettings.js");
 const { syntheticMap } = await import("./synthetic.mjs");
 
 const quiet = { pause: () => Promise.resolve() };

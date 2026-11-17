@@ -23,17 +23,17 @@ installPlatform({
     dialogs: { confirm: async () => true, prompt: async () => answers.prompt },
 });
 
-const { Generation } = await import("../../src/applications/Generation.js");
-const { Regeneration } = await import("../../src/applications/Regeneration.js");
-const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
-const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
-const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
-const { nestingProblems, paintAllow, settleParentKey } = await import("../../src/mesh/RegionEdits.js");
-const { UNCLAIMED, addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { typed } = await import("../../src/data/MapRules.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { Regeneration } = await import("../../src/studios/world/app/Regeneration.js");
+const { RegionPanel } = await import("../../src/studios/world/app/RegionPanel.js");
+const { RegionEditor } = await import("../../src/studios/world/app/RegionEditor.js");
+const { GeneratedDetails } = await import("../../src/studios/world/app/GeneratedDetails.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
+const { nestingProblems, paintAllow, settleParentKey } = await import("../../src/studios/world/mesh/RegionEdits.js");
+const { UNCLAIMED, addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { typed } = await import("../../src/studios/world/data/MapRules.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 const quick = { pause: () => Promise.resolve() };

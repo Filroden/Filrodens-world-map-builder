@@ -15,7 +15,7 @@ import {
     routeCells,
     routePolyline,
     terrainCost,
-} from "../../src/mesh/RoutePath.js";
+} from "../../src/studios/world/mesh/RoutePath.js";
 import { P0_SKIP, flatAggregates, isContiguous, loadP0, seededRandom, smallMesh } from "./helpers.mjs";
 
 test("a terrain leg costs exactly the distance field's value at its target", () => {

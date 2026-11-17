@@ -26,7 +26,7 @@ function files(path, extensions) {
 const SOURCES = ["src", "templates", "web", "main.js", "module.json"].flatMap((path) => files(path, [".js", ".mjs", ".hbs", ".json", ".html"])).map((path) => ({ path, text: readFileSync(path, "utf8") }));
 const SOURCE = SOURCES.map((file) => file.text).join("\n");
 const CONFIG = readFileSync(join(ROOT, "src/config.js"), "utf8");
-const STUDIO = readFileSync(join(ROOT, "src/applications/MapStudio.js"), "utf8");
+const STUDIO = readFileSync(join(ROOT, "src/studios/world/app/MapStudio.js"), "utf8");
 /** Every quoted word in the code, which the families below look their values up in. */
 const LITERALS = new Set([...SOURCE.matchAll(/["'`]([A-Za-z0-9_]+)["'`]/g)].map((match) => match[1]));
 

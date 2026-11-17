@@ -9,11 +9,11 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { Backup } = await import("../../src/data/Backup.js");
-const { MapPackage } = await import("../../src/data/MapPackage.js");
-const { MapImport } = await import("../../src/data/MapImport.js");
-const { ImageCheck } = await import("../../src/data/ImageCheck.js");
-const { ImportRefusal } = await import("../../src/data/Sanitize.js");
+const { Backup } = await import("../../src/studios/world/data/Backup.js");
+const { MapPackage } = await import("../../src/studios/world/data/MapPackage.js");
+const { MapImport } = await import("../../src/studios/world/data/MapImport.js");
+const { ImageCheck } = await import("../../src/kernel/data/ImageCheck.js");
+const { ImportRefusal } = await import("../../src/kernel/data/Sanitize.js");
 const { zipSync, strToU8 } = await import("../../vendor/fflate/fflate.js");
 
 const refusedFor = (reason) => (error) => error instanceof ImportRefusal && error.reason === reason;

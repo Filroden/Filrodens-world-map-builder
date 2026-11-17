@@ -16,8 +16,8 @@ installPlatform({
     dialogs: { confirm: async () => true, prompt: async () => null, choose: async () => null, dismiss() {}, attach: () => () => {} },
 });
 
-const { PinStyles } = await import("../../src/applications/PinStyles.js");
-const { MapDialogManager } = await import("../../src/applications/MapDialogManager.js");
+const { PinStyles } = await import("../../src/studios/world/app/PinStyles.js");
+const { MapDialogManager } = await import("../../src/studios/world/app/MapDialogManager.js");
 const { FILRODENSWMB } = await import("../../src/config.js");
 
 const config = MapDialogManager.QUICK_STYLE_CONFIG.Pin;

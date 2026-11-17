@@ -77,7 +77,7 @@ test("the language falls back to English before Foundry's localisation is ready"
 });
 
 test("the label fonts are the vendored ones, then the world's own that are not among them", async () => {
-    const { labelFontNames } = await import("../../src/data/fonts.js");
+    const { labelFontNames } = await import("../../src/kernel/data/fonts.js");
     const vendored = labelFontNames();
     globalThis.CONFIG = {};
     assert.deepEqual(platform.fonts.list(), vendored);

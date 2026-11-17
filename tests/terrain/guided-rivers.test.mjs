@@ -10,12 +10,12 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
-const { HydrologyEngine } = await import("../../src/generation/HydrologyEngine.js");
-const { RiverNetwork } = await import("../../src/generation/RiverNetwork.js");
-const { RiverCorridor } = await import("../../src/generation/RiverCorridor.js");
-const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
+const { HydrologyEngine } = await import("../../src/studios/world/generation/HydrologyEngine.js");
+const { RiverNetwork } = await import("../../src/studios/world/generation/RiverNetwork.js");
+const { RiverCorridor } = await import("../../src/studios/world/generation/RiverCorridor.js");
+const { RegionalExtractor } = await import("../../src/studios/world/app/RegionalExtractor.js");
 
 const SIZE = 400;
 const SEA = 0.4;

@@ -10,7 +10,7 @@ globalThis.window = window;
 globalThis.document = window.document;
 globalThis.HTMLElement = window.HTMLElement;
 
-const { ListNav } = await import("../../src/ui/ListNav.js");
+const { ListNav } = await import("../../src/shell/ListNav.js");
 
 function list({ selected = null } = {}) {
     document.body.innerHTML = `

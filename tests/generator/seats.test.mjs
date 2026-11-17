@@ -9,10 +9,10 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { buildModelCells } from "../../src/generator/CellValues.js";
-import { GeneratorRevision } from "../../src/generator/GeneratorRevision.js";
-import { modelBiomeRaster } from "../../src/generator/ModelBiomes.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
+import { buildModelCells } from "../../src/studios/world/generator/CellValues.js";
+import { GeneratorRevision } from "../../src/studios/world/generator/GeneratorRevision.js";
+import { modelBiomeRaster } from "../../src/studios/world/generator/ModelBiomes.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
 import { syntheticMap } from "./synthetic.mjs";
 
 const { LEGACY, REVISION_2 } = FILRODENSWMB.GENERATOR.REVISIONS;

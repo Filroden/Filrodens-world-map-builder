@@ -1,8 +1,8 @@
 // A small synthetic map for the generator's tests: an island with a ridge of hills down its middle,
 // a wetter west and a warmer south, and one river running east from the hills to the sea. Its mesh
 // is real (the module's own Mesh), so the generator reads it exactly as it reads a map's.
-import { Mesh } from "../../src/mesh/MeshBuilder.js";
-import { buildGeneratorPayload } from "../../src/generator/GeneratorInput.js";
+import { Mesh } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { buildGeneratorPayload } from "../../src/studios/world/generator/GeneratorInput.js";
 
 export const WIDTH = 480;
 export const HEIGHT = 360;

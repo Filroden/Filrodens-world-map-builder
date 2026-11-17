@@ -19,7 +19,7 @@ export const SITE_EXTENSIONS = ["js", "mjs", "json", "css", "hbs", "svg", "md", 
 export const PAGE = "web/index.html";
 
 /**
- * Every template's path inside templates/ ("toolbar.hbs", "parts/shared-range.hbs"), with forward
+ * Every template's path inside templates/ ("shell/toolbar.hbs", "shell/parts/shared-range.hbs"), with forward
  * slashes, sorted. The page loads them all at start-up from this list (written as templates.json).
  *
  * @param {string} root - The repository's root.

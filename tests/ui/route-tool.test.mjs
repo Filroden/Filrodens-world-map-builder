@@ -33,10 +33,10 @@ installPlatform({
     },
 });
 
-const { RouteTool } = await import("../../src/applications/RouteTool.js");
-const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
+const { RouteTool } = await import("../../src/studios/world/app/RouteTool.js");
+const { RouteEditor } = await import("../../src/studios/world/app/RouteEditor.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { isContiguous, smallSession } = await import("../mesh/helpers.mjs");
 
 beforeEach(() => {

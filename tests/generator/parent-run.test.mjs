@@ -1,4 +1,4 @@
-// A regional map's copy of its parent's run (src/generator/ParentRun.js): the parent's cells on the
+// A regional map's copy of its parent's run (src/studios/world/generator/ParentRun.js): the parent's cells on the
 // regional map and a margin round it, their sites moved into its pixels, their shares and trade
 // kept; the copy as the thematic layers read it (RunCells); the parent's model sites placed again
 // without its mesh; and a copy made for a regional map cut before maps carried one
@@ -9,13 +9,13 @@ import { test } from "node:test";
 import { smallMesh } from "../mesh/helpers.mjs";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { cropRun, parentRunSites } = await import("../../src/generator/ParentRun.js");
-const { decodeModelRun, encodeModelRun } = await import("../../src/generator/ModelRun.js");
-const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
-const { generateModelSites, generateSites } = await import("../../src/mesh/MeshBuilder.js");
-const { ThematicSource } = await import("../../src/thematic/ThematicData.js");
-const { RunCells } = await import("../../src/applications/RunCells.js");
-const { ParentRunRecovery } = await import("../../src/applications/ParentRunRecovery.js");
+const { cropRun, parentRunSites } = await import("../../src/studios/world/generator/ParentRun.js");
+const { decodeModelRun, encodeModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+const { resolveSettings } = await import("../../src/studios/world/generator/GeneratorSettings.js");
+const { generateModelSites, generateSites } = await import("../../src/studios/world/mesh/MeshBuilder.js");
+const { ThematicSource } = await import("../../src/studios/world/thematic/ThematicData.js");
+const { RunCells } = await import("../../src/studios/world/app/RunCells.js");
+const { ParentRunRecovery } = await import("../../src/studios/world/app/ParentRunRecovery.js");
 
 /** A run of the small mesh's model cells: each cell's population is its index, its culture share its x. */
 function runOf(mesh) {

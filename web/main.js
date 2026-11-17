@@ -10,8 +10,8 @@
  *    strings over the English ones;
  * 3. opens the saved maps database, builds the web platform services and installs them in place of
  *    Foundry's (see src/platform);
- * 4. loads every template, draws the studio's frame (templates/studio.hbs) into the page and
- *    mounts the studio in it.
+ * 4. loads every template, draws the studio's frame (templates/shell/studio.hbs) into the page and
+ *    mounts the shell, with the studios the site offers, in it.
  *
  * Everything is fetched relative to the page, so the site works from any address or folder.
  */
@@ -33,7 +33,7 @@ const fetchText = (path) => fetchFrom(path, (response) => response.text());
 /**
  * The page's own light or dark theme, from the reader's system preference, kept up to date when
  * it changes. It is what the studio's "Automatic" theme follows; a theme chosen in the studio
- * overrides it (see src/ui/Theme.js).
+ * overrides it (see src/shell/Theme.js).
  */
 function followSystemTheme() {
     const query = globalThis.matchMedia?.("(prefers-color-scheme: light)");
@@ -102,18 +102,19 @@ async function start() {
     );
     describeFailure = (detail) => platform.i18n.format("FILRODENSWMB.Web.StartFailed", { detail });
     // A picked image is known by its bytes and an SVG is cleaned before the studio keeps it (see ImageCheck)
-    const [{ ImageCheck }, { ImportRefusal, Sanitize }] = await Promise.all([import("../src/data/ImageCheck.js"), import("../src/data/Sanitize.js")]);
+    const [{ ImageCheck }, { ImportRefusal, Sanitize }] = await Promise.all([import("../src/kernel/data/ImageCheck.js"), import("../src/kernel/data/Sanitize.js")]);
     FilePickerElement.define(customElements, {
         browseLabel: platform.i18n.localize("FILRODENSWMB.UI.BrowseFiles"),
         check: (file) => ImageCheck.checkFile(file),
         onRefused: (error) => platform.notify.error(Sanitize.refusalMessage(error instanceof ImportRefusal ? error : new ImportRefusal("image"), platform.i18n)),
     });
 
-    const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }, { registerExportFormatSettings }] = await Promise.all([
-        import("../src/data/pinIcons.js"),
-        import("../src/applications/MapStudio.js"),
-        import("../src/ui/Theme.js"),
-        import("../src/tools/ImageFormat.js"),
+    const [{ registerPinIconSettings }, { Shell }, { STUDIOS }, { attachTheme, registerThemeSettings }, { registerExportFormatSettings }] = await Promise.all([
+        import("../src/kernel/data/pinIcons.js"),
+        import("../src/shell/Shell.js"),
+        import("../src/studios/index.js"),
+        import("../src/shell/Theme.js"),
+        import("../src/kernel/export/ImageFormat.js"),
     ]);
     registerPinIconSettings();
     registerExportFormatSettings();
@@ -123,19 +124,21 @@ async function start() {
     attachTheme(document.body);
 
     await platform.templates.load(await fetchJson(TEMPLATE_LIST));
-    frame.innerHTML = await platform.templates.render(`modules/${manifest.id}/templates/studio.hbs`, {});
-    MapStudio.applyTextDirection(frame);
+    frame.innerHTML = await platform.templates.render(`modules/${manifest.id}/templates/shell/studio.hbs`, {});
+    Shell.applyTextDirection(frame);
     new WebTooltips(frame);
 
-    const studio = new MapStudio();
-    studio.mount(frame.querySelector(".fwmb-studio"));
+    const shell = new Shell({ studios: STUDIOS });
+    shell.mount(frame.querySelector(".fwmb-studio"));
     if (!persistent) platform.notify.warn(platform.i18n.localize("FILRODENSWMB.Web.StorageUnavailable"), { permanent: true });
 
     // Leaving the page with unsaved changes asks first, as closing the studio's window does in Foundry
     globalThis.addEventListener("beforeunload", (event) => {
-        if (studio.isDirty) event.preventDefault();
+        if (shell.isDirty) event.preventDefault();
     });
-    globalThis.fwmbStudio = studio;
+    // For the tutorial runner and the smoke checks: the shell, and the World studio's controller
+    globalThis.fwmbShell = shell;
+    globalThis.fwmbStudio = shell.studio;
 }
 
 start().catch((error) => {

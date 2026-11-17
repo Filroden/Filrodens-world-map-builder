@@ -3,10 +3,10 @@ import "./foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { MeshSession } from "../../src/mesh/MeshSession.js";
-import { decodeOwners } from "../../src/mesh/OwnerLayer.js";
-import { extractRegionalVectors } from "../../src/mesh/RegionalMesh.js";
-import { UNCLAIMED } from "../../src/mesh/Schema.js";
+import { MeshSession } from "../../src/studios/world/mesh/MeshSession.js";
+import { decodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
+import { extractRegionalVectors } from "../../src/studios/world/mesh/RegionalMesh.js";
+import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
 import { FIXTURES, P0_SKIP, isContiguous, loadP0, readJson } from "./helpers.mjs";
 
 const CROP = { x: 500, y: 300, width: 400, height: 300 };
@@ -109,7 +109,7 @@ async function exporterApp() {
  * raw points, as the exporter tested regions before they moved onto the display mesh.
  */
 async function polygonRegions(regionLayers) {
-    const { GridAggregator } = await import("../../src/generation/GridAggregator.js");
+    const { GridAggregator } = await import("../../src/studios/world/generation/GridAggregator.js");
     return regionLayers.flatMap((layer) =>
         layer.regions.map((region) => ({
             id: region.id,
@@ -123,7 +123,7 @@ async function polygonRegions(regionLayers) {
 }
 
 test("grid data: region coverage from the cell raster matches the polygon test within 2%", { skip: P0_SKIP }, async () => {
-    const { GridDataExporter } = await import("../../src/applications/GridDataExporter.js");
+    const { GridDataExporter } = await import("../../src/studios/world/app/GridDataExporter.js");
     const { app, v3 } = await exporterApp();
     const polygons = GridDataExporter.build(app, { regions: await polygonRegions(v3.regionLayers) });
 

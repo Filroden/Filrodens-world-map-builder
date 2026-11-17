@@ -10,12 +10,12 @@ import { test } from "node:test";
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 installPlatform({ i18n: { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" }, utils: { ...platform.utils, deepClone: (value) => structuredClone(value) } });
 
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { decodeAge, encodeModelRun } = await import("../../src/generator/ModelRun.js");
-const { cropRun } = await import("../../src/generator/ParentRun.js");
-const { RULES, clean, cleanContext } = await import("../../src/data/MapRules.js");
-const { HistoryView } = await import("../../src/applications/HistoryView.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { decodeAge, encodeModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+const { cropRun } = await import("../../src/studios/world/generator/ParentRun.js");
+const { RULES, clean, cleanContext } = await import("../../src/studios/world/data/MapRules.js");
+const { HistoryView } = await import("../../src/studios/world/app/HistoryView.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 const map = syntheticMap();

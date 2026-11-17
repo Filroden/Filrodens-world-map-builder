@@ -1,5 +1,5 @@
 // The tool panel and the context bar (v4 step 3): each tool's Next footer and state word
-// (FILRODENSWMB.STUDIO.NEXT and STATE_WORD), the bar's fold order (BarFold) and the stylesheet's
+// (each tool's registered next and stateWord), the bar's fold order (BarFold) and the stylesheet's
 // promise that the mode in use is never folded, and the strings and icons the panels and the bar
 // name. Layout itself needs a browser and is checked by the smoke checks.
 import assert from "node:assert/strict";
@@ -11,15 +11,21 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
 const CSS = readFileSync(join(ROOT, "styles/filrodens-world-map-builder.css"), "utf8");
-const STUDIO_SOURCE = readFileSync(join(ROOT, "src/applications/MapStudio.js"), "utf8");
-const PICK_TOOL_SOURCE = readFileSync(join(ROOT, "src/applications/PickTool.js"), "utf8");
+const STUDIO_SOURCE = readFileSync(join(ROOT, "src/studios/world/app/MapStudio.js"), "utf8");
+const PICK_TOOL_SOURCE = readFileSync(join(ROOT, "src/studios/world/app/PickTool.js"), "utf8");
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { foldLevel, FOLD_LEVELS } = await import("../../src/ui/BarFold.js");
-const { PAINT_MODES } = await import("../../src/mesh/RegionPaint.js");
-const { ROUTE_TOOL_MODES } = await import("../../src/applications/RouteTool.js");
+const { foldLevel, FOLD_LEVELS } = await import("../../src/shell/BarFold.js");
+const { PAINT_MODES } = await import("../../src/studios/world/mesh/RegionPaint.js");
+const { ROUTE_TOOL_MODES } = await import("../../src/studios/world/app/RouteTool.js");
 
-const { TOOLS, STAGES, NEXT, STATE_WORD, STATE_WORDS, FOLD_RANK } = FILRODENSWMB.STUDIO;
+// The World studio's registration (src/studios/world/definition.js), in the shapes these checks read
+const { WORLD_DEFINITION } = await import("../../src/studios/world/definition.js");
+const TOOLS = Object.fromEntries(WORLD_DEFINITION.tools.map((tool) => [tool.id, tool]));
+const STAGES = WORLD_DEFINITION.stages.map((stage) => ({ ...stage, tools: WORLD_DEFINITION.tools.filter((tool) => tool.stage === stage.id).map((tool) => tool.id) }));
+const NEXT = Object.fromEntries(WORLD_DEFINITION.tools.map((tool) => [tool.id, tool.next]));
+const STATE_WORD = Object.fromEntries(WORLD_DEFINITION.tools.map((tool) => [tool.id, tool.stateWord]));
+const { STATE_WORDS, FOLD_RANK } = FILRODENSWMB.STUDIO;
 
 /** Every template under templates/, as [path, text]. */
 function templates(dir = join(ROOT, "templates")) {

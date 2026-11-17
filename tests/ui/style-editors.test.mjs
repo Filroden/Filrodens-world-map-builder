@@ -24,15 +24,15 @@ const document = window.document;
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
-const { Overlay } = await import("../../src/ui/Overlay.js");
-const { ListNav } = await import("../../src/ui/ListNav.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
+const { ListNav } = await import("../../src/shell/ListNav.js");
 const { Idiomorph } = await import("../../vendor/idiomorph/idiomorph.esm.js");
 
 const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" };
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-route.hbs", "parts/inspector-route-style.hbs", "parts/inspector-region-style.hbs", "parts/inspector-label-style.hbs", "parts/inspector-pin-style.hbs", "tools-library.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-route-style.hbs", "world/parts/inspector-region-style.hbs", "world/parts/inspector-label-style.hbs", "world/parts/inspector-pin-style.hbs", "world/tools-library.hbs"]);
 
 const answers = { prompt: null, confirm: true, confirmed: [] };
 let host = null;
@@ -57,14 +57,14 @@ installPlatform({
     },
 });
 
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { InspectorFields } = await import("../../src/applications/InspectorFields.js");
-const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
-const { StyleEditors } = await import("../../src/applications/StyleEditors.js");
-const { StyleLists } = await import("../../src/applications/StyleLists.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { allLevels } = await import("../../src/mesh/LayerTree.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { InspectorFields } = await import("../../src/studios/world/app/InspectorFields.js");
+const { RouteEditor } = await import("../../src/studios/world/app/RouteEditor.js");
+const { StyleEditors } = await import("../../src/studios/world/app/StyleEditors.js");
+const { StyleLists } = await import("../../src/studios/world/app/StyleLists.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
 
 beforeEach(() => {
     answers.prompt = null;
@@ -156,7 +156,7 @@ async function drawLibrary(app) {
         panel.className = "fwmb-context-panel";
     }
     // Morphed in place, as StudioView draws the panel, so focus survives a redraw
-    Idiomorph.morph(panel, await templates.render("modules/filrodens-world-map-builder/templates/tools-library.hbs", { styleLists: StyleLists.context(app), builtinPinIcons: [], customPinIcons: [] }), { morphStyle: "innerHTML" });
+    Idiomorph.morph(panel, await templates.render("modules/filrodens-world-map-builder/templates/world/tools-library.hbs", { styleLists: StyleLists.context(app), builtinPinIcons: [], customPinIcons: [] }), { morphStyle: "innerHTML" });
     ListNav.settle(panel);
 }
 
@@ -385,7 +385,7 @@ test("Save as… is one undo step with its style: undo takes the style away", as
 });
 
 test("a new map starts with the road (lane and old road too), sea lane and river trade route styles and their two label styles", async () => {
-    const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
+    const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
     const state = MapStateManager.buildDefaultUiState(400, 300);
     assert.deepEqual(state.customRouteStyles.map((style) => [style.name, style.transport, style.thickness, style.style, style.outline]), [
         ["FILRODENSWMB.UI.RouteStyleTrunkRoad", "road", 3, "solid", true],

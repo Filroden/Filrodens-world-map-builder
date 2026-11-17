@@ -1,11 +1,11 @@
-// Random names for the map's own items (src/names/PlaceNames.js): the same map seed, item id and
+// Random names for the map's own items (src/kernel/names/PlaceNames.js): the same map seed, item id and
 // roll always give the same name, whatever else is named and in whatever order; another roll gives
 // another; a share of names add a word that fits the item; a region's land and a pin's kind of
 // place are read in their order.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { landKind, placeName, settlementKind } from "../../src/names/PlaceNames.js";
+import { landKind, placeName, settlementKind } from "../../src/kernel/names/PlaceNames.js";
 
 const item = { mapSeed: "P0JBVA", itemId: "regionAAAAAAAAAA", nameBase: "English" };
 

@@ -13,14 +13,14 @@ installPlatform({
     utils: { ...platform.utils, randomID: () => `g${Math.random().toString(36).slice(2, 18).padEnd(16, "0")}`, deepClone: (value) => structuredClone(value), mergeObject: (target, source) => Object.assign(target, source) },
 });
 
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { Generation } = await import("../../src/applications/Generation.js");
-const { InfluencePainter } = await import("../../src/applications/InfluencePainter.js");
-const { InfluenceView, combinedByte, combinedLookup } = await import("../../src/applications/InfluenceView.js");
-const { RunInputs } = await import("../../src/applications/RunInputs.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { InfluencePainter } = await import("../../src/studios/world/app/InfluencePainter.js");
+const { InfluenceView, combinedByte, combinedLookup } = await import("../../src/studios/world/app/InfluenceView.js");
+const { RunInputs } = await import("../../src/studios/world/app/RunInputs.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 /** A studio stand-in on the synthetic island, with the Influences tool open. */

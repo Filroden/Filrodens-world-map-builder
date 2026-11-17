@@ -13,10 +13,10 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
-const { MaskSettings } = await import("../../src/generation/MaskSettings.js");
-const { typed, clean, cleanContext, RULES } = await import("../../src/data/MapRules.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
+const { MaskSettings } = await import("../../src/studios/world/generation/MaskSettings.js");
+const { typed, clean, cleanContext, RULES } = await import("../../src/studios/world/data/MapRules.js");
 
 const W = 500;
 const H = 400;

@@ -6,12 +6,12 @@ import "./foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { MeshIntegration } from "../../src/applications/MeshIntegration.js";
-import { INFLUENCE_KINDS, InfluenceStroke, Influences, MAX_INFLUENCE_LEVEL, brushWeight, validLevel } from "../../src/mesh/Influences.js";
-import { MeshSession } from "../../src/mesh/MeshSession.js";
-import { encodeOwners } from "../../src/mesh/OwnerLayer.js";
-import { extractRegionalVectors } from "../../src/mesh/RegionalMesh.js";
-import { cellLookup } from "../../src/mesh/Resample.js";
+import { MeshIntegration } from "../../src/studios/world/app/MeshIntegration.js";
+import { INFLUENCE_KINDS, InfluenceStroke, Influences, MAX_INFLUENCE_LEVEL, brushWeight, validLevel } from "../../src/studios/world/mesh/Influences.js";
+import { MeshSession } from "../../src/studios/world/mesh/MeshSession.js";
+import { encodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
+import { extractRegionalVectors } from "../../src/studios/world/mesh/RegionalMesh.js";
+import { cellLookup } from "../../src/studios/world/mesh/Resample.js";
 import { FIXTURES, P0_SKIP, cellsInRect, loadP0, readJson, smallMesh, smallSession } from "./helpers.mjs";
 
 test("a value is a whole number from -100 to 100; anything else is kept in range or none", () => {

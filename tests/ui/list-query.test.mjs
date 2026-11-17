@@ -13,10 +13,10 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { ListQuery } = await import("../../src/applications/ListQuery.js");
-const { MapDialogManager } = await import("../../src/applications/MapDialogManager.js");
-const { Generation } = await import("../../src/applications/Generation.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
+const { ListQuery } = await import("../../src/studios/world/app/ListQuery.js");
+const { MapDialogManager } = await import("../../src/studios/world/app/MapDialogManager.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 
 
 /** A thousand-odd rows: every third generated, kinds by turn. */

@@ -1,4 +1,4 @@
-// The vendored fonts (src/data/fonts.js): every listed file exists, each family's licence sits
+// The vendored fonts (src/kernel/data/fonts.js): every listed file exists, each family's licence sits
 // beside its files, nothing in assets/fonts/ is left out of the list, and the stylesheet's
 // @font-face rules describe exactly the faces the list holds. Then the label fonts: the list each
 // host offers, the picker's groups, the default and the fallback for a family the host lacks, the
@@ -8,9 +8,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_LABEL_FONT, FONT_FAMILIES, FONTS_FOLDER, LABEL_FONT_CATEGORIES, fontFaces, fontLicencePath, hasStyle, hasWeight, labelFontGroups, labelFontList, labelFontNames } from "../../src/data/fonts.js";
+import { DEFAULT_LABEL_FONT, FONT_FAMILIES, FONTS_FOLDER, LABEL_FONT_CATEGORIES, fontFaces, fontLicencePath, hasStyle, hasWeight, labelFontGroups, labelFontList, labelFontNames } from "../../src/kernel/data/fonts.js";
 import { FILRODENSWMB } from "../../src/config.js";
-import { LabelFonts } from "../../src/tools/LabelFonts.js";
+import { LabelFonts } from "../../src/kernel/util/LabelFonts.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const THEME = readFileSync(join(ROOT, "styles/fwmb-theme.css"), "utf8");

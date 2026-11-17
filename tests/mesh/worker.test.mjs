@@ -3,8 +3,8 @@
 import "../support/web-worker-shim.mjs";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { GenerationWorkers } from "../../src/tools/GenerationWorkers.js";
-import { buildMeshData } from "../../src/mesh/MeshBuilder.js";
+import { GenerationWorkers } from "../../src/studios/world/tools/GenerationWorkers.js";
+import { buildMeshData } from "../../src/studios/world/mesh/MeshBuilder.js";
 
 const params = { width: 800, height: 600, spacing: 4, modelSpacing: 12, seed: 42 };
 const CANCEL_PROMPTNESS_MS = 100;

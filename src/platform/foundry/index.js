@@ -5,8 +5,8 @@
  * importing it on another host (or in a Node test that stubs only some globals) is harmless.
  */
 import { FILRODENSWMB } from "../../config.js";
-import { labelFontList } from "../../data/fonts.js";
-import { createOverlayDialogs } from "../../ui/dialogs.js";
+import { labelFontList } from "../../kernel/data/fonts.js";
+import { createOverlayDialogs } from "../../shell/dialogs.js";
 import * as store from "./store.js";
 import { foundryAssets } from "./assets.js";
 

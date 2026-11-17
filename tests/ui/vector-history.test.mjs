@@ -6,10 +6,10 @@ import { test } from "node:test";
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 installPlatform({ utils: { ...platform.utils, deepClone: (value) => structuredClone(value) } });
 
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { deleteLevel } = await import("../../src/mesh/RegionEdits.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { deleteLevel } = await import("../../src/studios/world/mesh/RegionEdits.js");
 const { cellsInRect, smallSession } = await import("../mesh/helpers.mjs");
 
 /** A studio stand-in with the state the vector snapshot reads, and a session with one painted level. */

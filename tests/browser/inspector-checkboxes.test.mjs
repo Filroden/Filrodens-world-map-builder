@@ -73,20 +73,20 @@ after(async () => {
 
 /** The tool each kind of inspector is opened in, and how to open it and find its object, in the page. */
 const KINDS = {
-    pin: { tool: "infrastructure", open: "(await import('/src/applications/PinEditor.js')).PinEditor.open(app, ids.pin)", object: "app.mapPins.find((each) => each.id === ids.pin)" },
-    route: { tool: "infrastructure", open: "(await import('/src/applications/RouteEditor.js')).RouteEditor.open(app, ids.route)", object: "app.mapRoutes.find((each) => each.id === ids.route)" },
+    pin: { tool: "infrastructure", open: "(await import('/src/studios/world/app/PinEditor.js')).PinEditor.open(app, ids.pin)", object: "app.mapPins.find((each) => each.id === ids.pin)" },
+    route: { tool: "infrastructure", open: "(await import('/src/studios/world/app/RouteEditor.js')).RouteEditor.open(app, ids.route)", object: "app.mapRoutes.find((each) => each.id === ids.route)" },
     region: {
         tool: "regions",
-        open: "(await import('/src/applications/RegionEditor.js')).RegionEditor.open(app, ids.region.levelId, ids.region.id)",
+        open: "(await import('/src/studios/world/app/RegionEditor.js')).RegionEditor.open(app, ids.region.levelId, ids.region.id)",
         object: "app.regionLevels.find((level) => level.id === ids.region.levelId).regions.find((each) => each.id === ids.region.id)",
     },
-    fault: { tool: "features", open: "(await import('/src/applications/FeatureEditors.js')).FaultEditor.open(app, ids.fault)", object: "app.tectonicFaults.find((each) => each.id === ids.fault)" },
-    river: { tool: "features", open: "(await import('/src/applications/FeatureEditors.js')).RiverEditor.open(app, ids.river)", object: "app.manualRivers.find((each) => each.id === ids.river)" },
-    set: { tool: "regions", open: "(await import('/src/applications/LayerEditors.js')).LayerSetEditor.open(app, ids.set)", object: "app.layerSets.find((each) => each.id === ids.set)" },
-    level: { tool: "regions", open: "(await import('/src/applications/LayerEditors.js')).LevelEditor.open(app, ids.level)", object: "app.layerSets.flatMap((set) => set.levels).find((each) => each.id === ids.level)" },
-    routeStyle: { tool: "library", open: "(await import('/src/applications/StyleEditors.js')).StyleEditors.open(app, 'Route', ids.routeStyle)", object: "app.uiState.customRouteStyles.find((each) => each.id === ids.routeStyle)" },
-    regionStyle: { tool: "library", open: "(await import('/src/applications/StyleEditors.js')).StyleEditors.open(app, 'Region', ids.regionStyle)", object: "app.uiState.customRegionStyles.find((each) => each.id === ids.regionStyle)" },
-    labelStyle: { tool: "library", open: "(await import('/src/applications/StyleEditors.js')).StyleEditors.open(app, 'Label', ids.labelStyle)", object: "app.uiState.customLabelStyles.find((each) => each.id === ids.labelStyle)" },
+    fault: { tool: "features", open: "(await import('/src/studios/world/app/FeatureEditors.js')).FaultEditor.open(app, ids.fault)", object: "app.tectonicFaults.find((each) => each.id === ids.fault)" },
+    river: { tool: "features", open: "(await import('/src/studios/world/app/FeatureEditors.js')).RiverEditor.open(app, ids.river)", object: "app.manualRivers.find((each) => each.id === ids.river)" },
+    set: { tool: "regions", open: "(await import('/src/studios/world/app/LayerEditors.js')).LayerSetEditor.open(app, ids.set)", object: "app.layerSets.find((each) => each.id === ids.set)" },
+    level: { tool: "regions", open: "(await import('/src/studios/world/app/LayerEditors.js')).LevelEditor.open(app, ids.level)", object: "app.layerSets.flatMap((set) => set.levels).find((each) => each.id === ids.level)" },
+    routeStyle: { tool: "library", open: "(await import('/src/studios/world/app/StyleEditors.js')).StyleEditors.open(app, 'Route', ids.routeStyle)", object: "app.uiState.customRouteStyles.find((each) => each.id === ids.routeStyle)" },
+    regionStyle: { tool: "library", open: "(await import('/src/studios/world/app/StyleEditors.js')).StyleEditors.open(app, 'Region', ids.regionStyle)", object: "app.uiState.customRegionStyles.find((each) => each.id === ids.regionStyle)" },
+    labelStyle: { tool: "library", open: "(await import('/src/studios/world/app/StyleEditors.js')).StyleEditors.open(app, 'Label', ids.labelStyle)", object: "app.uiState.customLabelStyles.find((each) => each.id === ids.labelStyle)" },
 };
 
 /**

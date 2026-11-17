@@ -1,8 +1,8 @@
 // Borders derived from owner arrays: completeness, junctions, smoothing, classes, nesting, labels.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { arcsForLevel, borderSegments, chaikin, coincidentEdges, coincidentWith, labelAnchor, labelCandidates } from "../../src/mesh/BorderArcs.js";
-import { UNCLAIMED } from "../../src/mesh/Schema.js";
+import { arcsForLevel, borderSegments, chaikin, coincidentEdges, coincidentWith, labelAnchor, labelCandidates } from "../../src/studios/world/mesh/BorderArcs.js";
+import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
 import { P0_SKIP, flatAggregates, loadP0, smallMesh } from "./helpers.mjs";
 
 /** Expected arc counts for the P0JBVA realm fixture (see the handoff for how they compare with the prototype). */

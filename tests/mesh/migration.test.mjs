@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { migrateMapData, regionsToOwners, routesToWaypoints } from "../../src/mesh/Migration.js";
-import { pointInPolygon } from "../../src/mesh/OwnerLayer.js";
-import { cellsAlongPolyline, toFlatPoints } from "../../src/mesh/RoutePath.js";
-import { UNCLAIMED, VECTOR_SCHEMA_VERSION, validateOwners, validateVectorData } from "../../src/mesh/Schema.js";
+import { MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { migrateMapData, regionsToOwners, routesToWaypoints } from "../../src/studios/world/mesh/Migration.js";
+import { pointInPolygon } from "../../src/studios/world/mesh/OwnerLayer.js";
+import { cellsAlongPolyline, toFlatPoints } from "../../src/studios/world/mesh/RoutePath.js";
+import { UNCLAIMED, VECTOR_SCHEMA_VERSION, validateOwners, validateVectorData } from "../../src/studios/world/mesh/Schema.js";
 import { FIXTURES, isContiguous, readJson, smallMesh } from "./helpers.mjs";
 
 const MIN_IOU = 0.97;

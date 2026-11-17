@@ -60,7 +60,7 @@ const HOSTILE = `<?xml version="1.0"?><!-- an icon --><svg xmlns="http://www.w3.
 
 test("an SVG is cleaned of script, handlers, outside links and embedded HTML, and still draws", { skip }, async () => {
     const result = await page.evaluate(async (svg) => {
-        const { ImageCheck } = await import("/src/data/ImageCheck.js");
+        const { ImageCheck } = await import("/src/kernel/data/ImageCheck.js");
         const cleaned = ImageCheck.cleanSvg(svg);
         const image = new Image();
         image.src = ImageCheck.toDataUrl(new TextEncoder().encode(cleaned), "svg");
@@ -76,7 +76,7 @@ test("an SVG is cleaned of script, handlers, outside links and embedded HTML, an
 
 test("an SVG named and typed as a PNG is checked as the SVG it is, and kept as a cleaned SVG", { skip }, async () => {
     const url = await page.evaluate(async (svg) => {
-        const { ImageCheck } = await import("/src/data/ImageCheck.js");
+        const { ImageCheck } = await import("/src/kernel/data/ImageCheck.js");
         return ImageCheck.checkFile(new File([svg], "icon.png", { type: "image/png" }));
     }, HOSTILE);
     assert.ok(url.startsWith("data:image/svg+xml;base64,"), url.slice(0, 40));
@@ -86,7 +86,7 @@ test("an SVG named and typed as a PNG is checked as the SVG it is, and kept as a
 
 test("a real PNG is decoded and kept; a file of no image type is refused", { skip }, async () => {
     const outcome = await page.evaluate(async () => {
-        const { ImageCheck } = await import("/src/data/ImageCheck.js");
+        const { ImageCheck } = await import("/src/kernel/data/ImageCheck.js");
         const canvas = new OffscreenCanvas(3, 2);
         canvas.getContext("2d").fillRect(0, 0, 3, 2);
         const png = await canvas.convertToBlob({ type: "image/png" });

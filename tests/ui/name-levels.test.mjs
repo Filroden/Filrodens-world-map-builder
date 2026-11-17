@@ -5,10 +5,10 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { DetailLevel } from "../../src/applications/DetailLevel.js";
-import { PinStyles } from "../../src/applications/PinStyles.js";
-import { showNamesOnce } from "../../src/data/NameLevels.js";
-import { RULES, clean, cleanContext } from "../../src/data/MapRules.js";
+import { DetailLevel } from "../../src/studios/world/app/DetailLevel.js";
+import { PinStyles } from "../../src/studios/world/app/PinStyles.js";
+import { showNamesOnce } from "../../src/studios/world/data/NameLevels.js";
+import { RULES, clean, cleanContext } from "../../src/studios/world/data/MapRules.js";
 
 const STYLES = [
     { id: "style-city", tier: "city", detailLevel: 0, label: { visibility: "all", detailLevel: 0 } },

@@ -1,4 +1,4 @@
-// The credits (src/data/credits.js): every vendored folder (vendor/ and assets/fonts/) has an
+// The credits (src/kernel/data/credits.js): every vendored folder (vendor/ and assets/fonts/) has an
 // entry whose licence file is there, every entry's text is in en.json, and the README's
 // third-party table is the one written from them (scripts/credits-readme.mjs).
 import assert from "node:assert/strict";
@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { FONT_LICENCE, LIBRARY_CREDITS, fontCredits } from "../../src/data/credits.js";
+import { FONT_LICENCE, LIBRARY_CREDITS, fontCredits } from "../../src/kernel/data/credits.js";
 import { writtenReadme } from "../../scripts/credits-readme.mjs";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));

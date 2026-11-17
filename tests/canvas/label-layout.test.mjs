@@ -9,9 +9,9 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { LabelLayout, pinCandidates } from "../../src/canvas/LabelLayout.js";
-import { labelCandidates } from "../../src/mesh/BorderArcs.js";
-import { UNCLAIMED } from "../../src/mesh/Schema.js";
+import { LabelLayout, pinCandidates } from "../../src/studios/world/canvas/LabelLayout.js";
+import { labelCandidates } from "../../src/studios/world/mesh/BorderArcs.js";
+import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
 import { smallMesh } from "../mesh/helpers.mjs";
 
 const PIN_WIDTH = 10;
@@ -86,7 +86,7 @@ test("with Avoid overlaps off every name is at its first place, overlapping or n
 });
 
 test("names keep clear of a border's band along the map's edges", async () => {
-    const { nameInset } = await import("../../src/canvas/MapBorder.js");
+    const { nameInset } = await import("../../src/studios/world/canvas/MapBorder.js");
     assert.equal(nameInset({ cartographyBorderEnable: false, cartographyBorderStyle: "double" }), 0, "no border, no band");
     const inset = nameInset({ cartographyBorderEnable: true, cartographyBorderStyle: "double" });
     assert.ok(inset > nameInset({ cartographyBorderEnable: true, cartographyBorderStyle: "solid" }), "a double border's band is deeper than a solid one's");

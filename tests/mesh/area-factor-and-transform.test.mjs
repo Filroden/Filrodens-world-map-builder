@@ -5,15 +5,15 @@
 import "./foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MeshIntegration } from "../../src/applications/MeshIntegration.js";
-import { NoiseTransform } from "../../src/applications/NoiseTransform.js";
-import { VectorHistory } from "../../src/applications/VectorHistory.js";
-import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { RouteDraft } from "../../src/mesh/RouteEdits.js";
-import { addRegion, createLayerSet, createLevel, createMeshBlock, effectiveKmPerPx } from "../../src/mesh/Schema.js";
-import { TerrainVersion } from "../../src/tools/TerrainVersion.js";
-import { decodeModelRun, encodeModelRun } from "../../src/generator/ModelRun.js";
-import { resolveSettings } from "../../src/generator/GeneratorSettings.js";
+import { MeshIntegration } from "../../src/studios/world/app/MeshIntegration.js";
+import { NoiseTransform } from "../../src/studios/world/app/NoiseTransform.js";
+import { VectorHistory } from "../../src/studios/world/app/VectorHistory.js";
+import { MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { RouteDraft } from "../../src/studios/world/mesh/RouteEdits.js";
+import { addRegion, createLayerSet, createLevel, createMeshBlock, effectiveKmPerPx } from "../../src/studios/world/mesh/Schema.js";
+import { TerrainVersion } from "../../src/studios/world/tools/TerrainVersion.js";
+import { decodeModelRun, encodeModelRun } from "../../src/studios/world/generator/ModelRun.js";
+import { resolveSettings } from "../../src/studios/world/generator/GeneratorSettings.js";
 import { cellsInRect, isContiguous, smallSession } from "./helpers.mjs";
 
 const mapData = (world) => ({ mapWidth: 1000, mapHeight: 500, seed: "AREA", params: { latTop: 60, latBottom: -60 }, world });

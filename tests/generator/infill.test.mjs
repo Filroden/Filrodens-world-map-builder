@@ -1,4 +1,4 @@
-// Regional in-fill (src/generator/Infill.js, src/applications/InfillInput.js) on the synthetic
+// Regional in-fill (src/studios/world/generator/Infill.js, src/studios/world/app/InfillInput.js) on the synthetic
 // island: the parent's people shared out and never more of them, market towns within a day's round
 // trip of every village and none crowding a town, villages thinned by the area factor and capped,
 // places only near the inherited network, lanes joining every place to it, names in each place's
@@ -10,8 +10,8 @@ import { parentRunOf } from "./infill-helpers.mjs";
 import { syntheticMap } from "./synthetic.mjs";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { runInfill } = await import("../../src/generator/Infill.js");
-const { InfillInput } = await import("../../src/applications/InfillInput.js");
+const { runInfill } = await import("../../src/studios/world/generator/Infill.js");
+const { InfillInput } = await import("../../src/studios/world/app/InfillInput.js");
 
 /** A village of either size (a large one has at least INFILL.LARGE_VILLAGE_POP). */
 const isVillage = (place) => place.tier === "village" || place.tier === "largeVillage";

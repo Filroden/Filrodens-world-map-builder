@@ -4,9 +4,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
+const { RegionalExtractor } = await import("../../src/studios/world/app/RegionalExtractor.js");
 const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
-const { kmPerPxOf } = await import("../../src/data/MapUnit.js");
+const { kmPerPxOf } = await import("../../src/studios/world/data/MapScale.js");
 
 const PARENT = { width: 2000, height: 1600 };
 const plan = (crop, width, grid) => RegionalExtractor.planCrop(crop, width, grid, PARENT.width, PARENT.height);

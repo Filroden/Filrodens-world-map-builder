@@ -7,8 +7,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { nameEverything } = await import("../../src/generator/Names.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
+const { nameEverything } = await import("../../src/studios/world/generator/Names.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
 const { syntheticMap } = await import("./synthetic.mjs");
 
 const { LEGACY } = FILRODENSWMB.GENERATOR.REVISIONS;

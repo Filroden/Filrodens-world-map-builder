@@ -1,4 +1,4 @@
-import { registerModuleHelpers } from "../../ui/templateHelpers.js";
+import { registerModuleHelpers } from "../../shell/templateHelpers.js";
 
 /**
  * The module's Handlebars templates on the web (the platform's `templates` service), with the
@@ -62,7 +62,7 @@ export function createWebTemplates({ handlebars, prefix, fetchText }) {
         /**
          * Loads and registers templates, all at once.
          *
-         * @param {string[]} paths - Paths in the templates folder ("toolbar.hbs", "parts/shared-range.hbs").
+         * @param {string[]} paths - Paths in the templates folder ("shell/toolbar.hbs", "shell/parts/shared-range.hbs").
          */
         async load(paths) {
             await Promise.all(paths.map(add));

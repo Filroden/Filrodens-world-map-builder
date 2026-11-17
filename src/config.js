@@ -1,4 +1,4 @@
-import { DEFAULT_LABEL_FONT } from "./data/fonts.js";
+import { DEFAULT_LABEL_FONT } from "./kernel/data/fonts.js";
 
 /** The geographic label styles (see LABELS.DEFAULT_STYLES and FEATURE_NAMES). */
 const FEATURE_LABEL_STYLES = Object.freeze([
@@ -23,7 +23,7 @@ export const FILRODENSWMB = {
         GRID_DATA: "gridData",
     },
     TEMPLATES: {
-        TOOLBAR: "modules/filrodens-world-map-builder/templates/toolbar.hbs",
+        TOOLBAR: "modules/filrodens-world-map-builder/templates/shell/toolbar.hbs",
     },
     // Foundry's own CONST.GRID_TYPES numeric values (and a human-readable label for each) for the
     // three grid shapes FWMB supports, keyed by uiState.gridType. FWMB only ever exports the
@@ -770,92 +770,9 @@ export const FILRODENSWMB = {
             SCRATCH_RELEASE: 30000,
         },
     },
-    // The studio's frame (see toolbar.hbs). The rail groups the tools by the stage of making a map
-    // they belong to; each tool has its rail icon and name. The occasional tools sit below the
-    // stages (folding into More when the studio is short): a tool, an action of its own (the 3D
-    // view, full screen) or a menu (Appearance). Tool ids are the ones the changeTool action uses.
+    // The studio shell's own settings. The World studio's tools, stages, occasional tools, Next
+    // footers and state words are its registration (src/studios/world/definition.js).
     STUDIO: {
-        TOOLS: {
-            scene: { icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap" },
-            terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
-            biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
-            features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
-            influences: { icon: "tune", label: "FILRODENSWMB.UI.ToolInfluences" },
-            generate: { icon: "generate", label: "FILRODENSWMB.UI.ToolGenerate" },
-            regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
-            infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
-            labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
-            cartography: { icon: "explore", label: "FILRODENSWMB.UI.ToolCartography" },
-            history: { icon: "history", label: "FILRODENSWMB.UI.ToolHistory" },
-            travel: { icon: "travel-explore", label: "FILRODENSWMB.UI.ToolTravel" },
-            export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
-            reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
-            library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
-            manage: { icon: "folder-open", label: "FILRODENSWMB.UI.ToolManage" },
-        },
-        STAGES: [
-            { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
-            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["influences", "generate", "regions", "infrastructure", "labels"] },
-            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
-            // Tools to look at a finished map with, outside the order of work (no Next leads to them)
-            { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history", "travel"], optional: true },
-        ],
-        // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
-        // the web the full-screen toggle (shown only where the host can go full screen)
-        OCCASIONAL: [
-            { tool: "reference" },
-            { tool: "library" },
-            { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },
-            { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
-            { action: "toggleFullscreen", icon: "fullscreen", label: "FILRODENSWMB.UI.FullScreen", host: "fullscreen" },
-        ],
-        // The panel's header: each stage's tools are numbered in order ("Shape · 2 of 4") except
-        // Populate's, which are worked in any order. The engine is named for the tools it shapes.
-        UNNUMBERED_STAGES: ["populate", "explore"],
-        ENGINE_IN_HEADER: ["scene", "terrain"],
-        // Each tool's Next footer: the tool that follows and why (a localisation key). Tools outside
-        // the stages, in an optional stage, and the last one, have none.
-        NEXT: {
-            scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
-            terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
-            biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
-            features: { tool: "influences", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
-            influences: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonInfluences" },
-            generate: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonGenerate" },
-            regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
-            infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
-            labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
-            cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
-            export: null,
-            history: null,
-            travel: null,
-            reference: null,
-            library: null,
-            manage: null,
-        },
-        // What the pointer does while a tool is editing, named in the state block and on the bar:
-        // a word per tool, or per mode where the tool's modes do different things. Cartography has
-        // no edit toggle (its decorations can always be moved), so its word stands for the tool.
-        // Tools with null have no editing at all.
-        STATE_WORD: {
-            scene: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing", crop: "cropping" },
-            terrain: "terraforming",
-            biomes: "painting",
-            // Select starts editing in River (see PickTool.settleForEditing)
-            features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
-            influences: "painting",
-            generate: null,
-            regions: "painting",
-            infrastructure: { pin: "placing", route: "drawing" },
-            labels: "placing",
-            cartography: "placing",
-            history: null,
-            travel: null,
-            export: null,
-            reference: null,
-            library: null,
-            manage: null,
-        },
         // The localisation keys of each state word: its name, the state block's start and stop
         // buttons, and the line in a section its editing pauses
         STATE_WORDS: {
@@ -2272,10 +2189,10 @@ export const FILRODENSWMB = {
     // The version of the map's vector data (regions, routes and pins). Maps saved before it existed
     // have no `vectorSchemaVersion` and hold regions as polygons and routes as node lists; version 4
     // holds regions as cell ownership on the display mesh and routes as waypoint cells (see
-    // src/mesh/Migration.js, which converts the older shapes once).
+    // src/studios/world/mesh/Migration.js, which converts the older shapes once).
     VECTOR_SCHEMA_VERSION: 4,
     // The display mesh: a Poisson-disc Voronoi mesh over the whole map that regions are painted on
-    // and routes are found across (see src/mesh/). Sizes are in map pixels unless they say km.
+    // and routes are found across (see src/studios/world/mesh/). Sizes are in map pixels unless they say km.
     MESH: {
         // Distance between neighbouring cell centres. Small enough that a border drawn along cell
         // edges reads as a line, not a staircase, at the zoom levels a map is usually edited at.
@@ -2396,7 +2313,7 @@ export const FILRODENSWMB = {
             EDIT_FILL_OPACITY: 0.5,
         },
     },
-    // The settlement, route and realm generator (see src/generator/). It runs on the model mesh
+    // The settlement, route and realm generator (see src/studios/world/generator/). It runs on the model mesh
     // (the display mesh's coarse sites, MESH.MODEL_SPACING_KM apart) in "flat-km": the time it
     // takes to walk one effective km over flat open ground, so every cost below is a travel time.
     // The figures are tuned to give believable medieval places at world scale, not to be realistic.

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { installPlatform, platform } from "../../src/platform/index.js";
-import { findPinIconUsage, revertPinIconUsage } from "../../src/data/pinIcons.js";
+import { findPinIconUsage, revertPinIconUsage } from "../../src/kernel/data/pinIcons.js";
 
 /** A store holding two saved maps, recording the field updates it is sent. */
 function stubStore() {

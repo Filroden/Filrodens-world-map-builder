@@ -5,9 +5,9 @@
  * reaches it as `platform.store`.
  */
 import { FILRODENSWMB } from "../../config.js";
-import { ColorMath } from "../../tools/ColorMath.js";
-import { TerrainVersion } from "../../tools/TerrainVersion.js";
-import { BiomePlacement } from "../../generation/BiomePlacement.js";
+import { ColorMath } from "../../kernel/util/ColorMath.js";
+import { TerrainVersion } from "../../studios/world/tools/TerrainVersion.js";
+import { BiomePlacement } from "../../studios/world/generation/BiomePlacement.js";
 
 /** Decimal places kept when showing a regional map's zoom (a crop's zoom need not be a whole number). */
 const ZOOM_DECIMALS = 2;
@@ -90,7 +90,7 @@ export async function getSavedMaps() {
 }
 
 /**
- * The values the journal summary (templates/journal-summary.hbs) shows that are not stored in
+ * The values the journal summary (templates/world/journal-summary.hbs) shows that are not stored in
  * the map data as they are displayed: they are worked out from it here, so the template only
  * has to print them.
  *
@@ -265,7 +265,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
     Object.assign(cleanPayload, buildJournalContext(cleanPayload));
 
-    const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
+    const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/world/journal-summary.hbs", cleanPayload);
 
     const pages = [
         {

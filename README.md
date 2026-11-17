@@ -102,7 +102,7 @@ The map builder works with a mouse and keyboard or with a touch screen. On a tab
 
 Filroden's World Map Builder is released under the [MIT Licence](LICENSE.md). It also includes the following third-party code, icons and fonts. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
 
-<!-- credits:start (written by scripts/credits-readme.mjs from src/data/credits.js) -->
+<!-- credits:start (written by scripts/credits-readme.mjs from src/kernel/data/credits.js) -->
 | Dependency | Folder | Licence file | Licence |
 | :--- | :--- | :--- | :--- |
 | [d3-delaunay](https://github.com/d3/d3-delaunay) 6.0.4 (Delaunay triangulation for the map's cells, bundled into one file with delaunator and robust-predicates) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`licence-d3-delaunay.md`](vendor/d3-delaunay/licence-d3-delaunay.md) | ISC |

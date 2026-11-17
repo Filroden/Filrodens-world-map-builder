@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { ShoreRelay } = await import("../../src/applications/ShoreRelay.js");
-const { RunCells } = await import("../../src/applications/RunCells.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+const { ShoreRelay } = await import("../../src/studios/world/app/ShoreRelay.js");
+const { RunCells } = await import("../../src/studios/world/app/RunCells.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 const { parentRunOf } = await import("../generator/infill-helpers.mjs");
 

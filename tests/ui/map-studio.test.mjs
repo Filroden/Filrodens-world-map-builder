@@ -18,7 +18,7 @@ installPlatform({
     },
 });
 
-const { MapStudio } = await import("../../src/applications/MapStudio.js");
+const { MapStudio } = await import("../../src/studios/world/app/MapStudio.js");
 
 /** A studio whose unsaved-changes question answers `choice`, counting how often it is asked. */
 function studioAnswering(choice) {
@@ -106,11 +106,11 @@ test("the Foundry window closes only when the studio agrees, and destroys it fir
     }
     globalThis.window ??= { innerWidth: 1000, innerHeight: 800 };
     globalThis.foundry = { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } }, utils: { mergeObject: (target, source) => Object.assign(target, source) } };
-    const { MapStudioWindow } = await import("../../src/platform/foundry/MapStudioWindow.js");
+    const { StudioWindow } = await import("../../src/platform/foundry/StudioWindow.js");
 
-    const frame = new MapStudioWindow();
+    const frame = new StudioWindow();
     let answer = false;
-    frame.studio = { canClose: async () => answer, destroy: () => closed.push("studio") };
+    frame.shell = { canClose: async () => answer, destroy: () => closed.push("studio") };
 
     await frame.close();
     assert.deepEqual(closed, [], "kept open when the studio says no");

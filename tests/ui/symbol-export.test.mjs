@@ -5,9 +5,9 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { SymbolScale } from "../../src/tools/SymbolScale.js";
-import { ExportScale } from "../../src/tools/ExportScale.js";
-import { RULES, clean, cleanContext } from "../../src/data/MapRules.js";
+import { SymbolScale } from "../../src/kernel/util/SymbolScale.js";
+import { ExportScale } from "../../src/kernel/export/ExportScale.js";
+import { RULES, clean, cleanContext } from "../../src/studios/world/data/MapRules.js";
 
 const near = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 1e-3, `${message ?? ""} ${actual} vs ${expected}`);
 

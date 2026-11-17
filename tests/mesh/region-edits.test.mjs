@@ -2,7 +2,7 @@
 // nesting while painting, repairing nesting, and filling a child level inside its parents.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { UNCLAIMED, addRegion, createLayerSet, createLevel } from "../../src/mesh/Schema.js";
+import { UNCLAIMED, addRegion, createLayerSet, createLevel } from "../../src/studios/world/mesh/Schema.js";
 import {
     assignToParents,
     autoAssign,
@@ -16,7 +16,7 @@ import {
     paintAllow,
     settleParentKey,
     unassignedCount,
-} from "../../src/mesh/RegionEdits.js";
+} from "../../src/studios/world/mesh/RegionEdits.js";
 import { cellsInRect, smallSession } from "./helpers.mjs";
 
 let ids = 0;
@@ -182,7 +182,7 @@ async function coastalMap(watersPx) {
 }
 
 test("territorial waters go to the nearest coast up to the limit, split between neighbours, and lakes are claimed whole", async () => {
-    const { claimWaters } = await import("../../src/mesh/RegionEdits.js");
+    const { claimWaters } = await import("../../src/studios/world/mesh/RegionEdits.js");
     const map = await coastalMap(30);
     const result = claimWaters(map.session, map.realms);
     const owners = map.session.layer(map.realms.id).owners;

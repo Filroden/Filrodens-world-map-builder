@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
-const { transportCost } = await import("../../src/mesh/RouteEdits.js");
-const { RiverRelay } = await import("../../src/applications/RiverRelay.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
+const { transportCost } = await import("../../src/studios/world/mesh/RouteEdits.js");
+const { RiverRelay } = await import("../../src/studios/world/app/RiverRelay.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 /** The drawn river's middle line across the island. */

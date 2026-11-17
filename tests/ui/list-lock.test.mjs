@@ -18,7 +18,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/list-rows-pin.hbs", "parts/list-rows-route.hbs", "parts/shared-range.hbs"]);
+await templates.load(["world/parts/list-rows-pin.hbs", "world/parts/list-rows-route.hbs", "shell/parts/shared-range.hbs"]);
 
 async function rowsOf(template, rows, massEdit = false) {
     const holder = window.document.createElement("div");
@@ -33,7 +33,7 @@ const ROWS = [
     { id: "locked", name: "Cray", icon: "dot", color: "#000", visibility: "all", generated: true, locked: true, edited: false },
 ];
 
-for (const template of ["parts/list-rows-pin.hbs", "parts/list-rows-route.hbs"]) {
+for (const template of ["world/parts/list-rows-pin.hbs", "world/parts/list-rows-route.hbs"]) {
     test(`${template}: a generated row has a Lock icon button, pressed when locked; a hand-made row has none`, async () => {
         const holder = await rowsOf(template, ROWS, true);
         const lockOf = (id) => holder.querySelector(`[data-id="${id}"] [data-action="toggleLock"]`);
@@ -52,7 +52,7 @@ for (const template of ["parts/list-rows-pin.hbs", "parts/list-rows-route.hbs"])
 }
 
 test("a slider given a reset value carries it as data-default; one without has none", async () => {
-    const render = (extra) => templates.render("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", { name: "generator.world.density", label: "L", value: 2, min: 0.25, max: 4, step: 0.05, ...extra });
+    const render = (extra) => templates.render("modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs", { name: "generator.world.density", label: "L", value: 2, min: 0.25, max: 4, step: 0.05, ...extra });
     const holder = window.document.createElement("div");
     holder.innerHTML = await render({ resetTo: "1" });
     assert.equal(holder.querySelector("input").dataset.default, "1");

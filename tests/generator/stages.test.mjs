@@ -1,20 +1,20 @@
-// The generator's engine (src/generator/) on small inputs: the cell graph and its searches, the
+// The generator's engine (src/studios/world/generator/) on small inputs: the cell graph and its searches, the
 // settings, cultures, biomes, names and route chains, and whole runs on the synthetic island
 // (determinism, progress, cancelling).
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { buildModelCells } from "../../src/generator/CellValues.js";
-import { CellGraph, EDGE, portCost, travelCost } from "../../src/generator/CellGraph.js";
-import { affinity, closedness, habitatFit, resolveCultures, sharesOf, spreadCultures } from "../../src/generator/Cultures.js";
-import { resolveSettings } from "../../src/generator/GeneratorSettings.js";
-import { behavesLikeTable, biomeProperties, modelBiomeRaster, ownNumbers, startingNumbers } from "../../src/generator/ModelBiomes.js";
-import { nameBaseNames, nameEverything } from "../../src/generator/Names.js";
-import { GenerationCancelled, runGenerator } from "../../src/generator/Pipeline.js";
-import { hashString, stageRandom } from "../../src/generator/Random.js";
-import { routeChains } from "../../src/generator/RouteChains.js";
-import { SearchSpace, leastCostPerKm, searchAll } from "../../src/generator/Search.js";
+import { buildModelCells } from "../../src/studios/world/generator/CellValues.js";
+import { CellGraph, EDGE, portCost, travelCost } from "../../src/studios/world/generator/CellGraph.js";
+import { affinity, closedness, habitatFit, resolveCultures, sharesOf, spreadCultures } from "../../src/studios/world/generator/Cultures.js";
+import { resolveSettings } from "../../src/studios/world/generator/GeneratorSettings.js";
+import { behavesLikeTable, biomeProperties, modelBiomeRaster, ownNumbers, startingNumbers } from "../../src/studios/world/generator/ModelBiomes.js";
+import { nameBaseNames, nameEverything } from "../../src/studios/world/generator/Names.js";
+import { GenerationCancelled, runGenerator } from "../../src/studios/world/generator/Pipeline.js";
+import { hashString, stageRandom } from "../../src/kernel/random/Random.js";
+import { routeChains } from "../../src/studios/world/generator/RouteChains.js";
+import { SearchSpace, leastCostPerKm, searchAll } from "../../src/studios/world/generator/Search.js";
 import { syntheticMap } from "./synthetic.mjs";
 
 const quick = { pause: () => Promise.resolve() };

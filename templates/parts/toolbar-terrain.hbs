@@ -1,9 +1,0 @@
-{{!-- Terrain's bar: the brush modes, then the brush's size, strength and feather (Roughen always
-     lays the same texture, so it has no strength or feather). --}}
-{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
-<span class="fwmb-sep"></span>
-{{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
-{{#unless (eq uiState.terrainBrushTool "roughen")}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="brushStrength" label="FILRODENSWMB.UI.BarBrushStrength" icon="format-paint" value=(lookup uiState 'brushStrength') min=0.01 max=0.05 step=0.01}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="brushFeather" label="FILRODENSWMB.UI.BarBrushFeather" icon="gesture" value=(lookup uiState 'brushFeather') min=0 max=0.8 step=0.1}}
-{{/unless}}

@@ -11,7 +11,7 @@ import { Window } from "happy-dom";
 const window = new Window({ url: "http://localhost/" });
 Object.assign(globalThis, { window, document: window.document, CSS: window.CSS ?? { escape: (text) => text } });
 after(() => window.happyDOM.close());
-const { ListReorder } = await import("../../src/ui/ListReorder.js");
+const { ListReorder } = await import("../../src/shell/ListReorder.js");
 
 function list(ids) {
     document.body.innerHTML = `<div data-reorder="landMasks">${ids.map((id) => `<div data-reorder-item data-id="${id}"><button data-reorder-handle></button></div>`).join("")}</div>`;
@@ -38,9 +38,9 @@ test("Up and Down on a handle move its row one place, never past the ends; other
 });
 
 test("the Land masks list is in the masks' own order, with a handle on each row once there are two", () => {
-    const studio = readFileSync(fileURLToPath(new URL("../../src/applications/MapStudio.js", import.meta.url)), "utf8");
+    const studio = readFileSync(fileURLToPath(new URL("../../src/studios/world/app/MapStudio.js", import.meta.url)), "utf8");
     assert.doesNotMatch(studio, /context\.landMasks = \[\.\.\.\(this\.landMasks \|\| \[\]\)\]\.sort/, "not sorted by name");
-    const template = readFileSync(fileURLToPath(new URL("../../templates/tools-scene.hbs", import.meta.url)), "utf8");
+    const template = readFileSync(fileURLToPath(new URL("../../templates/world/tools-scene.hbs", import.meta.url)), "utf8");
     assert.match(template, /data-reorder="landMasks"/);
     assert.match(template, /data-reorder-item/);
     assert.match(template, /\{\{#if @root\.landMasksReorderable\}\}<button[^>]*data-reorder-handle/);

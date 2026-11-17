@@ -13,9 +13,9 @@ import {
     parentAssignments,
     pointInPolygon,
     withinParent,
-} from "../../src/mesh/OwnerLayer.js";
-import { UNCLAIMED } from "../../src/mesh/Schema.js";
-import { claimWaters, fillUnclaimedLand, relaxBorders } from "../../src/mesh/Territory.js";
+} from "../../src/studios/world/mesh/OwnerLayer.js";
+import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
+import { claimWaters, fillUnclaimedLand, relaxBorders } from "../../src/studios/world/mesh/Territory.js";
 import { P0_SKIP, cellsInRect, flatAggregates, loadP0, seededRandom, smallMesh } from "./helpers.mjs";
 
 const MAX_LEVEL_BYTES = 50 * 1024;

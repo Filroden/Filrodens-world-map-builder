@@ -2,7 +2,7 @@
 // of its land; each later realm once), and what changed between two ages.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ageChanges, chainRoads, cultureShares, matchRealms, placeCells } from "../../src/history/PastAge.js";
+import { ageChanges, chainRoads, cultureShares, matchRealms, placeCells } from "../../src/studios/world/history/PastAge.js";
 
 test("a realm carries on as the later realm holding its seat or most of its land, each later realm once", () => {
     // Ten cells. Earlier: realm 0 on cells 0 to 4 (seat 0), realm 1 on 5 to 7 (seat 6), realm 2 on 8 and 9 (seat 9)

@@ -31,12 +31,12 @@ installPlatform({
     },
 });
 
-const { RegionPainter } = await import("../../src/applications/RegionPainter.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { allLevels } = await import("../../src/mesh/LayerTree.js");
+const { RegionPainter } = await import("../../src/studios/world/app/RegionPainter.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { RegionPanel } = await import("../../src/studios/world/app/RegionPanel.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
 const { cellsInRect, smallSession } = await import("../mesh/helpers.mjs");
 
 beforeEach(() => {

@@ -13,8 +13,8 @@ for (const name of Object.getOwnPropertyNames(window)) {
 Object.assign(globalThis, { window, document: window.document });
 after(() => window.happyDOM.close());
 
-const { Overlay } = await import("../../src/ui/Overlay.js");
-const { createOverlayDialogs } = await import("../../src/ui/dialogs.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
+const { createOverlayDialogs } = await import("../../src/shell/dialogs.js");
 
 const dialogs = createOverlayDialogs({ localize: (key) => key.replace("FILRODENSWMB.UI.", "") });
 

@@ -1,10 +1,10 @@
-// The water route styles' new look on maps saved before it (src/data/WaterRouteStyles.js): styles
+// The water route styles' new look on maps saved before it (src/studios/world/data/WaterRouteStyles.js): styles
 // and routes still on the old default colour and line take the new ones, once; anything given a
 // look of its own is left alone.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { refreshWaterRoutesOnce } = await import("../../src/data/WaterRouteStyles.js");
+const { refreshWaterRoutesOnce } = await import("../../src/studios/world/data/WaterRouteStyles.js");
 
 function savedMap() {
     return {

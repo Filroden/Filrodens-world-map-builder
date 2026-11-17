@@ -1,4 +1,4 @@
-// The inspector (src/applications/Inspector.js) with its region and route kinds (RegionEditor,
+// The inspector (src/studios/world/app/Inspector.js) with its region and route kinds (RegionEditor,
 // RouteEditor), drawn from the real templates in a happy-dom document: changes apply at once, one
 // undo step each, and only when something changed; a text field applies on Enter or when left,
 // never per keystroke; a style picked fills its fields, a styled field changed makes the object
@@ -24,13 +24,13 @@ const document = window.document;
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
-const { Overlay } = await import("../../src/ui/Overlay.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
 
 const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" };
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs", "parts/inspector-biome.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-pin.hbs", "world/parts/inspector-label.hbs", "world/parts/inspector-region.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-river.hbs", "world/parts/inspector-fault.hbs", "world/parts/inspector-decoration.hbs", "world/parts/inspector-land-mask.hbs", "world/parts/inspector-level.hbs", "world/parts/inspector-set.hbs", "world/parts/inspector-biome.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -54,20 +54,20 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
-const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
-const { RouteTool } = await import("../../src/applications/RouteTool.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { PinEditor } = await import("../../src/applications/PinEditor.js");
-const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
-const { PickTool } = await import("../../src/applications/PickTool.js");
-const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/applications/FeatureEditors.js");
-const { LayerSetEditor, LevelEditor } = await import("../../src/applications/LayerEditors.js");
-const { BiomeEditor } = await import("../../src/applications/BiomeEditor.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { allLevels } = await import("../../src/mesh/LayerTree.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { RegionEditor } = await import("../../src/studios/world/app/RegionEditor.js");
+const { RouteEditor } = await import("../../src/studios/world/app/RouteEditor.js");
+const { RouteTool } = await import("../../src/studios/world/app/RouteTool.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { PinEditor } = await import("../../src/studios/world/app/PinEditor.js");
+const { LabelEditor } = await import("../../src/studios/world/app/LabelEditor.js");
+const { PickTool } = await import("../../src/studios/world/app/PickTool.js");
+const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/studios/world/app/FeatureEditors.js");
+const { LayerSetEditor, LevelEditor } = await import("../../src/studios/world/app/LayerEditors.js");
+const { BiomeEditor } = await import("../../src/studios/world/app/BiomeEditor.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
 const { cellsInRect, smallSession } = await import("../mesh/helpers.mjs");
 
 beforeEach(() => {
@@ -971,10 +971,10 @@ test("while a culture's climate is chosen biomes, a custom biome's placement and
 
 // ------------------------------------------------------------------ random names
 
-const { RandomNames } = await import("../../src/applications/RandomNames.js");
-const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
-const { RegionLists } = await import("../../src/applications/RegionLists.js");
-const { placeName } = await import("../../src/names/PlaceNames.js");
+const { RandomNames } = await import("../../src/studios/world/app/RandomNames.js");
+const { RegionPanel } = await import("../../src/studios/world/app/RegionPanel.js");
+const { RegionLists } = await import("../../src/studios/world/app/RegionLists.js");
+const { placeName } = await import("../../src/kernel/names/PlaceNames.js");
 
 /** Presses an inspector button by its action. */
 async function press(app, action) {
@@ -1092,8 +1092,8 @@ test("Random name on a generated item does not mark it edited, so Generate again
 });
 
 test("a random name is in the Name style its culture has now, not the one the run recorded", async () => {
-    const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
-    const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+    const { encodeModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+    const { resolveSettings } = await import("../../src/studios/world/generator/GeneratorSettings.js");
     const { app, session } = await studio();
     const mesh = session.mesh;
     const count = mesh.modelCount;

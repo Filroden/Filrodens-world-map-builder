@@ -2,8 +2,8 @@
 // stood in for by the Map-backed MemoryStore, which has the same four methods).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildMeshData } from "../../src/mesh/MeshBuilder.js";
-import { MemoryStore, MeshCache, meshCacheKey } from "../../src/mesh/MeshCache.js";
+import { buildMeshData } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { MemoryStore, MeshCache, meshCacheKey } from "../../src/studios/world/mesh/MeshCache.js";
 
 const params = (seed) => ({ width: 120, height: 90, spacing: 4, modelSpacing: 12, seed, kmPerPx: 2 });
 

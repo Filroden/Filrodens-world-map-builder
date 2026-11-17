@@ -3,9 +3,9 @@
 // to a finished route.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { RouteDraft, fillGaps, findLeg, tryLeg, insertWaypoint, joinRoutes, moveWaypoint, nearestLegCell, removeWaypoint, repathRoute, simplifyPolyline, simplifyRoute, splitRoute, strokeWaypoints, transportCost, waypointAt } from "../../src/mesh/RouteEdits.js";
-import { computeLeg } from "../../src/mesh/RoutePath.js";
-import { createRoute } from "../../src/mesh/Schema.js";
+import { RouteDraft, fillGaps, findLeg, tryLeg, insertWaypoint, joinRoutes, moveWaypoint, nearestLegCell, removeWaypoint, repathRoute, simplifyPolyline, simplifyRoute, splitRoute, strokeWaypoints, transportCost, waypointAt } from "../../src/studios/world/mesh/RouteEdits.js";
+import { computeLeg } from "../../src/studios/world/mesh/RoutePath.js";
+import { createRoute } from "../../src/studios/world/mesh/Schema.js";
 import { isContiguous, smallSession } from "./helpers.mjs";
 
 let ids = 0;

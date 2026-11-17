@@ -22,13 +22,13 @@ const document = window.document;
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
-const { Overlay } = await import("../../src/ui/Overlay.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
 
 const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" };
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/range-band.hbs", "parts/inspector-age.hbs", "tools-generate.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-age.hbs", "world/tools-generate.hbs"]);
 
 // A dialogue choice: `choose(options)` answers it (the rule editor's), by default with Cancel
 const answers = { confirm: true, choose: async () => "cancel" };
@@ -50,11 +50,11 @@ installPlatform({
     },
 });
 
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
-const { AgeEditor } = await import("../../src/applications/AgeEditor.js");
-const { AgeEventRows } = await import("../../src/applications/AgeEventRows.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
+const { AgeEditor } = await import("../../src/studios/world/app/AgeEditor.js");
+const { AgeEventRows } = await import("../../src/studios/world/app/AgeEventRows.js");
 
 
 beforeEach(() => {
@@ -107,7 +107,7 @@ async function drawPanel(app) {
         panel.className = "fwmb-context-panel";
     }
     const generate = GeneratePanel.context(app);
-    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/tools-generate.hbs", { generate, cultureList: { rows: [] } });
+    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-generate.hbs", { generate, cultureList: { rows: [] } });
 }
 
 const body = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-body");
@@ -214,7 +214,7 @@ test("an age's era, strife and events apply as one undo step each, marking a run
 });
 
 test("a regional map holding its parent's run: no Generate, the world and ages read only (each age opening read only), Output left out; Clone as new brings them back", async () => {
-    const { Generation } = await import("../../src/applications/Generation.js");
+    const { Generation } = await import("../../src/studios/world/app/Generation.js");
     const app = studio();
     Object.assign(app, { currentParentId: "parent", parentRun: { run: "parentRun" }, modelRun: null });
     app.uiState.generatorSettings.ages[1].events = [{ kind: "invasion", culture: "hill" }, { kind: "civilWar", place: { x: 8, y: 3 } }];
@@ -264,7 +264,7 @@ test("a regional map holding its parent's run: no Generate, the world and ages r
 });
 
 test("the cut carries the parent's Generate settings: its own seed, an event's place moved onto the regional map or dropped outside it", async () => {
-    const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
+    const { RegionalExtractor } = await import("../../src/studios/world/app/RegionalExtractor.js");
     const settings = {
         seed: "Parent's seed",
         nameBase: "French",

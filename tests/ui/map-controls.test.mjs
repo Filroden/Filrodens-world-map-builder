@@ -1,4 +1,4 @@
-// The map controls show what the map shows (src/ui/MapControls.js), and nothing changes a view
+// The map controls show what the map shows (src/shell/MapControls.js), and nothing changes a view
 // without telling them (MapStudio#syncMapControls).
 //
 // The controls are drawn from the real map.hbs, then marked from a view state as the studio does,
@@ -20,8 +20,8 @@ after(() => window.happyDOM.close());
 const document = window.document;
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { layersShown, syncMapControls, VIEW_LAYERS } = await import("../../src/ui/MapControls.js");
-const { ThematicView } = await import("../../src/applications/ThematicView.js");
+const { layersShown, syncMapControls, VIEW_LAYERS } = await import("../../src/shell/MapControls.js");
+const { ThematicView } = await import("../../src/studios/world/app/ThematicView.js");
 
 const TERRAIN_GROUPS = [
     { id: "terrain", icon: "elevation", tooltip: "LayerTerrain", items: [{ key: "elevation", label: "LayerElevation" }, { key: "relief", label: "LayerRelief" }, { key: "water", label: "LayerWater" }] },
@@ -33,9 +33,9 @@ function drawMap() {
     const handlebars = Handlebars.create();
     handlebars.registerHelper("localize", (key) => key);
     handlebars.registerHelper("eq", (a, b) => a === b);
-    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
-    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs", readFileSync(join(ROOT, "templates/parts/thematic-menu.hbs"), "utf8"));
-    const template = handlebars.compile(readFileSync(join(ROOT, "templates/map.hbs"), "utf8"));
+    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/shell/parts/shared-range.hbs"), "utf8"));
+    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/world/parts/thematic-menu.hbs", readFileSync(join(ROOT, "templates/world/parts/thematic-menu.hbs"), "utf8"));
+    const template = handlebars.compile(readFileSync(join(ROOT, "templates/world/map.hbs"), "utf8"));
     document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS, symbolSizes: FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100) })), thematic: ThematicView.menuContext() });
     return document.body;
 }
@@ -216,7 +216,7 @@ test("the Layers menu lists every wide toggle, in the same order", () => {
 
 // --- Every change to a view goes through #syncMapControls ------------------------------------
 
-const SOURCE = readFileSync(join(ROOT, "src/applications/MapStudio.js"), "utf8");
+const SOURCE = readFileSync(join(ROOT, "src/studios/world/app/MapStudio.js"), "utf8");
 
 /** The bodies of MapStudio's methods, by name (a method starts at a line indented four spaces). */
 function methodBodies(source) {

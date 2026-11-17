@@ -1,9 +1,10 @@
 import { FILRODENSWMB } from "../../config.js";
-import { Sanitize } from "../../data/Sanitize.js";
-import { GridDataExporter } from "../../applications/GridDataExporter.js";
-import { MapStateManager } from "../../applications/MapStateManager.js";
-import { GeneratedDetails } from "../../applications/GeneratedDetails.js";
-import { cleanUnit, kmPerPxOf } from "../../data/MapUnit.js";
+import { Sanitize } from "../../kernel/data/Sanitize.js";
+import { GridDataExporter } from "../../studios/world/app/GridDataExporter.js";
+import { MapStateManager } from "../../studios/world/app/MapStateManager.js";
+import { GeneratedDetails } from "../../studios/world/app/GeneratedDetails.js";
+import { cleanUnit } from "../../kernel/data/MapUnit.js";
+import { kmPerPxOf } from "../../studios/world/data/MapScale.js";
 
 /**
  * A description as a journal page's HTML. Descriptions are plain text (typed into a textarea, or

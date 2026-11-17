@@ -1,8 +1,8 @@
 // The synthetic island's parent run for the in-fill tests: people on land, two cultures split east
 // and west, as a regional map's copy of it (see ParentRun) covering the whole island at no zoom.
-import { encodeModelRun } from "../../src/generator/ModelRun.js";
-import { resolveSettings } from "../../src/generator/GeneratorSettings.js";
-import { cropRun } from "../../src/generator/ParentRun.js";
+import { encodeModelRun } from "../../src/studios/world/generator/ModelRun.js";
+import { resolveSettings } from "../../src/studios/world/generator/GeneratorSettings.js";
+import { cropRun } from "../../src/studios/world/generator/ParentRun.js";
 
 const PEOPLE_PER_CELL = 20000;
 

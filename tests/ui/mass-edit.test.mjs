@@ -28,7 +28,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["dialogs/mass-edit.hbs"]);
+await templates.load(["world/dialogs/mass-edit.hbs"]);
 
 /** What the dialogue does when it opens: the test drives the rendered form, then submits it. */
 const dialogue = { drive: null };
@@ -54,11 +54,11 @@ installPlatform({
     },
 });
 
-const { FieldSpecs } = await import("../../src/applications/FieldSpecs.js");
-const { MassEdit } = await import("../../src/applications/MassEdit.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { allLevels } = await import("../../src/mesh/LayerTree.js");
+const { FieldSpecs } = await import("../../src/studios/world/app/FieldSpecs.js");
+const { MassEdit } = await import("../../src/studios/world/app/MassEdit.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
 
 beforeEach(() => {
     dialogue.drive = null;
@@ -120,7 +120,7 @@ function change(form, name, value) {
 }
 
 test("every inspector field of a kind is in its mass edit, or listed as each item's own", () => {
-    const names = (file) => [...readFileSync(join(ROOT, "templates/parts", file), "utf8").matchAll(/name="([a-zA-Z]+)"/g)].map((match) => match[1]);
+    const names = (file) => [...readFileSync(join(ROOT, "templates/world/parts", file), "utf8").matchAll(/name="([a-zA-Z]+)"/g)].map((match) => match[1]);
     const label = [...names("label-fields.hbs"), "labelBold", "labelItalic"];
     const inspectors = { pin: [...names("inspector-pin.hbs"), ...label], route: [...names("inspector-route.hbs"), ...label], region: [...names("inspector-region.hbs"), ...label], label: [...names("inspector-label.hbs"), ...label], river: [...names("inspector-river.hbs"), ...label] };
     for (const [type, fields] of Object.entries(inspectors)) {
@@ -138,7 +138,7 @@ test("every inspector field of a kind is in its mass edit, or listed as each ite
 test("each field shows the value the items share, or Mixed: Leave as is, three-way booleans, empty numbers, a slider reading Mixed", async () => {
     const app = studio();
     const items = MassEdit.items(app, "label");
-    document.body.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs", MassEdit.context(app, "label", items));
+    document.body.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/dialogs/mass-edit.hbs", MassEdit.context(app, "label", items));
     const form = document.body;
     // The option the template chose (happy-dom's select value does not always follow the attribute)
     const chosen = (name) => control(form, name).querySelector("option[selected]")?.value ?? "";
@@ -157,7 +157,7 @@ test("each field shows the value the items share, or Mixed: Leave as is, three-w
 test("a touched row is marked changed and ↺ puts it back; a select back on Leave as is is not changed", async () => {
     const app = studio();
     const items = MassEdit.items(app, "route");
-    document.body.innerHTML = `<form>${await templates.render("modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs", MassEdit.context(app, "route", items))}</form>`;
+    document.body.innerHTML = `<form>${await templates.render("modules/filrodens-world-map-builder/templates/world/dialogs/mass-edit.hbs", MassEdit.context(app, "route", items))}</form>`;
     const form = document.querySelector("form");
     MassEdit.bind(app, "route", form);
     assert.equal(form.querySelectorAll(".fwmb-is-changed").length, 0);

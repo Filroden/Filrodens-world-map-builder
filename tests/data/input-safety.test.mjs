@@ -10,17 +10,17 @@ import { test } from "node:test";
 import Handlebars from "handlebars";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapImport } = await import("../../src/data/MapImport.js");
-const { overLimit, typed } = await import("../../src/data/MapRules.js");
-const { ImportRefusal, Sanitize } = await import("../../src/data/Sanitize.js");
-const { ImageCheck } = await import("../../src/data/ImageCheck.js");
-const { MapNames } = await import("../../src/data/MapNames.js");
-const { MapJson } = await import("../../src/data/MapJson.js");
-const { createMeshBlock, createLayerSet, createLevel, addRegion, normaliseAreaFactor } = await import("../../src/mesh/Schema.js");
-const { decodeOwners, encodeOwners } = await import("../../src/mesh/OwnerLayer.js");
-const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
-const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
-const GeneratorRevisionModule = await import("../../src/generator/GeneratorRevision.js");
+const { MapImport } = await import("../../src/studios/world/data/MapImport.js");
+const { overLimit, typed } = await import("../../src/studios/world/data/MapRules.js");
+const { ImportRefusal, Sanitize } = await import("../../src/kernel/data/Sanitize.js");
+const { ImageCheck } = await import("../../src/kernel/data/ImageCheck.js");
+const { MapNames } = await import("../../src/studios/world/data/MapNames.js");
+const { MapJson } = await import("../../src/studios/world/data/MapJson.js");
+const { createMeshBlock, createLayerSet, createLevel, addRegion, normaliseAreaFactor } = await import("../../src/studios/world/mesh/Schema.js");
+const { decodeOwners, encodeOwners } = await import("../../src/studios/world/mesh/OwnerLayer.js");
+const { encodeModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+const { resolveSettings } = await import("../../src/studios/world/generator/GeneratorSettings.js");
+const GeneratorRevisionModule = await import("../../src/studios/world/generator/GeneratorRevision.js");
 const webUtils = await import("../../src/platform/web/utils.js");
 const { registerHelpers } = await import("../../src/platform/web/templates.js");
 
@@ -280,7 +280,7 @@ function savedModelRun() {
 }
 
 test("a regional map's copy of its parent's run passes the importer whole, and a damaged one is dropped", async () => {
-    const { cropRun } = await import("../../src/generator/ParentRun.js");
+    const { cropRun } = await import("../../src/studios/world/generator/ParentRun.js");
     const copyOf = () => cropRun(savedModelRun(), { sites: [0, 0, 10, 0, 0, 10, 10, 10], spacingPx: 10, spacingKm: 25, crop: { x: 0, y: 0, width: 10, height: 10 }, zoomScale: 2 });
     const file = v4Map();
     file.parentRun = copyOf();

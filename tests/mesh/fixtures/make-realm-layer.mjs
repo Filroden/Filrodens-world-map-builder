@@ -8,10 +8,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MeshBuilder } from "../../../src/mesh/MeshBuilder.js";
-import { OwnerLayer } from "../../../src/mesh/OwnerLayer.js";
-import { createMeshBlock } from "../../../src/mesh/Schema.js";
-import { claimWaters, fillUnclaimedLand, relaxBorders } from "../../../src/mesh/Territory.js";
+import { MeshBuilder } from "../../../src/studios/world/mesh/MeshBuilder.js";
+import { OwnerLayer } from "../../../src/studios/world/mesh/OwnerLayer.js";
+import { createMeshBlock } from "../../../src/studios/world/mesh/Schema.js";
+import { claimWaters, fillUnclaimedLand, relaxBorders } from "../../../src/studios/world/mesh/Territory.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.argv[2];

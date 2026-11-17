@@ -10,12 +10,12 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
-const { TectonicFeatureEngine } = await import("../../src/generation/TectonicFeatureEngine.js");
-const { LineField } = await import("../../src/generation/tectonics/LineField.js");
-const { CatmullRom } = await import("../../src/tools/CatmullRom.js");
-const { SpatialMath } = await import("../../src/tools/SpatialMath.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
+const { TectonicFeatureEngine } = await import("../../src/studios/world/generation/TectonicFeatureEngine.js");
+const { LineField } = await import("../../src/studios/world/generation/tectonics/LineField.js");
+const { CatmullRom } = await import("../../src/kernel/util/CatmullRom.js");
+const { SpatialMath } = await import("../../src/kernel/util/SpatialMath.js");
 
 const { REVISION_2, REVISION_3 } = FILRODENSWMB.TERRAIN_VERSION;
 const p = (x, y) => ({ x, y });

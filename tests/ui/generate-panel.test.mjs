@@ -14,13 +14,13 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
-const { AgeEventRows } = await import("../../src/applications/AgeEventRows.js");
-const { Generation } = await import("../../src/applications/Generation.js");
-const { panelSettings, resolveOutput } = await import("../../src/generator/GeneratorSettings.js");
-const { materialise } = await import("../../src/generator/Materialise.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
+const { AgeEventRows } = await import("../../src/studios/world/app/AgeEventRows.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { panelSettings, resolveOutput } = await import("../../src/studios/world/generator/GeneratorSettings.js");
+const { materialise } = await import("../../src/studios/world/generator/Materialise.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
 const { MATERIALISE_NAMES, materialiseStyles } = await import("../generator/helpers.mjs");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 

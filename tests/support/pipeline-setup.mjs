@@ -1,11 +1,11 @@
 // Builds a MapStudio stand-in for a saved map, as app-pipeline.mjs does, for investigation scripts.
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralOrchestrator } = await import("../../src/ProceduralOrchestrator.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
-const { BrushEngine } = await import("../../src/tools/BrushEngine.js");
-const { RenderTimer } = await import("../../src/tools/RenderTimer.js");
-const { TerrainVersion } = await import("../../src/tools/TerrainVersion.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralOrchestrator } = await import("../../src/studios/world/ProceduralOrchestrator.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
+const { BrushEngine } = await import("../../src/studios/world/tools/BrushEngine.js");
+const { RenderTimer } = await import("../../src/kernel/util/RenderTimer.js");
+const { TerrainVersion } = await import("../../src/studios/world/tools/TerrainVersion.js");
 
 export function setupApp(payload) {
     const p = payload.params;

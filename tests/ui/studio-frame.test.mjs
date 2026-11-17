@@ -14,11 +14,15 @@ const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8")
 const CSS = readFileSync(join(ROOT, "styles/filrodens-world-map-builder.css"), "utf8");
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { widthClass, railFold, RAIL_FOLDS, STUDIO_WIDTH } = await import("../../src/ui/StudioLayout.js");
-const { CanvasHints } = await import("../../src/canvas/CanvasHints.js");
-const { MapStudio } = await import("../../src/applications/MapStudio.js");
+const { widthClass, railFold, RAIL_FOLDS, STUDIO_WIDTH } = await import("../../src/shell/StudioLayout.js");
+const { CanvasHints } = await import("../../src/studios/world/canvas/CanvasHints.js");
+const { MapStudio } = await import("../../src/studios/world/app/MapStudio.js");
 
-const { TOOLS, STAGES, OCCASIONAL } = FILRODENSWMB.STUDIO;
+// The World studio's registration (src/studios/world/definition.js), in the shapes these checks read
+const { WORLD_DEFINITION } = await import("../../src/studios/world/definition.js");
+const TOOLS = Object.fromEntries(WORLD_DEFINITION.tools.map((tool) => [tool.id, tool]));
+const STAGES = WORLD_DEFINITION.stages.map((stage) => ({ ...stage, tools: WORLD_DEFINITION.tools.filter((tool) => tool.stage === stage.id).map((tool) => tool.id) }));
+const OCCASIONAL = WORLD_DEFINITION.occasional;
 
 test("the studio's width classes switch at 1,400 and 1,200px, and the rail folds only as far as it must to fit", () => {
     assert.deepEqual([STUDIO_WIDTH.COMPACT_BELOW, STUDIO_WIDTH.NARROW_BELOW], [1400, 1200]);
@@ -57,10 +61,10 @@ test("every tool on the rail has an icon with a mask and a name in en.json, and 
     const railTools = [...STAGES.flatMap((stage) => stage.tools), ...OCCASIONAL.filter((entry) => entry.tool).map((entry) => entry.tool), "manage"];
     for (const id of railTools) {
         const tool = TOOLS[id];
-        assert.ok(tool, `${id} is in STUDIO.TOOLS`);
+        assert.ok(tool, `${id} is registered`);
         assert.ok(STRINGS[tool.label], `${tool.label} is in en.json`);
         assert.match(CSS, new RegExp(`\\.fwmb-icon--${tool.icon} \\{`), `${tool.icon} has an icon mask`);
-        assert.doesNotThrow(() => readFileSync(join(ROOT, `templates/tools-${id}.hbs`)), `templates/tools-${id}.hbs exists`);
+        assert.doesNotThrow(() => readFileSync(join(ROOT, `templates/world/tools-${id}.hbs`)), `templates/world/tools-${id}.hbs exists`);
     }
     for (const stage of STAGES) assert.ok(STRINGS[stage.label], `${stage.label} is in en.json`);
     for (const entry of OCCASIONAL.filter((item) => item.action || item.menu)) {

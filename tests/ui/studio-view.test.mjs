@@ -15,7 +15,7 @@ for (const name of Object.getOwnPropertyNames(window)) {
 Object.assign(globalThis, { window, document: window.document, customElements: window.customElements });
 after(() => window.happyDOM.close());
 
-const { StudioView } = await import("../../src/ui/StudioView.js");
+const { StudioView } = await import("../../src/shell/StudioView.js");
 
 /** Templates as plain functions of their context, standing in for Handlebars. */
 const TEMPLATES = {

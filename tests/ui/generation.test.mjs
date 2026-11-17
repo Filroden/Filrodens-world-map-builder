@@ -14,12 +14,12 @@ installPlatform({
     utils: { ...platform.utils, randomID: () => `g${String(++nextId).padStart(15, "0")}`, deepClone: (value) => structuredClone(value), mergeObject: (target, source) => Object.assign(target, source) },
 });
 
-const { Generation } = await import("../../src/applications/Generation.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
-const { UNCLAIMED } = await import("../../src/mesh/Schema.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
+const { UNCLAIMED } = await import("../../src/studios/world/mesh/Schema.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 let result = null;

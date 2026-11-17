@@ -5,11 +5,11 @@
 // where CI is set (GitHub Actions sets it) unless FWMB_PERF is set too.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { arcsForLevel } from "../../src/mesh/BorderArcs.js";
-import { generateSites, Mesh, MeshBuilder } from "../../src/mesh/MeshBuilder.js";
+import { arcsForLevel } from "../../src/studios/world/mesh/BorderArcs.js";
+import { generateSites, Mesh, MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
 import { Delaunay } from "../../vendor/d3-delaunay/d3-delaunay.js";
-import { decodeOwners, encodeOwners } from "../../src/mesh/OwnerLayer.js";
-import { distanceField, terrainCost } from "../../src/mesh/RoutePath.js";
+import { decodeOwners, encodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
+import { distanceField, terrainCost } from "../../src/studios/world/mesh/RoutePath.js";
 import { P0_SKIP, loadP0 } from "./helpers.mjs";
 
 const CI_SKIP = process.env.CI && !process.env.FWMB_PERF ? "performance budgets are not checked on CI runners (set FWMB_PERF to run)" : false;

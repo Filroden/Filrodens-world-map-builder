@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { migrateMapData } from "../../src/mesh/Migration.js";
-import { MeshSession, SESSION_WARNINGS } from "../../src/mesh/MeshSession.js";
-import { createMeshBlock } from "../../src/mesh/Schema.js";
+import { MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { migrateMapData } from "../../src/studios/world/mesh/Migration.js";
+import { MeshSession, SESSION_WARNINGS } from "../../src/studios/world/mesh/MeshSession.js";
+import { createMeshBlock } from "../../src/studios/world/mesh/Schema.js";
 import { FIXTURES, P0_SKIP, loadP0, readJson } from "./helpers.mjs";
 
 const v3 = () => readJson(join(FIXTURES, "v3-vectors.json"));
@@ -109,7 +109,7 @@ test("a map whose size changed is rebuilt from its migrated polygons", { skip: P
 // ------------------------------------------------------------------ strokes and level arrays
 
 test("a stroke marks cells for the fill as it goes, rebuilds borders once at its end and merges its patches", async () => {
-    const { createLayerSet, createLevel, addRegion } = await import("../../src/mesh/Schema.js");
+    const { createLayerSet, createLevel, addRegion } = await import("../../src/studios/world/mesh/Schema.js");
     const { smallSession, cellsInRect } = await import("./helpers.mjs");
     const level = createLevel({ id: "lv" });
     const region = addRegion(level, { id: "r" });
@@ -138,7 +138,7 @@ test("a stroke marks cells for the fill as it goes, rebuilds borders once at its
 });
 
 test("a level's owners can be taken out of the session and put back", async () => {
-    const { createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
+    const { createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
     const { smallSession, cellsInRect } = await import("./helpers.mjs");
     const level = createLevel({ id: "lv" });
     const session = await smallSession([createLayerSet({ levels: [level] })]);
@@ -153,7 +153,7 @@ test("a level's owners can be taken out of the session and put back", async () =
 });
 
 test("fields added after version 4 first shipped get their defaults on load", async () => {
-    const { normaliseVectorData, roundRouteThickness } = await import("../../src/mesh/Schema.js");
+    const { normaliseVectorData, roundRouteThickness } = await import("../../src/studios/world/mesh/Schema.js");
     const mapData = {
         params: { display: { regionOpacity: 0.7 } },
         layerSets: [{ id: "s", levels: [{ id: "l", opacity: 0.5, style: { lineColor: "#123456" }, regions: [{ id: "r", key: 0 }] }] }, { id: "t", opacity: 0.2, levels: [{ id: "m", opacity: 0.4, regions: [] }] }],

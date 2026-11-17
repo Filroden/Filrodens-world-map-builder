@@ -30,7 +30,7 @@
  *   their Foundry path ("modules/filrodens-world-map-builder/templates/...").
  * - `fonts`: `list()`, the font family names offered for labels.
  * - `dialogs`: `confirm`, `prompt` and `choose`, `dismiss({ placement })` to close open ones, and
- *   `attach(element)` for where they are drawn (see src/ui/dialogs.js for the options; every host
+ *   `attach(element)` for where they are drawn (see src/shell/dialogs.js for the options; every host
  *   can use createOverlayDialogs from there).
  * - `settings`: `register(key, config)`, `get(key)`, `set(key, value)` for the module's settings.
  * - `store`: the saved maps (see foundry/store.js for the methods and what they return).

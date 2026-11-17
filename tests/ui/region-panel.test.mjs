@@ -17,10 +17,10 @@ installPlatform({
     dialogs: { confirm: async () => answers.confirm, prompt: async () => answers.prompt, choose: async () => null, attach: () => () => {}, dismiss: () => {} },
 });
 
-const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
-const { allLevels } = await import("../../src/mesh/LayerTree.js");
+const { RegionPanel } = await import("../../src/studios/world/app/RegionPanel.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
+const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
 const { cellsInRect, smallSession } = await import("../mesh/helpers.mjs");
 
 beforeEach(() => {
@@ -345,7 +345,7 @@ test("sets move and change visibility from their rows, each one undo step", asyn
 });
 
 test("deleting the level being painted leaves the map drawn for the level that takes its place", async () => {
-    const { describeLevels } = await import("../../src/canvas/RegionLevelLayers.js");
+    const { describeLevels } = await import("../../src/studios/world/canvas/RegionLevelLayers.js");
     const { app, session } = await studio();
     RegionPanel.context(app);
     RegionPanel.selectLevelById(app, "counties");
@@ -357,7 +357,7 @@ test("deleting the level being painted leaves the map drawn for the level that t
 });
 
 test("an entry named in its row is made on Enter, and Escape or an empty name makes nothing", async () => {
-    const { RegionLists } = await import("../../src/applications/RegionLists.js");
+    const { RegionLists } = await import("../../src/studios/world/app/RegionLists.js");
     const { app } = await studio();
     RegionPanel.selectRegionById(app, "realms", "east");
 

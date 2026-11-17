@@ -1,4 +1,4 @@
-import { ImageCheck } from "../../data/ImageCheck.js";
+import { ImageCheck } from "../../kernel/data/ImageCheck.js";
 
 /**
  * Asset paths on the web (the platform's `assets` service), and reading and storing the images a

@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { generateSites, hashSites, Mesh, MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { createMeshBlock, resolveSpacing } from "../../src/mesh/Schema.js";
+import { generateSites, hashSites, Mesh, MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { createMeshBlock, resolveSpacing } from "../../src/studios/world/mesh/Schema.js";
 import { FIXTURES, P0_SKIP, flatAggregates, loadP0, readJson, seededRandom, smallMesh } from "./helpers.mjs";
 
 const expected = readJson(join(FIXTURES, "expected-sites.json"));
@@ -20,7 +20,7 @@ test("sites are bit-for-bit the stored fixture (determinism)", () => {
 });
 
 test("sampler source uses no engine-dependent maths", () => {
-    const source = readFileSync(fileURLToPath(new URL("../../src/mesh/MeshBuilder.js", import.meta.url)), "utf8")
+    const source = readFileSync(fileURLToPath(new URL("../../src/studios/world/mesh/MeshBuilder.js", import.meta.url)), "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/\/\/.*$/gm, "");
     const forbidden = source.match(/Math\.(sin|cos|tan|asin|acos|atan2?|exp|expm1|log\w*|pow|cbrt|hypot|random)\b/g);

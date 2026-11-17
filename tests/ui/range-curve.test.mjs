@@ -19,9 +19,9 @@ after(() => window.happyDOM.close());
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { RangeCurve } = await import("../../src/tools/RangeCurve.js");
-const { RangeDisplay } = await import("../../src/tools/RangeDisplay.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
+const { RangeCurve } = await import("../../src/kernel/util/RangeCurve.js");
+const { RangeDisplay } = await import("../../src/kernel/util/RangeDisplay.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
 
 const CURVE = FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE;
 
@@ -29,7 +29,7 @@ const CURVE = FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE;
 function drawSlider(value) {
     const handlebars = Handlebars.create();
     handlebars.registerHelper("localize", (key) => key);
-    const template = handlebars.compile(readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
+    const template = handlebars.compile(readFileSync(join(ROOT, "templates/shell/parts/shared-range.hbs"), "utf8"));
     const host = document.createElement("div");
     host.innerHTML = template({ name: "coastlineFracture", label: "L", value, curve: CURVE, position: RangeCurve.positionOf(value, CURVE), min: 0, max: 1, step: 0.01 });
     document.body.replaceChildren(host);
@@ -88,7 +88,7 @@ test("reading the panel takes a curved slider's value, not its position", () => 
 });
 
 test("every Coastline Fracture slider is on the curve, in steps of 0.01 of its position", () => {
-    const template = readFileSync(join(ROOT, "templates/tools-terrain.hbs"), "utf8");
+    const template = readFileSync(join(ROOT, "templates/world/tools-terrain.hbs"), "utf8");
     const sliders = [...template.matchAll(/name="coastlineFracture"[^}]*\}\}/g)].map((match) => match[0]);
     assert.equal(sliders.length, 3);
     for (const slider of sliders) assert.match(slider, /curve=fractureCurve position=fracturePosition min=0 max=1 step=0\.01/);

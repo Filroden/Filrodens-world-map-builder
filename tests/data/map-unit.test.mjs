@@ -5,9 +5,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { cleanUnit, formatDistance, kmPerPxOf, niceDistance, scaleBarOnMap, scaleBarTick, unitFromSaved, worldScaleTick } = await import("../../src/data/MapUnit.js");
-const { effectiveKmPerPx } = await import("../../src/mesh/Schema.js");
-const { RangeDisplay } = await import("../../src/tools/RangeDisplay.js");
+const { cleanUnit, formatDistance, niceDistance, unitFromSaved, worldScaleTick } = await import("../../src/kernel/data/MapUnit.js");
+const { kmPerPxOf, scaleBarOnMap, scaleBarTick } = await import("../../src/studios/world/data/MapScale.js");
+const { effectiveKmPerPx } = await import("../../src/studios/world/mesh/Schema.js");
+const { RangeDisplay } = await import("../../src/kernel/util/RangeDisplay.js");
 
 test("a unit name is trimmed text, and an empty one is the default", () => {
     assert.equal(cleanUnit("  leagues "), "leagues");
@@ -35,7 +36,7 @@ test("loading a map never changes its unit, so the unit never marks a loaded map
     // The studio marks a loaded map as changed only when its mesh was migrated or rebuilt (see
     // MapStudio#handleMapLoad); its unit, kept as saved, no longer takes part
     const { readFile } = await import("node:fs/promises");
-    const studio = await readFile(new URL("../../src/applications/MapStudio.js", import.meta.url), "utf8");
+    const studio = await readFile(new URL("../../src/studios/world/app/MapStudio.js", import.meta.url), "utf8");
     assert.match(studio, /this\.isDirty = MeshIntegration\.changedOnLoad\(this\);/);
     assert.doesNotMatch(studio, /unitConvertedOnLoad|MapUnitConverted/);
     for (const language of ["en", "en-gb"]) {

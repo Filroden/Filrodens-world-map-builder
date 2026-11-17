@@ -22,12 +22,12 @@ const document = window.document;
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
-const { Overlay } = await import("../../src/ui/Overlay.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
 const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" };
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/face-fields.hbs", "parts/inspector-help.hbs"]);
+await templates.load(["shell/parts/section.hbs", "world/parts/face-fields.hbs", "world/parts/inspector-help.hbs"]);
 
 let host = null;
 const notices = [];
@@ -41,14 +41,14 @@ installPlatform({
     utils: { ...platform.utils },
 });
 
-const { HelpPanel } = await import("../../src/applications/HelpPanel.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
+const { HelpPanel } = await import("../../src/studios/world/app/HelpPanel.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
 const { FILRODENSWMB } = await import("../../src/config.js");
 
 /** An object kind for Help to cover. */
 const PIN = Object.freeze({
     id: "pin",
-    template: "modules/filrodens-world-map-builder/templates/parts/face-fields.hbs",
+    template: "modules/filrodens-world-map-builder/templates/world/parts/face-fields.hbs",
     find: (app, ref) => app.pins.find((pin) => pin.id === ref.id) ?? null,
     header: (_app, pin) => ({ title: pin.name }),
     context: () => ({ face: { bold: true, italic: true } }),

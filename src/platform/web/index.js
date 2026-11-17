@@ -9,8 +9,8 @@
  * What the web version leaves out is expressed as data: `scene.available` is false (there is no
  * Foundry scene to export to), and `grid`, which only that export uses, is not offered.
  */
-import { labelFontList } from "../../data/fonts.js";
-import { createOverlayDialogs } from "../../ui/dialogs.js";
+import { labelFontList } from "../../kernel/data/fonts.js";
+import { createOverlayDialogs } from "../../shell/dialogs.js";
 import { createWebAssets } from "./assets.js";
 import { createI18n } from "./i18n.js";
 import { createNotifications } from "./notifications.js";

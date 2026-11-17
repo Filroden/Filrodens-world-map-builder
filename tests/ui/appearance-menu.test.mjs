@@ -26,7 +26,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["toolbar.hbs"]);
+await templates.load(["shell/toolbar.hbs"]);
 
 const stored = new Map();
 installPlatform({
@@ -35,13 +35,13 @@ installPlatform({
     settings: { register: () => {}, get: (key) => stored.get(key), set: async (key, value) => stored.set(key, value) },
 });
 
-const { AppearanceMenu } = await import("../../src/ui/AppearanceMenu.js");
-const { FILRODENSWMB } = await import("../../src/config.js");
+const { AppearanceMenu } = await import("../../src/shell/AppearanceMenu.js");
+const { WORLD_DEFINITION } = await import("../../src/studios/world/definition.js");
 
 /** The rail as the studio draws it, with the occasional group's entries. */
 async function rail() {
-    const occasional = FILRODENSWMB.STUDIO.OCCASIONAL.filter((entry) => !entry.host).map((entry) => (entry.menu ? { ...entry, appearance: AppearanceMenu.context() } : entry.tool ? { tool: entry.tool, ...FILRODENSWMB.STUDIO.TOOLS[entry.tool] } : entry));
-    document.body.innerHTML = `<div class="fwmb-studio"><div class="fwmb-toolbar">${await templates.render("modules/filrodens-world-map-builder/templates/toolbar.hbs", { railStages: [], railOccasional: occasional })}</div></div>`;
+    const occasional = WORLD_DEFINITION.occasional.filter((entry) => !entry.host).map((entry) => (entry.menu ? { ...entry, appearance: AppearanceMenu.context() } : entry.tool ? { ...WORLD_DEFINITION.tool(entry.tool), tool: entry.tool } : entry));
+    document.body.innerHTML = `<div class="fwmb-studio"><div class="fwmb-toolbar">${await templates.render("modules/filrodens-world-map-builder/templates/shell/toolbar.hbs", { railStages: [], railOccasional: occasional })}</div></div>`;
     return document.querySelector(".fwmb-studio");
 }
 

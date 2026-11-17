@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { LightingNormals } = await import("../../src/canvas/LightingNormals.js");
+const { LightingNormals } = await import("../../src/studios/world/canvas/LightingNormals.js");
 
 const OPTIONS = { emphasis: 20, radiusPx: 25, tiltLimit: 0.6, fineGain: 1.5, seabedShare: 0.5 };
 const COLS = 61;

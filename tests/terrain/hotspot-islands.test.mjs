@@ -8,9 +8,9 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
-const { TectonicFeatureEngine } = await import("../../src/generation/TectonicFeatureEngine.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
+const { TectonicFeatureEngine } = await import("../../src/studios/world/generation/TectonicFeatureEngine.js");
 
 const SIZE = 600;
 const SEA = 0.4;

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { RiverLabels } = await import("../../src/applications/RiverLabels.js");
+const { RiverLabels } = await import("../../src/studios/world/app/RiverLabels.js");
 
 const app = (extra = {}) => ({ uiState: { customLabelStyles: [] }, manualRivers: [], currentRiverData: null, ...extra });
 

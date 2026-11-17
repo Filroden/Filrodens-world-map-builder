@@ -1,4 +1,4 @@
-// Decorations the module draws (src/canvas/decorations): the compass rose's geometry (its points,
+// Decorations the module draws (src/studios/world/canvas/decorations): the compass rose's geometry (its points,
 // rings, letters and reach, in the interface's letters), a new rose's defaults and faces, and how
 // a regional map carries drawn decorations (at the same place relative to the map) while still
 // cropping image decorations.
@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { compassRose, reachOf } = await import("../../src/canvas/decorations/CompassGeometry.js");
-const { DrawnDecoration } = await import("../../src/canvas/decorations/DrawnDecoration.js");
-const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
+const { compassRose, reachOf } = await import("../../src/kernel/decorations/CompassGeometry.js");
+const { DrawnDecoration } = await import("../../src/kernel/decorations/DrawnDecoration.js");
+const { RegionalExtractor } = await import("../../src/studios/world/app/RegionalExtractor.js");
 
 const COLORS = FILRODENSWMB.DECORATIONS.SCHEMES.parchment;
 const rose = (fields = {}) => ({ radius: 100, design: "classic", points: 8, rings: 2, degreeRing: false, north: "letter", letters: "cardinal", letterSize: 0.22, backing: true, colors: COLORS, ...fields });
@@ -111,7 +111,7 @@ test("a regional map keeps a drawn decoration at the same place relative to the 
 });
 
 test("a thumbnail holds numbers and #rrggbb colours only, whatever the shapes carry", async () => {
-    const { svgShapes, compassThumbnail } = await import("../../src/canvas/decorations/DecorationSvg.js");
+    const { svgShapes, compassThumbnail } = await import("../../src/kernel/decorations/DecorationSvg.js");
     const data = svgShapes([{ path: [["M", 1.234, 2], ["L", 3, NaN], ["Z"]], fill: "red;background:url(x)", stroke: "#AbCdEf", width: 0.5 }, { circle: [0, 0, 5], fill: "#123456" }], 10);
     assert.equal(data.viewBox, "-10 -10 20 20");
     assert.deepEqual(data.shapes[0], { circle: null, d: "M1.23 2 L3 0 Z", fill: "none", stroke: "#AbCdEf", width: 0.5, join: "miter", opacity: 1 });
@@ -126,7 +126,7 @@ test("a thumbnail holds numbers and #rrggbb colours only, whatever the shapes ca
 const measure = (text, size) => text.length * size * 0.5;
 
 test("a title is fitted: at its size, then shrunk, then on two balanced lines, and reported when even that is too long", async () => {
-    const { fitTitle, MIN_SHRINK } = await import("../../src/canvas/decorations/CartoucheGeometry.js");
+    const { fitTitle, MIN_SHRINK } = await import("../../src/kernel/decorations/CartoucheGeometry.js");
     const widths = { minWidth: 80, maxWidth: 300 };
     const short = fitTitle(measure, "Isla", 20, widths);
     assert.deepEqual([short.size, short.lines, short.textWidth, short.overflow], [20, ["Isla"], 80, false], "a short name gets the narrowest panel");
@@ -143,7 +143,7 @@ test("a title is fitted: at its size, then shrunk, then on two balanced lines, a
 });
 
 test("a cartouche grows with its text, a subtitle and a second line, in each design", async () => {
-    const { cartouche } = await import("../../src/canvas/decorations/CartoucheGeometry.js");
+    const { cartouche } = await import("../../src/kernel/decorations/CartoucheGeometry.js");
     for (const design of ["plaque", "ribbon", "frame"]) {
         const panel = (fields) => cartouche({ design, textWidth: 100, titleSize: 20, colors: COLORS, ...fields });
         const base = panel();
@@ -190,7 +190,7 @@ test("a cartouche's layout keeps within its widest share of the map, widens for 
 });
 
 test("a cartouche's thumbnail holds numbers and #rrggbb colours only", async () => {
-    const { cartoucheThumbnail } = await import("../../src/canvas/decorations/DecorationSvg.js");
+    const { cartoucheThumbnail } = await import("../../src/kernel/decorations/DecorationSvg.js");
     for (const design of ["plaque", "ribbon", "frame"]) {
         const thumbnail = cartoucheThumbnail(DrawnDecoration.cartoucheOf({ kind: "cartouche", design, colors: { text: "url(x)" } }));
         assert.match(thumbnail.viewBox, /^-?[0-9.]+ -?[0-9.]+ [0-9.]+ [0-9.]+$/);

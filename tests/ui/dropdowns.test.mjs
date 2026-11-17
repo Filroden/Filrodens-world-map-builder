@@ -1,4 +1,4 @@
-// The option menus on list items (src/ui/dropdowns.js): a menu opens below its button unless there
+// The option menus on list items (src/shell/dropdowns.js): a menu opens below its button unless there
 // is too little room below and more above, within its list (without popovers) or the studio (as a
 // popover, drawn above every list). Layout is stood in for with fixed boxes, since
 // happy-dom does not lay out the page; the real layout is checked in a browser by the smoke checks.
@@ -10,7 +10,7 @@ const window = new Window({ url: "http://localhost/" });
 after(() => window.happyDOM.close());
 const document = window.document;
 
-const { placeDropdownMenu, positionPopoverMenu } = await import("../../src/ui/dropdowns.js");
+const { placeDropdownMenu, positionPopoverMenu } = await import("../../src/shell/dropdowns.js");
 
 /** A scrolling list from 0 to 300 holding a dropdown whose button spans `top` to `top + 30` and whose menu is 120 tall. */
 function listWithDropdownAt(top) {

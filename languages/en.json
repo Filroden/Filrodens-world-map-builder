@@ -1086,6 +1086,8 @@
     "FILRODENSWMB.UI.ThreeDView": "3D view",
 
     "FILRODENSWMB.UI.ToolManage": "Maps",
+    "FILRODENSWMB.UI.StudioWorld": "World studio",
+    "FILRODENSWMB.UI.StudioLocal": "Local studio",
     "FILRODENSWMB.UI.SavedMaps": "Saved maps",
     "FILRODENSWMB.UI.ImportJSON": "Import JSON map",
     "FILRODENSWMB.UI.Load": "Load",

@@ -8,11 +8,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { EDGE } = await import("../../src/generator/CellGraph.js");
-const { dayRings, edgeBetween, edgeDays, flagRoute, groundPace, joinSegments, riverDirection, roadEdges, travelConditions, travelFrom, travelTo, wayTo } = await import("../../src/travel/TravelTime.js");
-const { buildTravelGraph } = await import("../../src/travel/TravelGraph.js");
-const { GeneratorRevision } = await import("../../src/generator/GeneratorRevision.js");
-const { travelGrid, travelCellOfPixels } = await import("../../src/travel/TravelGrid.js");
+const { EDGE } = await import("../../src/studios/world/generator/CellGraph.js");
+const { dayRings, edgeBetween, edgeDays, flagRoute, groundPace, joinSegments, riverDirection, roadEdges, travelConditions, travelFrom, travelTo, wayTo } = await import("../../src/studios/world/travel/TravelTime.js");
+const { buildTravelGraph } = await import("../../src/studios/world/travel/TravelGraph.js");
+const { GeneratorRevision } = await import("../../src/studios/world/generator/GeneratorRevision.js");
+const { travelGrid, travelCellOfPixels } = await import("../../src/studios/world/travel/TravelGrid.js");
 const { syntheticMap } = await import("../generator/synthetic.mjs");
 
 const SPEEDS = { foot: 30, wagon: 25, mount: 60, riverDown: 60, riverUp: 20, sea: 150, boat: 40 };
@@ -275,7 +275,7 @@ test("the network carries the climate: latitudes from the map's, a wind by band,
 });
 
 test("the Travel tool follows the map's revision (a regional map its parent's), and its season is kept valid", async () => {
-    const { TravelView } = await import("../../src/applications/TravelView.js");
+    const { TravelView } = await import("../../src/studios/world/app/TravelView.js");
     const { LEGACY, REVISION_2 } = FILRODENSWMB.GENERATOR.REVISIONS;
     const older = { uiState: { travel: { season: "winter" } } };
     assert.equal(TravelView.hasConditions(older), false, "a map saved before v4.3 keeps today's times");
@@ -301,7 +301,7 @@ test("the way back: each cell's time to the start, each step timed the way it is
 });
 
 test("the way to the pointer is hidden at first and toggled for the session", async () => {
-    const { TravelView } = await import("../../src/applications/TravelView.js");
+    const { TravelView } = await import("../../src/studios/world/app/TravelView.js");
     const app = { uiState: {}, view: { render() {} } };
     assert.equal(TravelView.wayShown(app), false);
     TravelView.toggleWay(app);

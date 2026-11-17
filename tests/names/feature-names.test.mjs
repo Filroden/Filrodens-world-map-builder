@@ -1,5 +1,5 @@
-// Natural features (src/names/FeatureDetection.js) found on a small synthetic map, and named on
-// it (src/applications/FeatureNames.js): each kind found, footprints that find a feature again,
+// Natural features (src/kernel/names/FeatureDetection.js) found on a small synthetic map, and named on
+// it (src/studios/world/app/FeatureNames.js): each kind found, footprints that find a feature again,
 // labels in the geographic styles with a feature record, a second run placing untouched labels
 // again and keeping edited ones, a gone feature's label kept and counted, a feature the reader
 // named in a geographic style left alone, the Water style retired, one undo step, and the
@@ -16,10 +16,10 @@ installPlatform({
     utils: { ...platform.utils, randomID: () => `label${String(++nextId).padStart(11, "0")}`, deepClone: (value) => structuredClone(value) },
 });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { findFeatures, footprintCell, footprintOf, matchFeatures, overlap, footprintHas, riverStretches, SETTINGS } = await import("../../src/names/FeatureDetection.js");
-const { FeatureNames } = await import("../../src/applications/FeatureNames.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { ListQuery } = await import("../../src/applications/ListQuery.js");
+const { findFeatures, footprintCell, footprintOf, matchFeatures, overlap, footprintHas, riverStretches, SETTINGS } = await import("../../src/kernel/names/FeatureDetection.js");
+const { FeatureNames } = await import("../../src/studios/world/app/FeatureNames.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { ListQuery } = await import("../../src/studios/world/app/ListQuery.js");
 
 const W = 800;
 const H = 600;
@@ -175,7 +175,7 @@ test("the last run's report belongs to its map: another map opening forgets it",
     const app = { ...studio(), mapWidth: 0 };
     platform.notify.warn = () => {};
     assert.equal(await FeatureNames.run(app), null, "no terrain yet: nothing to report");
-    const studioSource = (await import("node:fs")).readFileSync(new URL("../../src/applications/MapStudio.js", import.meta.url), "utf8");
+    const studioSource = (await import("node:fs")).readFileSync(new URL("../../src/studios/world/app/MapStudio.js", import.meta.url), "utf8");
     assert.equal(studioSource.match(/FeatureNames\.forget\(this\)/g)?.length, 2, "forgotten when a map is read in and when a new map starts");
     const ready = studio();
     ready.currentElevationData = new Float32Array(W * H);

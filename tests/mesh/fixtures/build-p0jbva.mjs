@@ -38,7 +38,7 @@ if (process.argv.includes("--if-missing") && RASTERS.every((name) => existsSync(
     process.exit(0);
 }
 
-const { ProceduralOrchestrator } = await import("../../../src/ProceduralOrchestrator.js");
+const { ProceduralOrchestrator } = await import("../../../src/studios/world/ProceduralOrchestrator.js");
 const { setupApp } = await import("../../support/pipeline-setup.mjs");
 
 const payload = JSON.parse(source.toString("utf8"));

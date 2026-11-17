@@ -7,11 +7,11 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { biomeZones, climateOf, landBiomeIds, zoneCoverage, zoneFromBands } from "../../src/generator/CultureClimate.js";
-import { engineCultures, engineZones } from "../../src/generator/CultureInput.js";
-import { habitatFit } from "../../src/generator/Cultures.js";
-import { modelBiomeRaster } from "../../src/generator/ModelBiomes.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
+import { biomeZones, climateOf, landBiomeIds, zoneCoverage, zoneFromBands } from "../../src/studios/world/generator/CultureClimate.js";
+import { engineCultures, engineZones } from "../../src/studios/world/generator/CultureInput.js";
+import { habitatFit } from "../../src/studios/world/generator/Cultures.js";
+import { modelBiomeRaster } from "../../src/studios/world/generator/ModelBiomes.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
 import { syntheticMap, WIDTH } from "./synthetic.mjs";
 
 const { BIOME_IDS } = FILRODENSWMB;

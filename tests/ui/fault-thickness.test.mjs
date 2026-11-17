@@ -6,8 +6,8 @@ import { test } from "node:test";
 import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
-const { FaultThickness } = await import("../../src/tools/FaultThickness.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
+const { FaultThickness } = await import("../../src/studios/world/tools/FaultThickness.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
@@ -30,6 +30,6 @@ test("a new map's faults start at its own default thickness", () => {
 });
 
 test("the inspector and the bar take their range from the map", () => {
-    assert.match(read("templates/parts/inspector-fault.hbs"), /name="faultThickness"[^}]*min=thickness\.min max=thickness\.max step=thickness\.step/);
-    assert.match(read("templates/parts/toolbar-features.hbs"), /name="faultThickness"[^}]*min=faultThickness\.min max=faultThickness\.max step=faultThickness\.step/);
+    assert.match(read("templates/world/parts/inspector-fault.hbs"), /name="faultThickness"[^}]*min=thickness\.min max=thickness\.max step=thickness\.step/);
+    assert.match(read("templates/world/parts/toolbar-features.hbs"), /name="faultThickness"[^}]*min=faultThickness\.min max=faultThickness\.max step=faultThickness\.step/);
 });

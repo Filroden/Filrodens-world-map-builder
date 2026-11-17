@@ -1,4 +1,4 @@
-// The studio's colour theme (src/ui/Theme.js): two of the reader's own settings, written as
+// The studio's colour theme (src/shell/Theme.js): two of the reader's own settings, written as
 // attributes on the elements the host registers, kept up to date when they change.
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
@@ -13,7 +13,7 @@ after(() => window.happyDOM.close());
 
 const { installPlatform } = await import("../../src/platform/index.js");
 const { createWebSettings } = await import("../../src/platform/web/settings.js");
-const { applyTheme, attachTheme, currentTheme, registerThemeSettings, setTheme, THEME_SETTINGS } = await import("../../src/ui/Theme.js");
+const { applyTheme, attachTheme, currentTheme, registerThemeSettings, setTheme, THEME_SETTINGS } = await import("../../src/shell/Theme.js");
 
 let storage;
 const detachers = [];

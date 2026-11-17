@@ -13,8 +13,8 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 const i18n = { localize: (key) => key, format: (key) => key, lang: "en" };
 installPlatform({ ...platform, i18n });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { TerrainVersion } = await import("../../src/tools/TerrainVersion.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { TerrainVersion } = await import("../../src/studios/world/tools/TerrainVersion.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -23,12 +23,12 @@ const read = (path) => readFileSync(join(ROOT, path), "utf8");
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => read(join("templates", path)) });
-await templates.load(["parts/section.hbs", "tools-scene.hbs"]);
+await templates.load(["shell/parts/section.hbs", "world/tools-scene.hbs"]);
 
 /** The engine list's options, value and label, as New map draws it for a map on this engine. */
 const engineOptions = async (generationEngine) => {
     const engineLabels = Object.fromEntries(Object.keys(TerrainVersion.ENGINE_NAMES).map((engine) => [engine, `label-${engine}`]));
-    const html = await templates.render("modules/filrodens-world-map-builder/templates/tools-scene.hbs", { uiState: { generationEngine }, engineLabels });
+    const html = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-scene.hbs", { uiState: { generationEngine }, engineLabels });
     const select = html.match(/<select id="fwmb-generation-engine"[\s\S]*?<\/select>/)[0];
     return [...select.matchAll(/<option value="(\w+)"([^>]*)>([^<]*)<\/option>/g)].map(([, value, attrs, label]) => ({ value, selected: /selected/.test(attrs), label: label.trim() }));
 };
@@ -71,7 +71,7 @@ test("Legacy terrain is offered only on a map made with it, chosen there", async
 });
 
 test("a saved map with no engine recorded loads as Legacy terrain, not the new default", () => {
-    const studio = read("src/applications/MapStudio.js");
+    const studio = read("src/studios/world/app/MapStudio.js");
     assert.match(studio, /this\.uiState\.generationEngine = payload\.generationEngine \|\| "standard";/);
-    assert.match(read("src/ProceduralOrchestrator.js"), /app\.uiState\.generationEngine \|\| "standard"/);
+    assert.match(read("src/studios/world/ProceduralOrchestrator.js"), /app\.uiState\.generationEngine \|\| "standard"/);
 });

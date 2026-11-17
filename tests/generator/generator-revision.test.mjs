@@ -15,15 +15,15 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { GeneratorRevision } = await import("../../src/generator/GeneratorRevision.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
-const { cropRun } = await import("../../src/generator/ParentRun.js");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { Generation } = await import("../../src/applications/Generation.js");
-const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
-const { TravelNetwork } = await import("../../src/applications/TravelNetwork.js");
-const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
+const { GeneratorRevision } = await import("../../src/studios/world/generator/GeneratorRevision.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { encodeModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+const { cropRun } = await import("../../src/studios/world/generator/ParentRun.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
+const { TravelNetwork } = await import("../../src/studios/world/app/TravelNetwork.js");
+const { HEIGHT, WIDTH, syntheticMap } = await import("./synthetic.mjs");
 
 const { LEGACY, REVISION_2 } = FILRODENSWMB.GENERATOR.REVISIONS;
 const CURRENT = FILRODENSWMB.GENERATOR.REVISION;

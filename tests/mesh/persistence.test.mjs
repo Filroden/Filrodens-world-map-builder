@@ -3,12 +3,12 @@ import "./foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { MeshIntegration } from "../../src/applications/MeshIntegration.js";
+import { MeshIntegration } from "../../src/studios/world/app/MeshIntegration.js";
 import { saveMapData } from "../../src/platform/foundry/store.js";
-import { MapJson } from "../../src/data/MapJson.js";
-import { MeshSession } from "../../src/mesh/MeshSession.js";
-import { decodeOwners } from "../../src/mesh/OwnerLayer.js";
-import { deleteLevel, deleteRegion } from "../../src/mesh/RegionEdits.js";
+import { MapJson } from "../../src/studios/world/data/MapJson.js";
+import { MeshSession } from "../../src/studios/world/mesh/MeshSession.js";
+import { decodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
+import { deleteLevel, deleteRegion } from "../../src/studios/world/mesh/RegionEdits.js";
 import { FIXTURES, P0_SKIP, loadP0, readJson } from "./helpers.mjs";
 import { stubCompendium } from "./foundry-stubs.mjs";
 

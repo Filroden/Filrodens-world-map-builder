@@ -4,7 +4,7 @@
 // a candidate turned its own way placed by its own box, its turn carried back.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { placeLabels } from "../../src/canvas/LabelPlacement.js";
+import { placeLabels } from "../../src/studios/world/canvas/LabelPlacement.js";
 
 /** A pin's name: right of its point first, then left, then above. */
 function pinLabel(id, x, y, { w = 40, h = 10, weight = 1, mustShow = false } = {}) {

@@ -1,4 +1,4 @@
-// Image formats on exports (src/tools/ImageFormat.js): WebP is offered only where the browser
+// Image formats on exports (src/kernel/export/ImageFormat.js): WebP is offered only where the browser
 // really writes it, an encode that comes back as another type is saved as what it is, sizes are
 // estimated from sample tiles, the last choice is remembered per kind of export, and a scene's
 // earlier GM overlay is found in either format. Canvases are stand-ins whose toBlob answers as a
@@ -18,7 +18,7 @@ installPlatform({
     },
 });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { ImageFormat } = await import("../../src/tools/ImageFormat.js");
+const { ImageFormat } = await import("../../src/kernel/export/ImageFormat.js");
 const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
 
 /**

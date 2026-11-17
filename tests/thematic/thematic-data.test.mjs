@@ -1,4 +1,4 @@
-// The thematic layers' values (src/thematic/ThematicData.js): the fixed scales, the colour lookup,
+// The thematic layers' values (src/studios/world/thematic/ThematicData.js): the fixed scales, the colour lookup,
 // the blend that carries model-cell values to the display cells, a run's layers, and a run moved
 // with its map (ModelRun.resampleModelRun).
 import "../mesh/foundry-stubs.mjs";
@@ -7,9 +7,9 @@ import { test } from "node:test";
 import { smallMesh } from "../mesh/helpers.mjs";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { LAYERS, ThematicSource, TradeIndex, blendValues, blendWeights, rampLookup, scalePosition, stepOf, tradeClassOf, tradeLines } = await import("../../src/thematic/ThematicData.js");
-const { decodeAge, decodeModelRun, encodeModelRun, packArray, resampleModelRun } = await import("../../src/generator/ModelRun.js");
-const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+const { LAYERS, ThematicSource, TradeIndex, blendValues, blendWeights, rampLookup, scalePosition, stepOf, tradeClassOf, tradeLines } = await import("../../src/studios/world/thematic/ThematicData.js");
+const { decodeAge, decodeModelRun, encodeModelRun, packArray, resampleModelRun } = await import("../../src/studios/world/generator/ModelRun.js");
+const { resolveSettings } = await import("../../src/studios/world/generator/GeneratorSettings.js");
 
 /** "#rrggbb" as [r, g, b]. */
 const hexRgb = (hex) => [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));

@@ -9,8 +9,8 @@ import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ ...platform, i18n: { localize: (key) => key, format: (key) => key, lang: "en" } });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { TerrainVersion } = await import("../../src/tools/TerrainVersion.js");
-const { TerrainUpgrade } = await import("../../src/applications/TerrainUpgrade.js");
+const { TerrainVersion } = await import("../../src/studios/world/tools/TerrainVersion.js");
+const { TerrainUpgrade } = await import("../../src/studios/world/app/TerrainUpgrade.js");
 
 const { LEGACY, REVISION_2, REVISION_3, CURRENT } = FILRODENSWMB.TERRAIN_VERSION;
 const HOTSPOT = { id: 1, type: FILRODENSWMB.TECTONICS.FEATURES.TYPES.HOTSPOT, revision: FILRODENSWMB.TECTONICS.FEATURES.REVISION, points: [] };

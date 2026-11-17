@@ -24,13 +24,13 @@ const document = window.document;
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 const { createWebTemplates, registerHelpers } = await import("../../src/platform/web/templates.js");
-const { Overlay } = await import("../../src/ui/Overlay.js");
+const { Overlay } = await import("../../src/shell/Overlay.js");
 
 const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" };
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/range-band.hbs", "parts/inspector-culture.hbs", "tools-generate.hbs", "dialogs/culture-zones-editor.hbs", "dialogs/biome-rule-editor.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-culture.hbs", "world/tools-generate.hbs", "world/dialogs/culture-zones-editor.hbs", "world/dialogs/biome-rule-editor.hbs"]);
 
 // A dialogue choice: `choose(options)` answers it (the rule editor's), by default with Cancel
 const answers = { confirm: true, choose: async () => "cancel" };
@@ -53,17 +53,17 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { CultureEditor } = await import("../../src/applications/CultureEditor.js");
-const { CultureLists } = await import("../../src/applications/CultureLists.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { RangeTrack } = await import("../../src/ui/RangeTrack.js");
-const { CultureMarkers } = await import("../../src/applications/CultureMarkers.js");
-const { Inspector } = await import("../../src/applications/Inspector.js");
-const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
-const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
+const { CultureEditor } = await import("../../src/studios/world/app/CultureEditor.js");
+const { CultureLists } = await import("../../src/studios/world/app/CultureLists.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { RangeTrack } = await import("../../src/shell/RangeTrack.js");
+const { CultureMarkers } = await import("../../src/studios/world/app/CultureMarkers.js");
+const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
+const { GeneratedDetails } = await import("../../src/studios/world/app/GeneratedDetails.js");
+const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
 
-const { RuleEditorDialog } = await import("../../src/applications/RuleEditorDialog.js");
-const { zoneFromBands } = await import("../../src/generator/CultureClimate.js");
+const { RuleEditorDialog } = await import("../../src/studios/world/app/RuleEditorDialog.js");
+const { zoneFromBands } = await import("../../src/studios/world/generator/CultureClimate.js");
 
 beforeEach(() => {
     answers.confirm = true;
@@ -118,7 +118,7 @@ async function drawPanel(app) {
         panel = app.root.appendChild(document.createElement("div"));
         panel.className = "fwmb-context-panel";
     }
-    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/tools-generate.hbs", { generate: { nameBases: [], world: [], output: { places: [], routes: [] } }, cultureList: CultureLists.context(app) });
+    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-generate.hbs", { generate: { nameBases: [], world: [], output: { places: [], routes: [] } }, cultureList: CultureLists.context(app) });
 }
 
 const form = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-body");

@@ -6,12 +6,12 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { materialise, placeTier } from "../../src/generator/Materialise.js";
-import { MODEL_RUN_ARRAYS, decodeModelRun, encodeModelRun, packArray, unpackArray } from "../../src/generator/ModelRun.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
-import { MeshSession } from "../../src/mesh/MeshSession.js";
-import { routeRuns } from "../../src/mesh/RouteMerge.js";
-import { UNCLAIMED } from "../../src/mesh/Schema.js";
+import { materialise, placeTier } from "../../src/studios/world/generator/Materialise.js";
+import { MODEL_RUN_ARRAYS, decodeModelRun, encodeModelRun, packArray, unpackArray } from "../../src/studios/world/generator/ModelRun.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
+import { MeshSession } from "../../src/studios/world/mesh/MeshSession.js";
+import { routeRuns } from "../../src/studios/world/mesh/RouteMerge.js";
+import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
 import { MATERIALISE_NAMES, materialiseStyles } from "./helpers.mjs";
 import { HEIGHT, WIDTH, syntheticMap } from "./synthetic.mjs";
 

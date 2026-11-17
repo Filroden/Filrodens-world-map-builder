@@ -5,9 +5,9 @@ import "../support/web-worker-shim.mjs";
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { GenerationWorkers } from "../../src/tools/GenerationWorkers.js";
-import { generateInBackground } from "../../src/generator/Generate.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
+import { GenerationWorkers } from "../../src/studios/world/tools/GenerationWorkers.js";
+import { generateInBackground } from "../../src/studios/world/generator/Generate.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
 import { syntheticMap } from "./synthetic.mjs";
 
 const CANCEL_PROMPTNESS_MS = 100;

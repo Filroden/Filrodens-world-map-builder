@@ -4,8 +4,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Mesh, MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { decodeOwners } from "../../src/mesh/OwnerLayer.js";
+import { Mesh, MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { decodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const FIXTURES = join(here, "fixtures");
@@ -75,7 +75,7 @@ export function isContiguous(mesh, path) {
  * gives its array).
  */
 export async function smallSession(layerSets = [], owners = {}, { isWater = (x) => x < smallMesh().width / 4 } = {}) {
-    const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+    const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
     const mesh = smallMesh();
     const aggregates = flatAggregates(mesh, { isWater });
     const block = { seed: 42, spacing: 4, cells: mesh.cellCount, modelSpacingKm: 25, modelSpacingPx: 12, width: mesh.width, height: mesh.height, version: 1 };

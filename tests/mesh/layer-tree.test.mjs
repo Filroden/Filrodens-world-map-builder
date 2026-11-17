@@ -1,8 +1,8 @@
 // The structure of layer sets: parents, order, moving, removing and inserting levels.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { childLevels, descendantLevels, insertLevel, levelDepth, moveLevel, parentCandidates, removeLevel, setParent, uniqueName } from "../../src/mesh/LayerTree.js";
-import { validateVectorData } from "../../src/mesh/Schema.js";
+import { childLevels, descendantLevels, insertLevel, levelDepth, moveLevel, parentCandidates, removeLevel, setParent, uniqueName } from "../../src/studios/world/mesh/LayerTree.js";
+import { validateVectorData } from "../../src/studios/world/mesh/Schema.js";
 
 /** A set: realms > duchies > counties, and a separate "zones" top level. */
 function politicalSet() {

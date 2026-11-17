@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { engineCultures } = await import("../../src/generator/CultureInput.js");
-const { cultureId, cultureMix } = await import("../../src/generator/CultureIds.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
+const { engineCultures } = await import("../../src/studios/world/generator/CultureInput.js");
+const { cultureId, cultureMix } = await import("../../src/studios/world/generator/CultureIds.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
 const { syntheticMap } = await import("./synthetic.mjs");
 
 const PAYLOAD = { width: 4, height: 2, modelOf: Int32Array.from([0, 0, 1, 1, 2, 2, 3, 3]), seaLevel: 0.4, metresPerUnit: 10000 };

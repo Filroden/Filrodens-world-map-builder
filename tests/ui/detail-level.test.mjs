@@ -4,9 +4,9 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { DetailLevel } from "../../src/applications/DetailLevel.js";
-import { describeLevels } from "../../src/canvas/RegionLevelLayers.js";
-import { RULES, clean, cleanContext } from "../../src/data/MapRules.js";
+import { DetailLevel } from "../../src/studios/world/app/DetailLevel.js";
+import { describeLevels } from "../../src/studios/world/canvas/RegionLevelLayers.js";
+import { RULES, clean, cleanContext } from "../../src/studios/world/data/MapRules.js";
 
 const STYLES = [
     { id: "style-city", tier: "city", detailLevel: 0 },
@@ -79,7 +79,7 @@ test("a run starts at the most detailed level whose places are still far enough 
 });
 
 test("a map or styles file saved before Local keeps what Everything showed", async () => {
-    const { addLocalLevelOnce, moveStyleLevels } = await import("../../src/data/LocalLevel.js");
+    const { addLocalLevelOnce, moveStyleLevels } = await import("../../src/studios/world/data/LocalLevel.js");
     const saved = () => ({
         detailLevel: 3,
         customPinStyles: [
@@ -133,7 +133,7 @@ test("a level's fill opacity fades its fill, not its borders; with the Regions m
 // ------------------------------------------------------------------ generated details
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
-const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
+const { GeneratedDetails } = await import("../../src/studios/world/app/GeneratedDetails.js");
 installPlatform({ i18n: { ...platform.i18n, localize: (key) => key, lang: "en" } });
 
 /** A generated Political set: one kingdom of two duchies, holding three counties between them. */

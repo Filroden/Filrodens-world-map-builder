@@ -1,23 +1,27 @@
 /**
- * Writes the README's third-party table from src/data/credits.js (and the font registry), between
+ * Writes the README's third-party table from src/kernel/data/credits.js (and the font registry), between
  * its credits markers. `node scripts/credits-readme.mjs` rewrites it; `--check` only says whether
  * it is current (tests/ui/credits.test.mjs checks the same).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CREDITS_MARKERS, creditsTable } from "../src/data/credits.js";
+import { CREDITS_MARKERS, creditsTable } from "../src/kernel/data/credits.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const README = join(ROOT, "README.md");
 
-/** The README with its table written from the credits. */
+/**
+ * The README with its table written from the credits, in the README's own line endings (a Windows
+ * checkout has CRLF, so the table is written with them there).
+ */
 export function writtenReadme(readme, strings) {
     const start = readme.indexOf(CREDITS_MARKERS.start);
     const end = readme.indexOf(CREDITS_MARKERS.end);
     if (start === -1 || end === -1) throw new Error("The README has no credits markers");
-    const table = creditsTable((key) => strings[key] ?? key);
-    return `${readme.slice(0, start + CREDITS_MARKERS.start.length)}\n${table}\n${readme.slice(end)}`;
+    const eol = readme.includes("\r\n") ? "\r\n" : "\n";
+    const table = creditsTable((key) => strings[key] ?? key).replace(/\r?\n/g, eol);
+    return `${readme.slice(0, start + CREDITS_MARKERS.start.length)}${eol}${table}${eol}${readme.slice(end)}`;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

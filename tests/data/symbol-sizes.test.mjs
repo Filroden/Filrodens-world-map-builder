@@ -5,9 +5,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { needsRebase, rebaseMap } = await import("../../src/data/SymbolSizes.js");
-const { MapImport } = await import("../../src/data/MapImport.js");
-const { LabelWidth } = await import("../../src/tools/LabelWidth.js");
+const { needsRebase, rebaseMap } = await import("../../src/studios/world/data/SymbolSizes.js");
+const { MapImport } = await import("../../src/studios/world/data/MapImport.js");
+const { LabelWidth } = await import("../../src/kernel/util/LabelWidth.js");
 
 const GROWTH = 1 / FILRODENSWMB.SYMBOLS.UNIT;
 

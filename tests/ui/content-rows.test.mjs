@@ -5,9 +5,9 @@
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ContentRows, NO_STYLE } from "../../src/applications/ContentRows.js";
-import { DetailLevel } from "../../src/applications/DetailLevel.js";
-import { RULES, clean, cleanContext } from "../../src/data/MapRules.js";
+import { ContentRows, NO_STYLE } from "../../src/studios/world/app/ContentRows.js";
+import { DetailLevel } from "../../src/studios/world/app/DetailLevel.js";
+import { RULES, clean, cleanContext } from "../../src/studios/world/data/MapRules.js";
 import { installPlatform, platform } from "../../src/platform/index.js";
 
 installPlatform({ i18n: { ...platform.i18n, localize: (key) => key } });

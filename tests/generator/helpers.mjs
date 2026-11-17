@@ -5,9 +5,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FILRODENSWMB } from "../../src/config.js";
-import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
-import { effectiveKmPerPx } from "../../src/mesh/Schema.js";
-import { buildGeneratorPayload } from "../../src/generator/GeneratorInput.js";
+import { MeshBuilder } from "../../src/studios/world/mesh/MeshBuilder.js";
+import { effectiveKmPerPx } from "../../src/studios/world/mesh/Schema.js";
+import { buildGeneratorPayload } from "../../src/studios/world/generator/GeneratorInput.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MESH_FIXTURES = join(here, "..", "mesh", "fixtures");

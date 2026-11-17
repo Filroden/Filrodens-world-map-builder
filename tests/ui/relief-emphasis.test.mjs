@@ -8,8 +8,8 @@ const { installPlatform, platform } = await import("../../src/platform/index.js"
 installPlatform({ i18n: { localize: (key) => key, format: (key) => key, lang: "en" }, utils: { ...platform.utils, deepClone: (value) => structuredClone(value) } });
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { setupApp } = await import("../support/pipeline-setup.mjs");
-const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
-const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine.js");
+const { MapStateManager } = await import("../../src/studios/world/app/MapStateManager.js");
+const { ProceduralEngine } = await import("../../src/studios/world/generation/ProceduralEngine.js");
 
 const fixture = JSON.parse(readFileSync(new URL("../mesh/fixtures/p0jbva.json", import.meta.url)));
 

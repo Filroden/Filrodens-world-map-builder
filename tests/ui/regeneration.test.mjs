@@ -17,18 +17,18 @@ installPlatform({
     dialogs: { confirm: async () => confirmAnswer },
 });
 
-const { Generation } = await import("../../src/applications/Generation.js");
-const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
-const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
-const { Regeneration } = await import("../../src/applications/Regeneration.js");
-const { GeneratedEdits } = await import("../../src/applications/GeneratedEdits.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { MassEdit } = await import("../../src/applications/MassEdit.js");
-const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
-const { RunInputs } = await import("../../src/applications/RunInputs.js");
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
-const { UNCLAIMED } = await import("../../src/mesh/Schema.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
+const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
+const { GeneratedDetails } = await import("../../src/studios/world/app/GeneratedDetails.js");
+const { Regeneration } = await import("../../src/studios/world/app/Regeneration.js");
+const { GeneratedEdits } = await import("../../src/studios/world/app/GeneratedEdits.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { MassEdit } = await import("../../src/studios/world/app/MassEdit.js");
+const { RegionPanel } = await import("../../src/studios/world/app/RegionPanel.js");
+const { RunInputs } = await import("../../src/studios/world/app/RunInputs.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
+const { UNCLAIMED } = await import("../../src/studios/world/mesh/Schema.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 
 let result = null;

@@ -2,8 +2,8 @@
 // inside a parent region, clearing the levels below, and one patch per level.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { UNCLAIMED, addRegion, createLayerSet, createLevel } from "../../src/mesh/Schema.js";
-import { RegionStroke, STROKE_REFUSALS, cellsAlong, fillExtent, paintAction } from "../../src/mesh/RegionPaint.js";
+import { UNCLAIMED, addRegion, createLayerSet, createLevel } from "../../src/studios/world/mesh/Schema.js";
+import { RegionStroke, STROKE_REFUSALS, cellsAlong, fillExtent, paintAction } from "../../src/studios/world/mesh/RegionPaint.js";
 import { cellsInRect, smallMesh, smallSession } from "./helpers.mjs";
 
 let ids = 0;

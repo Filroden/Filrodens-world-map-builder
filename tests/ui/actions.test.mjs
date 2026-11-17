@@ -11,7 +11,7 @@ import { test } from "node:test";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const TEMPLATES = join(ROOT, "templates");
 
-const { MapStudio } = await import("../../src/applications/MapStudio.js");
+const { MapStudio } = await import("../../src/studios/world/app/MapStudio.js");
 
 /** The action names in the studio's handler table. */
 function handlerNames() {

@@ -8,7 +8,7 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
 import { syntheticMap } from "./synthetic.mjs";
 
 const { LEGACY } = FILRODENSWMB.GENERATOR.REVISIONS;

@@ -18,11 +18,11 @@ installPlatform({
 });
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { Infilling } = await import("../../src/applications/Infilling.js");
-const { InfillInput } = await import("../../src/applications/InfillInput.js");
-const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
-const { runInfill } = await import("../../src/generator/Infill.js");
-const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+const { Infilling } = await import("../../src/studios/world/app/Infilling.js");
+const { InfillInput } = await import("../../src/studios/world/app/InfillInput.js");
+const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
+const { runInfill } = await import("../../src/studios/world/generator/Infill.js");
+const { MeshSession } = await import("../../src/studios/world/mesh/MeshSession.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("../generator/synthetic.mjs");
 const { parentRunOf } = await import("../generator/infill-helpers.mjs");
 
@@ -155,7 +155,7 @@ test("the Fill in section: shown on regional maps, offered when the parent's cel
 });
 
 test("a place keeps out of a drawn river and a few pixels from its edge", async () => {
-    const { RiverNetwork } = await import("../../src/generation/RiverNetwork.js");
+    const { RiverNetwork } = await import("../../src/studios/world/generation/RiverNetwork.js");
     const range = RiverNetwork.FIELD_RANGE;
     // The image's red byte at a distance from the channel's edge (negative inside)
     const pixel = (distance) => Uint8Array.of(Math.round(((range - distance) / (2 * range)) * 255), 0, 0, 0);

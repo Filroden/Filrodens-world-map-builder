@@ -1,9 +1,9 @@
-// Touch input on the map canvas (src/canvas/TouchGestures.js): what each finger gesture turns into
+// Touch input on the map canvas (src/studios/world/canvas/TouchGestures.js): what each finger gesture turns into
 // in the mouse's terms, with a recorder standing in for the canvas and a clock moved by hand.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { TouchGestures } = await import("../../src/canvas/TouchGestures.js");
+const { TouchGestures } = await import("../../src/studios/world/canvas/TouchGestures.js");
 
 /** A clock whose time and timers move only when told to. */
 function manualClock() {

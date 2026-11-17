@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FILRODENSWMB } from "../../src/config.js";
-import { TradeFlowLayer } from "../../src/canvas/TradeFlowLayer.js";
+import { TradeFlowLayer } from "../../src/studios/world/canvas/TradeFlowLayer.js";
 
 class Graphics {
     visible = true;

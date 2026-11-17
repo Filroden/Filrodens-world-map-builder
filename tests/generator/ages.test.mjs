@@ -6,9 +6,9 @@ import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { decodeAge, encodeModelRun, unpackArray } = await import("../../src/generator/ModelRun.js");
-const { RULES, clean, cleanContext } = await import("../../src/data/MapRules.js");
+const { runGenerator } = await import("../../src/studios/world/generator/Pipeline.js");
+const { decodeAge, encodeModelRun, unpackArray } = await import("../../src/studios/world/generator/ModelRun.js");
+const { RULES, clean, cleanContext } = await import("../../src/studios/world/data/MapRules.js");
 const { syntheticMap } = await import("./synthetic.mjs");
 
 const quiet = { pause: () => Promise.resolve() };

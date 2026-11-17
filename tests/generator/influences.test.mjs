@@ -6,10 +6,10 @@
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildModelCells } from "../../src/generator/CellValues.js";
-import { influenceLevels, levelFactors } from "../../src/generator/InfluenceLevels.js";
-import { modelBiomeRaster } from "../../src/generator/ModelBiomes.js";
-import { runGenerator } from "../../src/generator/Pipeline.js";
+import { buildModelCells } from "../../src/studios/world/generator/CellValues.js";
+import { influenceLevels, levelFactors } from "../../src/studios/world/generator/InfluenceLevels.js";
+import { modelBiomeRaster } from "../../src/studios/world/generator/ModelBiomes.js";
+import { runGenerator } from "../../src/studios/world/generator/Pipeline.js";
 import { FILRODENSWMB } from "../../src/config.js";
 import { HEIGHT, WIDTH, syntheticMap } from "./synthetic.mjs";
 
