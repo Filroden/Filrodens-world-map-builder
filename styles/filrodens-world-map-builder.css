@@ -512,7 +512,7 @@
     width: 1rem;
     height: 1rem;
     border-radius: 50%;
-    border: 0.09375rem solid currentColor;
+    border: 1.5px solid currentColor;
     color: var(--fwmb-text-muted);
     display: inline-grid;
     place-items: center;
@@ -532,7 +532,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     border: 1px solid var(--fwmb-border-strong);
     background: var(--fwmb-bg-raised);
     color: var(--fwmb-text-primary);
@@ -567,14 +567,15 @@
     cursor: default;
     pointer-events: none;
 }
+/* The accent fill takes text-on-accent (white, or dark on gold light's bright gold) and an edge */
 .fwmb-btn--primary {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
 }
 .fwmb-btn--primary:hover {
     background: var(--fwmb-fill-accent-hover);
-    border-color: var(--fwmb-fill-accent-hover);
+    border-color: var(--fwmb-fill-accent-edge);
 }
 .fwmb-btn--secondary {
     background: var(--fwmb-fill-secondary);
@@ -628,10 +629,27 @@
 .fwmb-btn[data-tone]:hover {
     filter: brightness(0.9);
 }
+/* Delete and other destructive buttons (v5): a solid button like any other, marked by danger text and
+   border; it fills with the negative tone on hover and focus, before the confirmation asks. Sits apart,
+   at the foot. */
 .fwmb-btn--danger-quiet {
-    background: transparent;
-    border-color: var(--fwmb-border-main);
+    background: var(--fwmb-bg-raised);
+    border-color: var(--fwmb-color-danger);
     color: var(--fwmb-color-danger);
+}
+.fwmb-btn--danger-quiet:is(:hover, :focus-visible) {
+    background: var(--fwmb-fill-negative);
+    border-color: var(--fwmb-fill-negative);
+    color: var(--fwmb-text-inverse);
+}
+/* Go (v5): the link back to another tool or editor, in the secondary accent */
+.fwmb-btn--go {
+    border-color: var(--fwmb-accent-secondary);
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-btn--go:hover {
+    background: var(--fwmb-bg-selected);
+    color: var(--fwmb-accent-secondary-hover);
 }
 
 /* ---------- Mode buttons (the context bar's pointer modes; a radio group) ---------- */
@@ -645,7 +663,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     border: 1px solid var(--fwmb-border-main);
     background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
@@ -657,8 +675,8 @@
 }
 .fwmb-mode[aria-checked="true"] {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
 }
 
 /* ---------- Fields ---------- */
@@ -670,7 +688,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     border: 1px solid var(--fwmb-border-strong);
     background: var(--fwmb-bg-base);
     color: var(--fwmb-text-primary);
@@ -741,8 +759,8 @@
 .fwmb-check .fwmb-box {
     width: 1rem;
     height: 1rem;
-    border-radius: 0.1875rem;
-    border: 0.09375rem solid var(--fwmb-border-strong);
+    border-radius: 3px;
+    border: 1.5px solid var(--fwmb-border-strong);
     background: var(--fwmb-bg-base);
     display: grid;
     place-items: center;
@@ -752,13 +770,13 @@
 }
 .fwmb-check[aria-checked="true"] .fwmb-box {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
 }
 .fwmb-check[aria-checked="true"] .fwmb-box::after {
     content: "";
     width: 0.5rem;
     height: 0.25rem;
-    border: 0.125rem solid var(--fwmb-text-inverse);
+    border: 2px solid var(--fwmb-text-on-accent);
     border-top: 0;
     border-right: 0;
     transform: rotate(-45deg) translate(1px, -1px);
@@ -774,7 +792,7 @@
 .fwmb-swatch {
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     border: 1px solid var(--fwmb-border-strong);
     background: var(--swatch, transparent);
     cursor: pointer;
@@ -793,7 +811,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.0625rem 0.375rem;
-    border-radius: 0.1875rem;
+    border-radius: 3px;
     background: var(--fwmb-badge-bg);
     color: var(--fwmb-badge-text);
     font: 400 0.6875rem/0.875rem var(--fwmb-font-ui);
@@ -840,7 +858,7 @@
 .fwmb-section {
     margin: 0.5rem;
     border: 1px solid var(--fwmb-border-main);
-    border-radius: 0.625rem;
+    border-radius: 10px;
     background: var(--fwmb-bg-raised);
 }
 .fwmb-section > summary {
@@ -875,7 +893,7 @@
 }
 /* A section's badge keeps to one line where it fits, and wraps inside its pill rather than
    running past the card where a translation is longer than the room it has */
-.fwmb-section > summary .fwmb-badge {
+.fwmb-section > summary :is(.fwmb-badge, .fwmb-tag) {
     flex: 0 1 auto;
     min-width: 0;
     white-space: normal;
@@ -998,7 +1016,7 @@
     min-height: 1.875rem;
     padding: 0 0.5rem;
     padding-inline-start: calc(0.5rem + var(--depth, 0) * 1.25rem);
-    border-radius: 0.375rem;
+    border-radius: 6px;
     color: var(--fwmb-text-primary);
     cursor: pointer;
 }
@@ -1065,12 +1083,12 @@
     inset-inline-end: 0;
     align-items: center;
     padding-inline: 0.25rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     background: var(--fwmb-bg-hover);
     visibility: hidden;
 }
 .fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"])[aria-selected="true"] > .fwmb-actions {
-    background: var(--fwmb-bg-highlight);
+    background: var(--fwmb-bg-selected);
 }
 .fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"]):is(:hover, :focus-within, [aria-selected="true"]) > .fwmb-actions {
     visibility: visible;
@@ -1085,8 +1103,21 @@
 .fwmb .fwmb-list-item:is([aria-selected="true"], .fwmb-is-working) :is(button, .fwmb-btn, .fwmb-eye, a):hover {
     background: var(--fwmb-bg-hover);
 }
+/* Delete keeps its own hover in a row (an icon button included): it fills with the negative tone, as
+   every Delete does, rather than taking the row's button hover under its light icon */
+.fwmb .fwmb-btn.fwmb-btn--danger-quiet:is(:hover, :focus-visible),
+.fwmb .fwmb-list-item .fwmb-btn.fwmb-btn--danger-quiet:is(:hover, :focus-visible) {
+    background: var(--fwmb-fill-negative);
+    border-color: var(--fwmb-fill-negative);
+    color: var(--fwmb-text-inverse);
+}
+/* Selected (v5): the selected surface with a bar in the secondary accent, the row's icon in it too */
 .fwmb-list-item[aria-selected="true"] {
-    background: var(--fwmb-bg-highlight);
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
+}
+.fwmb-list-item[aria-selected="true"] > .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
 }
 /* The History tool: its ages as one choice (the chosen one highlighted, as a selected row is),
    and its realms, each a swatch, its name with its capital below, and its people */
@@ -1104,7 +1135,8 @@
     background: var(--fwmb-bg-hover);
 }
 .fwmb .fwmb-history-ages .fwmb-list-item[aria-checked="true"] {
-    background: var(--fwmb-bg-highlight);
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
 }
 /* These lists scroll, which cuts off anything outside them: room round the rows for the focus
    ring (2px wide, 2px outside the row) */
@@ -1183,7 +1215,7 @@
 .fwmb-influence-ramp {
     block-size: 0.75rem;
     margin-block: 0.25rem;
-    border-radius: 0.25rem;
+    border-radius: 4px;
     border: 1px solid var(--fwmb-border-main);
     background: linear-gradient(to right, #b2182b, #ffffff, #2166ac);
 }
@@ -1260,8 +1292,8 @@
     text-align: start;
 }
 .fwmb-list-item.fwmb-is-working {
-    background: var(--fwmb-bg-highlight);
-    box-shadow: inset 0.1875rem 0 0 var(--fwmb-accent-secondary);
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
 }
 .fwmb-list-item.fwmb-is-working .fwmb-state {
     color: var(--fwmb-accent-secondary);
@@ -1334,7 +1366,7 @@
     height: 1.5rem;
     display: grid;
     place-items: center;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     flex: none;
     color: var(--fwmb-accent-main);
 }
@@ -1342,7 +1374,7 @@
     content: "";
     width: 0.875rem;
     height: 0.5625rem;
-    border: 0.09375rem solid currentColor;
+    border: 1.5px solid currentColor;
     border-radius: 50% / 60%;
     background: radial-gradient(circle, currentColor 0 32%, transparent 36%);
 }
@@ -1358,9 +1390,10 @@
 .fwmb-chip-swatch {
     width: 0.75rem;
     height: 0.75rem;
-    border-radius: 0.1875rem;
+    border-radius: 3px;
     background: var(--swatch);
     flex: none;
+    box-shadow: 0 0 0 1px var(--fwmb-border-strong);
 }
 /* A fill of none: the swatch's outline, crossed */
 .fwmb-chip-swatch--none {
@@ -1391,7 +1424,7 @@
 .fwmb-dropdown-menu {
     min-width: 11rem;
     padding: 0.25rem;
-    border-radius: 0.625rem;
+    border-radius: 10px;
     border: 1px solid var(--fwmb-border-main);
     background: var(--fwmb-bg-panel);
     box-shadow: var(--fwmb-shadow-popout);
@@ -1404,7 +1437,7 @@
     gap: 0.5rem;
     height: 1.875rem;
     padding: 0 0.5rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     color: var(--fwmb-text-primary);
     cursor: pointer;
 }
@@ -1430,7 +1463,7 @@
 .fwmb-tooltip {
     max-width: 16rem;
     padding: 0.375rem 0.625rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     background: var(--fwmb-overlay-bg);
     color: var(--fwmb-overlay-text);
     font-size: 0.75rem;
@@ -1447,7 +1480,7 @@
     gap: 0.5rem;
     max-width: 22rem;
     padding: 0.5rem 0.75rem;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     border: 1px solid var(--fwmb-border-main);
     background: var(--fwmb-bg-panel);
     box-shadow: var(--fwmb-shadow-popout);
@@ -1479,7 +1512,7 @@
 }
 .fwmb-overlay-modal {
     width: 25rem;
-    border-radius: 0.625rem;
+    border-radius: 10px;
     box-shadow: var(--fwmb-shadow-window);
 }
 .fwmb-overlay-docked {
@@ -1512,12 +1545,44 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+/* In a modal dialogue the groups are parted by hairlines */
+.fwmb-overlay-modal .fwmb-group {
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--fwmb-border-subtle);
 }
-.fwmb-overlay-body .fwmb-group:last-child {
+.fwmb-overlay-modal .fwmb-group:last-child {
     border-bottom: 0;
     padding-bottom: 0;
+}
+/* The docked inspector (v5): one column on the base surface; each group is a card with its title in a
+   tinted strip; a group that is only a folding section is that card itself */
+.fwmb-overlay-docked .fwmb-overlay-header > .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-overlay-docked .fwmb-group {
+    padding: 0.625rem 0.75rem 0.75rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    background: var(--fwmb-bg-panel);
+}
+.fwmb-overlay-docked .fwmb-group > .fwmb-section-title {
+    margin: -0.625rem -0.75rem 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    background: var(--fwmb-bg-raised);
+    border-radius: 10px 10px 0 0;
+}
+.fwmb-overlay-docked .fwmb-group:has(> details:only-child) {
+    padding: 0;
+    border: 0;
+    background: none;
+}
+/* A folding section in the inspector (Label, Generated) is a card like the groups, on the same surface */
+.fwmb-overlay-docked .fwmb-group > details.fwmb-section,
+.fwmb-overlay-docked .fwmb-overlay-body > details.fwmb-section {
+    margin: 0;
+    background: var(--fwmb-bg-panel);
 }
 /* The texts an export refuses on (MapDialogManager.showOverLimit): one per line, scrolling when long */
 .fwmb-overlay-body .fwmb-limit-list {
@@ -1534,8 +1599,18 @@
     padding: 0.625rem 0.75rem;
     border-top: 1px solid var(--fwmb-border-main);
 }
-.fwmb-overlay-footer .fwmb-start {
+/* The footer's start item (an estimate, a setting such as Ask each time) sits on the buttons' centre line */
+.fwmb-overlay-footer > .fwmb-start {
     margin-inline-end: auto;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--fwmb-control-height);
+    margin-block: 0;
+    line-height: 1rem;
+}
+.fwmb-overlay-footer > .fwmb-start .fwmb-check {
+    margin: 0;
 }
 .fwmb-scrim {
     position: absolute;
@@ -1563,7 +1638,7 @@
     height: 2.25rem;
     display: grid;
     place-items: center;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     color: var(--fwmb-text-secondary);
     background: transparent;
     border: 0;
@@ -1575,7 +1650,8 @@
 }
 .fwmb-rail-btn:is([aria-pressed="true"], [aria-current="page"]) {
     background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
+    box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
 }
 .fwmb-rail-btn.fwmb-is-dirty {
     position: relative;
@@ -1610,7 +1686,8 @@
     gap: 0.375rem;
     color: var(--fwmb-text-secondary);
 }
-.fwmb-edit-toolbar .fwmb-state b {
+.fwmb-edit-toolbar .fwmb-state b,
+.fwmb-edit-toolbar .fwmb-state--working {
     color: var(--fwmb-accent-secondary);
 }
 .fwmb-edit-toolbar .fwmb-grow {
@@ -1627,7 +1704,7 @@
     background: var(--fwmb-overlay-bg);
     color: var(--fwmb-overlay-text);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 0.375rem;
+    border-radius: 6px;
     font-size: 0.75rem;
     line-height: 1rem;
 }
@@ -1697,7 +1774,7 @@
 .fwmb-canvas-readout .fwmb-classes i {
     width: 0.625rem;
     height: 0.625rem;
-    border-radius: 0.125rem;
+    border-radius: 2px;
     background: var(--swatch);
     flex: none;
 }
@@ -1706,7 +1783,7 @@
     height: 1.75rem;
     display: grid;
     place-items: center;
-    border-radius: 0.25rem;
+    border-radius: 4px;
     border: 1px solid var(--fwmb-overlay-border);
     background: var(--fwmb-overlay-control);
     color: var(--fwmb-overlay-text);
@@ -1718,7 +1795,8 @@
 }
 .fwmb-map-btn[aria-pressed="true"] {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
 }
 .fwmb-map-btn.fwmb-is-partial::after {
     content: "";
@@ -1728,8 +1806,8 @@
     width: 0.375rem;
     height: 0.375rem;
     border-radius: 50%;
-    background: var(--fwmb-fill-accent);
-    border: 1px solid #fff;
+    background: var(--fwmb-overlay-accent);
+    border: 1px solid #000;
 }
 
 /* ---------- Processing overlay ---------- */
@@ -1739,7 +1817,7 @@
     gap: 0.5rem;
     width: 18rem;
     padding: 0.75rem;
-    border-radius: 0.625rem;
+    border-radius: 10px;
     background: var(--fwmb-overlay-bg);
     color: var(--fwmb-overlay-text);
     box-shadow: var(--fwmb-shadow-window);
@@ -1830,7 +1908,7 @@
 }
 .fwmb-progress {
     height: 0.375rem;
-    border-radius: 0.1875rem;
+    border-radius: 3px;
     background: var(--fwmb-overlay-control);
     overflow: hidden;
 }
@@ -1900,14 +1978,14 @@
 .fwmb-canvas-readout .fwmb-ramp-bar {
     position: relative;
     block-size: 0.625rem;
-    border-radius: 0.125rem;
+    border-radius: 2px;
 }
 .fwmb-canvas-readout .fwmb-ramp-marker {
     position: absolute;
     inset-block: -0.1875rem;
     inline-size: 0.1875rem;
     margin-inline-start: -0.09375rem;
-    border-radius: 0.0625rem;
+    border-radius: 1px;
     background: var(--fwmb-overlay-accent);
     box-shadow: 0 0 0 1px var(--fwmb-overlay-bg);
 }
@@ -1930,7 +2008,7 @@
 .fwmb-canvas-readout .fwmb-classes i.fwmb-line-sample {
     width: 1.25rem;
     height: var(--fwmb-line-rem, 0.125rem);
-    border-radius: 1rem;
+    border-radius: 16px;
     background: var(--fwmb-overlay-text);
 }
 /* A class legend: the culture under the pointer stands out in the accent */
@@ -2035,7 +2113,7 @@
         flex: 1;
     }
     /* A cost badge drops beneath the title; a list's count stays beside it */
-    .fwmb-section > summary .fwmb-badge:not(.fwmb-badge--count) {
+    .fwmb-section > summary :is(.fwmb-badge:not(.fwmb-badge--count), .fwmb-tag) {
         order: 2;
         margin-inline-start: 1.5rem;
     }
@@ -2043,6 +2121,2220 @@
         content: "";
         order: 1;
         flex-basis: 100%;
+    }
+}
+
+/* ===================================================================
+   --- DESIGN SYSTEM COMPONENTS: v5 ---
+   The v5 design system's new components (S0 step 0), lifted from its bundle.css: read-only fields,
+   the Relief range, ticks and radios, tags, the panel lede, menus' new rows, choice cards and
+   action lists, the short rail, the map controls' menus, the marks on the canvas and the crop, the
+   studio shell's parts (the world bar, layer switcher, mode switch, state marks, settlement bar,
+   segmented choices, Go, notices, the overview and its cards, versions, households), the export
+   dialogue and the settlement map's framings, then the coarse-pointer forms. The v4 components
+   above carry v5's changes in place. The shell's layout itself (the studio as a column, the world
+   bar over its body) comes with the world bar, in step 3.
+=================================================================== */
+
+/* v5: read only (a held regional world's settings): dimmed, dashed */
+.fwmb-is-readonly :is(.fwmb-input, .fwmb-select, .fwmb-range-input, .fwmb-check) {
+    opacity: 0.6;
+}
+.fwmb-is-readonly :is(.fwmb-input, .fwmb-select) {
+    border-style: dashed;
+}
+
+/* v5: a two-handle range with zone toggles above it (Relief): the zones are multi-select, the range
+   spans the lowest to the highest zone chosen, and the handles fine-tune either end */
+.fwmb-range2 {
+    position: relative;
+    height: 0.375rem;
+    border-radius: 3px;
+    background: var(--fwmb-range-track);
+    margin: 0.5rem 0.5rem 0.25rem;
+}
+.fwmb-range2::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--from);
+    inset-inline-end: calc(100% - var(--to));
+    background: var(--fwmb-range-fill);
+    border-radius: 3px;
+}
+.fwmb-range2 i {
+    position: absolute;
+    top: -0.3125rem;
+    width: 1rem;
+    height: 1rem;
+    margin-inline-start: -0.5rem;
+    border-radius: 50%;
+    background: var(--fwmb-bg-panel);
+    border: 2px solid var(--fwmb-range-fill);
+}
+
+/* v5: a tick inside a menu row (Show's parts): on, off, or partial (some of its submenu's parts
+   on); a radio (a choice card, a version card) */
+.fwmb-tick {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    border: 1.5px solid var(--fwmb-border-strong);
+    border-radius: 3px;
+    background: var(--fwmb-bg-base);
+    display: grid;
+    place-items: center;
+}
+.fwmb-tick--on,
+.fwmb-tick--part {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
+}
+.fwmb-tick--on::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.25rem;
+    border-left: 2px solid var(--fwmb-text-on-accent);
+    border-bottom: 2px solid var(--fwmb-text-on-accent);
+    transform: rotate(-45deg) translate(0.03rem, -0.05rem);
+}
+.fwmb-tick--part::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.125rem;
+    background: var(--fwmb-text-on-accent);
+}
+.fwmb-radio {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--fwmb-border-strong);
+    flex: none;
+    margin-top: 1px;
+    background: var(--fwmb-bg-base);
+}
+
+/* v5: a tag names where a panel's content belongs: World (a world setting, not this map's) or
+   Explore (the mode, read only); outlined, so it never reads as a button or a badge */
+.fwmb-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 1px 0.375rem;
+    border-radius: 3px;
+    border: 1px solid var(--fwmb-border-strong);
+    color: var(--fwmb-text-secondary);
+    font: 400 0.6875rem/0.875rem var(--fwmb-font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+.fwmb-tag .fwmb-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    color: var(--fwmb-accent-main);
+}
+
+/* v5: the panel lede: one sentence under the title saying what the tool does on this map type. Help
+   lives in three places, never repeated: the lede (what the tool is for), the canvas hint (what the
+   pointer does now), section hints and Go blocks (what a setting does, where else to go).
+   Appearance › Tool descriptions (on by default) hides every lede without moving anything. */
+.fwmb-lede {
+    flex: none;
+    margin: 0;
+    padding: 0.375rem 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-subhead {
+    padding: 0.375rem 0.5rem 0.125rem;
+    color: var(--fwmb-text-muted);
+    font: 700 0.6875rem/1rem var(--fwmb-font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-kind {
+    font-size: 0.6875rem;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-lock {
+    color: var(--fwmb-text-muted);
+}
+
+/* v5: Worlds as a tree: a world's maps, settlement maps and regional worlds under it */
+.fwmb-tree .fwmb-list-item {
+    min-height: 1.75rem;
+}
+.fwmb-tree .fwmb-list-item .fwmb-state-mark {
+    flex: none;
+}
+.fwmb-worldrow {
+    font-weight: 700;
+}
+
+/* v5: menus: wide, the popover, icons and ends of rows, the current item, submenus, two-line rows,
+   a slider inside a menu, group heads */
+.fwmb-dropdown-menu--wide {
+    min-width: 17rem;
+}
+.fwmb-popover {
+    position: absolute;
+    z-index: 30;
+}
+.fwmb-menu-item > .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-menu-item .fwmb-end {
+    margin-inline-start: auto;
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-menu-item--strong {
+    font-weight: 700;
+}
+.fwmb-menu-item--sub {
+    padding-inline-start: 1.75rem;
+}
+.fwmb-menu-item:is([aria-checked="true"], [aria-current="true"], .fwmb-menu-item--open) {
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
+}
+.fwmb-menu-item .fwmb-submenu {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-menu-item .fwmb-submenu::after {
+    content: "›";
+    font-size: 1rem;
+}
+.fwmb-menu-item--partial::after {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--fwmb-accent-main);
+    margin-inline-start: 0.375rem;
+    flex: none;
+}
+.fwmb-menu-item--two {
+    height: auto;
+    min-height: 2.25rem;
+    padding-block: 0.25rem;
+    align-items: flex-start;
+}
+.fwmb-menu-item--two > :is(.fwmb-icon, .fwmb-tick) {
+    margin-top: 0.125rem;
+}
+.fwmb-desc {
+    display: block;
+    color: var(--fwmb-text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.875rem;
+}
+.fwmb-menu-slider {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem 0.375rem 2.25rem;
+}
+.fwmb-menu-slider .fwmb-range-input {
+    flex: 1;
+}
+.fwmb-menu-slider .fwmb-readout {
+    min-width: 2.5rem;
+    text-align: end;
+}
+.fwmb-menu-head {
+    padding: 0.375rem 0.5rem 0.25rem;
+    color: var(--fwmb-text-muted);
+    font: 700 0.6875rem/1rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* v5: a choice card inside a dialogue (the single Generate's guard, Generate all) */
+.fwmb-choice {
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    padding: 0.625rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-raised);
+}
+.fwmb-choice[aria-checked="true"] {
+    border-color: var(--fwmb-accent-secondary);
+    background: var(--fwmb-bg-selected);
+}
+.fwmb-choice[aria-checked="true"] .fwmb-radio {
+    border: 5px solid var(--fwmb-accent-secondary);
+}
+.fwmb-choice b {
+    display: block;
+}
+.fwmb-steps {
+    margin: 0;
+    padding-inline-start: 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-steps b {
+    color: var(--fwmb-text-primary);
+}
+
+/* v5: an action list: more than two or three secondary actions become one card of rows (icon, bold
+   label, a short note, chevron) under one primary button; Delete apart below; renaming is the Name
+   field */
+.fwmb-action-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    background: var(--fwmb-bg-panel);
+    overflow: hidden;
+}
+.fwmb-action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.25rem;
+    padding: 0.375rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    background: transparent;
+    color: var(--fwmb-text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    width: 100%;
+}
+.fwmb-action-row:last-child {
+    border-bottom: 0;
+}
+.fwmb-action-row:is(:hover, :focus-visible) {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-action-row:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-action-row:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+.fwmb-action-row > .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-action-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.fwmb-action-text b {
+    font-weight: 700;
+}
+.fwmb-action-text span {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-action-row::after {
+    content: "›";
+    color: var(--fwmb-text-muted);
+    font-size: 1rem;
+}
+.fwmb-foot-danger {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* v5: the short rail (below 680px of height): stage labels become dividers, buttons 2rem, Help
+   joins More */
+.fwmb-toolbar--short .fwmb-rail-btn {
+    width: 2rem;
+    height: 2rem;
+}
+.fwmb-toolbar--short .fwmb-rail-stage {
+    position: relative;
+    width: 1.5rem;
+    height: 1px;
+    margin: 0.375rem 0;
+    overflow: hidden;
+    color: transparent;
+    background: var(--fwmb-border-main);
+}
+.fwmb-toolbar--short .fwmb-rail-stage:first-child {
+    margin-top: 0.125rem;
+}
+
+/* v5: the map controls' three labelled menus: Visibility, Show, Thematic views. An open one takes
+   the secondary accent; the partial dot says some of its choices are off. Icon buttons in compact
+   and touch */
+.fwmb-map-menu {
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.5rem 0 0.375rem;
+    border-radius: 4px;
+    border: 1px solid var(--fwmb-overlay-border);
+    background: var(--fwmb-overlay-control);
+    color: var(--fwmb-overlay-text);
+    font: 700 0.75rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fwmb-map-menu:hover {
+    background: var(--fwmb-overlay-control-hover);
+}
+.fwmb-map-menu:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-map-menu[aria-expanded="true"] {
+    background: var(--fwmb-overlay-control-hover);
+    border-color: var(--fwmb-overlay-accent-secondary);
+    box-shadow: inset 0 -2px 0 var(--fwmb-overlay-accent-secondary);
+}
+.fwmb-map-menu .fwmb-count {
+    font: 500 0.6875rem/1 var(--fwmb-font-readout);
+    color: var(--fwmb-overlay-accent);
+}
+.fwmb-map-menu.fwmb-is-partial::after {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--fwmb-overlay-accent);
+    margin-inline-start: 0.125rem;
+}
+
+/* v5: marks on the canvas. A link's mark: the link icon in a ring; the chosen one lit in the
+   secondary accent; a link whose other end is not yet placed is dashed. The other end of a link,
+   live, in the inspector. */
+.fwmb-linkmark {
+    position: absolute;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: -0.75rem 0 0 -0.75rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #f3f2ef;
+    border: 2px solid #15130e;
+    color: #15130e;
+}
+.fwmb-linkmark .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+.fwmb-linkmark--on {
+    background: var(--fwmb-overlay-accent-secondary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fwmb-overlay-accent-secondary) 45%, transparent);
+}
+.fwmb-linkmark--ghost {
+    opacity: 0.7;
+    border-style: dashed;
+}
+.fwmb-inset {
+    position: relative;
+    height: 8rem;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-canvas-surround);
+}
+.fwmb-inset img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-inset-label {
+    position: absolute;
+    bottom: 0.25rem;
+    inset-inline-start: 0.25rem;
+    padding: 1px 0.375rem;
+    border-radius: 3px;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
+    font: 500 0.6875rem/1rem var(--fwmb-font-ui);
+}
+.fwmb-ends {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.5rem;
+    align-items: center;
+    font-size: 0.75rem;
+}
+.fwmb-ends .fwmb-term {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-ends .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-accent-main);
+    vertical-align: -0.125rem;
+    margin-inline-end: 0.25rem;
+}
+
+/* v5: the crop control, one control with two jobs and two names: a regional world's crop (Cut
+   regional world…, and the selected world in Worlds) and an export's Area. The outline in the
+   overlay secondary, the scrim outside it while cutting; corner handles; the drawn outline dashed
+   beside the snapped crop. The export's extras: the label inside the area's corner, the warning
+   edge when the choice is too large, and edge handles on touch. */
+.fwmb-crop {
+    position: absolute;
+    border: 2px solid var(--fwmb-overlay-accent-secondary);
+    box-shadow: 0 0 0 1px #000 inset;
+}
+.fwmb-crop--cutting {
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45), 0 0 0 1px #000 inset;
+}
+.fwmb-crop i {
+    position: absolute;
+    width: 0.625rem;
+    height: 0.625rem;
+    background: #fff;
+    border: 1px solid #000;
+}
+.fwmb-crop i:nth-child(1) {
+    top: -0.375rem;
+    inset-inline-start: -0.375rem;
+}
+.fwmb-crop i:nth-child(2) {
+    top: -0.375rem;
+    inset-inline-end: -0.375rem;
+}
+.fwmb-crop i:nth-child(3) {
+    bottom: -0.375rem;
+    inset-inline-start: -0.375rem;
+}
+.fwmb-crop i:nth-child(4) {
+    bottom: -0.375rem;
+    inset-inline-end: -0.375rem;
+}
+.fwmb-crop-label {
+    position: absolute;
+    top: -1.75rem;
+    inset-inline-start: 0;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-accent-secondary);
+    font: 600 0.75rem/1rem var(--fwmb-font-readout);
+    white-space: nowrap;
+}
+.fwmb-crop-drawn {
+    position: absolute;
+    border: 1.5px dashed rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+}
+.fwmb-crop--area .fwmb-crop-label {
+    top: auto;
+    bottom: 0.375rem;
+    inset-inline-start: 0.375rem;
+}
+.fwmb-crop--whole .fwmb-crop-label {
+    bottom: auto;
+    top: 0.375rem;
+}
+.fwmb-crop--over {
+    border-color: var(--fwmb-color-warning);
+}
+.fwmb-crop-edge {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #000;
+    border-radius: 3px;
+}
+.fwmb-crop-edge--n,
+.fwmb-crop-edge--s {
+    left: 50%;
+    width: 1.75rem;
+    height: 0.5rem;
+    margin-left: -0.875rem;
+}
+.fwmb-crop-edge--n {
+    top: -0.3125rem;
+}
+.fwmb-crop-edge--s {
+    bottom: -0.3125rem;
+}
+.fwmb-crop-edge--w,
+.fwmb-crop-edge--e {
+    top: 50%;
+    width: 0.5rem;
+    height: 1.75rem;
+    margin-top: -0.875rem;
+}
+.fwmb-crop-edge--w {
+    left: -0.3125rem;
+}
+.fwmb-crop-edge--e {
+    right: -0.3125rem;
+}
+
+/* A culture's homeland on the map: its colour, dashed when the generator placed it; a house on a
+   settlement map in Explore, the one under the pointer */
+.fwmb-homeland {
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    margin: -0.5rem 0 0 -0.5rem;
+    border-radius: 50%;
+    border: 3px solid var(--c);
+    background: color-mix(in srgb, var(--c) 35%, transparent);
+}
+.fwmb-homeland--auto {
+    background: transparent;
+    border-style: dashed;
+}
+.fwmb-house {
+    position: absolute;
+    width: 0.875rem;
+    height: 0.625rem;
+    margin: -0.3125rem 0 0 -0.4375rem;
+    border: 2px solid var(--fwmb-overlay-accent-secondary);
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 2px;
+}
+
+/* v5: the studio shell's parts. The shell's layout (the studio as a column, the world bar over the
+   body) is S0 step 3's, with the world bar itself; these style its parts */
+.fwmb-caret {
+    width: 0;
+    height: 0;
+    flex: none;
+    border-left: 0.3125rem solid transparent;
+    border-right: 0.3125rem solid transparent;
+    border-top: 0.375rem solid currentColor;
+    opacity: 0.75;
+}
+
+/* v5: the world bar. One row above the rail and the canvas: the world name menu, Save world, the
+   layer switcher, Settlement maps; then Create and Explore and the World menu at the end. Never
+   wraps. Folding order as it narrows: full map names and mark text (wide) → short names and icon
+   marks (typical) → Settlement maps into the layer switcher's menu → the switcher to one menu
+   button naming the map, with one mark for all → the world name to an ellipsis with a tooltip. Save
+   world, the mode switch and World never fold. */
+.fwmb-worldbar {
+    flex: none;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.625rem;
+    background: var(--fwmb-bg-panel);
+    border-bottom: 1px solid var(--fwmb-border-main);
+    white-space: nowrap;
+    position: relative;
+    z-index: 6;
+}
+.fwmb-worldbar .fwmb-sep,
+.fwmb-subbar .fwmb-sep {
+    width: 1px;
+    height: 1.75rem;
+    background: var(--fwmb-border-main);
+    flex: none;
+}
+.fwmb-world-menu {
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fwmb-text-primary);
+    cursor: pointer;
+    min-width: 0;
+    max-width: 20rem;
+    flex: 0 1 auto;
+    font: inherit;
+}
+.fwmb-world-menu:hover {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-border-main);
+}
+.fwmb-world-menu[aria-expanded="true"] {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-accent-secondary);
+}
+.fwmb-world-menu > .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-world-name {
+    font: 600 1rem/1.25rem var(--fwmb-font-display);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* A bar button (Settlement maps, World, Save world, Back to a regional world) */
+.fwmb-barbtn {
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.625rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: 700 0.8125rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+    flex: none;
+    position: relative;
+}
+.fwmb-barbtn:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-barbtn[aria-expanded="true"] {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-accent-secondary);
+}
+.fwmb-barbtn > .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-barbtn--icon {
+    padding: 0;
+    width: 2.25rem;
+    justify-content: center;
+}
+
+/* Settlement maps naming the open settlement map: lit as the current layer is */
+.fwmb-barbtn--current {
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 0 -3px 0 var(--fwmb-accent-secondary);
+}
+.fwmb-barbtn--current > .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
+}
+
+/* Save world: just after the world name, never folds; the dot is the unsaved-changes mark and the
+   tooltip names what is unsaved */
+.fwmb-save.fwmb-is-dirty::after {
+    content: "";
+    position: absolute;
+    top: 0.3125rem;
+    inset-inline-end: 0.3125rem;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    background: var(--fwmb-accent-secondary);
+}
+
+/* The layer switcher: one segment a map, in the world's order (Surface, Geology, Underground maps,
+   Aerial), then Add a map. Its segments size to their names (the one segmented control that does).
+   The current layer is the map being worked on: the selected surface with a bar in the secondary
+   accent. */
+.fwmb-layers {
+    display: inline-flex;
+    align-items: stretch;
+    height: 2.25rem;
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+    overflow: hidden;
+    flex: none;
+}
+.fwmb-layer {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-inline-end: 1px solid var(--fwmb-border-main);
+    background: transparent;
+    color: var(--fwmb-text-secondary);
+    font: 700 0.8125rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fwmb-layer:last-child {
+    border-inline-end: 0;
+}
+.fwmb-layer:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-layer[aria-checked="true"] {
+    background: var(--fwmb-bg-selected);
+    color: var(--fwmb-text-primary);
+    box-shadow: inset 0 -3px 0 var(--fwmb-accent-secondary);
+}
+.fwmb-layer[aria-checked="true"] > .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-layer--add {
+    padding: 0 0.5rem;
+    color: var(--fwmb-accent-main);
+}
+.fwmb-layer--menu {
+    gap: 0.5rem;
+}
+.fwmb-layer--menu .fwmb-state-mark {
+    margin-inline: 0.125rem 0.25rem;
+}
+
+/* The mode switch: Create and Explore, a two-way segmented control in the accent fill */
+.fwmb-mode-switch {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    height: 2.25rem;
+    padding: 0.1875rem;
+    gap: 0.125rem;
+    border-radius: 8px;
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-strong);
+    flex: none;
+}
+.fwmb-mode-switch button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0 0.75rem;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fwmb-text-secondary);
+    font: 700 0.8125rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+}
+.fwmb-mode-switch button:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-mode-switch button[aria-checked="true"] {
+    background: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-on-accent);
+    box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
+}
+
+/* v5: state marks, one set everywhere (layer switcher, Worlds, the overview, Run, menus). Icon and
+   text in menus and lists (a heading counting them, an action naming what it runs); icon only in
+   the layer switcher's segments at a typical width. Warning colour only for marks that need action.
+   No mark is shaped like a caret or other pointer; a mark's icon takes the mark's colour. */
+.fwmb-state-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1875rem;
+    height: 1.125rem;
+    padding: 0 0.3125rem 0 0.1875rem;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    font: 400 0.6875rem/1 var(--fwmb-font-ui);
+    white-space: nowrap;
+    background: var(--fwmb-bg-panel);
+}
+.fwmb-state-mark .fwmb-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    color: inherit !important;
+}
+.fwmb-state-mark--stale,
+.fwmb-state-mark--refresh {
+    color: var(--fwmb-color-warning);
+}
+.fwmb-state-mark--older {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-state-mark--held {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-state-mark--ok {
+    color: var(--fwmb-color-success);
+}
+.fwmb-state-mark--icon {
+    padding: 0 0.125rem;
+}
+.fwmb-state-mark--regional {
+    color: var(--fwmb-text-on-accent);
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
+}
+
+/* v5: a settlement map's own bar, under the world bar: the way back to its pin, Town view and
+   Hinterland view, and Levels for a hold (up to six, gate level first). Same styles as the world
+   bar's, one step smaller. */
+.fwmb-subbar {
+    flex: none;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.625rem;
+    background: var(--fwmb-bg-raised);
+    border-bottom: 1px solid var(--fwmb-border-main);
+    white-space: nowrap;
+    position: relative;
+    z-index: 5;
+}
+.fwmb-subbar .fwmb-sep {
+    height: 1.5rem;
+}
+.fwmb-sublabel {
+    color: var(--fwmb-text-secondary);
+    font: 700 0.6875rem/1rem var(--fwmb-font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.fwmb-subbar .fwmb-seg button {
+    height: 1.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.75rem;
+}
+.fwmb-subbar .fwmb-seg button .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+}
+.fwmb-subbar .fwmb-layers {
+    height: 1.875rem;
+}
+.fwmb-subbar .fwmb-layer {
+    font-size: 0.75rem;
+    padding: 0 0.5rem;
+}
+.fwmb-crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.875rem;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fwmb-text-primary);
+    font: 400 0.8125rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+}
+.fwmb-crumb:hover {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-border-main);
+}
+.fwmb-crumb .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-crumb b {
+    font-weight: 700;
+}
+
+/* v5: segmented choices. Every segmented choice gives its options equal widths, the widest label
+   setting the width; a long label wraps (fwmb-seg--equal at a fixed width). The layer switcher is
+   the one exception. */
+.fwmb-seg {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.fwmb-seg button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 0;
+    border-inline-end: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-secondary);
+    font: 700 0.75rem/1 var(--fwmb-font-ui);
+    padding: 0 0.5rem;
+    height: 1.75rem;
+    cursor: pointer;
+}
+.fwmb-seg button:last-child {
+    border-inline-end: 0;
+}
+.fwmb-seg button:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-seg button[aria-checked="true"] {
+    background: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-on-accent);
+    box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
+}
+.fwmb-seg--equal {
+    display: grid;
+    grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr));
+}
+.fwmb-seg--equal button {
+    height: auto;
+    min-height: 2.25rem;
+    padding: 0.25rem 0.375rem;
+    white-space: normal;
+    line-height: 1rem;
+}
+.fwmb-layer:focus-visible,
+.fwmb-barbtn:focus-visible,
+.fwmb-world-menu:focus-visible,
+.fwmb-mode-switch button:focus-visible,
+.fwmb-seg button:focus-visible,
+.fwmb-card:focus-visible,
+.fwmb-version:focus-visible,
+.fwmb-crumb:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+
+/* v5: Go, a link back to another tool or editor: a plain sentence ending with the destination in
+   bold, then one Go button below it at the end */
+.fwmb-goto {
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--fwmb-border-subtle);
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+}
+.fwmb-goto p {
+    margin: 0;
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-goto p b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-goto-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.375rem;
+}
+
+/* v5: notices in the panel. The held banner (a held regional world: its parent's settings read
+   only) and the action notice (a state that needs action: Refresh from surface). The title is
+   primary text for contrast; the colour is on the icon and the border only: the accent for held,
+   warning for an action. */
+.fwmb-held,
+.fwmb-notice {
+    margin: 0.5rem 0.5rem 0;
+    padding: 0.625rem;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-held {
+    border: 1px solid var(--fwmb-accent-main);
+    background: var(--fwmb-bg-highlight);
+}
+.fwmb-notice {
+    border: 1px solid var(--fwmb-color-warning);
+    background: var(--fwmb-bg-base);
+}
+.fwmb-held b,
+.fwmb-notice b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-held-title,
+.fwmb-notice-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--fwmb-text-primary);
+    font: 700 0.75rem/1rem var(--fwmb-font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.fwmb-held-title .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-notice-title .fwmb-icon {
+    color: var(--fwmb-color-warning);
+}
+
+/* What a change reaches, beside Revert changes in a world settings editor */
+.fwmb-reach {
+    margin: 0.5rem 0.5rem 0;
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-reach .fwmb-btn {
+    margin-inline-start: auto;
+    flex: none;
+}
+
+/* A world settings editor's header strip: the World tag, then Close */
+.fwmb-world-head {
+    background: var(--fwmb-bg-raised);
+}
+.fwmb-world-head .fwmb-tag {
+    margin-inline-start: 0.25rem;
+}
+.fwmb-world-head .fwmb-close {
+    margin-inline-start: auto;
+}
+.fwmb-world-note {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-world-note .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-accent-main);
+}
+
+/* v5: Run (Peoples and realms): the world's maps in run order */
+.fwmb-runlist {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.fwmb-runrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.75rem;
+    padding: 0 0.375rem;
+    border-radius: 6px;
+}
+.fwmb-runrow > .fwmb-icon {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-runname {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fwmb-runrow--this {
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
+}
+
+/* v5: the world overview (the World menu's first item) and cards */
+.fwmb-overview {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr var(--fwmb-overview-side-width, 19rem);
+    min-height: 0;
+}
+.fwmb-overview-main {
+    overflow: auto;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--fwmb-bg-base);
+}
+.fwmb-overview-head {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+}
+.fwmb-overview-head h1 {
+    margin: 0;
+    font: 600 1.25rem/1.5rem var(--fwmb-font-display);
+}
+.fwmb-overview-side {
+    background: var(--fwmb-bg-panel);
+    border-inline-start: 1px solid var(--fwmb-border-main);
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+.fwmb-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+    gap: 0.75rem;
+}
+.fwmb-card {
+    display: flex;
+    flex-direction: column;
+    text-align: start;
+    padding: 0;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    overflow: hidden;
+    cursor: pointer;
+    font: inherit;
+}
+.fwmb-card:hover {
+    border-color: var(--fwmb-border-strong);
+}
+.fwmb-card[aria-current="true"] {
+    border-color: var(--fwmb-accent-secondary);
+    box-shadow: 0 0 0 1px var(--fwmb-accent-secondary);
+}
+.fwmb-card-thumb {
+    height: 6.5rem;
+    background: var(--fwmb-canvas-surround);
+    position: relative;
+}
+.fwmb-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-card-thumb .fwmb-state-mark {
+    position: absolute;
+    top: 0.375rem;
+    inset-inline-start: 0.375rem;
+}
+.fwmb-card-body {
+    padding: 0.5rem 0.625rem 0.625rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 700;
+}
+.fwmb-card-title .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-card[aria-current="true"] .fwmb-card-title .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-card-meta {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-card--add {
+    align-items: center;
+    justify-content: center;
+    min-height: 9.5rem;
+    border-style: dashed;
+    color: var(--fwmb-accent-main);
+    gap: 0.375rem;
+    font-weight: 700;
+    background: transparent;
+}
+
+/* A tool row in the overview's side column (Generate all, the settings editors, Export world) */
+.fwmb-toolrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--fwmb-text-primary);
+    font: inherit;
+    cursor: pointer;
+    width: 100%;
+    text-align: start;
+}
+.fwmb-toolrow:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-toolrow > .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-toolrow .fwmb-end {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+/* v5: the four-version choice (Make settlement map): four town views, one kept */
+.fwmb-versions {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--fwmb-canvas-surround);
+}
+.fwmb-version {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border: 0.125rem solid transparent;
+    border-radius: 8px;
+    background: var(--fwmb-bg-panel);
+    overflow: hidden;
+    cursor: pointer;
+    font: inherit;
+    color: var(--fwmb-text-primary);
+    text-align: start;
+    min-height: 0;
+}
+.fwmb-version img {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-version:hover {
+    border-color: var(--fwmb-border-strong);
+}
+.fwmb-version[aria-checked="true"] {
+    border-color: var(--fwmb-accent-secondary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fwmb-accent-secondary) 35%, transparent);
+}
+.fwmb-version-bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    border-top: 1px solid var(--fwmb-border-main);
+}
+.fwmb-version-bar b {
+    font-weight: 700;
+}
+.fwmb-version-bar .fwmb-kind {
+    margin-inline-start: auto;
+}
+.fwmb-version-bar .fwmb-radio {
+    margin: 0;
+}
+.fwmb-version[aria-checked="true"] .fwmb-version-bar {
+    background: var(--fwmb-bg-selected);
+}
+.fwmb-version[aria-checked="true"] .fwmb-radio {
+    border: 5px solid var(--fwmb-accent-secondary);
+}
+.fwmb-version-num {
+    position: absolute;
+    top: 0.5rem;
+    inset-inline-start: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
+    font: 700 0.75rem/1rem var(--fwmb-font-ui);
+}
+
+/* v5: the households card (Explore on a settlement map). Opens on hover over a house and stays on
+   click (mouse); on touch the same card is a sheet over the bottom of the canvas, opened by tap and
+   closed by its button or a tap elsewhere. Read only. */
+.fwmb-hh {
+    position: absolute;
+    z-index: 20;
+    width: 17.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    box-shadow: var(--fwmb-shadow-window);
+    overflow: hidden;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-hh-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    background: var(--fwmb-bg-raised);
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-hh-head b {
+    font: 700 0.8125rem/1rem var(--fwmb-font-ui);
+}
+.fwmb-hh-head .fwmb-kind {
+    margin-inline-start: auto;
+}
+.fwmb-hh-body {
+    padding: 0.5rem 0.625rem 0.625rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.fwmb-hh-body ul {
+    margin: 0;
+    padding-inline-start: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-hh-body ul b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-hh-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    border-top: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-muted);
+    font-size: 0.6875rem;
+}
+.fwmb-hh-foot .fwmb-btn {
+    margin-inline-start: auto;
+}
+.fwmb-hh--sheet {
+    inset-inline: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+    max-width: 30rem;
+    margin-inline: auto;
+}
+.fwmb-hh--sheet .fwmb-hh-body {
+    flex-direction: row;
+    gap: 1rem;
+}
+.fwmb-hh--sheet .fwmb-hh-body > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.fwmb-grab {
+    width: 2.5rem;
+    height: 0.25rem;
+    border-radius: 2px;
+    background: var(--fwmb-border-strong);
+    margin: 0.375rem auto 0;
+}
+
+/* v5: Explore panels: totals, shares, chips. A share bar: user colours keep an edge, segments
+   parted by a hairline of the panel's colour. Chosen items as chips (a culture's chosen biomes). */
+.fwmb-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem;
+}
+.fwmb-stat {
+    padding: 0.375rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-subtle);
+    background: var(--fwmb-bg-base);
+    display: flex;
+    flex-direction: column;
+}
+.fwmb-stat b {
+    font: 600 1rem/1.25rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-stat span {
+    color: var(--fwmb-text-muted);
+    font-size: 0.6875rem;
+    line-height: 0.875rem;
+}
+.fwmb-share-bar {
+    height: 0.625rem;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    background: var(--fwmb-range-track);
+    border: 1px solid var(--fwmb-border-strong);
+}
+.fwmb-share-bar i {
+    display: block;
+    height: 100%;
+}
+.fwmb-share-bar i + i {
+    border-inline-start: 1px solid var(--fwmb-bg-panel);
+}
+.fwmb-legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-legend-row i {
+    display: inline-block;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 2px;
+    margin-inline-end: 0.25rem;
+    vertical-align: -0.0625rem;
+    box-shadow: 0 0 0 1px var(--fwmb-border-strong);
+}
+.fwmb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.fwmb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.5rem;
+    padding: 0 0.25rem 0 0.375rem;
+    border-radius: 12px;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-raised);
+    font-size: 0.75rem;
+}
+.fwmb-chip .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-key-sym {
+    width: 1.25rem;
+    text-align: center;
+    font: 700 0.875rem/1 var(--fwmb-font-ui);
+    color: var(--fwmb-text-secondary);
+    flex: none;
+}
+
+/* v5: an export's File name: the label above a full-width input with room inside it, filled in from
+   the map and the choices until typed over; the extension follows the format and is not part of the
+   field; a long name ends in an ellipsis rather than touching the edge */
+.fwmb-filename {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.fwmb-filename .fwmb-input {
+    flex: 1;
+    min-width: 0;
+    height: 2rem;
+    padding: 0 0.625rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: flex;
+}
+.fwmb-filename .fwmb-ext {
+    color: var(--fwmb-text-muted);
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+}
+.fwmb-filename + .fwmb-hint {
+    margin-top: 0.125rem;
+}
+
+/* v5 DE: one image export with an area; the settlement map's framings */
+
+/* The export dialogue. One dialogue for every image export (Export image, History's Export this
+   age, Travel's Export this journey, a settlement map's Export, and Export to scene with its scene
+   fields). Two columns: the Area at the start (presets, Aspect, the preview of the whole map with
+   the area over it), then Scale, the image's size, Image format and quality and File name at the
+   end. As wide as it needs (60rem), never wider than the window less 2rem each side; two columns
+   down to about 900 px of window, one below that; on a short window the preview takes the height
+   that is left. */
+.fwmb-export {
+    --fwmb-export-max-h: 34rem;
+    width: 60rem;
+    max-width: calc(100% - 4rem);
+}
+.fwmb-export-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    gap: 0.5rem;
+    align-items: start;
+    background: var(--fwmb-bg-base);
+}
+.fwmb-export-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.fwmb-export-body .fwmb-group {
+    padding: 0.625rem 0.75rem 0.75rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    background: var(--fwmb-bg-panel);
+}
+.fwmb-export-body .fwmb-group > .fwmb-section-title {
+    margin: -0.625rem -0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    background: var(--fwmb-bg-raised);
+    border-radius: 10px 10px 0 0;
+}
+.fwmb-export--one-column .fwmb-export-body {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: var(--fwmb-export-max-h);
+    overflow-y: auto;
+}
+
+/* The preview: the whole map (or frame), at most about 26rem tall (17rem on a short window) */
+.fwmb-export-preview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--ar, 1.25);
+    max-width: calc(var(--fwmb-preview-max-h, 26rem) * var(--ar, 1.25));
+    margin-inline: auto;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-canvas-surround);
+}
+.fwmb-export-preview > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-export--short {
+    --fwmb-preview-max-h: 17rem;
+}
+
+/* The grid under the area when the export snaps to it (Export to scene) */
+.fwmb-export-grid {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.28) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+    background-size: var(--cell-x, 2.5%) var(--cell-y, 3.125%);
+}
+.fwmb-area-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.fwmb-aspect {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-aspect .fwmb-select {
+    min-width: 6rem;
+}
+.fwmb-area-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.fwmb-area-foot .fwmb-hint {
+    flex: 1;
+    margin: 0;
+}
+.fwmb-area-foot .fwmb-readout {
+    flex: none;
+    white-space: nowrap;
+}
+
+/* Presets: chips, one pressed (the brand fill, as a chosen segment); none once the user draws, with
+   a Drawn tag (the secondary accent: what is being worked on) in their place. The area goes back to
+   its preset whenever a map loads and after every export: a drawn area is never kept. */
+.fwmb-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+}
+.fwmb-preset {
+    height: 1.75rem;
+    padding: 0 0.625rem;
+    border-radius: 14px;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: 400 0.75rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fwmb-preset:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-preset:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-preset[aria-pressed="true"] {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
+    font-weight: 700;
+}
+.fwmb-drawn-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 1.375rem;
+    padding: 0 0.5rem;
+    border-radius: 11px;
+    border: 1px dashed var(--fwmb-accent-secondary);
+    color: var(--fwmb-text-primary);
+    font: 400 0.6875rem/1 var(--fwmb-font-ui);
+}
+
+/* Scale: one slider for every map type. Stops marked (a stop too close to its neighbour keeps a
+   short tick and no label), the recommended stop flagged by a small triangle in the success colour,
+   a number field (five characters and the ×; steps of 0.05) beside it, the ground units read out
+   below. The track is inset by half a label's width so the end labels stay inside the column. On
+   touch the track is taller: the mark above the thumb, the labels below it, steppers beside the
+   field. */
+.fwmb-scale {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.fwmb-scale-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-scale-track {
+    position: relative;
+    flex: 1;
+    height: 2.25rem;
+    margin-inline: 1rem;
+}
+.fwmb-scale-track::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0.625rem;
+    height: 0.3125rem;
+    border-radius: 3px;
+    background: var(--fwmb-range-track);
+}
+.fwmb-scale-fill {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.625rem;
+    height: 0.3125rem;
+    width: var(--pos);
+    border-radius: 3px;
+    background: var(--fwmb-range-fill);
+}
+.fwmb-scale-thumb {
+    position: absolute;
+    top: 0.25rem;
+    left: var(--pos);
+    width: 1.0625rem;
+    height: 1.0625rem;
+    margin-left: -0.53rem;
+    border-radius: 50%;
+    background: var(--fwmb-bg-panel);
+    border: 2px solid var(--fwmb-range-fill);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.fwmb-scale-track:focus-visible .fwmb-scale-thumb {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-scale-stop {
+    position: absolute;
+    top: 0.5rem;
+    width: 1px;
+    height: 0.5625rem;
+    background: var(--fwmb-border-strong);
+}
+.fwmb-scale-stop span {
+    position: absolute;
+    top: 0.8125rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--fwmb-text-muted);
+    font: 500 0.6875rem/1 var(--fwmb-font-readout);
+    white-space: nowrap;
+}
+.fwmb-scale-stop--minor {
+    height: 0.375rem;
+    top: 0.5625rem;
+}
+.fwmb-scale-rec,
+.fwmb-scale-rec-key {
+    position: absolute;
+    top: -1px;
+    width: 0;
+    height: 0;
+    margin-left: -0.3125rem;
+    border-left: 0.3125rem solid transparent;
+    border-right: 0.3125rem solid transparent;
+    border-top: 0.4375rem solid var(--fwmb-color-success);
+}
+.fwmb-scale-rec-key {
+    position: relative;
+    display: inline-block;
+    top: 0;
+    margin: 0 0.375rem 0 0;
+    vertical-align: 1px;
+}
+.fwmb-scale-row .fwmb-input {
+    flex: none;
+    width: 3.75rem;
+    min-width: 0;
+    justify-content: flex-end;
+    padding: 0 0.375rem;
+    font: 500 0.8125rem/1 var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-scale-read {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+.fwmb-scale-read b {
+    font: 600 1rem/1.25rem var(--fwmb-font-readout);
+}
+.fwmb-scale-read span {
+    color: var(--fwmb-text-secondary);
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+}
+
+/* The result line, and Too large in its place when the choice goes past what the client can draw
+   (MAX_SIDE, MAX_PIXELS, the graphics card's texture limit): it names the limit in plain words and
+   offers the nearest fits as full-width buttons whose text wraps (a bold lead, a detail line).
+   Export waits. */
+.fwmb-result {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-result .fwmb-k {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-result b {
+    font: 600 0.9375rem/1.25rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-result-note {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-toolarge {
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-color-warning);
+    background: var(--fwmb-bg-base);
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-toolarge p {
+    margin: 0;
+}
+.fwmb-toolarge p b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-toolarge-fits {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-toolarge-fits .fwmb-btn {
+    width: 100%;
+    height: auto;
+    min-height: 2.75rem;
+    padding: 0.375rem 0.625rem;
+    align-items: flex-start;
+    justify-content: flex-start;
+    white-space: normal;
+    text-align: start;
+}
+.fwmb-toolarge-fits .fwmb-btn > .fwmb-icon {
+    margin-top: 0.125rem;
+}
+.fwmb-fit-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    font-weight: 400;
+    line-height: 1rem;
+}
+.fwmb-fit-text b {
+    font-weight: 700;
+}
+.fwmb-fit-text span {
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+}
+
+/* Image format and quality: choice rows (as choice cards, the chosen one in the secondary accent)
+   with each format's estimated size at the end; "too large" in place of a size while the choice
+   does not fit */
+.fwmb-formats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-format {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.875rem;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-subtle);
+    background: var(--fwmb-bg-raised);
+    cursor: pointer;
+}
+.fwmb-format[aria-checked="true"] {
+    border-color: var(--fwmb-accent-secondary);
+    background: var(--fwmb-bg-selected);
+}
+.fwmb-format[aria-checked="true"] .fwmb-radio {
+    border: 5px solid var(--fwmb-accent-secondary);
+}
+.fwmb-format .fwmb-radio {
+    margin: 0;
+}
+.fwmb-format-size {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-secondary);
+    font: 500 0.75rem/1 var(--fwmb-font-readout);
+    white-space: nowrap;
+}
+.fwmb-format[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* Drawing a large export in tiles: a progress group with Cancel heads the end column, the other
+   settings dim, the preview shows the tiles drawn; Close and keep drawing leaves it running (the
+   file goes to the downloads when done). */
+.fwmb-export-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.fwmb-export-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-export-progress-bar {
+    flex: 1;
+    height: 0.5rem;
+    border-radius: 4px;
+    background: var(--fwmb-range-track);
+    overflow: hidden;
+}
+.fwmb-export-progress-bar i {
+    display: block;
+    height: 100%;
+    width: var(--p);
+    background: var(--fwmb-range-fill);
+}
+.fwmb-export.fwmb-is-drawing .fwmb-group:not(.fwmb-group--keep) {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.fwmb-export-tiles {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    grid-template-rows: repeat(var(--rows), 1fr);
+}
+.fwmb-export-tiles i {
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(10, 10, 10, 0.5);
+}
+.fwmb-export-tiles i.fwmb-is-done {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+.fwmb-export-tiles i.fwmb-is-now {
+    background: color-mix(in srgb, var(--fwmb-overlay-accent-secondary) 35%, transparent);
+    border-color: var(--fwmb-overlay-accent-secondary);
+}
+
+/* The report sheet in the end column (L-surface's): the map part follows the area and the scale;
+   the parent map inset and the information block keep their size, beside a tall or square area and
+   below a wide one. */
+.fwmb-report-sheet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+    gap: 0.375rem;
+    padding: 0.375rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-main);
+    background: #f4f1ea;
+}
+.fwmb-report-sheet--below {
+    grid-template-columns: minmax(0, 1fr);
+}
+.fwmb-report-map {
+    position: relative;
+    aspect-ratio: var(--ar, 1.333);
+    overflow: hidden;
+    border: 1px solid #b9b2a3;
+}
+.fwmb-report-map img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-report-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-report-sheet--below .fwmb-report-side {
+    flex-direction: row;
+}
+.fwmb-report-inset {
+    height: 3.5rem;
+    border: 1px solid #b9b2a3;
+    background: center / cover no-repeat;
+}
+.fwmb-report-sheet--below .fwmb-report-inset {
+    width: 5rem;
+    height: 3.25rem;
+    flex: none;
+}
+.fwmb-report-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid #b9b2a3;
+}
+.fwmb-report-lines i {
+    display: block;
+    height: 0.3125rem;
+    border-radius: 2px;
+    background: #c9c2b2;
+}
+.fwmb-report-lines i:first-of-type {
+    width: 70%;
+    background: #8a8170;
+}
+.fwmb-report-cap {
+    color: #4a453b;
+    font: 600 0.625rem/0.75rem var(--fwmb-font-ui);
+}
+
+/* Exporting again to a scene made with a different area or scale: a warning, with the scene's own
+   choices offered rather than preselected */
+.fwmb-scene-warn {
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-color-warning);
+    background: var(--fwmb-bg-base);
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-scene-warn b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-scene-warn .fwmb-row {
+    justify-content: flex-end;
+}
+
+/* The settlement map's framings (L-surface's). Town view and Hinterland view are framing buttons in
+   the settlement bar, not a switch: each moves the camera; one is pressed (the selected surface and
+   a bar in the secondary accent, as the current layer: "you are here") while the camera is on its
+   framing, neither after a pan or zoom. */
+.fwmb-framings {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.25rem;
+}
+.fwmb-framing {
+    height: 1.875rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: 700 0.75rem/1 var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fwmb-framing .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--fwmb-accent-main);
+}
+.fwmb-framing:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-framing:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-framing[aria-pressed="true"] {
+    background: var(--fwmb-bg-selected);
+    border-color: var(--fwmb-accent-secondary);
+    box-shadow: inset 0 -3px 0 var(--fwmb-accent-secondary);
+}
+.fwmb-framing[aria-pressed="true"] .fwmb-icon {
+    color: var(--fwmb-accent-secondary);
+}
+
+/* Drawing on screen: a thin line along the canvas's top while a redraw takes longer than about half
+   a second */
+.fwmb-drawline {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    inset-inline-start: 0;
+    height: 0.1875rem;
+    width: var(--p, 40%);
+    background: var(--fwmb-overlay-accent);
+    border-radius: 0 2px 2px 0;
+}
+
+/* v5: touch (a coarse pointer). Targets grow from 1.75rem to 2.75rem where the finger needs it;
+   nothing depends on hover alone: row actions show without it, the households card opens by tap. */
+@media (pointer: coarse) {
+    .fwmb-worldbar {
+        height: 3.5rem;
+    }
+    :is(.fwmb-layers, .fwmb-mode-switch, .fwmb-barbtn, .fwmb-world-menu) {
+        height: 2.75rem;
+    }
+    .fwmb-barbtn--icon {
+        width: 2.75rem;
+    }
+    .fwmb-rail-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+    .fwmb-menu-item {
+        height: 2.75rem;
+    }
+    :is(.fwmb-map-btn, .fwmb-map-menu) {
+        height: 2.5rem;
+        min-width: 2.5rem;
+    }
+    .fwmb-map-btn {
+        width: 2.5rem;
+    }
+    .fwmb-list-item {
+        min-height: 2.75rem;
+    }
+    :is(.fwmb-btn, .fwmb-mode, .fwmb-select, .fwmb-input) {
+        height: 2.5rem;
+    }
+    .fwmb-list-item .fwmb-actions {
+        display: inline-flex;
+    }
+    .fwmb-mode-switch button {
+        padding: 0 1rem;
+    }
+    .fwmb-crop i {
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 4px;
+    }
+    .fwmb-crop i:nth-child(1) {
+        top: -0.6875rem;
+        inset-inline-start: -0.6875rem;
+    }
+    .fwmb-crop i:nth-child(2) {
+        top: -0.6875rem;
+        inset-inline-end: -0.6875rem;
+    }
+    .fwmb-crop i:nth-child(3) {
+        bottom: -0.6875rem;
+        inset-inline-start: -0.6875rem;
+    }
+    .fwmb-crop i:nth-child(4) {
+        bottom: -0.6875rem;
+        inset-inline-end: -0.6875rem;
+    }
+    .fwmb-preset {
+        height: 2.75rem;
+        padding: 0 1rem;
+        border-radius: 22px;
+    }
+    .fwmb-scale-track {
+        height: 3.75rem;
+    }
+    .fwmb-scale-track::before,
+    .fwmb-scale-fill {
+        top: 1.25rem;
+    }
+    .fwmb-scale-thumb {
+        top: 0.5rem;
+        width: 1.75rem;
+        height: 1.75rem;
+        margin-left: -0.875rem;
+    }
+    .fwmb-scale-stop {
+        top: 2.375rem;
+        height: 0.375rem;
+    }
+    .fwmb-scale-stop--minor {
+        height: 0.25rem;
+    }
+    .fwmb-scale-stop span {
+        top: 0.5rem;
+        font-size: 0.75rem;
+    }
+    .fwmb-scale-rec {
+        top: -0.125rem;
+        border-left-width: 0.375rem;
+        border-right-width: 0.375rem;
+        border-top-width: 0.5rem;
+        margin-left: -0.375rem;
+    }
+    .fwmb-scale-row .fwmb-input {
+        width: 4.25rem;
+    }
+    .fwmb-format {
+        min-height: 2.75rem;
+    }
+    .fwmb-framing {
+        height: 2.75rem;
+        padding: 0 1rem;
+    }
+    .fwmb-subbar {
+        height: 3.25rem;
+    }
+    .fwmb-filename .fwmb-input {
+        height: 2.75rem;
+        padding: 0 0.75rem;
     }
 }
 
@@ -2114,7 +4406,7 @@
 :where(.fwmb) button {
     background: var(--fwmb-fill-accent);
     border: none;
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
     border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
     padding: 0;
@@ -2129,7 +4421,7 @@
 
 :where(.fwmb) button:where(:hover) {
     background: var(--fwmb-fill-accent-hover);
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
     box-shadow: none;
 }
 
@@ -2161,8 +4453,8 @@
 /* A toggle or mode button that is on: the theme's fill, as a mode in the context bar */
 .fwmb .fwmb-btn[aria-pressed="true"] {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
 }
 
 /* An icon inside a button follows the button's text colour at the bars' icon size */
@@ -2346,8 +4638,7 @@
 }
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
-.fwmb-checkbox,
-.fwmb-radio {
+.fwmb-checkbox {
     appearance: auto;
     accent-color: var(--fwmb-fill-accent);
     width: var(--fwmb-size-16) !important;
@@ -2360,9 +4651,7 @@
 }
 
 .fwmb-checkbox::before,
-.fwmb-checkbox::after,
-.fwmb-radio::before,
-.fwmb-radio::after {
+.fwmb-checkbox::after {
     content: none;
 }
 
@@ -2940,7 +5229,7 @@
 }
 .fwmb .fwmb-studio[data-fwmb-short="files"] .fwmb-rail-more:has(.fwmb-rail-more-files [aria-current="page"]) > .fwmb-rail-btn {
     background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
 }
 
 /* More is a rail button like the others (the dropdown's own button look does not apply), and its
@@ -2949,7 +5238,7 @@
     width: 2.25rem;
     height: 2.25rem;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: 6px;
     background: transparent;
     color: var(--fwmb-text-secondary);
 }
@@ -2959,10 +5248,12 @@
 }
 .fwmb .fwmb-rail-more > .fwmb-rail-btn[aria-current="page"] {
     background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
+    box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
 }
 .fwmb .fwmb-rail-more .fwmb-dropdown-menu button:is([aria-current="page"], [aria-checked="true"]) {
-    background: var(--fwmb-bg-highlight);
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
     font-weight: 700;
 }
 
@@ -3002,7 +5293,7 @@
 }
 
 .fwmb :is(.fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:is([aria-pressed="true"], [aria-current="page"]) {
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
     background: var(--fwmb-fill-accent);
 }
 
@@ -3171,7 +5462,7 @@
     min-width: var(--fwmb-size-16);
 }
 .fwmb .fwmb-map-btn[aria-pressed="true"] {
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
 }
 .fwmb .fwmb-map-btn[aria-pressed="true"]:hover {
     background: var(--fwmb-fill-accent-hover);
@@ -3321,15 +5612,15 @@
 
 .fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check {
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent-edge);
 }
 
 .fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check::after {
     content: "";
     inline-size: 0.25rem;
     block-size: 0.5rem;
-    border: solid var(--fwmb-text-inverse, #000);
-    border-width: 0 0.125rem 0.125rem 0;
+    border: solid var(--fwmb-text-on-accent);
+    border-width: 0 2px 2px 0;
     transform: translateY(-0.06rem) rotate(45deg);
 }
 
@@ -3342,7 +5633,7 @@
     block-size: 0.375rem;
     border: none;
     border-radius: 50%;
-    background: var(--fwmb-text-inverse, #000);
+    background: var(--fwmb-text-on-accent);
     transform: none;
 }
 
@@ -3406,7 +5697,7 @@
     height: var(--fwmb-range-thumb-size);
     /* The thumb is placed against the track's top edge, so centre it on the track */
     margin-block-start: calc((var(--fwmb-range-track-height) - var(--fwmb-range-thumb-size)) / 2);
-    border: 0.125rem solid var(--fwmb-range-fill);
+    border: 2px solid var(--fwmb-range-fill);
     border-radius: 50%;
     background: var(--fwmb-bg-panel);
 }
@@ -3436,7 +5727,7 @@
     box-sizing: border-box;
     width: var(--fwmb-range-thumb-size);
     height: var(--fwmb-range-thumb-size);
-    border: 0.125rem solid var(--fwmb-range-fill);
+    border: 2px solid var(--fwmb-range-fill);
     border-radius: 50%;
     background: var(--fwmb-bg-panel);
 }
@@ -3951,7 +6242,8 @@
 
 /* A menu row that is chosen (a mode in More, the tool in use in the rail's More) */
 .fwmb .fwmb-dropdown-menu button:is([aria-current="page"], [aria-checked="true"]) {
-    background: var(--fwmb-bg-highlight);
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
     font-weight: 700;
 }
 
@@ -4179,8 +6471,8 @@ input.fwmb-swatch {
    at a glance which item type's checkboxes are showing. */
 .fwmb-legend-action[aria-pressed="true"] {
     background-color: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    border-color: var(--fwmb-fill-accent-edge);
+    color: var(--fwmb-text-on-accent);
 }
 
 /* Greys out and disables a Mass Edit "Select" toggle when a sibling type sharing the same
@@ -4606,7 +6898,7 @@ input.fwmb-swatch {
 .fwmb-route-swatch {
     width: var(--fwmb-size-32);
     border-inline-width: 0;
-    border-block-width: 0.03125rem;
+    border-block-width: 0.5px;
 }
 
 .fwmb .fwmb-name {
@@ -4792,7 +7084,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-overlay-scrim {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: light-dark(rgba(10, 10, 10, 0.45), rgba(0, 0, 0, 0.62));
     z-index: 500;
 }
 
@@ -4828,6 +7120,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     height: fit-content;
 }
 
+/* Modal dialogues stand apart from the studio (v5; Ken, 2026-11-17): a strong edge, a deep two-layer
+   shadow and the darker scrim above; in dark themes a faint light rim as well, since a dark shadow on
+   a dark studio barely shows. light-dark() follows the colour scheme each theme block sets, so the
+   rim comes with every way of choosing a dark theme (Appearance, or Automatic from the host's). */
+.fwmb .fwmb-overlay-modal {
+    border-color: var(--fwmb-border-strong);
+    box-shadow:
+        0 0 0 1px light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.1)),
+        0 4px 12px light-dark(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.5)),
+        0 24px 48px light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.75));
+}
+
 /* Moved or resized: placed by its offset in the studio (left and top, set as it moves) */
 .fwmb .fwmb-overlay-modal.fwmb-overlay-placed {
     inset: auto;
@@ -4840,6 +7144,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    (one placement at every width, rather than lying over the canvas on narrow windows, so it never
    hides the object being inspected) */
 .fwmb .fwmb-overlay-docked {
+    background: var(--fwmb-bg-base);
     position: relative;
     inset: auto;
     order: 10;
@@ -5007,7 +7312,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb .fwmb-inspector .fwmb-overlay-body {
-    gap: 0.75rem;
+    gap: 0.5rem;
+    background: var(--fwmb-bg-base);
 }
 
 .fwmb .fwmb-inspector .fwmb-overlay-body .fwmb-form-group {
@@ -5090,8 +7396,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb .fwmb-icon-picker .fwmb-icon-grid .fwmb-btn[aria-selected="true"] {
-    background: var(--fwmb-bg-highlight);
-    border-color: var(--fwmb-accent-main);
+    background: var(--fwmb-bg-selected);
+    border-color: var(--fwmb-accent-secondary);
 }
 
 /* A label's Bold and Italic, side by side under its font */
@@ -5413,7 +7719,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     white-space: nowrap;
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 62.5rem;
+    border-radius: 1000px;
     padding: var(--fwmb-size-1) var(--fwmb-size-6);
 }
 .fwmb-is-locked .fwmb-rule-chip {
@@ -5435,7 +7741,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     position: relative;
     height: 1.125rem;
     background: var(--fwmb-range-track);
-    border-radius: 62.5rem;
+    border-radius: 1000px;
     border: 1px solid var(--fwmb-border-subtle);
 }
 .fwmb-is-locked .fwmb-rule-track {
@@ -5449,7 +7755,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     background: color-mix(in srgb, var(--fwmb-range-fill) 35%, transparent);
     border-block-start: 1px solid var(--fwmb-range-fill);
     border-block-end: 1px solid var(--fwmb-range-fill);
-    border-radius: 62.5rem;
+    border-radius: 1000px;
 }
 .fwmb-is-locked .fwmb-rule-fill {
     background: color-mix(in srgb, var(--fwmb-text-muted) 20%, transparent);
@@ -5462,7 +7768,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     width: 0.75rem;
     height: 0.75rem;
     background: var(--fwmb-bg-panel);
-    border: 0.125rem solid var(--fwmb-range-fill);
+    border: 2px solid var(--fwmb-range-fill);
     border-radius: 50%;
     transform: translate(-50%, -50%);
     cursor: grab;
@@ -5543,7 +7849,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 .fwmb button.fwmb-rule-step-btn:hover:not(:disabled) {
     background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
+    color: var(--fwmb-text-on-accent);
 }
 .fwmb button.fwmb-rule-step-btn:disabled {
     opacity: 0.35;
@@ -5751,7 +8057,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     flex: none;
     width: var(--fwmb-size-12);
     height: var(--fwmb-size-12);
-    border-radius: var(--fwmb-size-2);
+    border-radius: 2px;
     border: 1px solid var(--fwmb-border-subtle);
 }
 .fwmb-culture-climate-wide {
@@ -5774,7 +8080,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-text-secondary);
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 62.5rem;
+    border-radius: 1000px;
     padding: var(--fwmb-size-1) var(--fwmb-size-4);
     cursor: pointer;
 }

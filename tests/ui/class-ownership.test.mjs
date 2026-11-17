@@ -1,14 +1,19 @@
-// Every class the studio uses is the module's own, and every length in its stylesheets is in rem.
+// Every class the studio uses is the module's own, and every length in its stylesheets follows the
+// length rule.
 //
 // Classes: a class that is not the module's (Foundry's form-group, a bare "active" or "small")
 // lets a host's stylesheet reach into the studio, and looks different in Foundry and on the web.
 // So every class token in the templates, and every class the scripts set, starts with "fwmb-".
 // States are ARIA attributes (aria-pressed, aria-selected, aria-current, disabled) or fwmb-is-*.
 //
-// Lengths: the studio follows the browser's zoom and Foundry's interface scale only if its sizes
-// are rem. The one exception is a 1px hairline and the 2px focus ring (an outline), which should
-// stay crisp at any scale. Pixel values that are map data (a brush size, a line thickness) are
-// numbers handed to the canvas, not CSS, and are not affected.
+// Lengths (Ken, 2026-11-17): text, containers, spacing (margins, padding, gaps), images and
+// positioning are rem, so the studio follows the browser's zoom and Foundry's interface scale;
+// strokes (borders and outlines), shadows and radii are px, so they stay crisp at any scale. The
+// offsets of an absolutely placed element (top, right, bottom, left, inset) may be px where they
+// must be. A 1px length is allowed anywhere (a hairline). A CSS triangle (a shape drawn
+// from transparent borders) is an icon sized with the text, so its borders stay rem. Pixel values that
+// are map data (a brush size, a line thickness) are numbers handed to the canvas, not CSS, and are not
+// affected.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -73,30 +78,55 @@ test("every class the scripts set is the module's own", () => {
     assert.deepEqual(foreign, [], `Classes that are not the module's own:\n${foreign.join("\n")}`);
 });
 
-/** Every px length in a stylesheet's declarations (comments dropped), with its line. A 2px length
- * is allowed in an outline or outline-offset declaration only. */
-function pxLengths(text) {
-    const found = [];
+/** The properties that draw a stroke, a shadow or a corner: their lengths are px. */
+const STROKE = /^(border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-width)?|border-([a-z-]+-)?radius|outline(-offset|-width)?|box-shadow|text-shadow|column-rule(-width)?|text-decoration-thickness|-webkit-text-stroke(-width)?)$/;
+
+/** The offsets of a placed element, which may be px. */
+const OFFSET = /^(top|right|bottom|left|inset(-(block|inline)(-(start|end))?)?)$/;
+
+/** A rule that draws a triangle out of transparent borders. */
+const TRIANGLE = /border[\w-]*\s*:[^;]*transparent/;
+
+/** The classes of a selector's last compound selectors (one per comma-separated part). */
+const lastClasses = (selector) => selector.split(",").flatMap((part) => [...(part.trim().split(/\s+/).pop() ?? "").matchAll(/\.(fwmb-[\w-]+)/g)].map((match) => match[1]));
+
+/**
+ * Every length in a stylesheet that breaks the rule, with its line: a px length outside a stroke,
+ * shadow, radius or placed element's offset (other than 1px), or a rem length in a stroke, shadow
+ * or radius (other than a triangle's borders, and
+ * the borders of a rule restyling a triangle's class).
+ */
+function badLengths(text) {
     const code = text.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
     const lines = code.split("\n");
-    for (const declaration of code.matchAll(/([\w-]+)\s*:\s*([^;{}]+)/g)) {
-        const isOutline = /^outline(-offset)?$/.test(declaration[1]);
-        for (const [, number] of declaration[2].matchAll(/(-?\d*\.?\d+)px\b/g)) {
-            const size = Math.abs(Number(number));
-            if (size === 1 || (isOutline && size === 2)) continue;
-            const line = code.slice(0, declaration.index).split("\n").length;
+    const rules = [...code.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    const triangles = new Set(rules.filter(([, , body]) => TRIANGLE.test(body)).flatMap(([, selector]) => lastClasses(selector)));
+    const found = [];
+    for (const rule of rules) {
+        const [, selector, body] = rule;
+        const triangle = TRIANGLE.test(body) || lastClasses(selector).some((name) => triangles.has(name));
+        const bodyStart = rule.index + selector.length + 1;
+        for (const declaration of body.matchAll(/(?<![\w-])([\w-]+)\s*:\s*([^;{}]+)/g)) {
+            const [, property, value] = declaration;
+            if (property.startsWith("--") || OFFSET.test(property)) continue;
+            const strokeLengths = STROKE.test(property) && !(triangle && property.startsWith("border") && !property.includes("radius"));
+            const bad = strokeLengths
+                ? [...value.matchAll(/(-?\d*\.?\d+)rem\b/g)].filter(([, number]) => Number(number) !== 0)
+                : [...value.matchAll(/(-?\d*\.?\d+)px\b/g)].filter(([, number]) => ![0, 1].includes(Math.abs(Number(number))));
+            if (!bad.length) continue;
+            const line = code.slice(0, bodyStart + declaration.index).split("\n").length;
             found.push(`${line}: ${lines[line - 1].trim()}`);
         }
     }
     return found;
 }
 
-test("the stylesheets size everything in rem, apart from 1px hairlines and the 2px focus ring", () => {
+test("the stylesheets size text and containers in rem, and strokes, shadows and radii in px", () => {
     const found = [];
     for (const file of [...filesIn("styles", /\.css$/), ...filesIn("web", /\.css$/)]) {
-        for (const where of pxLengths(file.text)) found.push(`${file.name}:${where}`);
+        for (const where of badLengths(file.text)) found.push(`${file.name}:${where}`);
     }
-    assert.deepEqual(found, [], `px lengths:\n${found.join("\n")}`);
+    assert.deepEqual(found, [], `Lengths against the rule:\n${found.join("\n")}`);
 });
 
 test("the templates' style attributes size nothing in px", () => {
@@ -111,5 +141,24 @@ test("the templates' style attributes size nothing in px", () => {
 
 test("the checks find what they look for", () => {
     assert.deepEqual(classTokens('fwmb-btn {{#if on}}active{{/if}} fwmb-icon--{{key}}'), ["fwmb-btn", "active", "fwmb-icon--"]);
-    assert.deepEqual(pxLengths("a {\n    width: 8px;\n    border: 1px solid;\n    outline: 2px solid;\n    border: 2px solid;\n}"), ["2: width: 8px;", "5: border: 2px solid;"]);
+    const css = [
+        ".fwmb-a {",
+        "    width: 8px;",
+        "    border: 1px solid;",
+        "    outline: 2px solid;",
+        "    border: 0.125rem solid;",
+        "    border-radius: 6px;",
+        "    height: 1px;",
+        "    box-shadow: 0 0.5rem 1rem #000;",
+        "    top: 4px;",
+        "    padding: 4px;",
+        "}",
+        ".fwmb-t {",
+        "    border-top: 0.375rem solid transparent;",
+        "}",
+        ".fwmb-b .fwmb-t {",
+        "    border-top-width: 0.5rem;",
+        "}",
+    ].join("\n");
+    assert.deepEqual(badLengths(css), ["2: width: 8px;", "5: border: 0.125rem solid;", "8: box-shadow: 0 0.5rem 1rem #000;", "10: padding: 4px;"]);
 });

@@ -1,5 +1,5 @@
 /**
- * The studio's colour theme: light or dark, and the gold or teal hue, chosen in the studio itself
+ * The studio's colour theme: light or dark, and the gold or blue hue, chosen in the studio itself
  * (the rail's Appearance menu, see AppearanceMenu) and kept as the reader's own settings, the same
  * in Foundry and on the web.
  *
@@ -22,6 +22,8 @@ export const THEME_SETTINGS = Object.freeze({ MODE: "themeMode", HUE: "themeHue"
 /** The choices each setting offers, the first being its default. */
 export const THEME_CHOICES = Object.freeze({
     themeMode: Object.freeze(["auto", "light", "dark"]),
+    // The blue hue is stored as "teal", its name until v5 (Appearance shows Blue), so settings
+    // saved before v5 keep their choice without a migration
     themeHue: Object.freeze(["gold", "teal"]),
 });
 

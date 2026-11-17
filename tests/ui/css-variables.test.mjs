@@ -65,7 +65,7 @@ function tokensOf(theme, selectorText) {
     return [...rule[2].matchAll(/(--fwmb-[\w-]+)\s*:/g)].map(([, name]) => name).sort();
 }
 
-test("the theme's light and dark blocks, and its gold and teal blocks, define the same tokens", () => {
+test("the theme's light and dark blocks, and its gold and blue (stored as teal) blocks, define the same tokens", () => {
     const theme = files.find((file) => file.name === "styles/fwmb-theme.css").text;
     assert.deepEqual(tokensOf(theme, '[data-fwmb-theme="light"]'), tokensOf(theme, '[data-fwmb-theme="dark"]'));
     assert.deepEqual(tokensOf(theme, '[data-fwmb-hue="teal"]'), tokensOf(theme, '[data-fwmb-hue="gold"]'));
@@ -119,37 +119,70 @@ function contrast(a, b) {
     return (high + 0.05) / (low + 0.05);
 }
 
-/** The pairs the interface puts together and the contrast each needs (the design system's list). */
+/**
+ * The pairs the interface puts together and the contrast each needs: v5's (the design system's
+ * Contrast card), then v4's that v5 does not already cover, as design/tokens/gen-tokens.py checks
+ * them. v4's white text on the accent fill no longer holds in gold light by design: its fill is a
+ * bright gold that takes dark text (text-on-accent).
+ */
 const CONTRAST_PAIRS = [
-    ["text-primary", "bg-base", 7],
-    ["text-primary", "bg-panel", 7],
-    ["text-secondary", "bg-panel", 4.5],
-    ["text-muted", "bg-panel", 4.5],
-    ["text-muted", "bg-base", 4.5],
-    ["text-primary", "bg-highlight", 4.5],
-    ["accent-main", "bg-panel", 4.5],
-    ["accent-main", "bg-base", 4.5],
-    ["accent-secondary", "bg-panel", 4.5],
-    ["text-inverse", "fill-accent", 4.5],
-    ["text-inverse", "fill-secondary", 4.5],
-    ["text-inverse", "fill-positive", 4.5],
-    ["text-inverse", "fill-caution", 4.5],
-    ["text-inverse", "fill-negative", 4.5],
-    ["color-danger", "bg-panel", 4.5],
-    ["color-warning", "bg-panel", 4.5],
-    ["color-success", "bg-panel", 4.5],
-    ["badge-text", "badge-bg", 4.5],
-    ["border-strong", "bg-panel", 3],
-    ["border-focus", "bg-panel", 3],
-    ["range-fill", "range-track", 3],
-    ["overlay-text", "overlay-bg", 7],
-    ["overlay-muted", "overlay-bg", 4.5],
-    ["overlay-accent", "overlay-bg", 4.5],
-    ["overlay-accent-secondary", "overlay-bg", 4.5],
-    // The canvas surround against a black and a white map border and against the overlays drawn on it
-    ["canvas-surround", "#000000", 3],
-    ["canvas-surround", "#ffffff", 3],
-    ["canvas-surround", "overlay-bg", 3],
+    ["text-primary", "bg-panel", 7], // Primary text on the world bar (panel)
+    ["accent-main", "bg-panel", 3], // World bar icons (accent) on the panel
+    ["text-secondary", "bg-base", 4.5], // Layer names (secondary) on the switcher (base)
+    ["text-primary", "bg-selected", 4.5], // Current layer: primary text on selected
+    ["accent-secondary", "bg-selected", 3], // Current layer: bar and icon (secondary) on selected
+    ["text-on-accent", "fill-accent", 4.5], // Mode switch: text on the accent fill
+    ["fill-accent-edge", "bg-panel", 3], // Accent fill edge on the panel
+    ["text-on-accent", "fill-accent-hover", 4.5], // Accent fill hover: text on it
+    ["color-warning", "bg-panel", 4.5], // Out of date mark (warning) on the panel
+    ["color-warning", "bg-base", 4.5], // Out of date mark on the switcher (base)
+    ["text-secondary", "bg-panel", 4.5], // Older generator mark (secondary) on the panel
+    ["accent-main", "bg-panel", 4.5], // Held mark (accent) on the panel
+    ["color-success", "bg-panel", 4.5], // Up to date mark (success) on the panel
+    ["accent-secondary", "bg-raised", 3], // Unsaved dot (secondary) on raised
+    ["text-primary", "bg-raised", 4.5], // Settlement bar: primary text on raised
+    ["text-muted", "bg-raised", 4.5], // Settlement bar: menu head (muted) on raised
+    ["text-secondary", "bg-panel", 4.5], // Lede (secondary) on the panel
+    ["text-secondary", "bg-base", 4.5], // Go block: secondary text on base
+    ["accent-secondary", "bg-raised", 4.5], // Go button: secondary accent on raised
+    ["accent-secondary-hover", "bg-selected", 4.5], // Go button hover: secondary hover on selected
+    ["text-secondary", "bg-base", 4.5], // Action notice: secondary text on base
+    ["color-warning", "bg-base", 3], // Action notice: warning icon and edge on base
+    ["text-primary", "bg-highlight", 4.5], // Held banner: primary title on highlight
+    ["text-secondary", "bg-highlight", 4.5], // Held banner: secondary text on highlight
+    ["accent-main", "bg-highlight", 3], // Held banner: accent icon and edge on highlight
+    ["text-muted", "bg-selected", 4.5], // Selected row: muted meta on selected
+    ["accent-secondary", "bg-selected", 4.5], // Selected row: secondary accent on selected
+    ["accent-secondary", "bg-panel", 4.5], // Working state text (secondary) on the panel
+    ["text-muted", "bg-panel", 4.5], // Card meta (muted) on the panel
+    ["text-primary", "bg-raised", 4.5], // Chips: primary text on raised
+    ["text-muted", "bg-base", 4.5], // Stats: muted label on base
+    ["text-muted", "bg-panel", 4.5], // Households card: muted key on the panel
+    ["text-secondary", "bg-raised", 4.5], // Tags: secondary text on raised (header)
+    ["color-danger", "bg-raised", 4.5], // Delete: danger text on raised
+    ["text-inverse", "fill-negative", 4.5], // Delete hover: white on negative fill
+    ["text-inverse", "fill-secondary", 4.5], // Reserved badge: white on secondary fill
+    ["border-strong", "bg-panel", 3], // Swatch ring (strong border) on the panel
+    ["overlay-accent-secondary", "overlay-control", 3], // Open map menu (overlay secondary) on overlay control
+    ["overlay-accent-secondary", "overlay-bg", 4.5], // Overlay secondary text on overlay
+    ["overlay-accent", "overlay-control", 3], // Partial dot (overlay accent) on overlay control
+    ["text-on-accent", "fill-accent", 4.5], // Map button pressed: icon on the accent fill
+    ["text-primary", "bg-base", 7], // Primary text on base
+    ["text-muted", "bg-panel", 4.5], // Muted text on the panel
+    ["accent-main", "bg-base", 4.5], // Accent text on base
+    ["accent-secondary", "bg-panel", 4.5], // Secondary accent on the panel
+    ["text-inverse", "fill-positive", 4.5], // White on the positive fill
+    ["text-inverse", "fill-caution", 4.5], // White on the caution fill
+    ["color-danger", "bg-panel", 4.5], // Danger text on the panel
+    ["badge-text", "badge-bg", 4.5], // Badge text on badge
+    ["border-focus", "bg-panel", 3], // Focus ring on the panel
+    ["range-fill", "range-track", 3], // Range fill on its track
+    ["overlay-text", "overlay-bg", 7], // Overlay text on overlay
+    ["overlay-muted", "overlay-bg", 4.5], // Overlay muted on overlay
+    ["overlay-accent", "overlay-bg", 4.5], // Overlay accent on overlay
+    ["canvas-surround", "#000000", 3], // Canvas surround against a black border
+    ["canvas-surround", "#ffffff", 3], // Canvas surround against a white border
+    ["canvas-surround", "overlay-bg", 3], // Canvas surround against the overlays
 ];
 
 test("every colour pair passes its WCAG AA contrast in all four themes", () => {
