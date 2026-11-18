@@ -1,8 +1,10 @@
 /**
  * Saved maps in Foundry: each map is a JournalEntry in the world compendium, holding the map data
- * (and each level's encoded owner array) in its flags, plus a readable summary page. This is the
- * Foundry implementation of the platform's `store` service (see ../index.js); the shared code
- * reaches it as `platform.store`.
+ * (and each level's encoded owner array) in its flags, plus a readable summary page. From v5 a
+ * map's journal also keeps its world record fields (its world, map type, revision and the time of
+ * its last changed save) in a flag of their own, and each world is a JournalEntry in a second
+ * compendium, its record in its flags (see Worlds). This is the Foundry implementation of the
+ * platform's `store` service (see ../index.js); the shared code reaches it as `platform.store`.
  */
 import { FILRODENSWMB } from "../../config.js";
 import { ColorMath } from "../../kernel/util/ColorMath.js";
@@ -25,23 +27,20 @@ const GRID_LABELS = Object.freeze({
     hexC: "FILRODENSWMB.UI.GridHexCols",
 });
 
+/** A compendium of the world, made when it does not exist yet. */
+async function ensurePack(name, label) {
+    const pack = game.packs.get(`world.${name}`);
+    if (pack) return pack;
+    console.log(`FWMB | Initializing the ${name} compendium...`);
+    return foundry.documents.collections.CompendiumCollection.createCompendium({ type: "JournalEntry", label, name, package: "world" });
+}
+
 /**
- * Ensures the world compendium exists, creating it natively if it does not.
+ * Ensures the maps compendium and the worlds compendium exist, creating them natively if they do not.
  */
 export async function initializeCompendium() {
-    const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
-    let pack = game.packs.get(packName);
-
-    if (!pack) {
-        console.log("FWMB | Initializing Map Compendium...");
-        pack = await foundry.documents.collections.CompendiumCollection.createCompendium({
-            type: "JournalEntry",
-            label: FILRODENSWMB.COMPENDIUM.LABEL,
-            name: FILRODENSWMB.COMPENDIUM.NAME,
-            package: "world",
-        });
-    }
-
+    const pack = await ensurePack(FILRODENSWMB.COMPENDIUM.NAME, FILRODENSWMB.COMPENDIUM.LABEL);
+    await ensurePack(FILRODENSWMB.COMPENDIUM.WORLDS_NAME, FILRODENSWMB.COMPENDIUM.WORLDS_LABEL);
     return pack;
 }
 
@@ -218,25 +217,38 @@ function getJournalColors(payload) {
 const MAP_DATA_PATH = `flags.${FILRODENSWMB.ID}.mapData`;
 const OWNERS_PATH = `flags.${FILRODENSWMB.ID}.owners`;
 const MODEL_RUN_PATH = `flags.${FILRODENSWMB.ID}.modelRun`;
+/** The flag path of a map's world record fields (v5), and of a world journal's record. */
+const META_PATH = `flags.${FILRODENSWMB.ID}.meta`;
+const WORLD_PATH = `flags.${FILRODENSWMB.ID}.world`;
 
 /**
- * `next` with every key of `stored` that `next` no longer has marked for deletion.
+ * `next` with every key of `stored` that `next` no longer has marked for deletion, at every depth.
  *
- * Foundry merges an object written to a flag into the one already there, so a key left out of a
- * save would otherwise survive it: the region layers of a map migrated to layer sets, or the owner
- * array of a deleted level. A key whose value is a ForcedDeletion operator is removed instead (the
- * replacement for the older "-=key" syntax, which Foundry now reports as deprecated).
+ * Foundry merges an object written to a flag into the one already there, all the way down, so a
+ * key left out of a save would otherwise survive it: the region layers of a map migrated to layer
+ * sets, the owner array of a deleted level, or (from v5) the world's settings a map's data no
+ * longer holds, some of them nested (`params.globalTemp`, `generatorSettings.ages`). A key whose
+ * value is a ForcedDeletion operator is removed instead (the replacement for the older "-=key"
+ * syntax, which Foundry now reports as deprecated). Where both hold a plain object under a key, the
+ * two are compared the same way; arrays, and everything else, are written as they are.
  *
  * @param {object|undefined} stored - What the flag holds now.
  * @param {object} next - What it should hold.
- * @returns {object} A shallow copy of `next` with the deletions added.
+ * @param {() => object} [deletion] - Makes a deletion operator (Foundry's by default).
+ * @returns {object} A copy of `next`'s objects with the deletions added.
  */
-function withStaleKeysDeleted(stored, next) {
+export function withStaleKeysDeleted(stored, next, deletion = () => new foundry.data.operators.ForcedDeletion()) {
     const update = { ...next };
     for (const key of Object.keys(stored ?? {})) {
-        if (!(key in next)) update[key] = new foundry.data.operators.ForcedDeletion();
+        if (!(key in next)) update[key] = deletion();
+        else if (isPlainObject(stored[key]) && isPlainObject(next[key])) update[key] = withStaleKeysDeleted(stored[key], next[key], deletion);
     }
     return update;
+}
+
+/** An object written as a flag's nested fields: not an array, a null or an operator. */
+function isPlainObject(value) {
+    return !!value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 }
 
 /**
@@ -254,15 +266,20 @@ function withStaleKeysDeleted(stored, next) {
  * @param {object|null} [options.modelRun] - The generator's saved outputs (see ModelRun), under
  *     their own flag key so the map list never reads them; left out keeps what is stored, null
  *     removes it.
+ * @param {object|null} [options.meta] - The map's world record fields (see Worlds); null keeps
+ *     those stored.
+ * @param {object|null} [options.summary] - The data the summary page is drawn from, when it is
+ *     not the map data itself (a v5 map's data no longer holds its world's settings, which the
+ *     page shows: the caller passes the two merged).
  */
-export async function saveMapData(mapName, mapDataPayload, existingId = null, { owners = null, modelRun = undefined } = {}) {
+export async function saveMapData(mapName, mapDataPayload, existingId = null, { owners = null, modelRun = undefined, meta = null, summary = null } = {}) {
     if (!mapDataPayload) return null;
 
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
     const pack = game.packs.get(packName);
     if (!pack) return null;
 
-    const cleanPayload = foundry.utils.deepClone(mapDataPayload);
+    const cleanPayload = foundry.utils.deepClone(summary ?? mapDataPayload);
     Object.assign(cleanPayload, buildJournalContext(cleanPayload));
 
     const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/world/journal-summary.hbs", cleanPayload);
@@ -292,6 +309,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
                 pages: pages,
             };
             if (owners) update[OWNERS_PATH] = withStaleKeysDeleted(stored.owners, owners);
+            if (meta) update[META_PATH] = withStaleKeysDeleted(stored.meta, meta);
             if (modelRun) update[MODEL_RUN_PATH] = withStaleKeysDeleted(stored.modelRun, modelRun);
             else if (modelRun === null && stored.modelRun) update[MODEL_RUN_PATH] = new foundry.data.operators.ForcedDeletion();
             await doc.update(update);
@@ -306,6 +324,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
     };
     if (owners) data[OWNERS_PATH] = owners;
     if (modelRun) data[MODEL_RUN_PATH] = modelRun;
+    if (meta) data[META_PATH] = meta;
     return await JournalEntry.create(data, { pack: pack.collection });
 }
 
@@ -415,7 +434,10 @@ export async function listMapData() {
     if (!pack) return [];
 
     const documents = await pack.getDocuments();
-    return documents.map((doc) => ({ id: doc.id, name: doc.name, mapData: doc.flags?.[FILRODENSWMB.ID]?.mapData ?? null }));
+    return documents.map((doc) => {
+        const flags = doc.flags?.[FILRODENSWMB.ID];
+        return { id: doc.id, name: doc.name, mapData: flags?.mapData ?? null, meta: flags?.meta ?? null, hasModelRun: !!flags?.modelRun };
+    });
 }
 
 /**
@@ -430,3 +452,145 @@ export async function loadMapData(documentId) {
 
     return document?.flags?.[FILRODENSWMB.ID]?.mapData || null;
 }
+
+// ------------------------------------------------------------------ v5: a map's world fields
+
+const mapsPack = () => game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+const worldsPack = () => game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.WORLDS_NAME}`);
+
+/** A map's world record fields (see Worlds), or null for a map saved before v5. */
+export async function loadMapMeta(documentId) {
+    const document = await mapsPack()?.getDocument(documentId);
+    const meta = document?.flags?.[FILRODENSWMB.ID]?.meta;
+    return meta ? foundry.utils.deepClone(meta) : null;
+}
+
+/** Writes a map's world record fields, leaving its data and summary as they were saved. */
+export async function saveMapMeta(documentId, meta) {
+    const document = await mapsPack()?.getDocument(documentId);
+    if (!document) return false;
+    await document.update({ [META_PATH]: withStaleKeysDeleted(document.flags?.[FILRODENSWMB.ID]?.meta, meta) });
+    return true;
+}
+
+/** Every saved map's id, name and world fields, from the compendium's index (without its data). */
+export async function listMaps() {
+    const pack = mapsPack();
+    if (!pack) return [];
+    const index = await pack.getIndex({ fields: [META_PATH] });
+    return [...index].map((entry) => ({ id: entry._id, name: entry.name || "", meta: entry.flags?.[FILRODENSWMB.ID]?.meta ?? null }));
+}
+
+// ------------------------------------------------------------------ v5: the world records
+
+/** A world journal's record, with its id (the journal's). */
+const worldOf = (document) => {
+    const record = document?.flags?.[FILRODENSWMB.ID]?.world;
+    return record ? { ...foundry.utils.deepClone(record), id: document.id, name: document.name } : null;
+};
+
+/** Every world record (see Worlds). */
+export async function listWorlds() {
+    const pack = worldsPack();
+    if (!pack) return [];
+    return (await pack.getDocuments()).map(worldOf).filter(Boolean);
+}
+
+export async function loadWorld(id) {
+    return worldOf(await worldsPack()?.getDocument(id));
+}
+
+/**
+ * Saves a world record. A record whose journal exists is written over it; a new one is made with
+ * the record's id (see Worlds.newWorldId), so the maps that name it find it.
+ */
+export async function saveWorld(record) {
+    const pack = worldsPack();
+    if (!pack || !record?.id) return null;
+    const { id, name, ...rest } = record;
+    const document = await pack.getDocument(id);
+    const page = { name: game.i18n.localize("FILRODENSWMB.JOURNAL.WorldTitle"), type: "text", text: { content: await worldSummary(record, pack), format: 1 } };
+    if (document) {
+        // The summary page is written over, as a map journal's is
+        const existingPage = document.pages.contents[0];
+        if (existingPage) page._id = existingPage.id;
+        await document.update({ name, [WORLD_PATH]: withStaleKeysDeleted(document.flags?.[FILRODENSWMB.ID]?.world, rest), pages: [page] });
+        return { id, name };
+    }
+    await JournalEntry.create({ _id: id, name, [WORLD_PATH]: rest, pages: [page] }, { pack: pack.collection, keepId: true });
+    return { id, name };
+}
+
+/** The map types' names on a world's page. */
+const MAP_TYPE_LABELS = Object.freeze({ surface: "FILRODENSWMB.JOURNAL.WorldMapSurface" });
+
+/**
+ * A world journal's readable page (templates/world/world-summary.hbs): its maps, the world it was
+ * cut from, World setup and, unless it is held, a summary of the settings its maps share.
+ * @param {object} record - The world record being saved.
+ * @param {object} pack - The worlds compendium.
+ */
+async function worldSummary(record, pack) {
+    const nameOf = async (worldId) => (worldId ? ((await pack.getDocument(worldId))?.name ?? null) : null);
+    // The world a held world's settings come from: the first above it that is not held
+    let source = record;
+    for (let depth = 0; source?.held && source.parentWorldId && depth < MAX_CHAIN; depth++) {
+        const parent = await pack.getDocument(source.parentWorldId);
+        if (!parent) break;
+        source = { id: parent.id, name: parent.name, ...(parent.flags?.[FILRODENSWMB.ID]?.world ?? {}) };
+    }
+    const settings = record.settings ?? {};
+    const count = (list) => (Array.isArray(list) ? list.length : 0);
+    const savedAt = record.settingsSavedAt ? new Date(record.settingsSavedAt) : null;
+    const context = {
+        maps: (record.maps ?? []).map((map) => ({ label: MAP_TYPE_LABELS[map.type] ?? map.type })),
+        held: record.held === true,
+        parentName: await nameOf(record.parentWorldId),
+        sourceName: source?.name ?? "",
+        settingsRevision: record.settingsRevision ?? 1,
+        savedAt: savedAt && !Number.isNaN(savedAt.getTime()) ? savedAt.toLocaleString(game.i18n.lang) : null,
+        setup: settings.setup ?? {},
+        engineLabel: TerrainVersion.ENGINE_NAMES[settings.setup?.engine] ?? null,
+        areaFactor: settings.setup?.areaFactor ?? 1,
+        cultures: (settings.cultures?.list ?? []).map((culture) => culture?.name).filter(Boolean),
+        ages: count(settings.ages?.list),
+        nameStyle: settings.nameStyle?.nameBase ?? "",
+        styles: { pin: count(settings.styles?.pin), route: count(settings.styles?.route), label: count(settings.styles?.label), region: count(settings.styles?.region) },
+        icons: { custom: count(settings.icons?.custom), hidden: count(settings.icons?.disabled) },
+        biomes: count(settings.biomes?.custom),
+        climate: settings.climate ?? {},
+    };
+    return foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/world/world-summary.hbs", context);
+}
+
+/** How far up a chain of held worlds a page looks for the world its settings come from. */
+const MAX_CHAIN = 32;
+
+export async function deleteWorld(id) {
+    const document = await worldsPack()?.getDocument(id);
+    if (!document) return false;
+    await document.delete();
+    return true;
+}
+
+/**
+ * Writes a file into the world's data (a backup made before migrating, say), in a folder of the
+ * module's, and returns its path.
+ * @param {string} folderName - The folder, under the world's data.
+ * @param {string} fileName
+ * @param {Uint8Array} bytes
+ * @param {string} type - Its MIME type.
+ */
+export async function keepWorldFile(folderName, fileName, bytes, type) {
+    const filePicker = foundry.applications.apps.FilePicker.implementation;
+    const folder = `worlds/${game.world.id}/${folderName}`;
+    try {
+        await filePicker.browse("data", folder);
+    } catch {
+        await filePicker.createDirectory("data", folder);
+    }
+    const response = await filePicker.upload("data", folder, new File([bytes], fileName, { type }), {}, { notify: false });
+    if (!response?.path) throw new Error(`The upload of ${fileName} to ${folder} failed.`);
+    return response.path;
+}
+

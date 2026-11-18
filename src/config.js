@@ -1520,6 +1520,10 @@ export const FILRODENSWMB = {
     COMPENDIUM: {
         NAME: "fwmb-maps",
         LABEL: "Filroden's World Map Builder",
+        // v5's world records (see Worlds), in a compendium of their own so that 4.3, reading the
+        // maps compendium, still finds only maps there
+        WORLDS_NAME: "fwmb-worlds",
+        WORLDS_LABEL: "Filroden's World Map Builder: worlds",
     },
     INFRASTRUCTURE_ICONS: {
         anchor: "FILRODENSWMB.ICONS.Anchor",

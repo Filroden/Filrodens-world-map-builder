@@ -52,6 +52,28 @@ export class Shell {
     #entry;
 
     /**
+     * Runs what each studio prepares before any studio opens (the World studio makes saved maps
+     * into worlds, for one), in the order the studios are given. A studio whose preparation fails
+     * is reported and the others still run, so the studio can still open.
+     *
+     * @param {Array<{definition: object, prepare?: Function}>} studios
+     * @returns {Promise<Array<*>>} Each studio's result (null for one with nothing to prepare, or
+     *     one whose preparation failed).
+     */
+    static async prepare(studios) {
+        const results = [];
+        for (const studio of studios) {
+            try {
+                results.push(studio.prepare ? await studio.prepare() : null);
+            } catch (error) {
+                console.error(`FWMB | Preparing the ${studio.definition?.id} studio failed:`, error);
+                results.push(null);
+            }
+        }
+        return results;
+    }
+
+    /**
      * Gives an element the reading direction of the host's language: right to left for the
      * languages that read so, the element marked for the stylesheets as well (fwmb-rtl). The hosts
      * call it on their frame, so its own controls (a window's header) follow the studio's direction.

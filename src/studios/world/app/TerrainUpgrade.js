@@ -4,6 +4,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { platform } from "../../../platform/index.js";
+import { WorldMaps } from "../data/WorldMaps.js";
 
 /**
  * Offers a map built with an older revision of the terrain generation rules the chance to be
@@ -50,7 +51,7 @@ export class TerrainUpgrade {
             if (known) return known;
             if (!current.parentId) return null;
 
-            current = await platform.store.loadMapData(current.parentId);
+            current = await WorldMaps.payload(current.parentId);
             if (!current) return null;
         }
 

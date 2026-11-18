@@ -5,6 +5,8 @@ import { registerPinIconSettings } from "./src/kernel/data/pinIcons.js";
 import { registerExportFormatSettings } from "./src/kernel/export/ImageFormat.js";
 import { attachTheme, registerThemeSettings } from "./src/shell/Theme.js";
 import { registerModuleHelpers } from "./src/shell/templateHelpers.js";
+import { Shell } from "./src/shell/Shell.js";
+import { STUDIOS } from "./src/studios/index.js";
 
 Hooks.once("init", async () => {
     game.filrodenswmb = {
@@ -28,6 +30,7 @@ Hooks.once("init", async () => {
         // studio's regions, the tools' panels, and the panel and bar parts
         "modules/filrodens-world-map-builder/templates/shell/context.hbs",
         "modules/filrodens-world-map-builder/templates/world/journal-summary.hbs",
+        "modules/filrodens-world-map-builder/templates/world/world-summary.hbs",
         "modules/filrodens-world-map-builder/templates/world/map.hbs",
         "modules/filrodens-world-map-builder/templates/shell/studio.hbs",
         "modules/filrodens-world-map-builder/templates/shell/toolbar.hbs",
@@ -132,4 +135,6 @@ Hooks.once("init", async () => {
 
 Hooks.once("ready", async () => {
     await initializeCompendium();
+    // Only the GM writes the compendiums: the studios prepare (saved maps made into worlds) for them
+    if (game.user.isGM) await Shell.prepare(STUDIOS);
 });

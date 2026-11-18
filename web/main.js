@@ -128,6 +128,8 @@ async function start() {
     Shell.applyTextDirection(frame);
     new WebTooltips(frame);
 
+    // Saved maps made into worlds, and the like, before any studio opens
+    await Shell.prepare(STUDIOS);
     const shell = new Shell({ studios: STUDIOS });
     shell.mount(frame.querySelector(".fwmb-studio"));
     if (!persistent) platform.notify.warn(platform.i18n.localize("FILRODENSWMB.Web.StorageUnavailable"), { permanent: true });

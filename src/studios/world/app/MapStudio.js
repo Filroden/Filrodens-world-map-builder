@@ -21,7 +21,7 @@ import { ColorMath } from "../../../kernel/util/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { bindDropdownMenus, positionPopoverMenu } from "../../../shell/dropdowns.js";
-import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../../../kernel/data/pinIcons.js";
+import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons, usePinIcons, currentPinIcons } from "../../../kernel/data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
@@ -101,6 +101,11 @@ import { DrawnDecoration } from "../../../kernel/decorations/DrawnDecoration.js"
 import { ExportScale } from "../../../kernel/export/ExportScale.js";
 import { ImageFormat } from "../../../kernel/export/ImageFormat.js";
 import { WORLD_DEFINITION } from "../definition.js";
+import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
+import { WorldSettings } from "../data/WorldSettings.js";
+import { WorldMaps } from "../data/WorldMaps.js";
+import { WorldMigration } from "../data/WorldMigration.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -581,6 +586,13 @@ export class MapStudio {
         this.currentSaveId = null;
         this.currentSaveName = null;
         this.currentParentId = null;
+        // The open map's world record as last saved (v5; see Worlds), or null for a world not saved
+        // yet; and its settings as they stood once the map had loaded (with the defaults a load
+        // fills in), which a save compares to say whether they changed (see #worldSettingsNow)
+        this.world = null;
+        this.worldSettingsOpened = null;
+        // A new world's pin icons: the built-ins only, until a saved world is opened
+        this.#useWorldIcons(WorldRecord.emptyIcons());
 
         // What updating the open map to the current terrain rules would change, or null if it is
         // already current or would not change (see TerrainUpgrade). Drives the Update Map button.
@@ -725,6 +737,29 @@ export class MapStudio {
         this.#showTitle();
         // A cartouche showing the map's name follows it
         this.canvasEngine?.setMapName?.(name);
+    }
+
+    /**
+     * Makes a world's pin icons the ones the pickers and drawing read (see usePinIcons): a change to
+     * them is a change to the world, so the map is marked unsaved.
+     * @param {{custom: object[], disabled: string[]}} icons
+     */
+    #useWorldIcons(icons) {
+        usePinIcons(structuredClone(icons ?? WorldRecord.emptyIcons()), () => {
+            this.isDirty = true;
+        });
+    }
+
+    /**
+     * The saved maps that read the open world's pin icons (its own and its held regional worlds'),
+     * or, for a world not saved yet, none: what removing a custom icon reverts (see pinIcons).
+     * @returns {Promise<Set<string>>}
+     */
+    async _mapsReadingWorldIcons() {
+        if (!this.world) return new Set();
+        const worlds = await Worlds.all();
+        const source = WorldRecord.settingsSource(worlds.get(this.world.id) ?? this.world, (id) => worlds.get(id) ?? null);
+        return WorldMaps.readingSettingsOf(source.id);
     }
 
     /** Whether the open map has changes that are not saved. */
@@ -1358,7 +1393,7 @@ export class MapStudio {
             }
 
             if (this.activeTool === "manage") {
-                context.savedMaps = MapStudio.#namedMaps(await platform.store.getSavedMaps());
+                context.savedMaps = MapStudio.#namedMaps(MapStudio.#worldRows(await Worlds.tree()));
             }
         }
 
@@ -4687,13 +4722,12 @@ export class MapStudio {
             await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
-            const { payload, owners, modelRun } = this._buildSavePayload();
-            const journal = await platform.store.saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners, modelRun });
+            const saved = await this.#saveWorld(createsNewMap, asNew);
 
-            if (journal) {
-                this.currentSaveId = journal.id;
+            if (saved) {
+                this.currentSaveId = saved.mapId;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
-                platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
+                platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: saved.name }));
                 // A new saved map also belongs in the saved maps list, if it is showing
                 this.view?.render(createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"]);
                 return true;
@@ -4704,6 +4738,43 @@ export class MapStudio {
         } finally {
             this.#endProcessing();
         }
+    }
+
+    /**
+     * Writes the open world (see Worlds.save): the map's own data, and its world's settings split
+     * from it (see WorldSettings) with the world's pin icons. Save world in v5's words: the map's
+     * revision rises when it has changed, the settings' when they have. A held regional world
+     * writes only its own World setup; until its world editors are read only (S0 step 5), any
+     * other setting changed on it is not kept.
+     *
+     * @param {boolean} createsNewMap - Whether the map is saved as a new one.
+     * @param {boolean} asNew - Whether this is Save as (a copy of the open world).
+     * @returns {Promise<{mapId: string, name: string}|null>}
+     */
+    async #saveWorld(createsNewMap, asNew) {
+        // A map saved before v5 that was opened before it had a world (one imported while the
+        // studio was open, say) is given one first, so its save does not make a second map
+        if (!this.world && this.currentSaveId && !createsNewMap) {
+            await WorldMigration.run();
+            this.world = await Worlds.ofMap(this.currentSaveId);
+        }
+        const { payload, owners, modelRun } = this._buildSavePayload();
+        const { settings, mapData } = WorldSettings.split(payload);
+        settings.icons = structuredClone(currentPinIcons() ?? WorldRecord.emptyIcons());
+        const opened = this.worldSettingsOpened;
+        const result = await Worlds.save({
+            world: this.world,
+            name: this.currentSaveName,
+            settings,
+            maps: [{ id: createsNewMap ? null : this.currentSaveId, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun, summary: payload, changed: this.isDirty || createsNewMap }],
+            asNew: asNew && !!this.world,
+            // A held world writes only its own World setup, so only that can change its revision
+            settingsChanged: opened ? WorldRecord.changedGroups(this.world?.held ? { setup: opened.setup } : opened, this.world?.held ? { setup: settings.setup } : settings).length > 0 : undefined,
+        });
+        if (!result) return null;
+        this.world = result.world;
+        this.worldSettingsOpened = settings;
+        return { mapId: result.maps[0].id, name: this.currentSaveName };
     }
 
     /**
@@ -5376,9 +5447,13 @@ export class MapStudio {
         this.activeRiverId = null;
         this.activeLandMaskId = null;
 
-        // 3. Wipe the save memory so the next save forces a "Save As" prompt
+        // 3. Wipe the save memory so the next save forces a "Save As" prompt: a new world, with
+        // the built-in pin icons only
         this.currentSaveId = null;
         this.currentSaveName = null;
+        this.world = null;
+        this.worldSettingsOpened = null;
+        this.#useWorldIcons(WorldRecord.emptyIcons());
 
         // 4. If switching to Guided Mode, auto-activate the drawing tools
         if (newEngine === "guided") {
@@ -5823,6 +5898,9 @@ export class MapStudio {
 
             // 5. Save to database
             const journal = await platform.store.saveMapData(mapName, payload, null, { owners });
+            // Made a regional world under the open world (see WorldMigration); written by the cut
+            // itself, with its full record, from S0 step 5
+            if (journal) await WorldMigration.run();
             if (journal) platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.RegionalMapCreated", { name: journal.name }));
         } catch (err) {
             console.error("FWMB | Regional Map Generation Failed:", err);
@@ -5867,7 +5945,8 @@ export class MapStudio {
 
     /** Restore from backup: maps from a backup zip added as new saved maps (see MapTransfer.restore). */
     async _onRestoreBackup(_event, _target) {
-        const file = await MapStudio.#chooseFile(".zip");
+        // A zip from Back up all, or the JSON the migration to v5 wrote into the world's data
+        const file = await MapStudio.#chooseFile(".zip,.json");
         if (!file) return;
         try {
             if (await MapTransfer.restore(file, this.#processingOverlay())) this.view?.render(["toolbar", "context"]);
@@ -6135,11 +6214,19 @@ export class MapStudio {
         const canLoad = await this.#gateUnsavedChanges();
         if (!canLoad) return;
 
-        const payload = await platform.store.loadMapData(mapId);
-        if (payload) {
+        // The map's data with its world's settings merged in (see WorldMaps)
+        const loaded = await WorldMaps.load(mapId);
+        if (loaded) {
+            const { payload, world, settings } = loaded;
             this.currentSaveId = mapId;
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+            this.world = world;
+            this.worldSettingsOpened = settings;
+            this.#useWorldIcons(settings?.icons ?? WorldMigration.hostIcons());
             await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
+            // The settings as loaded (the defaults a load fills in included): a save that leaves
+            // them so does not raise their revision. Nothing below changes them.
+            this.worldSettingsOpened = this.#worldSettingsNow();
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.view?.render(["toolbar", "context"]);
@@ -6172,6 +6259,13 @@ export class MapStudio {
             // generated climate, and an update applied here must leave the map marked unsaved.
             await this.#offerTerrainUpgrade();
         }
+    }
+
+    /** The open world's settings as a save would write them (see WorldSettings), with its pin icons. */
+    #worldSettingsNow() {
+        const { settings } = WorldSettings.split(this._buildSavePayload().payload);
+        settings.icons = structuredClone(currentPinIcons() ?? WorldRecord.emptyIcons());
+        return settings;
     }
 
     /**
@@ -6230,13 +6324,47 @@ export class MapStudio {
         if (choice.apply) await this.#applyTerrainUpgrade();
     }
 
+    /** The world a saved map belongs to, by its id (null for a map without one). */
+    static async #worldIdOf(mapId) {
+        return (await platform.store.loadMapMeta(mapId))?.worldId ?? null;
+    }
+
+    /**
+     * Deletes a saved world and its maps. Its regional worlds stay, each keeping its own: held ones
+     * move up to its parent when it is held itself, and are otherwise released as worlds of their
+     * own with a copy of the settings they read (see Worlds.delete). The confirmation names them.
+     */
     async #handleMapDelete(mapId) {
-        const confirmed = await MapDialogManager._confirmDialog();
+        const worldId = await MapStudio.#worldIdOf(mapId);
+        const plan = worldId ? await Worlds.deletePlan(worldId) : { movedUp: [], released: [], unlinked: [] };
+        const names = (worlds) => worlds.map((world) => world.name).join(", ");
+        const notes = [];
+        if (plan.released.length) notes.push(platform.i18n.format("FILRODENSWMB.UI.DeleteWorldReleases", { names: names(plan.released) }));
+        if (plan.movedUp.length) notes.push(platform.i18n.format("FILRODENSWMB.UI.DeleteWorldMovesUp", { names: names(plan.movedUp) }));
+        // Plain text: the dialogue escapes it (see MapDialogManager._confirmDialog)
+        const content = notes.length ? [platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm"), ...notes].join(" ") : undefined;
+        const confirmed = await MapDialogManager._confirmDialog(undefined, content);
         if (!confirmed) return;
 
-        await platform.store.deleteSavedMap(mapId);
-        if (this.currentSaveId === mapId) this.currentSaveId = null;
+        if (worldId) await Worlds.delete(worldId);
+        else await platform.store.deleteSavedMap(mapId);
+        if (this.currentSaveId === mapId) {
+            this.currentSaveId = null;
+            this.world = null;
+        } else if (this.world) {
+            // The open world may be one of those moved up or released
+            this.world = (await Worlds.get(this.world.id)) ?? this.world;
+        }
         this.view?.render(["context"]);
+    }
+
+    /**
+     * The saved worlds as the Maps tool lists them until Worlds replaces it (S0 step 3): a row per
+     * world, keyed by its Surface map's id (the row's actions are the map's), its regional worlds
+     * under it.
+     */
+    static #worldRows(tree) {
+        return tree.filter((node) => node.mapId).map((node) => ({ id: node.mapId, worldId: node.id, name: node.name, parentId: node.parentId, held: node.held, children: MapStudio.#worldRows(node.children) }));
     }
 
     /** The saved maps as the Maps tool lists them, a map saved without a name named "Unnamed map". */
@@ -6249,13 +6377,14 @@ export class MapStudio {
         const newName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName);
 
         if (newName && newName !== currentName) {
-            const updatedDoc = await platform.store.renameSavedMap(mapId, newName);
+            // The world and its maps (see Worlds.rename)
+            const worldId = await MapStudio.#worldIdOf(mapId);
+            if (worldId) await Worlds.rename(worldId, newName);
+            else await platform.store.renameSavedMap(mapId, newName);
 
             if (this.currentSaveId === mapId) {
                 this.currentSaveName = newName;
-                if (updatedDoc?.id && updatedDoc.id !== this.currentSaveId) {
-                    this.currentSaveId = updatedDoc.id;
-                }
+                if (this.world) this.world = { ...this.world, name: newName };
             }
             this.view?.render(["context"]);
         }
@@ -6263,7 +6392,11 @@ export class MapStudio {
 
     async #handleMapDuplicate(mapId, card) {
         const name = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        await platform.store.duplicateSavedMap(mapId, platform.i18n.format("FILRODENSWMB.UI.CopyMapName", { name }));
+        const copyName = platform.i18n.format("FILRODENSWMB.UI.CopyMapName", { name });
+        // The world and its maps, not its regional worlds (see Worlds.copy)
+        const worldId = await MapStudio.#worldIdOf(mapId);
+        if (worldId) await Worlds.copy(worldId, copyName);
+        else await platform.store.duplicateSavedMap(mapId, copyName);
         this.view?.render(["context"]);
     }
 
@@ -6274,15 +6407,15 @@ export class MapStudio {
         );
         if (!confirmed) return;
 
-        const exportData = await platform.store.loadMapData(mapId);
-        if (exportData) {
-            delete exportData.parentId;
-
-            const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-            const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
-
-            await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId), modelRun: await platform.store.loadMapModelRun(mapId) });
-
+        // Clone as new: a world of its own, with a copy of the settings it read, no longer held or
+        // cut from its parent (see Worlds.cloneAsNew); its map no longer names the parent's map
+        const worldId = await MapStudio.#worldIdOf(mapId);
+        if (!worldId) return;
+        const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+        const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
+        const clone = await Worlds.cloneAsNew(worldId, newName);
+        if (clone) {
+            for (const map of clone.maps) await platform.store.updateMapDataFields(map.id, { parentId: null });
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess"));
             this.view?.render(["context"]);
         }

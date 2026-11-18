@@ -11,6 +11,12 @@ import { Sanitize } from "./Sanitize.js";
  * Both registries feed the same picker lists used when placing or editing a pin, and the
  * same path resolution used when drawing pins and baking the raster export - see
  * resolvePinIconPath().
+ *
+ * From v5 the custom icons and the hidden built-ins are each world's own, part of its Styles and
+ * icons (`settings.icons` in the world record): the studio hands the open world's to usePinIcons,
+ * and every read and change below goes to them. The host's settings registered here are what 4.3
+ * kept for the whole host; v5 reads them once, to give each migrated world its icons, and uses them
+ * only while no world is open.
  */
 
 /**
@@ -60,9 +66,45 @@ export function registerPinIconSettings() {
 }
 
 /**
- * The built-in icon keys a GM has hidden from the pickers.
+ * The open world's pin icons (v5: the icons are each world's own, a part of its Styles and icons),
+ * `{custom, disabled}`, and what to tell when they change; null until a studio opens a world, when
+ * the host's settings are read and written as before v5 (the migration reads them from there).
+ */
+let worldIcons = null;
+let onWorldIconsChanged = null;
+
+/**
+ * Makes a world's pin icons the ones every picker, label and drawing reads, and the ones the
+ * registry's changes are made to. The object is kept and changed in place; `onChange` is called
+ * after each change (the studio marks the world unsaved).
+ * @param {{custom: object[], disabled: string[]}|null} icons - Null goes back to the host's settings.
+ * @param {(() => void)|null} [onChange]
+ */
+export function usePinIcons(icons, onChange = null) {
+    worldIcons = icons ? { custom: Array.isArray(icons.custom) ? icons.custom : [], disabled: Array.isArray(icons.disabled) ? icons.disabled : [] } : null;
+    onWorldIconsChanged = icons ? onChange : null;
+}
+
+/** The open world's pin icons as `usePinIcons` was given them (changed since), or null. */
+export function currentPinIcons() {
+    return worldIcons;
+}
+
+/** Writes one of the two lists: to the open world's icons, or the host's settings when none is open. */
+async function writeIcons(list, value) {
+    if (worldIcons) {
+        worldIcons[list] = value;
+        onWorldIconsChanged?.();
+        return;
+    }
+    await platform.settings.set(list === "custom" ? FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM : FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, value);
+}
+
+/**
+ * The built-in icon keys hidden from the pickers.
  */
 function getDisabledPinIcons() {
+    if (worldIcons) return worldIcons.disabled;
     return platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED) || [];
 }
 
@@ -72,7 +114,7 @@ function getDisabledPinIcons() {
  * texture loads, so only a data path, an https address or a checked embedded image may reach them.
  */
 function getCustomPinIcons() {
-    const stored = platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM);
+    const stored = worldIcons ? worldIcons.custom : platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM);
     if (!Array.isArray(stored)) return [];
     return stored.filter((entry) => Sanitize.isId(entry?.id) && typeof entry.name === "string" && Sanitize.imageSource(entry.path, { remote: true }) !== null);
 }
@@ -186,7 +228,7 @@ export function resolvePinIconPath(key) {
  */
 export async function addCustomPinIcon({ name, path }) {
     const entry = { id: platform.utils.randomID(), name, path };
-    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, [...getCustomPinIcons(), entry]);
+    await writeIcons("custom", [...getCustomPinIcons(), entry]);
     return entry;
 }
 
@@ -196,7 +238,7 @@ export async function addCustomPinIcon({ name, path }) {
  */
 export async function updateCustomPinIcon(id, { name, path }) {
     const icons = getCustomPinIcons().map((entry) => (entry.id === id ? { ...entry, name, path } : entry));
-    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
+    await writeIcons("custom", icons);
 }
 
 /**
@@ -207,7 +249,7 @@ export async function updateCustomPinIcon(id, { name, path }) {
  */
 export async function removeCustomPinIconEntry(id) {
     const icons = getCustomPinIcons().filter((entry) => entry.id !== id);
-    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
+    await writeIcons("custom", icons);
 }
 
 /**
@@ -221,7 +263,7 @@ export async function setBuiltinPinIconDisabled(key, isDisabled) {
     if (isDisabled) current.add(key);
     else current.delete(key);
 
-    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, [...current]);
+    await writeIcons("disabled", [...current]);
 }
 
 /**
@@ -255,12 +297,12 @@ export function findUnresolvedPinIcons(pins = []) {
  */
 export async function setAllBuiltinPinIconsDisabled(isDisabled) {
     if (!isDisabled) {
-        await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, []);
+        await writeIcons("disabled", []);
         return;
     }
 
     const keys = Object.keys(FILRODENSWMB.INFRASTRUCTURE_ICONS).filter((key) => key !== FILRODENSWMB.PIN_ICONS.DEFAULT);
-    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, keys);
+    await writeIcons("disabled", keys);
 }
 
 /**
@@ -269,12 +311,15 @@ export async function setAllBuiltinPinIconsDisabled(isDisabled) {
  * Studio saves them by.
  * @param {string} key - The icon key to search for.
  * @param {Array} livePins - The currently open session's `app.mapPins`, or [] if none.
+ * @param {Set<string>|null} [mapIds] - The saved maps that read the open world's icons (its own,
+ *     and its held regional worlds'); every saved map when null.
  * @returns {Promise<{savedMaps: Array<{id: string, name: string, count: number}>, liveCount: number, totalCount: number}>}
  */
-export async function findPinIconUsage(key, livePins = []) {
+export async function findPinIconUsage(key, livePins = [], mapIds = null) {
     const savedMaps = [];
 
     for (const { id, name, mapData } of await platform.store.listMapData()) {
+        if (mapIds && !mapIds.has(id)) continue;
         const pins = mapData?.mapPins || [];
         const count = pins.filter((pin) => pin.icon === key).length;
         if (count > 0) savedMaps.push({ id, name, count });
@@ -292,11 +337,13 @@ export async function findPinIconUsage(key, livePins = []) {
  * custom icon's registry entry whenever findPinIconUsage() reports it's in use.
  * @param {string} key - The icon key being removed.
  * @param {Array} livePins - The currently open session's `app.mapPins`, mutated in place.
+ * @param {Set<string>|null} [mapIds] - The saved maps to revert (see findPinIconUsage).
  */
-export async function revertPinIconUsage(key, livePins = []) {
+export async function revertPinIconUsage(key, livePins = [], mapIds = null) {
     const fallback = FILRODENSWMB.PIN_ICONS.DEFAULT;
 
     for (const { id, mapData } of await platform.store.listMapData()) {
+        if (mapIds && !mapIds.has(id)) continue;
         const pins = mapData?.mapPins;
         if (!pins?.some((pin) => pin.icon === key)) continue;
 

@@ -5,8 +5,11 @@ import { MapNames } from "../data/MapNames.js";
 import { MapPackage } from "../data/MapPackage.js";
 import { overLimit } from "../data/MapRules.js";
 import { ImportRefusal, Sanitize } from "../../../kernel/data/Sanitize.js";
-import { addCustomPinIcon, findUnresolvedPinIcons, getCustomPinIconEntries } from "../../../kernel/data/pinIcons.js";
+import { getCustomPinIconEntries } from "../../../kernel/data/pinIcons.js";
 import { platform } from "../../../platform/index.js";
+import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { WorldMaps } from "../data/WorldMaps.js";
+import { WorldMigration } from "../data/WorldMigration.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 
 const RESTORE_TEMPLATE = "modules/filrodens-world-map-builder/templates/world/dialogs/restore-backup.hbs";
@@ -17,6 +20,10 @@ const BYTES_PER_MEGABYTE = 1048576;
  * map (Back up all maps, Restore from backup). Every map that arrives goes through the same steps
  * (MapImport for its data, MapPackage for its images and custom pin icons, MapNames for its name),
  * whichever file it came in, and arrives as a new saved map: nothing already saved is changed.
+ *
+ * From v5 a map leaves with its world's settings merged into its data (see WorldMaps), so the file
+ * holds what a 4.3 map file held, and arrives as a world of its own (see WorldMigration), with the
+ * custom pin icons it carried as that world's icons. (The world file of S0 step 2b replaces this.)
  *
  * The studio's processing overlay is passed in as `overlay` (`start`, `text`, `end`), since it
  * belongs to MapStudio.
@@ -32,14 +39,15 @@ export class MapTransfer {
      * @param {string} name - The saved map's name.
      */
     static async exportMap(mapId, name) {
-        const mapData = await platform.store.loadMapData(mapId);
+        const loaded = await WorldMaps.load(mapId);
+        const mapData = loaded?.payload;
         if (!mapData) return;
         const tooLong = overLimit(mapData, { "FILRODENSWMB.UI.LimitFieldName": name });
         if (tooLong.length) {
             await MapDialogManager.showOverLimit(tooLong);
             return;
         }
-        const { file, missing } = await MapPackage.prepare({ mapData, owners: await platform.store.loadMapOwners(mapId), modelRun: await platform.store.loadMapModelRun(mapId), name, icons: getCustomPinIconEntries(), mode: "embed", read: (src) => platform.assets.read(src) });
+        const { file, missing } = await MapPackage.prepare({ mapData, owners: await platform.store.loadMapOwners(mapId), modelRun: await platform.store.loadMapModelRun(mapId), name, icons: loaded.settings?.icons?.custom ?? getCustomPinIconEntries(), mode: "embed", read: (src) => platform.assets.read(src) });
         if (missing > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.BackupImagesLeftOut", { count: missing }));
         const safeName = name.replaceAll(/[^a-z0-9]/gi, "_").toLowerCase();
         MapTransfer.download(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }), `fwmb_${safeName}.json`);
@@ -147,12 +155,18 @@ export class MapTransfer {
      */
     static async #bringIn(parsed, { fallback, taken, parentId, assetBytes = () => null }) {
         const { mapData, owners, modelRun, name: savedName, pinIcons, corrected } = MapImport.read(parsed, { newId: () => platform.utils.randomID() });
-        const { missing } = await MapPackage.resolve({ mapData, pinIcons, assetBytes, keep: (bytes, type, hash) => platform.assets.keep(bytes, type, hash), icons: ICONS });
+        // The icons the file carries become the new world's own (not the open world's)
+        const icons = importedIcons();
+        const { missing } = await MapPackage.resolve({ mapData, pinIcons, assetBytes, keep: (bytes, type, hash) => platform.assets.keep(bytes, type, hash), icons });
         mapData.parentId = parentId(mapData.parentId ?? null) ?? null;
         const name = MapNames.unique(savedName ?? fallback, taken, numberedName);
         const saved = await platform.store.saveMapData(name, mapData, null, { owners, modelRun });
         if (!saved) throw new Error("The map could not be saved.");
-        return { id: saved.id, name, corrected, missing, unresolvedIcons: findUnresolvedPinIcons(mapData.mapPins).affectedPinCount };
+        // The saved map made a world, with the file's icons
+        await WorldMigration.run();
+        const world = await Worlds.ofMap(saved.id);
+        if (world && !world.held) await platform.store.saveWorld({ ...world, settings: { ...world.settings, icons: { custom: icons.list(), disabled: [] } } });
+        return { id: saved.id, name, corrected, missing, unresolvedIcons: unresolvedPins(mapData.mapPins, icons.list()) };
     }
 
     /** Every map written out under the overlay (see #pack). */
@@ -168,14 +182,16 @@ export class MapTransfer {
     /** Every map written out; text past its limit is gathered rather than written. */
     static async #pack(entries, overlay, mode) {
         const assets = new Map();
-        const icons = getCustomPinIconEntries();
         const maps = [];
         const tooLong = [];
         let missing = 0;
         for (const [index, entry] of entries.entries()) {
             overlay.text(platform.i18n.format("FILRODENSWMB.UI.BackupPacking", { index: index + 1, count: entries.length }));
-            const mapData = await platform.store.loadMapData(entry.id);
+            // The map with its world's settings, and its world's icons
+            const loaded = await WorldMaps.load(entry.id);
+            const mapData = loaded?.payload;
             if (!mapData) continue;
+            const icons = loaded.settings?.icons?.custom ?? getCustomPinIconEntries();
             for (const problem of overLimit(mapData, { "FILRODENSWMB.UI.LimitFieldName": entry.name })) tooLong.push({ ...problem, map: entry.name });
             const owners = await platform.store.loadMapOwners(entry.id);
             const modelRun = await platform.store.loadMapModelRun(entry.id);
@@ -287,10 +303,27 @@ export class MapTransfer {
 const DOWNLOAD_RELEASE_MS = 60000;
 
 /** The host's custom pin icons, for MapPackage.resolve. */
-const ICONS = Object.freeze({
-    list: () => getCustomPinIconEntries(),
-    add: (entry) => addCustomPinIcon(entry),
-});
+/**
+ * The pin icons an arriving map brings, as MapPackage.resolve adds them: a list of its own, given
+ * to the world the map becomes (each world's icons are its own from v5).
+ */
+function importedIcons() {
+    const entries = [];
+    return {
+        list: () => entries.map((entry) => ({ ...entry })),
+        add: async (entry) => {
+            const added = { id: platform.utils.randomID(), ...entry };
+            entries.push(added);
+            return added;
+        },
+    };
+}
+
+/** How many pins name an icon that is neither built in nor one of `icons`. */
+function unresolvedPins(pins = [], icons = []) {
+    const ids = new Set(icons.map((entry) => entry.id));
+    return pins.filter((pin) => pin?.icon && !Object.hasOwn(FILRODENSWMB.INFRASTRUCTURE_ICONS, pin.icon) && !ids.has(pin.icon)).length;
+}
 
 const numberedName = (name, number) => platform.i18n.format("FILRODENSWMB.UI.NumberedMapName", { name, number });
 

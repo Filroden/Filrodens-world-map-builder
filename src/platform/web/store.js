@@ -6,21 +6,33 @@
  * Each saved map is one record: its id, its name, the map data exactly as the studio saved it, and
  * the encoded owner arrays saved beside it. Keeping the map data's shape means a map moves between
  * Foundry and the web through the studio's JSON export and import, and the load-time upgrades run
- * on maps saved here as they do on maps saved in Foundry.
+ * on maps saved here as they do on maps saved in Foundry. From v5 a map's record also keeps its
+ * `meta` (its world, map type, revision and the time of its last changed save; see Worlds), and
+ * each world is a record of its own in a second object store (see Worlds for its fields).
  *
  * The records go through a small store interface (get, put, delete, all) so the service can be
- * tested without a browser: MemoryRecords keeps them in a Map, IndexedDbRecords in IndexedDB.
+ * tested without a browser: MemoryRecords keeps them in a Map, IndexedDbRecords in IndexedDB. Each
+ * has a `worlds` beside it, the same interface over the world records.
  */
 import { deepClone, randomID } from "./utils.js";
 
 /** The database and its object store. */
 const DATABASE = "fwmb-maps";
 const STORE = "maps";
-const DATABASE_VERSION = 1;
+const WORLDS = "worlds";
+/** 2 adds the world records (v5). */
+const DATABASE_VERSION = 2;
 
 /** Records kept in memory (tests, and browsers where IndexedDB is refused). */
 export class MemoryRecords {
     #records = new Map();
+    #worlds = null;
+
+    /** The world records kept beside these (made when first asked for). */
+    get worlds() {
+        this.#worlds ??= new MemoryRecords();
+        return this.#worlds;
+    }
 
     async get(id) {
         return deepClone(this.#records.get(id));
@@ -42,9 +54,18 @@ export class MemoryRecords {
 /** Records in the browser's IndexedDB, keyed by id. Every read returns a fresh copy. */
 export class IndexedDbRecords {
     #db;
+    #store;
+    #worlds = null;
 
-    constructor(db) {
+    constructor(db, store = STORE) {
         this.#db = db;
+        this.#store = store;
+    }
+
+    /** The world records, in the same database. */
+    get worlds() {
+        this.#worlds ??= new IndexedDbRecords(this.#db, WORLDS);
+        return this.#worlds;
     }
 
     /**
@@ -61,7 +82,9 @@ export class IndexedDbRecords {
             }
             const request = factory.open(DATABASE, DATABASE_VERSION);
             request.onupgradeneeded = () => {
-                if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE, { keyPath: "id" });
+                for (const name of [STORE, WORLDS]) {
+                    if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name, { keyPath: "id" });
+                }
             };
             request.onsuccess = () => resolve(new IndexedDbRecords(request.result));
             request.onerror = () => reject(request.error);
@@ -71,8 +94,8 @@ export class IndexedDbRecords {
 
     #request(mode, operate) {
         return new Promise((resolve, reject) => {
-            const transaction = this.#db.transaction(STORE, mode);
-            const request = operate(transaction.objectStore(STORE));
+            const transaction = this.#db.transaction(this.#store, mode);
+            const request = operate(transaction.objectStore(this.#store));
             transaction.oncomplete = () => resolve(request.result);
             transaction.onerror = () => reject(transaction.error);
             transaction.onabort = () => reject(transaction.error);
@@ -109,6 +132,7 @@ const summary = (record) => ({ id: record.id, name: record.name });
  * @param {() => string} [options.newId]
  */
 export function createWebStore(records, { newId = randomID } = {}) {
+    const worlds = records.worlds;
     return {
         /** Nothing to prepare: the database is created when it is opened. */
         async initializeCompendium() {},
@@ -138,16 +162,19 @@ export function createWebStore(records, { newId = randomID } = {}) {
          * @param {string} mapName
          * @param {object} mapData
          * @param {string|null} [existingId]
-         * @param {{owners?: object|null, modelRun?: object|null}} [options] - Owner arrays by level
-         *     id (null keeps those already saved), and the generator's saved outputs (left out keeps
-         *     those already saved; null removes them).
+         * @param {{owners?: object|null, modelRun?: object|null, meta?: object|null}} [options] - Owner
+         *     arrays by level id (null keeps those already saved), the generator's saved outputs
+         *     (left out keeps those already saved; null removes them), and the map's world record
+         *     fields (null keeps those already saved; see Worlds).
          * @returns {Promise<{id: string, name: string}|null>}
          */
-        async saveMapData(mapName, mapData, existingId = null, { owners = null, modelRun = undefined } = {}) {
+        async saveMapData(mapName, mapData, existingId = null, { owners = null, modelRun = undefined, meta = null } = {}) {
             if (!mapData) return null;
             const existing = existingId ? await records.get(existingId) : null;
             const run = modelRun === undefined ? (existing?.modelRun ?? null) : modelRun;
             const record = { id: existing?.id ?? newId(), name: mapName, mapData: deepClone(mapData), owners: deepClone(owners ?? existing?.owners ?? {}), modelRun: deepClone(run) };
+            const kept = meta ?? existing?.meta;
+            if (kept) record.meta = deepClone(kept);
             await records.put(record);
             return summary(record);
         },
@@ -198,7 +225,52 @@ export function createWebStore(records, { newId = randomID } = {}) {
         },
 
         async listMapData() {
-            return (await records.all()).map((record) => ({ id: record.id, name: record.name, mapData: record.mapData ?? null }));
+            return (await records.all()).map((record) => ({ id: record.id, name: record.name, mapData: record.mapData ?? null, meta: record.meta ?? null, hasModelRun: !!record.modelRun }));
+        },
+
+        // ------------------------------------------------------------ v5: the map's world fields
+
+        /** A map's world record fields (see Worlds), or null for a map saved before v5. */
+        async loadMapMeta(id) {
+            return deepClone((await records.get(id))?.meta ?? null);
+        },
+
+        /** Writes a map's world record fields, leaving its data as it was saved. */
+        async saveMapMeta(id, meta) {
+            const record = await records.get(id);
+            if (!record) return false;
+            record.meta = deepClone(meta);
+            await records.put(record);
+            return true;
+        },
+
+        /** Every saved map's id, name and world fields, without its data. */
+        async listMaps() {
+            return (await records.all()).map((record) => ({ id: record.id, name: record.name || "", meta: record.meta ?? null }));
+        },
+
+        // ------------------------------------------------------------ v5: the world records
+
+        /** Every world record (see Worlds). */
+        async listWorlds() {
+            return worlds.all();
+        },
+
+        async loadWorld(id) {
+            return (await worlds.get(id)) ?? null;
+        },
+
+        /** Saves a world record, given its id (see Worlds.newWorldId). */
+        async saveWorld(record) {
+            if (!record?.id) return null;
+            await worlds.put(deepClone(record));
+            return summary(record);
+        },
+
+        async deleteWorld(id) {
+            if (!(await worlds.get(id))) return false;
+            await worlds.delete(id);
+            return true;
         },
     };
 }

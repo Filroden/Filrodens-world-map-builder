@@ -94,3 +94,21 @@ test("installPlatform replaces the services callers read", async () => {
     installPlatform({ notify: original });
     assert.deepEqual(messages, ["hello"]);
 });
+
+test("a save marks every key the flag no longer holds for deletion, nested ones too", async () => {
+    const { withStaleKeysDeleted } = await import("../../src/platform/foundry/store.js");
+    const DELETE = { deleted: true };
+    const stored = { seed: "s", cultures: [1], params: { globalTemp: 0.5, noise: { scale: 1, octaves: 3 }, seaLevel: 0.3 }, generatorSettings: { ages: [{}], output: { labels: true } }, list: [{ a: 1, b: 2 }] };
+    const next = { params: { noise: { octaves: 4 }, seaLevel: 0.4 }, generatorSettings: { output: { labels: false } }, list: [{ a: 1 }], added: 1 };
+    assert.deepEqual(withStaleKeysDeleted(stored, next, () => DELETE), {
+        seed: DELETE,
+        cultures: DELETE,
+        params: { globalTemp: DELETE, noise: { scale: DELETE, octaves: 4 }, seaLevel: 0.4 },
+        generatorSettings: { ages: DELETE, output: { labels: false } },
+        // Arrays are written as they are, never compared item by item
+        list: [{ a: 1 }],
+        added: 1,
+    });
+    assert.deepEqual(next.params, { noise: { octaves: 4 }, seaLevel: 0.4 }, "what is to be saved is not changed");
+});
+

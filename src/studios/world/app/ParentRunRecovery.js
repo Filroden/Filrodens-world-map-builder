@@ -1,4 +1,5 @@
 import { platform } from "../../../platform/index.js";
+import { WorldMaps } from "../data/WorldMaps.js";
 import { cropRun, parentRunSites } from "../generator/ParentRun.js";
 import { MeshBuilder, generateModelSites } from "../mesh/MeshBuilder.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -23,7 +24,7 @@ export class ParentRunRecovery {
         if (!runs.size) return false;
         const mapId = app.currentSaveId;
         try {
-            const [parentData, parentRun] = await Promise.all([platform.store.loadMapData(app.currentParentId), platform.store.loadMapModelRun(app.currentParentId)]);
+            const [parentData, parentRun] = await Promise.all([WorldMaps.payload(app.currentParentId), platform.store.loadMapModelRun(app.currentParentId)]);
             const copy = parentData ? this.copyFrom(parentData, parentRun, runs, { world: app.uiState?.world, mapWidth: app.mapWidth, mapHeight: app.mapHeight }) : null;
             // The user may have opened another map while the parent was read
             if (!copy || app.currentSaveId !== mapId || app.parentRun || app.modelRun) return false;

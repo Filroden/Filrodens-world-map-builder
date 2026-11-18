@@ -615,7 +615,9 @@ export class MapDialogManager {
         const icon = getCustomPinIconById(id);
         if (!icon) return;
 
-        const usage = await findPinIconUsage(id, app.mapPins);
+        // The maps that read the open world's icons: its own, and its held regional worlds'
+        const mapIds = await app._mapsReadingWorldIcons();
+        const usage = await findPinIconUsage(id, app.mapPins, mapIds);
 
         const content =
             usage.totalCount > 0
@@ -627,7 +629,7 @@ export class MapDialogManager {
 
         if (usage.totalCount > 0) {
             if (usage.liveCount > 0) MapStateManager.pushVectorState(app);
-            await revertPinIconUsage(id, app.mapPins);
+            await revertPinIconUsage(id, app.mapPins, mapIds);
         }
 
         await removeCustomPinIconEntry(id);

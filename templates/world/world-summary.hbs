@@ -1,0 +1,109 @@
+{{! The readable page of a world's journal in the worlds compendium (see platform/foundry/store.js saveWorld): what the world holds, written each time it is saved. }}
+<div class="fwmb-journal-summary">
+    <h2>{{localize "FILRODENSWMB.JOURNAL.WorldTitle"}}</h2>
+    <p>{{localize "FILRODENSWMB.JOURNAL.WorldDescription"}}</p>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.WorldSection"}}</h3>
+    <table class="fwmb-summary-table">
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldMaps"}}</strong></td>
+                <td>{{#each maps}}{{localize this.label}}{{#unless @last}}, {{/unless}}{{/each}}</td>
+            </tr>
+            {{#if parentName}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldCutFrom"}}</strong></td>
+                    <td>{{#if held}}{{localize "FILRODENSWMB.JOURNAL.WorldHeldBy" name=parentName}}{{else}}{{parentName}}{{/if}}</td>
+                </tr>
+            {{/if}}
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldSettingsRevision"}}</strong></td>
+                <td>{{#if savedAt}}{{localize "FILRODENSWMB.JOURNAL.WorldRevisionSaved" revision=settingsRevision date=savedAt}}{{else}}{{settingsRevision}}{{/if}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.WorldSetup"}}</h3>
+    <table class="fwmb-summary-table">
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Seed"}}</strong></td>
+                <td class="fwmb-mono">{{setup.seed}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldEngine"}}</strong></td>
+                <td>{{#if engineLabel}}{{localize engineLabel}}{{/if}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Resolution"}}</strong></td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.ResolutionValue" width=setup.frame.width height=setup.frame.height}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Latitudes"}}</strong></td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.LatitudesValue" top=setup.latTop bottom=setup.latBottom}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldAreaFactor"}}</strong></td>
+                <td>{{areaFactor}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldUnit"}}</strong></td>
+                <td>{{setup.unit}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.WorldSettings"}}</h3>
+    {{#if held}}
+        <p>{{localize "FILRODENSWMB.JOURNAL.WorldSettingsRead" name=sourceName}}</p>
+    {{else}}
+        <table class="fwmb-summary-table">
+            <tbody>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldCultures"}}</strong></td>
+                    <td>{{#each cultures}}{{this}}{{#unless @last}}, {{/unless}}{{else}}{{localize "FILRODENSWMB.JOURNAL.WorldNone"}}{{/each}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldAges"}}</strong></td>
+                    <td>{{ages}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldNameStyle"}}</strong></td>
+                    <td>{{nameStyle}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldStyles"}}</strong></td>
+                    <td>{{localize "FILRODENSWMB.JOURNAL.WorldStylesValue" pins=styles.pin routes=styles.route labels=styles.label regions=styles.region}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldIcons"}}</strong></td>
+                    <td>{{localize "FILRODENSWMB.JOURNAL.WorldIconsValue" custom=icons.custom hidden=icons.hidden}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.WorldBiomes"}}</strong></td>
+                    <td>{{biomes}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempBase"}}</strong></td>
+                    <td>{{climate.globalTemp}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistBase"}}</strong></td>
+                    <td>{{climate.globalMoisture}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeasonOffset"}}</strong></td>
+                    <td>{{climate.seasonOffset}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.AltCooling"}}</strong></td>
+                    <td>{{climate.altCooling}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.FreezingThreshold"}}</strong></td>
+                    <td>{{climate.freezingThreshold}}</td>
+                </tr>
+            </tbody>
+        </table>
+    {{/if}}
+</div>

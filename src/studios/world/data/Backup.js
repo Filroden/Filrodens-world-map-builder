@@ -4,7 +4,8 @@ import { IMAGE_TYPES } from "../../../kernel/data/ImageCheck.js";
 import { ImportRefusal, Sanitize } from "../../../kernel/data/Sanitize.js";
 
 /**
- * The backup file: every saved map in one zip, with the images they use.
+ * The backup file: every saved map in one zip, with the images they use (or, as the migration to
+ * v5 writes it, in one JSON file without them; see packJson).
  *
  *     manifest.json        { format, exportedAt, module: { version }, app, maps: [{ id, name, parentId }], assets: [{ hash, type }] }
  *     maps/<id>.json       each map as its JSON export writes it (see MapPackage, `assets` mode)
@@ -56,8 +57,29 @@ export class Backup {
     }
 
     /**
-     * A backup file opened: its manifest's maps, and each map's file and each image's bytes on
-     * request. Refused (ImportRefusal) when it is too large, not a backup, or shaped to do harm.
+     * The backup as one JSON file, without images: what the migration to v5 writes into the
+     * Foundry world's data before it changes anything, since Foundry will not take a zip there.
+     * Its images stay where they are in the world's data, which the maps still name. Restore reads
+     * it as it reads the zip.
+     * @param {object} options - As pack, with no assets.
+     * @returns {Uint8Array}
+     */
+    static packJson({ maps, app, version, exportedAt = new Date() }) {
+        const file = {
+            format: Backup.FORMAT,
+            exportedAt: exportedAt.toISOString(),
+            module: { version },
+            app,
+            maps: maps.map(({ id, name, parentId, file: mapFile }) => ({ id, name, parentId: parentId ?? null, file: mapFile })),
+            assets: [],
+        };
+        return strToU8(JSON.stringify(file));
+    }
+
+    /**
+     * A backup file opened, a zip or the JSON form (see packJson): its manifest's maps, and each
+     * map's file and each image's bytes on request. Refused (ImportRefusal) when it is too large,
+     * not a backup, or shaped to do harm.
      *
      * @param {Uint8Array} bytes
      * @returns {{exportedAt: string|null, app: string|null, maps: {id: string, name: string, parentId: string|null}[], mapFile: (id: string) => *, assetBytes: (hash: string) => Uint8Array|null}}
@@ -66,6 +88,7 @@ export class Backup {
     static read(bytes) {
         const limits = FILRODENSWMB.LIMITS.BACKUP;
         if (bytes.length > limits.BYTES) throw new ImportRefusal("tooLarge", { detail: `${bytes.length} bytes` });
+        if (isJson(bytes)) return readJson(bytes);
         const entries = unpack(bytes, limits);
         const manifestBytes = entries[MANIFEST];
         if (!manifestBytes) throw new ImportRefusal("notBackup", { detail: "no manifest" });
@@ -146,6 +169,34 @@ function parseJson(bytes, reason) {
     } catch (error) {
         throw new ImportRefusal(reason, { detail: error.message });
     }
+}
+
+/** Whether a file's first character (after any byte order mark or space) opens a JSON object. */
+function isJson(bytes) {
+    for (const byte of bytes.subarray(0, 64)) {
+        if (byte === 0x7b) return true;
+        if (![0x20, 0x09, 0x0a, 0x0d, 0xef, 0xbb, 0xbf].includes(byte)) return false;
+    }
+    return false;
+}
+
+/** The JSON form of a backup read: the manifest's checks, each map's file kept beside it. */
+function readJson(bytes) {
+    const raw = parseJson(bytes, "notBackup");
+    const files = new Map();
+    for (const map of Array.isArray(raw?.maps) ? raw.maps : []) if (Sanitize.isId(map?.id) && map.file && typeof map.file === "object") files.set(map.id, map.file);
+    const manifest = readManifest(strToU8(JSON.stringify({ ...raw, maps: (raw?.maps ?? []).map(({ id, name, parentId }) => ({ id, name, parentId })), assets: [] })));
+    return {
+        exportedAt: typeof manifest.exportedAt === "string" ? manifest.exportedAt : null,
+        app: typeof manifest.app === "string" ? manifest.app : null,
+        maps: manifest.maps.filter((map) => files.has(map.id)),
+        mapFile: (id) => {
+            const file = Sanitize.isId(id) ? files.get(id) : null;
+            if (!file) throw new ImportRefusal("notMap", { detail: `no file for map ${id}` });
+            return structuredClone(file);
+        },
+        assetBytes: () => null,
+    };
 }
 
 /** The manifest's known fields, checked: the maps' ids, names and parents, and the images' hashes and types. */
