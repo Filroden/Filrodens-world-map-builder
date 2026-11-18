@@ -1,3 +1,5 @@
+import { StrokeHistory } from "../tools/StrokeHistory.js";
+
 /**
  * The Standard engine's noise frame: where the map sits in the infinite noise field (the pan
  * offsets) and how large the noise is drawn (the elevation scale). Panning or rescaling the noise
@@ -52,8 +54,11 @@ export class NoiseTransform {
                 for (const point of stroke.points) [point.x, point.y] = toTarget(point.x, point.y);
                 stroke.size *= ratio;
             };
-            app.brushEngine.history.forEach(moveStroke);
-            app.brushEngine.redoStack.forEach(moveStroke);
+            // Moved in place, so a held regional map's inherited strokes stay its parent's
+            StrokeHistory.rewrite(app, () => {
+                app.brushEngine.history.forEach(moveStroke);
+                app.brushEngine.redoStack.forEach(moveStroke);
+            });
             // The brushed layer was built from the strokes where they were
             app.brushEngine.invalidateLayerCache();
         }

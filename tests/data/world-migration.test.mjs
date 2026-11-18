@@ -60,7 +60,11 @@ test("a regional map holding its parent's run becomes a held regional world, its
     const region = byId(worlds).get("m2");
     assert.equal(region.held, true);
     assert.equal(region.parentWorldId, "m1");
-    assert.deepEqual(region.regional, { sourceMapId: "m1", migrated: true });
+    assert.equal(region.regional.version, 1);
+    assert.equal(region.regional.migrated, true);
+    const [part] = region.regional.maps;
+    assert.deepEqual([part.mapId, part.sourceMapId, part.zoom, part.cutBase, part.cropFingerprint, part.parentRevision], ["m2", "m1", 1, null, null, null]);
+    assert.deepEqual(part.size, { width: 100, height: 80 });
     assert.deepEqual(Object.keys(region.settings), ["setup"]);
     assert.equal(region.settings.setup.seed, "child");
     assert.deepEqual(region.migration.changed, []);
@@ -193,3 +197,52 @@ test("a backup that cannot be written is reported and the migration goes on", as
         console.warn = quiet;
     }
 });
+
+// ------------------------------------------------------------------ the regional record (2b)
+
+const { readFileSync } = await import("node:fs");
+const fixture = (name) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"));
+
+test("a held world gets its regional record: the crop, the zoom and its parent's strokes recovered", () => {
+    // Eldoria was cut from Aethoria; every stroke it has is Aethoria's
+    const parent = fixture("fwmb_aethoria.json");
+    const child = { ...fixture("fwmb_eldoria.json"), parentId: "aethoria", parentRun: { run: "r" } };
+    const { worlds } = plan([entry("eldoria", "Eldoria", child), entry("aethoria", "Aethoria", parent)]);
+    const record = byId(worlds).get("eldoria").regional;
+    assert.equal(record.migrated, true);
+    const [part] = record.maps;
+    assert.equal(part.inheritedStrokes, child.history.length);
+    assert.equal(part.crop.parent.x, child.world.originX);
+    assert.equal(part.crop.root.x, child.world.originX);
+    assert.equal(part.zoom, child.world.zoom);
+    assert.equal(part.rootZoom, child.world.zoom);
+    assert.deepEqual(part.size, { width: child.mapWidth, height: child.mapHeight });
+});
+
+test("a held world 2a made, with only a placeholder, gets its record on the next run, and only once", async () => {
+    const parent = await store.saveMapData("Aethoria", data(), null, {});
+    const child = await store.saveMapData("Region", data({ parentId: parent.id, parentRun: { run: "r" } }), null, {});
+    await WorldMigration.run();
+    // As 2a left it
+    const world = await store.loadWorld(child.id);
+    await store.saveWorld({ ...world, regional: { sourceMapId: parent.id, migrated: true } });
+    const result = await WorldMigration.run();
+    assert.deepEqual([result.worlds, result.maps], [1, 0]);
+    const filled = (await store.loadWorld(child.id)).regional;
+    assert.equal(filled.version, 1);
+    assert.equal(filled.maps[0].sourceMapId, parent.id);
+    assert.deepEqual(await WorldMigration.run(), { worlds: 0, maps: 0, backup: null });
+});
+
+test("a held world whose parent map is gone gets a record with what its own map tells", () => {
+    const records = new Map([["w2", { id: "w2", held: true, parentWorldId: "w1", maps: [{ id: "m2", type: "surface" }], regional: { sourceMapId: "gone", migrated: true } }]]);
+    const byMap = new Map([["m2", entry("m2", "Region", data({ history: [{ tool: "raise", points: [] }] }))]]);
+    const record = WorldMigration.regionalOf(records.get("w2"), records, byMap);
+    const [part] = record.maps;
+    assert.equal(part.sourceMapId, "gone");
+    assert.equal(part.crop.parent, null);
+    assert.ok(part.crop.root);
+    assert.equal(part.zoom, null);
+    assert.equal(part.inheritedStrokes, 0);
+});
+

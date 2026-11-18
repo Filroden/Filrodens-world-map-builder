@@ -60,7 +60,7 @@ const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'
  */
 export class ImportRefusal extends Error {
     /**
-     * @param {"tooLarge"|"notMap"|"notStyles"|"notBackup"|"damaged"|"textTooLong"|"image"} reason
+     * @param {"tooLarge"|"notMap"|"notStyles"|"notBackup"|"damaged"|"newer"|"textTooLong"|"image"} reason
      * @param {object} [data]
      */
     constructor(reason, data = {}) {
@@ -80,6 +80,7 @@ const REFUSAL_KEYS = Object.freeze({
     textTooLong: "FILRODENSWMB.UI.ImportRefusedTextTooLong",
     notBackup: "FILRODENSWMB.UI.ImportRefusedNotBackup",
     image: "FILRODENSWMB.UI.ImportRefusedImage",
+    newer: "FILRODENSWMB.UI.ImportRefusedNewer",
 });
 
 const BYTES_PER_MEGABYTE = 1048576;

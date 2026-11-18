@@ -102,6 +102,7 @@ import { ExportScale } from "../../../kernel/export/ExportScale.js";
 import { ImageFormat } from "../../../kernel/export/ImageFormat.js";
 import { WORLD_DEFINITION } from "../definition.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
 import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { WorldSettings } from "../data/WorldSettings.js";
 import { WorldMaps } from "../data/WorldMaps.js";
@@ -591,6 +592,9 @@ export class MapStudio {
         // fills in), which a save compares to say whether they changed (see #worldSettingsNow)
         this.world = null;
         this.worldSettingsOpened = null;
+        // On a held regional map, how many strokes at the head of its history are its parent's
+        // (see StrokeHistory and RegionalRecord); undefined on any other map
+        this.inheritedStrokes = undefined;
         // A new world's pin icons: the built-ins only, until a saved world is opened
         this.#useWorldIcons(WorldRecord.emptyIcons());
 
@@ -4762,6 +4766,9 @@ export class MapStudio {
         const { settings, mapData } = WorldSettings.split(payload);
         settings.icons = structuredClone(currentPinIcons() ?? WorldRecord.emptyIcons());
         const opened = this.worldSettingsOpened;
+        // A held regional map's count of inherited strokes, if a rewrite of its history changed it
+        const entry = !createsNewMap && this.world?.held && RegionalRecord.isCurrent(this.world.regional) ? RegionalRecord.forMap(this.world.regional, this.currentSaveId) : null;
+        const regional = entry && this.inheritedStrokes !== undefined && entry.inheritedStrokes !== this.inheritedStrokes ? RegionalRecord.withMap(this.world.regional, this.currentSaveId, { inheritedStrokes: this.inheritedStrokes }) : undefined;
         const result = await Worlds.save({
             world: this.world,
             name: this.currentSaveName,
@@ -4770,6 +4777,7 @@ export class MapStudio {
             asNew: asNew && !!this.world,
             // A held world writes only its own World setup, so only that can change its revision
             settingsChanged: opened ? WorldRecord.changedGroups(this.world?.held ? { setup: opened.setup } : opened, this.world?.held ? { setup: settings.setup } : settings).length > 0 : undefined,
+            regional,
         });
         if (!result) return null;
         this.world = result.world;
@@ -5453,6 +5461,7 @@ export class MapStudio {
         this.currentSaveName = null;
         this.world = null;
         this.worldSettingsOpened = null;
+        this.inheritedStrokes = undefined;
         this.#useWorldIcons(WorldRecord.emptyIcons());
 
         // 4. If switching to Guided Mode, auto-activate the drawing tools
@@ -5923,8 +5932,10 @@ export class MapStudio {
 
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap"));
         try {
-            const { name, corrected, missing, unresolvedIcons } = await MapTransfer.importMap(file);
+            const { name, corrected, missing, unresolvedIcons, released } = await MapTransfer.importMap(file);
             platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ImportSuccess", { name }));
+            // A held regional world whose parent is not saved here arrives as a world of its own
+            if (released) platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ImportReleased", { name }));
             if (corrected > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportCorrected", { count: corrected }));
             if (missing > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportImagesLeftOut", { count: missing }));
             // Pins on a custom icon the file did not carry (from an older export) fall back to the default
@@ -6227,6 +6238,7 @@ export class MapStudio {
             // The settings as loaded (the defaults a load fills in included): a save that leaves
             // them so does not raise their revision. Nothing below changes them.
             this.worldSettingsOpened = this.#worldSettingsNow();
+            this.inheritedStrokes = world?.held && RegionalRecord.isCurrent(world.regional) ? (RegionalRecord.forMap(world.regional, mapId)?.inheritedStrokes ?? 0) : undefined;
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.view?.render(["toolbar", "context"]);

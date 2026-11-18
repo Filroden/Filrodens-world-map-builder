@@ -175,6 +175,8 @@ export function createWebStore(records, { newId = randomID } = {}) {
             const record = { id: existing?.id ?? newId(), name: mapName, mapData: deepClone(mapData), owners: deepClone(owners ?? existing?.owners ?? {}), modelRun: deepClone(run) };
             const kept = meta ?? existing?.meta;
             if (kept) record.meta = deepClone(kept);
+            // A save writes the map's data; its blobs are written and dropped by their own calls
+            if (existing?.blobs) record.blobs = existing.blobs;
             await records.put(record);
             return summary(record);
         },
@@ -247,6 +249,41 @@ export function createWebStore(records, { newId = randomID } = {}) {
         /** Every saved map's id, name and world fields, without its data. */
         async listMaps() {
             return (await records.all()).map((record) => ({ id: record.id, name: record.name || "", meta: record.meta ?? null }));
+        },
+
+        // ------------------------------------------------------------ v5: a map's blobs
+
+        /** Keeps a blob with a map (see Blobs): its gzipped bytes, by hash. */
+        async saveMapBlob(id, hash, bytes) {
+            const record = await records.get(id);
+            if (!record) return false;
+            record.blobs = { ...(record.blobs ?? {}), [hash]: new Uint8Array(bytes) };
+            await records.put(record);
+            return true;
+        },
+
+        /** A blob kept with a map, or null. */
+        async loadMapBlob(id, hash) {
+            const bytes = (await records.get(id))?.blobs?.[hash];
+            return bytes ? new Uint8Array(bytes) : null;
+        },
+
+        /** The hashes of the blobs kept with a map. */
+        async listMapBlobs(id) {
+            return Object.keys((await records.get(id))?.blobs ?? {});
+        },
+
+        /** Drops every blob kept with a map but those named (what its record still names). */
+        async keepMapBlobs(id, keep) {
+            const record = await records.get(id);
+            if (!record?.blobs) return true;
+            const wanted = new Set(keep);
+            const blobs = Object.fromEntries(Object.entries(record.blobs).filter(([hash]) => wanted.has(hash)));
+            if (Object.keys(blobs).length === Object.keys(record.blobs).length) return true;
+            if (Object.keys(blobs).length) record.blobs = blobs;
+            else delete record.blobs;
+            await records.put(record);
+            return true;
         },
 
         // ------------------------------------------------------------ v5: the world records

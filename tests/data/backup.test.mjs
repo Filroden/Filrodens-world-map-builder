@@ -216,7 +216,9 @@ test("too many entries, too large a file, and files that are not backups are ref
     }
     assert.throws(() => Backup.read(new TextEncoder().encode("not a zip at all")), refusedFor("notBackup"));
     assert.throws(() => Backup.read(zipSync({ "maps/mapAAAAAAAAAAAAA.json": strToU8("{}") })), refusedFor("notBackup"), "no manifest");
-    assert.throws(() => Backup.read(zipSync({ "manifest.json": strToU8(JSON.stringify({ format: 99, maps: [] })) })), refusedFor("notBackup"));
+    // A later version's backup is named as one, so the user knows to update rather than that it is broken
+    assert.throws(() => Backup.read(zipSync({ "manifest.json": strToU8(JSON.stringify({ format: 99, maps: [] })) })), refusedFor("newer"));
+    assert.throws(() => Backup.read(zipSync({ "manifest.json": strToU8(JSON.stringify({ format: "2", maps: [] })) })), refusedFor("notBackup"));
     assert.throws(() => Backup.read(zipSync({ "manifest.json": strToU8(JSON.stringify({ format: 1, maps: [{ id: "a.b" }] })) })), refusedFor("damaged"));
 
     // A manifest's __proto__ pollutes nothing, and a map listed without its file is left out
@@ -224,4 +226,94 @@ test("too many entries, too large a file, and files that are not backups are ref
     assert.equal({}.polluted, undefined);
     assert.deepEqual(listed.maps, []);
     assert.throws(() => listed.mapFile("mapAAAAAAAAAAAAA"), refusedFor("notMap"));
+});
+
+// ------------------------------------------------------------------ format 2: worlds and blobs
+
+const { WorldSettings } = await import("../../src/studios/world/data/WorldSettings.js");
+const { RegionalRecord } = await import("../../src/kernel/worlds/RegionalRecord.js");
+const { WorldRecord } = await import("../../src/kernel/worlds/WorldRecord.js");
+
+/** A world and a held regional world under it, each map written without its world's settings. */
+function worldsBackup({ worlds: change = (list) => list } = {}) {
+    const top = savedMap({ id: "mapTopAAAAAAAAAA" });
+    const region = { ...savedMap({ id: "mapRegionAAAAAAA" }), seed: "regional", parentId: "mapTopAAAAAAAAAA", cultures: [{ id: "own" }] };
+    const split = (data) => WorldSettings.split(data);
+    const hash = "c".repeat(32);
+    const worlds = change([
+        WorldRecord.create({ id: "worldTopAAAAAAAA", name: "Top", settings: { ...split(top).settings, icons: { custom: [], disabled: [] } }, maps: [{ id: "mapTopAAAAAAAAAA", type: "surface" }] }),
+        {
+            ...WorldRecord.create({ id: "worldRegionAAAAA", name: "Region", settings: { setup: split(region).settings.setup }, maps: [{ id: "mapRegionAAAAAAA", type: "surface" }], parentWorldId: "worldTopAAAAAAAA", held: true }),
+            regional: RegionalRecord.create({ migrated: true, maps: [{ mapId: "mapRegionAAAAAAA", sourceMapId: "mapTopAAAAAAAAAA", inheritedStrokes: 2, cutBase: hash }] }),
+        },
+    ]);
+    const bytes = Backup.pack({
+        maps: [
+            { id: "mapTopAAAAAAAAAA", name: "Top", parentId: null, file: { name: "Top", ...split(top).mapData } },
+            { id: "mapRegionAAAAAAA", name: "Region", parentId: "mapTopAAAAAAAAAA", file: { name: "Region", ...split(region).mapData } },
+        ],
+        assets: new Map(),
+        worlds,
+        blobs: new Map([[hash, new Uint8Array([9, 9, 9])]]),
+        app: "web",
+        version: "5.0.0",
+    });
+    return { bytes, top, region, hash };
+}
+
+test("a format 2 backup holds the worlds and blobs, and hands each map back with its world's settings", () => {
+    const { bytes, top, hash } = worldsBackup();
+    const backup = Backup.read(bytes);
+    assert.equal(backup.format, 2);
+    assert.deepEqual(backup.worlds.map((world) => [world.id, world.held, world.parentWorldId]), [["worldTopAAAAAAAA", false, null], ["worldRegionAAAAA", true, "worldTopAAAAAAAA"]]);
+    assert.equal(RegionalRecord.forMap(backup.worlds[1].regional, "mapRegionAAAAAAA").inheritedStrokes, 2);
+    // The held world's map reads its parent's cultures, its own seed
+    const regionFile = backup.mapFile("mapRegionAAAAAAA");
+    assert.deepEqual(regionFile.cultures, top.cultures);
+    assert.equal(regionFile.seed, "regional");
+    assert.equal(regionFile.name, "Region");
+    assert.equal(backup.mapFile("mapTopAAAAAAAAAA").seed, top.seed);
+    // And each arrives as a map file does
+    assert.equal(MapImport.read(regionFile, { newId: () => "x" }).mapData.seed, "regional");
+    assert.deepEqual(backup.blobBytes(hash), new Uint8Array([9, 9, 9]));
+    assert.equal(backup.blobBytes("d".repeat(32)), null);
+    assert.equal(backup.blobBytes("../manifest"), null);
+});
+
+test("a format 2 backup's damaged worlds are read safely", () => {
+    const { bytes } = worldsBackup({
+        worlds: (list) => [
+            { ...list[0], name: { evil: true }, maps: [...list[0].maps, { id: "mapNotInBackup", type: "surface" }, { id: "mapRegionAAAAAAA", type: "nope" }], settings: { cultures: "broken", junk: { a: 1 } }, settingsRevision: -4 },
+            { ...list[1], parentWorldId: "worldRegionAAAAA", regional: { version: 1, maps: [{ mapId: "mapRegionAAAAAAA", cutBase: "../x", inheritedStrokes: "lots" }] } },
+            { id: "worldTopAAAAAAAA", name: "Repeated" },
+            { id: "../bad" },
+        ],
+    });
+    const { worlds } = Backup.read(bytes);
+    assert.equal(worlds.length, 2);
+    const [top, region] = worlds;
+    assert.equal(top.name, "");
+    assert.deepEqual(top.maps, [{ id: "mapTopAAAAAAAAAA", type: "surface" }]);
+    assert.deepEqual(Object.keys(top.settings), ["icons"]);
+    assert.equal(top.settingsRevision, 1);
+    assert.equal(region.parentWorldId, null, "a world cannot be its own parent");
+    const part = RegionalRecord.forMap(region.regional, "mapRegionAAAAAAA");
+    assert.deepEqual([part.cutBase, part.inheritedStrokes], [null, 0]);
+});
+
+test("a blob entry is the only new name a format 2 zip may hold", () => {
+    const manifest = strToU8(JSON.stringify({ format: 2, maps: [], worlds: [], blobs: [], assets: [] }));
+    assert.equal(Backup.read(zipSync({ "manifest.json": manifest, "blobs/": new Uint8Array(), [`blobs/${"e".repeat(32)}.gz`]: new Uint8Array([1]) })).format, 2);
+    assert.throws(() => Backup.read(zipSync({ "manifest.json": manifest, "blobs/../x.gz": new Uint8Array([1]) })), refusedFor("damaged"));
+    assert.throws(() => Backup.read(zipSync({ "manifest.json": manifest, "blobs/short.gz": new Uint8Array([1]) })), refusedFor("damaged"));
+});
+
+test("Back up all writes format 2; the migration's JSON backup stays format 1 and is read as before", () => {
+    assert.equal(Backup.FORMAT, 2);
+    const json = Backup.packJson({ maps: [{ id: "mapAAAAAAAAAAAAA", name: "Old", parentId: null, file: savedMap() }], app: "foundry", version: "5.0.0" });
+    const read = Backup.read(json);
+    assert.equal(read.format, 1);
+    assert.deepEqual(read.worlds, []);
+    assert.equal(read.mapFile("mapAAAAAAAAAAAAA").seed, savedMap().seed);
+    assert.equal(read.blobBytes("e".repeat(32)), null);
 });

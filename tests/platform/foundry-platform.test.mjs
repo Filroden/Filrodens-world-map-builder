@@ -112,3 +112,44 @@ test("a save marks every key the flag no longer holds for deletion, nested ones 
     assert.deepEqual(next.params, { noise: { octaves: 4 }, seaLevel: 0.4 }, "what is to be saved is not changed");
 });
 
+
+test("a map's blobs are base64 in a flag on its journal, kept and dropped by hash", async () => {
+    const store = await import("../../src/platform/foundry/store.js");
+    const { FILRODENSWMB } = await import("../../src/config.js");
+    const id = FILRODENSWMB.ID;
+    class ForcedDeletion {}
+    const doc = { flags: { [id]: { mapData: {} } }, updates: [] };
+    doc.update = async (changes) => {
+        doc.updates.push(changes);
+        for (const [path, value] of Object.entries(changes)) {
+            const keys = path.split(".").slice(1);
+            let node = doc;
+            for (const key of ["flags", ...keys.slice(0, -1)]) node = node[key] ??= {};
+            if (value instanceof ForcedDeletion) delete node[keys.at(-1)];
+            else node[keys.at(-1)] = value;
+        }
+    };
+    const pack = { getDocument: async (wanted) => (wanted === "m1" ? doc : null) };
+    globalThis.foundry = { data: { operators: { ForcedDeletion } } };
+    globalThis.game = { packs: { get: () => pack } };
+    try {
+        const a = "a".repeat(32);
+        const b = "b".repeat(32);
+        assert.equal(await store.saveMapBlob("m1", a, new Uint8Array([1, 2, 255])), true);
+        await store.saveMapBlob("m1", b, new Uint8Array([7]));
+        assert.deepEqual(Object.keys(doc.updates[0]), [`flags.${id}.blobs.${a}`]);
+        assert.equal(typeof doc.flags[id].blobs[a], "string");
+        assert.deepEqual(await store.loadMapBlob("m1", a), new Uint8Array([1, 2, 255]));
+        assert.equal(await store.loadMapBlob("m1", "c".repeat(32)), null);
+        assert.deepEqual((await store.listMapBlobs("m1")).sort(), [a, b]);
+        await store.keepMapBlobs("m1", [a]);
+        assert.deepEqual(await store.listMapBlobs("m1"), [a]);
+        const count = doc.updates.length;
+        await store.keepMapBlobs("m1", [a]);
+        assert.equal(doc.updates.length, count, "nothing to drop writes nothing");
+        assert.equal(await store.saveMapBlob("missing", a, new Uint8Array([1])), false);
+    } finally {
+        delete globalThis.foundry;
+        delete globalThis.game;
+    }
+});

@@ -4,6 +4,10 @@ import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { WorldSettings } from "./WorldSettings.js";
 import { Backup } from "./Backup.js";
 import { MapPackage } from "./MapPackage.js";
+import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
+import { ParentRunRecovery } from "../app/ParentRunRecovery.js";
+import { StrokeHistory } from "../tools/StrokeHistory.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 
 /** The style lists a held regional map's own additions are carried up from (see #carryUp). */
 const STYLE_LISTS = Object.freeze(["route", "label", "region", "pin"]);
@@ -29,6 +33,11 @@ const BACKUP_FOLDER = "fwmb-backups";
  *   its look; anything else that differs takes the parent's, and the world's `migration` record
  *   lists which groups did, for the first opening's notice.
  * - Every world takes the custom pin icons as the host has them now.
+ * - A held world gets its regional record (RegionalRecord; step 2b), marked as migrated: its crop
+ *   and zoom from the two maps' places in the world where its parent is saved, the count of its
+ *   strokes that are its parent's (StrokeHistory.inheritedCount), and no base or fingerprint, so
+ *   it is never marked Out of date. A held world made in 2a, with only a placeholder, gets it the
+ *   same way the next time this runs.
  * - Nothing is removed: a map's data keeps its copy of the settings until it is next saved, so a
  *   map not yet saved in v5 still opens in 4.3.
  *
@@ -77,7 +86,43 @@ export class WorldMigration {
             changed.add(record.id);
             metas.push({ mapId: map.id, meta: { worldId: record.id, mapType: MAP_TYPES.SURFACE, revision: 1, savedAt: null } });
         }
+        for (const record of records.values()) {
+            if (!record.held || RegionalRecord.isCurrent(record.regional)) continue;
+            record.regional = WorldMigration.regionalOf(record, records, byMap);
+            changed.add(record.id);
+        }
         return { worlds: [...changed].map((id) => records.get(id)), metas };
+    }
+
+    /**
+     * A held world's regional record, made from what the maps hold (see the class comment).
+     * @param {object} world - The held world.
+     * @param {Map<string, object>} records - Every world record, by id.
+     * @param {Map<string, object>} byMap - Every saved map's entry, by id.
+     * @returns {object}
+     */
+    static regionalOf(world, records, byMap) {
+        const mapId = world.maps?.find((map) => map.type === MAP_TYPES.SURFACE)?.id ?? world.maps?.[0]?.id;
+        const parentWorld = records.get(world.parentWorldId);
+        const sourceMapId = world.regional?.sourceMapId ?? parentWorld?.maps?.find((map) => map.type === MAP_TYPES.SURFACE)?.id ?? null;
+        const own = byMap.get(mapId)?.mapData;
+        const parent = sourceMapId ? byMap.get(sourceMapId)?.mapData : null;
+        const entry = { mapId, sourceMapId };
+        if (own) {
+            const size = Number.isInteger(own.mapWidth) && Number.isInteger(own.mapHeight) ? { width: own.mapWidth, height: own.mapHeight } : null;
+            const frame = parent && size ? ParentRunRecovery.frame(parent, { world: own.world, mapWidth: own.mapWidth, mapHeight: own.mapHeight }) : null;
+            const place = TerrainVersion.resolveWorld(own);
+            const root = size && [place.zoom, place.originX, place.originY].every(Number.isFinite) && place.zoom > 0 ? { x: place.originX, y: place.originY, width: size.width / place.zoom, height: size.height / place.zoom } : null;
+            Object.assign(entry, {
+                size,
+                crop: frame || root ? { parent: frame?.crop ?? null, root } : null,
+                zoom: frame?.zoomScale ?? null,
+                rootZoom: root ? place.zoom : null,
+                inheritedStrokes: size ? StrokeHistory.inheritedCount(own.history, parent?.history, frame, size) : 0,
+            });
+        }
+        // Read back through the record's own check, so a map's odd values cannot reach the record
+        return RegionalRecord.check(RegionalRecord.create({ migrated: true, maps: mapId ? [entry] : [] }));
     }
 
     /**
@@ -103,7 +148,7 @@ export class WorldMigration {
         const [maps, saved] = await Promise.all([platform.store.listMapData(), platform.store.listWorlds()]);
         const worlds = new Map(saved.map((world) => [world.id, world]));
         const { worlds: records, metas } = WorldMigration.plan({ maps, worlds, icons: WorldMigration.hostIcons() });
-        if (!metas.length) return { worlds: 0, maps: 0, backup: null };
+        if (!metas.length && !records.length) return { worlds: 0, maps: 0, backup: null };
 
         let backup = null;
         let backupFailed = false;

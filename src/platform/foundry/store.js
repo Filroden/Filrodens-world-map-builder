@@ -8,6 +8,7 @@
  */
 import { FILRODENSWMB } from "../../config.js";
 import { ColorMath } from "../../kernel/util/ColorMath.js";
+import { Blobs } from "../../kernel/data/Blobs.js";
 import { TerrainVersion } from "../../studios/world/tools/TerrainVersion.js";
 import { BiomePlacement } from "../../studios/world/generation/BiomePlacement.js";
 
@@ -220,6 +221,8 @@ const MODEL_RUN_PATH = `flags.${FILRODENSWMB.ID}.modelRun`;
 /** The flag path of a map's world record fields (v5), and of a world journal's record. */
 const META_PATH = `flags.${FILRODENSWMB.ID}.meta`;
 const WORLD_PATH = `flags.${FILRODENSWMB.ID}.world`;
+/** The flag path of the blobs kept with a map (see Blobs), base64 by hash. */
+const BLOBS_PATH = `flags.${FILRODENSWMB.ID}.blobs`;
 
 /**
  * `next` with every key of `stored` that `next` no longer has marked for deletion, at every depth.
@@ -470,6 +473,38 @@ export async function saveMapMeta(documentId, meta) {
     const document = await mapsPack()?.getDocument(documentId);
     if (!document) return false;
     await document.update({ [META_PATH]: withStaleKeysDeleted(document.flags?.[FILRODENSWMB.ID]?.meta, meta) });
+    return true;
+}
+
+/** Keeps a blob with a map (see Blobs): its gzipped bytes, base64 in a flag, by hash. */
+export async function saveMapBlob(documentId, hash, bytes) {
+    const document = await mapsPack()?.getDocument(documentId);
+    if (!document) return false;
+    await document.update({ [`${BLOBS_PATH}.${hash}`]: Blobs.toBase64(bytes) });
+    return true;
+}
+
+/** A blob kept with a map, or null. */
+export async function loadMapBlob(documentId, hash) {
+    const document = await mapsPack()?.getDocument(documentId);
+    const text = document?.flags?.[FILRODENSWMB.ID]?.blobs?.[hash];
+    return typeof text === "string" ? Blobs.fromBase64(text) : null;
+}
+
+/** The hashes of the blobs kept with a map. */
+export async function listMapBlobs(documentId) {
+    const document = await mapsPack()?.getDocument(documentId);
+    return Object.keys(document?.flags?.[FILRODENSWMB.ID]?.blobs ?? {});
+}
+
+/** Drops every blob kept with a map but those named (what its record still names). */
+export async function keepMapBlobs(documentId, keep) {
+    const document = await mapsPack()?.getDocument(documentId);
+    if (!document) return false;
+    const wanted = new Set(keep);
+    const update = {};
+    for (const hash of Object.keys(document.flags?.[FILRODENSWMB.ID]?.blobs ?? {})) if (!wanted.has(hash)) update[`${BLOBS_PATH}.${hash}`] = new foundry.data.operators.ForcedDeletion();
+    if (Object.keys(update).length) await document.update(update);
     return true;
 }
 

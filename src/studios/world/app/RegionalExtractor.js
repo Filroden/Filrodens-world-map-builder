@@ -3,7 +3,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
-import { BrushEngine } from "../tools/BrushEngine.js";
+import { StrokeHistory } from "../tools/StrokeHistory.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
@@ -92,7 +92,7 @@ export class RegionalExtractor {
             cultures: this.#translateCultures(state.cultures ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             // And the Generate settings its run was made with, for when the map leaves its parent
             generatorSettings: this.carrySettings(state.generatorSettings, cropBox, zoomScale, targetWidth, targetHeight),
-            history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
+            history: StrokeHistory.translate(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: this.guideRivers(app, this.#scaleRiverWidths(translate(app.manualRivers), zoomScale), cropBox),
             mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
@@ -323,36 +323,6 @@ export class RegionalExtractor {
         const engine = app.brushEngine;
         if (!engine?.resolveAnchors || !app.baseElevationData) return new Map();
         return engine.resolveAnchors(app.baseElevationData, seaLevel, ProceduralOrchestrator.getBaseRoughness(app));
-    }
-
-    /**
-     * Converts the brush strokes into the regional map's pixels, keeping those that reach into
-     * the crop. A slope or Level stroke also keeps the elevation it anchored to on the parent
-     * (`anchors`, see BrushEngine.resolveAnchors), since the regional map cannot find it itself
-     * when the stroke starts outside the crop. A slope stroke also records how many regional
-     * pixels one pixel of the map it was painted on spans (`scale`, compounding through each crop),
-     * so it climbs to the same height over the same stretch of the world (see BrushEngine).
-     */
-    static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight, anchors = new Map()) {
-        const newHistory = [];
-        for (const stroke of history) {
-            const translatedStroke = platform.utils.deepClone(stroke);
-            if (anchors.has(stroke)) translatedStroke.anchor = anchors.get(stroke);
-            if (BrushEngine.isSlope(stroke)) translatedStroke.scale = (stroke.scale ?? 1) * zoomScale;
-            translatedStroke.size *= zoomScale;
-            let isVisible = false;
-
-            for (const pt of translatedStroke.points) {
-                pt.x = (pt.x - cropBox.x) * zoomScale;
-                pt.y = (pt.y - cropBox.y) * zoomScale;
-
-                if (pt.x + translatedStroke.size >= 0 && pt.x - translatedStroke.size <= targetWidth && pt.y + translatedStroke.size >= 0 && pt.y - translatedStroke.size <= targetHeight) {
-                    isVisible = true;
-                }
-            }
-            if (isVisible) newHistory.push(translatedStroke);
-        }
-        return newHistory;
     }
 
     /**

@@ -151,3 +151,67 @@ test("deleting a middle world moves its held regional worlds up to its parent, s
     assert.equal(leaf.held, true);
     assert.equal(leaf.parentWorldId, root.world.id);
 });
+
+// ------------------------------------------------------------------ blobs kept with their maps
+
+const { RegionalRecord } = await import("../../src/kernel/worlds/RegionalRecord.js");
+const HASH_A = "a".repeat(32);
+const HASH_B = "b".repeat(32);
+
+/** A held regional world under a new world, its map holding blob A (named by its record) and blob B (not). */
+async function heldWithBlobs() {
+    const parent = await newWorld("Parent");
+    const saved = await Worlds.save({ world: null, name: "Region", settings: { setup: { seed: "r" } }, maps: [surface()] });
+    const mapId = saved.maps[0].id;
+    const world = { ...saved.world, parentWorldId: parent.world.id, held: true, regional: RegionalRecord.create({ maps: [{ mapId, cutBase: HASH_A, inheritedStrokes: 3 }] }) };
+    await platform.store.saveWorld(world);
+    await platform.store.saveMapBlob(mapId, HASH_A, new Uint8Array([1, 2, 3]));
+    await platform.store.saveMapBlob(mapId, HASH_B, new Uint8Array([4]));
+    return { parent, world, mapId };
+}
+
+test("a save keeps the blobs its record names and drops the rest", async () => {
+    const { world, mapId } = await heldWithBlobs();
+    await Worlds.save({ world, name: "Region", settings: { setup: { seed: "r" } }, maps: [surface(undefined, { id: mapId, changed: false })] });
+    assert.deepEqual(await platform.store.listMapBlobs(mapId), [HASH_A]);
+    assert.deepEqual(await platform.store.loadMapBlob(mapId, HASH_A), new Uint8Array([1, 2, 3]));
+    // A map's data saved again keeps its blobs
+    await platform.store.saveMapData("Region", { mapWidth: 10 }, mapId, {});
+    assert.deepEqual(await platform.store.listMapBlobs(mapId), [HASH_A]);
+});
+
+test("a save can change the record (the inherited strokes), and Save as takes the record and blobs to the copy", async () => {
+    const { world, mapId } = await heldWithBlobs();
+    const regional = RegionalRecord.withMap(world.regional, mapId, { inheritedStrokes: 1 });
+    const saved = await Worlds.save({ world, name: "Region", settings: { setup: { seed: "r" } }, maps: [surface(undefined, { id: mapId })], regional });
+    assert.equal(RegionalRecord.forMap((await Worlds.get(world.id)).regional, mapId).inheritedStrokes, 1);
+    const copy = await Worlds.save({ world: saved.world, name: "Region 2", settings: { setup: { seed: "r" } }, maps: [surface(undefined, { id: mapId })], asNew: true });
+    const copyMap = copy.maps[0].id;
+    assert.notEqual(copyMap, mapId);
+    assert.equal(RegionalRecord.forMap(copy.world.regional, copyMap).cutBase, HASH_A);
+    assert.equal(RegionalRecord.forMap(copy.world.regional, mapId), null);
+    assert.deepEqual(await platform.store.listMapBlobs(copyMap), [HASH_A]);
+    assert.deepEqual(await platform.store.listMapBlobs(mapId), [HASH_A], "the original keeps its own");
+});
+
+test("Duplicate takes the record and blob to the copy; Clone as new drops both", async () => {
+    const { world, mapId } = await heldWithBlobs();
+    const duplicate = await Worlds.copy(world.id, "Region (copy)");
+    const dupMap = duplicate.maps[0].id;
+    assert.equal(duplicate.held, true);
+    assert.equal(RegionalRecord.forMap(duplicate.regional, dupMap).inheritedStrokes, 3);
+    assert.ok((await platform.store.listMapBlobs(dupMap)).includes(HASH_A));
+    const clone = await Worlds.cloneAsNew(world.id, "Region (standalone)");
+    assert.equal(clone.regional, null);
+    assert.deepEqual(await platform.store.listMapBlobs(clone.maps[0].id), []);
+    assert.ok((await platform.store.listMapBlobs(mapId)).includes(HASH_A), "the original keeps its own");
+});
+
+test("a held world released by its parent's deletion drops its record and blobs", async () => {
+    const { parent, world, mapId } = await heldWithBlobs();
+    await Worlds.delete(parent.world.id);
+    const released = await Worlds.get(world.id);
+    assert.equal(released.held, false);
+    assert.equal(released.regional, null);
+    assert.deepEqual(await platform.store.listMapBlobs(mapId), []);
+});

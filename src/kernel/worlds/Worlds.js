@@ -1,5 +1,6 @@
 import { platform } from "../../platform/index.js";
 import { MAP_TYPES, WorldRecord } from "./WorldRecord.js";
+import { RegionalRecord } from "./RegionalRecord.js";
 
 /**
  * The world records and their maps, over the platform's store (v5's family records; see
@@ -18,6 +19,9 @@ import { MAP_TYPES, WorldRecord } from "./WorldRecord.js";
  *   still held, when it is held itself (they read the same settings); otherwise they are released
  *   as worlds of their own with a copy of the settings they read. Each keeps its own regional
  *   worlds under it. A regional world only cut from it (not held) loses the link.
+ * - **Blobs** (a regional world's `cutBase`, see RegionalRecord) are kept with the map whose part of
+ *   the record names them. Each save drops the blobs a map's record no longer names; a copy takes
+ *   them along with its record; Clone as new and a release drop the record, and the blobs with it.
  *
  * The clock and the id maker can be replaced for tests.
  */
@@ -81,18 +85,21 @@ export class Worlds {
      * @param {Array<{id: string|null, type: string, data: object, owners?: object, modelRun?: object|null, summary?: object, changed: boolean}>} options.maps
      * @param {boolean} [options.asNew=false] - Save as a new world (Save as): a held world's copy is
      *     held by the same parent.
+     * @param {object|null} [options.regional] - The held world's record as the open map changed it
+     *     (its inherited strokes, see StrokeHistory); left out keeps the saved one.
      * @param {boolean} [options.settingsChanged] - Whether the settings changed since the world was
      *     opened, when the caller knows better than a comparison with the saved record can (a map's
      *     load fills in defaults the record never held, which are not a change of the user's).
      * @returns {Promise<{world: object, maps: Array<{id: string, type: string}>}|null>}
      */
-    static async save({ world, name, settings, maps, asNew = false, settingsChanged = undefined }) {
+    static async save({ world, name, settings, maps, asNew = false, settingsChanged = undefined, regional = undefined }) {
         const stamp = Worlds.now();
         const fresh = !world || asNew;
         const record = fresh
             ? WorldRecord.create({ id: Worlds.newWorldId(), name, parentWorldId: world?.parentWorldId ?? null, held: world?.held === true })
             : structuredClone(world);
         if (fresh && world) record.regional = structuredClone(world.regional ?? null);
+        if (regional !== undefined) record.regional = structuredClone(regional);
         record.name = name;
 
         const stored = fresh ? null : world.settings;
@@ -118,12 +125,19 @@ export class Worlds {
             if (map.studio) meta.studio = map.studio;
             const saved = await platform.store.saveMapData(name, map.data, existingId, { owners: map.owners ?? null, modelRun: map.modelRun, meta, summary: map.summary ?? null });
             if (!saved) return null;
-            savedMaps.push({ id: saved.id, type: map.type });
+            savedMaps.push({ id: saved.id, type: map.type, from: map.id ?? null });
         }
-        record.maps = mergeMaps(record.maps, savedMaps);
+        if (fresh && record.regional) {
+            // Save as: the copy's maps take their part of the record, and its blobs, under their new ids
+            const renamed = new Map(savedMaps.filter((map) => map.from).map((map) => [map.from, map.id]));
+            for (const [from, to] of renamed) await Worlds.#copyBlobs(record.regional, from, to);
+            record.regional = RegionalRecord.remap(record.regional, renamed);
+        }
+        for (const map of savedMaps) await Worlds.#keepBlobs(record, map.id);
+        record.maps = mergeMaps(record.maps, savedMaps.map(({ id, type }) => ({ id, type })));
 
         if (!(await platform.store.saveWorld(record))) return null;
-        return { world: record, maps: savedMaps };
+        return { world: record, maps: savedMaps.map(({ id, type }) => ({ id, type })) };
     }
 
     /**
@@ -138,7 +152,10 @@ export class Worlds {
         if (!world) return null;
         const copy = { ...structuredClone(world), id: Worlds.newWorldId(), name, settingsRevision: 1, settingsSavedAt: Worlds.now() };
         delete copy.migration;
-        copy.maps = await Worlds.#copyMaps(world, copy, name);
+        const renamed = new Map();
+        copy.maps = await Worlds.#copyMaps(world, copy, name, renamed);
+        // The copied maps carry their blobs (the store copies a map whole); the record follows them
+        copy.regional = RegionalRecord.remap(copy.regional ?? null, renamed);
         await platform.store.saveWorld(copy);
         return copy;
     }
@@ -157,6 +174,8 @@ export class Worlds {
         const copy = { ...structuredClone(world), id: Worlds.newWorldId(), name, settings, settingsRevision: 1, settingsSavedAt: Worlds.now(), parentWorldId: null, held: false, regional: null };
         delete copy.migration;
         copy.maps = await Worlds.#copyMaps(world, copy, name);
+        // No record, so no blobs
+        for (const map of copy.maps) await Worlds.#keepBlobs(copy, map.id);
         await platform.store.saveWorld(copy);
         return copy;
     }
@@ -203,15 +222,31 @@ export class Worlds {
         for (const child of plan.movedUp) await platform.store.saveWorld({ ...child, parentWorldId: world.parentWorldId });
         for (const child of plan.released) {
             const settings = WorldRecord.effectiveSettings(child, byId);
-            await platform.store.saveWorld({ ...child, settings, parentWorldId: null, held: false, settingsSavedAt: Worlds.now() });
+            const released = { ...child, settings, parentWorldId: null, held: false, regional: null, settingsSavedAt: Worlds.now() };
+            for (const map of child.maps ?? []) await Worlds.#keepBlobs(released, map.id);
+            await platform.store.saveWorld(released);
         }
         for (const child of plan.unlinked) await platform.store.saveWorld({ ...child, parentWorldId: null });
         for (const map of world.maps ?? []) await platform.store.deleteSavedMap(map.id);
         return platform.store.deleteWorld(worldId);
     }
 
+    /** Drops the blobs kept with a map that its world's record no longer names. */
+    static async #keepBlobs(world, mapId) {
+        if (typeof platform.store.keepMapBlobs !== "function") return;
+        await platform.store.keepMapBlobs(mapId, RegionalRecord.blobsOf(world.regional, mapId));
+    }
+
+    /** Copies the blobs a record names for one map to another map (Save as). */
+    static async #copyBlobs(regional, from, to) {
+        for (const hash of RegionalRecord.blobsOf(regional, from)) {
+            const bytes = await platform.store.loadMapBlob(from, hash);
+            if (bytes) await platform.store.saveMapBlob(to, hash, bytes);
+        }
+    }
+
     /** Duplicates a world's maps for a copy of it, each made the copy's at revision 1. */
-    static async #copyMaps(world, copy, name) {
+    static async #copyMaps(world, copy, name, renamed = new Map()) {
         const stamp = Worlds.now();
         const maps = [];
         for (const map of world.maps ?? []) {
@@ -220,6 +255,7 @@ export class Worlds {
             const previous = await platform.store.loadMapMeta(map.id);
             await platform.store.saveMapMeta(duplicate.id, { ...(previous ?? {}), worldId: copy.id, mapType: map.type, revision: 1, savedAt: stamp });
             maps.push({ id: duplicate.id, type: map.type });
+            renamed.set(map.id, duplicate.id);
         }
         return maps;
     }
