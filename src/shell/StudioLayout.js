@@ -1,4 +1,5 @@
 import { applyBarFold } from "./BarFold.js";
+import { applyWorldBarFold } from "./WorldBarFold.js";
 import { mustFoldMapControls } from "./MapControls.js";
 
 /**
@@ -12,8 +13,8 @@ import { mustFoldMapControls } from "./MapControls.js";
  *   compact rail, panel and inspector widths) or `narrow` (below 1,200px: the same widths; kept
  *   for rules that need the narrowest studio).
  * - `data-fwmb-short` on the studio while the whole rail would not fit its height: the rail folds
- *   its occasional tools into More (`""`), and should that still not fit, its file actions too
- *   (`"files"`). Help, last, never folds. The rail is measured rather than given a fixed height,
+ *   its occasional tools into More (`""`), and should that still not fit, it scrolls (`"scroll"`;
+ *   the file actions it once folded too are the world bar's from v5). Help, last, never folds. The rail is measured rather than given a fixed height,
  *   since its length depends on the host (full screen on the web) and the width (stage names).
  * - `--fwmb-controls-w` on the map preview: the map controls' width (bottom end), which the hint
  *   (bottom start) leaves free beside it.
@@ -27,6 +28,7 @@ import { mustFoldMapControls } from "./MapControls.js";
  * - `data-fold` on the map controls when their full row does not fit beside the hint at its
  *   narrowest: the layer toggles give way to the Layers menu.
  * - `data-fold` on the context bar (0 to 3): how far it folds to stay on one row (see BarFold).
+ * - `data-fold` on the world bar (0 to 4): the same, in the world bar's order (see WorldBarFold).
  * - `--fwmb-layer-menu-max` on the map preview: the height the map controls' menus may take
  *   before they scroll, which is the room above the controls.
  *
@@ -36,8 +38,8 @@ import { mustFoldMapControls } from "./MapControls.js";
  */
 export const STUDIO_WIDTH = Object.freeze({ COMPACT_BELOW: 1400, NARROW_BELOW: 1200 });
 
-/** How far the rail folds, least first: nothing, the occasional tools, then the file actions too. */
-export const RAIL_FOLDS = Object.freeze([null, "", "files"]);
+/** How far the rail folds, least first: nothing, the occasional tools, then scrolling. */
+export const RAIL_FOLDS = Object.freeze([null, "", "scroll"]);
 
 /** The space kept between the canvas overlays, and between them and the canvas edge, in rem. */
 const OVERLAY_GAP_REM = 0.5;
@@ -81,9 +83,11 @@ export class StudioLayout {
         const view = this.#root.ownerDocument.defaultView;
         if (!this.#resize && view?.ResizeObserver) {
             this.#resize = new view.ResizeObserver(() => this.update());
-            // Docked panels come and go as children of the studio
+            // Docked panels come and go as children of the studio's body
             this.#mutations = new view.MutationObserver(() => this.#observeAll());
             this.#mutations.observe(this.#root, { childList: true });
+            const body = this.#root.querySelector(":scope > .fwmb-studio-body");
+            if (body) this.#mutations.observe(body, { childList: true });
         }
         this.#observeAll();
         this.update();
@@ -139,7 +143,7 @@ export class StudioLayout {
     }
 
     get #dockedPanels() {
-        return [...this.#root.querySelectorAll(":scope > .fwmb-overlay-docked")];
+        return [...this.#root.querySelectorAll(":scope > .fwmb-overlay-docked, :scope > .fwmb-studio-body > .fwmb-overlay-docked")];
     }
 
     /** Measures and writes every rule. */
@@ -151,6 +155,9 @@ export class StudioLayout {
         if (width === 0) return;
 
         setAttribute(root, "data-fwmb-width", widthClass(width));
+        // The world bar folds to the studio's width (see WorldBarFold)
+        const worldBar = root.querySelector(":scope > .fwmb-worldbar");
+        if (worldBar && worldBar.offsetParent !== null) applyWorldBarFold(worldBar, width);
         this.#foldRail();
 
         const bar = this.#bar;

@@ -1,10 +1,15 @@
 {{!--
     The studio window's only part: the frame its regions are drawn into (see MapStudio's
-    regions and StudioView). Each placeholder is replaced by its region's own root element the
-    first time the region is drawn; the edit toolbar is drawn inside the map's container.
+    regions and StudioView). The world bar runs across the top; the body below it holds the rail,
+    the context panel and the map side by side, with the inspector docked at its end edge (see
+    Overlay). Each placeholder is replaced by its region's own root element the first time the
+    region is drawn; the edit toolbar is drawn inside the map's container.
 --}}
 <div class="fwmb-studio">
-    <div data-region="toolbar"></div>
-    <div data-region="context"></div>
-    <div data-region="map"></div>
+    <div data-region="worldbar"></div>
+    <div class="fwmb-studio-body">
+        <div data-region="toolbar"></div>
+        <div data-region="context"></div>
+        <div data-region="map"></div>
+    </div>
 </div>

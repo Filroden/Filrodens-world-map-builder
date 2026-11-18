@@ -34,6 +34,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/map.hbs",
         "modules/filrodens-world-map-builder/templates/shell/studio.hbs",
         "modules/filrodens-world-map-builder/templates/shell/toolbar.hbs",
+        "modules/filrodens-world-map-builder/templates/shell/worldbar.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-biomes.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-cartography.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-export.hbs",
@@ -47,6 +48,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/tools-generate.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-history.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-travel.hbs",
+        "modules/filrodens-world-map-builder/templates/world/tools-threeD.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-regions.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-scene.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-terrain.hbs",
@@ -63,6 +65,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/dialogs/name-all.hbs",
         "modules/filrodens-world-map-builder/templates/shell/dialogs/shortcuts.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/terrain-upgrade.hbs",
+        "modules/filrodens-world-map-builder/templates/world/dialogs/first-opening.hbs",
 
         "modules/filrodens-world-map-builder/templates/shell/parts/bar-modes.hbs",
         "modules/filrodens-world-map-builder/templates/shell/parts/bar-pause.hbs",

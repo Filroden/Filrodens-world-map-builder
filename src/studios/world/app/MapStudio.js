@@ -27,6 +27,7 @@ import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
 import { ShoreRelay } from "./ShoreRelay.js";
 import { RunCells } from "./RunCells.js";
+import { FirstOpening } from "./FirstOpening.js";
 import { RunInputs } from "./RunInputs.js";
 import { Infilling } from "./Infilling.js";
 import { RandomNames } from "./RandomNames.js";
@@ -308,7 +309,11 @@ export class MapStudio {
         setPickMode(_e, t)              { if (PickTool.setMode(this, t.dataset.mode)) this.#modeChosen(t.dataset.mode !== "select"); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         setCartographyMode(_e, t)       { this.uiState.cartographyMode = t.dataset.mode === "move" ? "move" : "select"; this.#modeChosen(false); },
-        threeDView(e, t)                { this._onThreeDView(e, t); },
+        threeDZoom(_e, t)               { this.scene3D?.zoomBy(t.dataset.zoom === "in" ? MapStudio.#THREE_D_ZOOM : 1 / MapStudio.#THREE_D_ZOOM); },
+        threeDResetView()               { this.scene3D?.resetView(); },
+        chooseMode(_e, t)               { this.enterMode(t.dataset.mode); },
+        newWorld(e, t)                  { this._onNewWorld(e, t); },
+        exportOpenWorld(e, t)           { this._onExportOpenWorld(e, t); },
         toggleAppearance(_e, t)         { AppearanceMenu.toggle(this.root, t); },
         chooseAppearance(_e, t)         { AppearanceMenu.choose(this.root, t); },
         toggleFullscreen()              { platform.frame?.fullscreen?.toggle(); },
@@ -353,6 +358,7 @@ export class MapStudio {
      * drawn at the top of the map's container, inside the map region.
      */
     static #REGIONS = Object.freeze({
+        worldbar: { template: `${TEMPLATE_ROOT}shell/worldbar.hbs`, classes: ["fwmb-worldbar"] },
         toolbar: { template: `${TEMPLATE_ROOT}shell/toolbar.hbs`, classes: ["fwmb-toolbar"] },
         context: { template: `${TEMPLATE_ROOT}shell/context.hbs`, classes: ["fwmb-panel", "fwmb-context-panel"] },
         map: { template: `${TEMPLATE_ROOT}world/map.hbs`, classes: ["fwmb-map"], once: true },
@@ -385,6 +391,19 @@ export class MapStudio {
     #saveId = null;
     #saveName = null;
     #dirty = false;
+
+    /**
+     * The mode the studio is in (S0 step 3): Create, the map's tools, or Explore, reading the map
+     * (History, Travel, the 3D view). The tool last open in each mode is kept, so switching back
+     * returns to it; and each world's, for the session only (Ken, 2026-11-18), so reopening a world
+     * returns to where it was left. A world opened afresh opens in Explore when it has a run.
+     */
+    mode = "create";
+    #modeTools = { create: null, explore: null };
+    #worldModes = new Map();
+    // The world the mode and tools are kept for: the one whose mode was last chosen, so a world
+    // being opened is not given the last one's while it loads
+    #modeWorldId = null;
 
     /**
      * The terrain's layers and the two map-control buttons that group them. Each group button
@@ -728,6 +747,8 @@ export class MapStudio {
         if (id === this.#saveId) return;
         this.#saveId = id;
         this.#showTitle();
+        // The world bar names the world and offers Export world once it is saved
+        this.view?.render(["worldbar"]);
     }
 
     /** The saved map's name, or null for a map that has never been saved. */
@@ -739,6 +760,7 @@ export class MapStudio {
         if (name === this.#saveName) return;
         this.#saveName = name;
         this.#showTitle();
+        this.view?.render(["worldbar"]);
         // A cartouche showing the map's name follows it
         this.canvasEngine?.setMapName?.(name);
     }
@@ -782,11 +804,11 @@ export class MapStudio {
      * The Save button's name for the open map: the map's name when it has one, and that it has
      * unsaved changes when it does.
      */
-    #saveLabel() {
+    #saveLabel(groups = []) {
         const { i18n } = platform;
-        let label = i18n.localize("FILRODENSWMB.UI.SaveMap");
-        if (this.#saveName) label = `${label} (${this.#saveName})`;
-        return this.#dirty ? i18n.format("FILRODENSWMB.UI.SaveMapUnsaved", { label }) : label;
+        if (!this.#dirty) return i18n.localize("FILRODENSWMB.UI.SaveWorld");
+        if (!groups.length) return i18n.localize("FILRODENSWMB.UI.SaveWorldUnsaved");
+        return i18n.format("FILRODENSWMB.UI.SaveWorldUnsavedGroups", { groups: new Intl.ListFormat(i18n.lang, { type: "conjunction" }).format(groups) });
     }
 
     /**
@@ -795,41 +817,114 @@ export class MapStudio {
      * follows, its text the same name, and More shows the dot while it holds Save.
      */
     #showDirty() {
-        const button = this.root?.querySelector('.fwmb-rail-files [data-action="saveMap"]');
-        const item = this.root?.querySelector('.fwmb-rail-more-files [data-action="saveMap"]');
-        if (!button && !item) return;
+        const button = this.root?.querySelector('.fwmb-worldbar [data-action="saveMap"]');
+        if (!button) return;
         const label = this.#saveLabel();
-        if (button) {
-            button.classList.toggle("fwmb-is-dirty", this.#dirty);
-            button.setAttribute("aria-label", label);
-            button.dataset.tooltip = label;
-        }
-        if (item) {
-            item.classList.toggle("fwmb-is-dirty", this.#dirty);
-            const text = item.querySelector(".fwmb-menu-text");
-            if (text) text.textContent = label;
+        button.classList.toggle("fwmb-is-dirty", this.#dirty);
+        button.setAttribute("aria-label", label);
+        button.dataset.tooltip = label;
+    }
+
+    /**
+     * Save world's name as the pointer or focus reaches it: what is unsaved, the world's settings
+     * groups that changed since it opened named (see #saveLabel). Worked out then rather than at
+     * every edit, since it reads the whole map's settings.
+     */
+    #nameUnsaved(event) {
+        const button = event.target.closest?.('.fwmb-worldbar [data-action="saveMap"]');
+        if (!button || !this.#dirty) return;
+        const label = this.#saveLabel(this.#changedGroupNames());
+        button.setAttribute("aria-label", label);
+        button.dataset.tooltip = label;
+    }
+
+    /** The names of the world settings groups changed since the world opened, in the editors' order. */
+    #changedGroupNames() {
+        if (!this.worldSettingsOpened) return [];
+        try {
+            const changed = new Set(WorldRecord.changedGroups(this.worldSettingsOpened, this.#worldSettingsNow()));
+            // Pin icons are edited with the styles, so they are named as Styles and icons
+            if (changed.delete("icons")) changed.add("styles");
+            const order = ["setup", "cultures", "ages", "nameStyle", "styles", "biomes", "climate"];
+            return order.filter((group) => changed.has(group)).map((group) => platform.i18n.localize(MapStudio.#GROUP_NAMES[group]));
+        } catch (error) {
+            console.warn("FWMB | The world's settings could not be compared:", error);
+            return [];
         }
     }
+
+    /** The world settings groups' names, as the World menu names their editors. */
+    static #GROUP_NAMES = Object.freeze({
+        setup: "FILRODENSWMB.UI.WorldSetup",
+        cultures: "FILRODENSWMB.UI.WorldCultures",
+        ages: "FILRODENSWMB.UI.WorldAges",
+        nameStyle: "FILRODENSWMB.UI.WorldNameStyle",
+        styles: "FILRODENSWMB.UI.ToolLibrary",
+        biomes: "FILRODENSWMB.UI.WorldBiomes",
+        climate: "FILRODENSWMB.UI.WorldClimate",
+    });
 
     /** The rail's groups and buttons, for toolbar.hbs (see the studio's definition). */
     #railContext() {
         const { definition } = this;
         // Full screen only where the host offers it and the page may use it (see platform.frame)
         const fullscreen = platform.frame?.fullscreen;
-        const occasional = definition.occasional.filter((entry) => entry.host !== "fullscreen" || fullscreen?.enabled()).map((entry) => {
+        // An occasional tool belongs to a mode, as the stages' do (Reference image and Styles and
+        // icons are Create's); the menus and toggles are in both
+        const inMode = (entry) => !entry.tool || definition.tool(entry.tool)?.mode === this.mode;
+        const occasional = definition.occasional.filter((entry) => (entry.host !== "fullscreen" || fullscreen?.enabled()) && inMode(entry)).map((entry) => {
             if (entry.tool) return { ...definition.tool(entry.tool), tool: entry.tool };
             if (entry.menu) return { ...entry, appearance: AppearanceMenu.context() };
             if (entry.host === "fullscreen") return { ...entry, ...this.#fullscreenState() };
-            return { ...entry, pressed: entry.action === "threeDView" && !!this.scene3D };
+            return { ...entry, pressed: false };
         });
         return {
-            // Every mode's stages until the mode switch arrives (S0 step 3)
-            railStages: definition.railStages(this.mapType, null),
+            railStages: definition.railStages(this.mapType, this.mode),
             railOccasional: occasional,
             railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
-            isDirty: this.#dirty,
-            saveLabel: this.#saveLabel(),
             helpOpen: HelpPanel.shows(this),
+        };
+    }
+
+    /**
+     * The world bar (worldbar.hbs): the world's name and its menu, Save world, the layer switcher
+     * (the Surface map, with Geology and Add a map drawn for the tracks that build them), the mode
+     * and the World menu (its items drawn for S0 step 4, which builds them).
+     */
+    #worldBarContext() {
+        const { i18n } = platform;
+        const notBuilt = (name) => i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name });
+        const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const surface = { id: "surface", icon: "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: true };
+        surface.tooltip = surface.full;
+        const geologyName = i18n.localize("FILRODENSWMB.UI.LayerGeologyFull");
+        const geology = { id: "geology", icon: "strata", full: geologyName, short: i18n.localize("FILRODENSWMB.UI.LayerGeology"), disabled: true, tooltip: notBuilt(geologyName) };
+        const item = (key, icon, separated = false) => ({ label: i18n.localize(key), icon, separated, tooltip: notBuilt(i18n.localize(key)) });
+        return {
+            name,
+            nameMenuLabel: i18n.format("FILRODENSWMB.UI.WorldNameMenuHint", { name }),
+            saved: !!this.#saveId,
+            dirty: this.#dirty,
+            saveLabel: this.#saveLabel(),
+            layers: [surface, geology],
+            current: surface,
+            layerMenuLabel: i18n.format("FILRODENSWMB.UI.LayerMenuHint", { map: surface.full }),
+            addMap: notBuilt(i18n.localize("FILRODENSWMB.UI.AddMap")),
+            settlementMaps: notBuilt(i18n.localize("FILRODENSWMB.UI.SettlementMaps")),
+            mode: this.mode,
+            fold: this.root?.querySelector(":scope > .fwmb-worldbar")?.dataset.fold ?? "1",
+            worldMenu: [
+                item("FILRODENSWMB.UI.WorldOverview", "public"),
+                item("FILRODENSWMB.UI.WorldSetup", "tune", true),
+                item("FILRODENSWMB.UI.WorldCultures", "castle"),
+                item("FILRODENSWMB.UI.WorldAges", "history"),
+                item("FILRODENSWMB.UI.WorldNameStyle", "insert-text"),
+                item("FILRODENSWMB.UI.ToolLibrary", "palette"),
+                item("FILRODENSWMB.UI.WorldBiomes", "forest"),
+                item("FILRODENSWMB.UI.WorldClimate", "water-drop"),
+                item("FILRODENSWMB.UI.GenerateAll", "generate", true),
+                item("FILRODENSWMB.UI.CutRegionalWorld", "crop"),
+            ],
         };
     }
 
@@ -946,6 +1041,8 @@ export class MapStudio {
         const next = entry?.next;
         return {
             title: i18n.localize(entry?.label ?? ""),
+            // Explore's tools read the map and change nothing on it
+            tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
             meta,
             state: this.#stateBlockContext(),
             next: next ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
@@ -1219,6 +1316,7 @@ export class MapStudio {
         context.sceneExport = platform.scene.available;
 
         if (regionId === "toolbar") Object.assign(context, this.#railContext());
+        if (regionId === "worldbar") context.worldBar = this.#worldBarContext();
         if (regionId === "map") Object.assign(context, MapStudio.#mapControlsContext());
 
         const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
@@ -1646,6 +1744,8 @@ export class MapStudio {
         root.addEventListener("input", (event) => this.#routeFieldEvent(event));
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
+        root.addEventListener("pointerover", (event) => this.#nameUnsaved(event));
+        root.addEventListener("focusin", (event) => this.#nameUnsaved(event));
         root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
         ListReorder.bind(root, (list, id, to) => this.#moveListItem(list, id, to));
         bindDropdownMenus(root);
@@ -4782,6 +4882,7 @@ export class MapStudio {
         if (!result) return null;
         this.world = result.world;
         this.worldSettingsOpened = settings;
+        this.view?.render(["worldbar"]);
         return { mapId: result.maps[0].id, name: this.currentSaveName };
     }
 
@@ -5463,6 +5564,9 @@ export class MapStudio {
         this.worldSettingsOpened = null;
         this.inheritedStrokes = undefined;
         this.#useWorldIcons(WorldRecord.emptyIcons());
+        // A new world opens in Create, on Map setup (S0 step 3)
+        this.mode = "create";
+        this.#modeTools = { create: "scene", explore: null };
 
         // 4. If switching to Guided Mode, auto-activate the drawing tools
         if (newEngine === "guided") {
@@ -5488,7 +5592,71 @@ export class MapStudio {
     _onChangeTool(event, target) {
         // A tool that is no longer on the rail (the Settings tool, now the Appearance menu) opens New map
         const newTool = this.definition.offers(target.dataset.tool, this.mapType) ? target.dataset.tool : "scene";
-        if (this.activeTool === newTool) return;
+        return this.switchTool(newTool);
+    }
+
+    /** How far one press of the 3D view's zoom buttons moves the camera. */
+    static #THREE_D_ZOOM = 0.8;
+
+    /** The tool each mode opens on when none of its tools has been open yet. */
+    static #MODE_FIRST_TOOL = Object.freeze({ create: "scene", explore: "history" });
+
+    /**
+     * Switches between Create and Explore (S0 step 3): the map stays; the mode's rail is drawn, and
+     * the tool last open in it opens again (its first tool when none has been).
+     * @param {"create"|"explore"} mode
+     */
+    async enterMode(mode) {
+        if (!["create", "explore"].includes(mode) || mode === this.mode) return;
+        this.mode = mode;
+        const kept = this.#modeTools[mode];
+        const tool = kept && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode];
+        this.#rememberWorldMode();
+        await this.switchTool(tool, { force: true });
+        this.view?.render(["worldbar"]);
+    }
+
+    /** Keeps the open world's mode and each mode's tool for the session (see mode). */
+    #rememberWorldMode() {
+        const id = this.world?.id ?? this.#saveId;
+        if (id && id === this.#modeWorldId) this.#worldModes.set(id, { mode: this.mode, tools: { ...this.#modeTools } });
+    }
+
+    /**
+     * The mode a world opens in: as it was left this session, else Explore when the map has a run
+     * to explore and Create when it has none (see mode).
+     */
+    async #openWorldMode() {
+        this.#modeWorldId = this.world?.id ?? this.#saveId;
+        const kept = this.#worldModes.get(this.#modeWorldId);
+        // Its own run, or its copy of its parent's (the mesh the run's cells need may not be built yet)
+        const mode = kept?.mode ?? (this.modelRun || this.parentRun ? "explore" : "create");
+        if (kept) this.#modeTools = { ...kept.tools };
+        else this.#modeTools = { create: this.mode === "create" && this.definition.tool(this.activeTool)?.stage ? this.activeTool : this.#modeTools.create, explore: null };
+        if (mode === this.mode) {
+            if (mode === "explore" && !this.definition.offers(this.activeTool, this.mapType, "explore")) await this.switchTool(this.#modeTools.explore ?? MapStudio.#MODE_FIRST_TOOL.explore);
+        } else {
+            this.mode = mode;
+            const tool = this.#modeTools[mode] && this.definition.offers(this.#modeTools[mode], this.mapType, mode) ? this.#modeTools[mode] : MapStudio.#MODE_FIRST_TOOL[mode];
+            await this.switchTool(tool, { force: true });
+        }
+        this.#rememberWorldMode();
+        this.view?.render(["worldbar", "toolbar"]);
+    }
+
+    /**
+     * Opens a tool: the one open is left (its drawing ended, its inspector closed, the 3D view
+     * closed when it is the 3D view), and the new one is set up and drawn.
+     * @param {string} newTool
+     * @param {{force?: boolean}} [options] - Draw again even when the tool is the one open (a mode change).
+     */
+    async switchTool(newTool, { force = false } = {}) {
+        if (this.activeTool === newTool && !force) return;
+        // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
+        if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
+        const toolMode = this.definition.tool(newTool)?.mode;
+        if (toolMode && this.definition.tool(newTool)?.stage && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
+        this.#rememberWorldMode();
 
         // 1. Teardown current state. Automatic generation always comes back on when the tool
         // changes; changes deferred by the pause toggle are generated now (which also covers a
@@ -5523,6 +5691,7 @@ export class MapStudio {
         this._repaintVectors();
         this.view?.render(["toolbar", "context", "editToolbar"]);
         this.#updateCanvasHint();
+        if (newTool === "threeD" && !this.scene3D) await this._onThreeDView();
     }
 
     /**
@@ -6269,8 +6438,76 @@ export class MapStudio {
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.
+            // Its mode (Explore when it has a run, S0 step 3), then, for a world made from a 4.3 map,
+            // the notice saying what that means, once
+            await this.#openWorldMode();
+            await this.#offerFirstOpeningNotice();
             await this.#offerTerrainUpgrade();
         }
+    }
+
+    /**
+     * New world (the world bar's name menu). Until World setup arrives (S0 step 4), a new world is
+     * made as a new map was: Create opens on Map setup, its Create new map section open, and its
+     * button asks about unsaved changes before it makes the world.
+     */
+    async _onNewWorld() {
+        if (this.mode !== "create") await this.enterMode("create");
+        await this.switchTool("scene");
+        await this.view?.render(["context"]);
+        const section = this.root?.querySelector('.fwmb-context-panel details[data-section="generation"]');
+        if (!section) return;
+        section.open = true;
+        section.scrollIntoView({ block: "start" });
+        section.querySelector("select, input")?.focus({ preventScroll: true });
+    }
+
+    /** Export world (the world bar's name menu): the open world as last saved, in a world file (see MapTransfer). */
+    async _onExportOpenWorld() {
+        if (!this.#saveId) return;
+        if (this.#dirty) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.ExportWorldSavedOnly"));
+        await MapTransfer.exportMap(this.#saveId, this.#saveName ?? this.world?.name ?? "");
+    }
+
+    /**
+     * The first opening of a world made from a 4.3 map (board W8): what changed, once a world (Ken,
+     * 2026-11-18). Seeing it is written to the world's record at once, so the map is not marked
+     * unsaved for it. A world with a run opened in Explore; the notice offers Create.
+     */
+    async #offerFirstOpeningNotice() {
+        const world = this.world;
+        if (!world?.migration || world.migration.noticed) return;
+        const { i18n } = platform;
+        const noticed = { ...world, migration: { ...world.migration, noticed: true } };
+        this.world = noticed;
+        try {
+            await platform.store.saveWorld(noticed);
+        } catch (error) {
+            console.warn("FWMB | The world's first-opening notice could not be marked seen:", error);
+        }
+        const explore = this.mode === "explore";
+        const source = noticed.held ? await this.#heldSourceName() : null;
+        const content = await platform.templates.render(`${TEMPLATE_ROOT}world/dialogs/first-opening.hbs`, FirstOpening.context(noticed, { explore, source, link: FILRODENSWMB.HELP.UPDATING_5 }, i18n));
+        const choice = await platform.dialogs.choose({
+            classes: ["fwmb", "fwmb-first-opening"],
+            title: i18n.format("FILRODENSWMB.UI.FirstOpeningTitle", { name: noticed.name || this.#saveName || "" }),
+            icon: "fwmb-icon fwmb-icon--public",
+            content,
+            buttons: explore
+                ? [
+                      { action: "create", label: i18n.localize("FILRODENSWMB.UI.FirstOpeningCreate") },
+                      { action: "explore", label: i18n.localize("FILRODENSWMB.UI.ModeExplore"), tone: "positive", default: true },
+                  ]
+                : [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), tone: "positive", default: true }],
+            dismissed: "close",
+        });
+        if (choice === "create") await this.enterMode("create");
+    }
+
+    /** The name of the world a held regional world reads its settings from (the top of its chain). */
+    async #heldSourceName() {
+        const worlds = await Worlds.all();
+        return WorldRecord.settingsSource(worlds.get(this.world.id) ?? this.world, (id) => worlds.get(id) ?? null)?.name ?? null;
     }
 
     /** The open world's settings as a save would write them (see WorldSettings), with its pin icons. */
@@ -6632,14 +6869,9 @@ export class MapStudio {
             this.#syncMapControls();
             this.#applyCanvasInteractivity();
 
-            // Restore the manual layout wrappers
-            const mapControls = this.root.querySelector(".fwmb-map-controls");
-            const contextPanel = this.root.querySelector(".fwmb-context-panel");
-            const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
-
-            if (mapControls) mapControls.classList.remove("fwmb-hidden");
-            if (contextPanel) contextPanel.style.display = "";
-            if (editToolbar) editToolbar.style.display = ""; // Restores standard CSS flow
+            // The panel and the context bar come back (see the stylesheet's fwmb-is-3d-view)
+            this.root.classList.remove("fwmb-is-3d-view");
+            this.root.querySelector(".fwmb-map-controls")?.classList.remove("fwmb-hidden");
 
             this.#updateCanvasHint();
             return;
@@ -6654,8 +6886,6 @@ export class MapStudio {
 
         // 3. Setup 3D overlay UI
         const mapControls = this.root.querySelector(".fwmb-map-controls");
-        const contextPanel = this.root.querySelector(".fwmb-context-panel");
-        const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
         overlay.classList.remove("fwmb-hidden");
         // The canvas's overlays (information bar, map controls, undo and redo) belong to the flat
         // map and are hidden while the 3D view covers it; the hint stays, with the 3D view's own
@@ -6663,10 +6893,10 @@ export class MapStudio {
         overlay.closest(".fwmb-map-preview")?.classList.add("fwmb-is-3d");
         this.#syncReliefEmphasisSlider();
 
-        // Manually hide layout wrappers so the 3D canvas fills the entire screen
+        // The 3D view has no panel and no context bar, so its canvas fills the body beside the rail:
+        // a class on the studio (rather than the parts' own styles) so a redraw of either keeps it
         if (mapControls) mapControls.classList.add("fwmb-hidden");
-        if (contextPanel) contextPanel.style.display = "none";
-        if (editToolbar) editToolbar.style.display = "none"; // Destroys the bottom margin bug!
+        this.root.classList.add("fwmb-is-3d-view");
 
         // 4. Generate 3D Scene. The terrain images the flat map was last painted from are
         // current (any pending generation has just run), so the 3D view is built from the same

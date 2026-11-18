@@ -42,15 +42,15 @@ test("every tool the World studio registers has a stage or is occasional, a mode
     assert.ok(STRINGS[WORLD_DEFINITION.label] && STRINGS[LocalStudio.definition.label], "the studios' names are in en.json");
 });
 
-test("the rail is the registration's: every mode's stages until the mode switch, or one mode's", () => {
+test("the rail is the registration's: one mode's stages (every mode's when none is named)", () => {
     const ids = (stages) => stages.map((stage) => [stage.id, stage.tools.map((tool) => tool.id)]);
     assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface")), [
         ["shape", ["scene", "terrain", "biomes", "features"]],
         ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
         ["finish", ["cartography", "export"]],
-        ["explore", ["history", "travel"]],
+        ["explore", ["history", "travel", "threeD"]],
     ]);
-    assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface", "explore")), [["explore", ["history", "travel"]]]);
+    assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface", "explore")), [["explore", ["history", "travel", "threeD"]]]);
     assert.equal(WORLD_DEFINITION.railStages("surface", "create").length, 3);
     assert.ok(WORLD_DEFINITION.offers("manage", "surface"), "an occasional tool is offered");
     assert.equal(WORLD_DEFINITION.offers("nothing", "surface"), false);

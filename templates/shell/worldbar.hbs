@@ -1,0 +1,99 @@
+{{!--
+    The world bar (v5): one row across the studio's top, above the rail and the canvas. The world
+    name menu, Save world, the layer switcher, Settlement maps; then Create and Explore and the
+    World menu at the end. It never wraps: as it narrows it folds (data-fold, see WorldBarFold), and
+    this template draws every fold's form so a fold never redraws it:
+
+    - 0: full map names; 1: short names; 2: Settlement maps leaves the bar for the layer menu;
+    - 3: the layer switcher becomes one menu button naming the map; 4: the world name ellipsises.
+
+    Save world, the mode switch and World never fold. Parts later tracks fill (Geology, Add a map,
+    Settlement maps, and the World menu's items until S0 step 4) are drawn in their places and
+    disabled, with a tooltip saying they are not built yet (aria-disabled, so the tooltip still shows).
+    See MapStudio's #worldBarContext.
+--}}
+<header aria-label="{{localize 'FILRODENSWMB.UI.WorldBar'}}" data-fold="{{worldBar.fold}}">
+    <div class="fwmb-dropdown fwmb-worldbar-menu" tabindex="-1">
+        <button type="button" class="fwmb-world-menu" aria-haspopup="menu" aria-label="{{worldBar.nameMenuLabel}}" data-tooltip="{{worldBar.nameMenuLabel}}">
+            <span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>
+            <span class="fwmb-world-name">{{worldBar.name}}</span>
+            <span class="fwmb-caret" aria-hidden="true"></span>
+        </button>
+        <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.WorldNameMenu'}}">
+            <button type="button" role="menuitem" data-action="changeTool" data-tool="manage"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuWorlds"}}</button>
+            <button type="button" role="menuitem" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
+            <button type="button" role="menuitem" data-action="saveMapAs"><span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuSaveAs"}}</button>
+            {{#if worldBar.saved}}
+            <button type="button" role="menuitem" data-action="exportOpenWorld"><span class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuExportWorld"}}</button>
+            {{else}}
+            <button type="button" role="menuitem" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportWorldUnsaved'}}"><span class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuExportWorld"}}</button>
+            {{/if}}
+            <button type="button" role="menuitem" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
+        </div>
+    </div>
+
+    <button type="button" class="fwmb-barbtn fwmb-barbtn--icon fwmb-save{{#if worldBar.dirty}} fwmb-is-dirty{{/if}}" data-action="saveMap" aria-label="{{worldBar.saveLabel}}" data-tooltip="{{worldBar.saveLabel}}">
+        <span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>
+    </button>
+
+    <span class="fwmb-sep" aria-hidden="true"></span>
+
+    {{!-- The layer switcher as segments (folds 0 to 2) --}}
+    <div class="fwmb-layers" role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.LayerSwitcher'}}">
+        {{#each worldBar.layers}}
+        <button type="button" class="fwmb-layer" role="radio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}"{{#if this.disabled}} aria-disabled="true"{{/if}} aria-label="{{this.full}}" data-tooltip="{{this.tooltip}}">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+            <span class="fwmb-fold-full">{{this.full}}</span><span class="fwmb-fold-short">{{this.short}}</span>
+        </button>
+        {{/each}}
+        <button type="button" class="fwmb-layer fwmb-layer--add" aria-disabled="true" aria-label="{{worldBar.addMap}}" data-tooltip="{{worldBar.addMap}}">
+            <span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>
+        </button>
+    </div>
+
+    {{!-- The layer switcher as one menu naming the map (folds 3 and 4), Settlement maps in it --}}
+    <div class="fwmb-dropdown fwmb-layers-menu" tabindex="-1">
+        <button type="button" class="fwmb-barbtn fwmb-layer--menu" aria-haspopup="menu" aria-label="{{worldBar.layerMenuLabel}}" data-tooltip="{{worldBar.layerMenuLabel}}">
+            <span class="fwmb-icon fwmb-icon--{{worldBar.current.icon}}" aria-hidden="true"></span>
+            {{worldBar.current.full}}
+            <span class="fwmb-caret" aria-hidden="true"></span>
+        </button>
+        <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.LayerSwitcher'}}">
+            {{#each worldBar.layers}}
+            <button type="button" role="menuitemradio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}"{{#if this.disabled}} aria-disabled="true"{{/if}} data-tooltip="{{this.tooltip}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{this.full}}</button>
+            {{/each}}
+            <button type="button" role="menuitem" aria-disabled="true" data-tooltip="{{worldBar.addMap}}"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.AddMap"}}</button>
+            <button type="button" role="menuitem" class="fwmb-menu-item--separated" aria-disabled="true" data-tooltip="{{worldBar.settlementMaps}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.SettlementMaps"}}</button>
+        </div>
+    </div>
+
+    {{!-- Settlement maps (leaves the bar at fold 2, for the layer menu) --}}
+    <button type="button" class="fwmb-barbtn fwmb-worldbar-settlements" aria-disabled="true" aria-label="{{worldBar.settlementMaps}}" data-tooltip="{{worldBar.settlementMaps}}">
+        <span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>
+        {{localize "FILRODENSWMB.UI.SettlementMaps"}}
+        <span class="fwmb-caret" aria-hidden="true"></span>
+    </button>
+
+    <span class="fwmb-grow"></span>
+
+    <div class="fwmb-mode-switch" role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.ModeLabel'}}">
+        <button type="button" role="radio" aria-checked="{{#if (eq worldBar.mode 'create')}}true{{else}}false{{/if}}" data-action="chooseMode" data-mode="create" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeCreateHint'}}">
+            <span class="fwmb-icon fwmb-icon--mode-create" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ModeCreate"}}
+        </button>
+        <button type="button" role="radio" aria-checked="{{#if (eq worldBar.mode 'explore')}}true{{else}}false{{/if}}" data-action="chooseMode" data-mode="explore" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeExploreHint'}}">
+            <span class="fwmb-icon fwmb-icon--explore" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ModeExplore"}}
+        </button>
+    </div>
+
+    <div class="fwmb-dropdown fwmb-worldbar-world" tabindex="-1">
+        <button type="button" class="fwmb-barbtn" aria-haspopup="menu" aria-label="{{localize 'FILRODENSWMB.UI.WorldMenuHint'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.WorldMenuHint'}}">
+            {{localize "FILRODENSWMB.UI.WorldMenu"}}
+            <span class="fwmb-caret" aria-hidden="true"></span>
+        </button>
+        <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.WorldMenu'}}">
+            {{#each worldBar.worldMenu}}
+            <button type="button" role="menuitem"{{#if this.separated}} class="fwmb-menu-item--separated"{{/if}} aria-disabled="true" data-tooltip="{{this.tooltip}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{this.label}}</button>
+            {{/each}}
+        </div>
+    </div>
+</header>

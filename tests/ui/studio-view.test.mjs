@@ -243,3 +243,27 @@ test("a region whose template draws more than one root element is refused", asyn
     const view = makeView({ renderTemplate: async () => "<div></div><div></div>" });
     await assert.rejects(view.render(["toolbar"]), /exactly one root element/);
 });
+
+test("a redraw asked for while a slower one is drawing lands after it, so the newer state wins", async () => {
+    let release;
+    const slow = new Promise((resolve) => (release = resolve));
+    let first = true;
+    const view = makeView({
+        // The first context takes a while to build (as a map's panel can while it loads)
+        buildContext: async () => {
+            const snapshot = { ...state };
+            if (first) {
+                first = false;
+                await slow;
+            }
+            return snapshot;
+        },
+    });
+    const older = view.render(["toolbar"]);
+    await Promise.resolve();
+    state.tool = "b";
+    const newer = view.render(["toolbar"]);
+    release();
+    await Promise.all([older, newer]);
+    assert.ok(root.querySelector(".fwmb-toolbar .icon.b"), "the newer state is drawn last");
+});

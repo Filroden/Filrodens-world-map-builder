@@ -137,11 +137,11 @@ test("en.json is US English, and en-gb.json gives the British spelling of every 
     }
 });
 
-/** Words that keep their capital inside a sentence-case label. */
+/** Words that keep their capital inside a sentence-case label (Create and Explore are the studio's two modes, named). */
 const PROPER = new Set(
     `Foundry VTT Filroden Filroden's World Map Builder Delaunay Pixi Three Handlebars Material Symbols Pinhead Atkinson Hyperlegible
     Sora Barlow Semi Condensed Noto Serif Sans Ko-fi GitHub Sponsors Ctrl Shift Alt Enter Escape Esc Backspace Tab Space Home End
-    American Political`.split(/\s+/),
+    American Political Create Explore`.split(/\s+/),
 );
 /**
  * Strings that are the pattern of a proper name rather than a label: the generator names a castle

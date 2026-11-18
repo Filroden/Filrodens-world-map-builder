@@ -1087,6 +1087,8 @@ export const FILRODENSWMB = {
         CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
         WIKI: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/",
         TUTORIAL: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/tutorial-01-a-new-world/",
+        // The migration page (written at v5's close), opened from a 4.3 map's first-opening notice
+        UPDATING_5: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/updating-to-5-0-0/",
         ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
         // The other host: the web version from Foundry, the Foundry module from the web
         WEB_VERSION: "https://fwmb.filroden.com",

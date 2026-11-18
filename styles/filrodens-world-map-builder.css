@@ -107,6 +107,19 @@
 .fwmb-icon--center-focus {
     --fwmb-mask: url("../assets/icons/center_focus_strong.svg");
 }
+/* v5's own (see icons-licence.md): a world, the Geology map, Create, and the Out of date mark */
+.fwmb-icon--public {
+    --fwmb-mask: url("../assets/icons/public.svg");
+}
+.fwmb-icon--strata {
+    --fwmb-mask: url("../assets/icons/strata.svg");
+}
+.fwmb-icon--mode-create {
+    --fwmb-mask: url("../assets/icons/mode_create.svg");
+}
+.fwmb-icon--warning-mark {
+    --fwmb-mask: url("../assets/icons/warning_mark.svg");
+}
 .fwmb-icon--tune {
     --fwmb-mask: url("../assets/icons/tune.svg");
 }
@@ -1723,6 +1736,18 @@
 .fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-map-overlay-3d {
     display: block;
 }
+/* The 3D view (Explore's third tool) has no panel and no context bar: its canvas fills the body */
+.fwmb .fwmb-studio.fwmb-is-3d-view :is(.fwmb-context-panel, .fwmb-edit-toolbar) {
+    display: none;
+}
+/* The 3D view's zoom group, where the flat map's map controls sit */
+.fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-3d-zoom {
+    display: flex;
+    gap: 0.25rem;
+    bottom: 0.5rem;
+    inset-inline-end: var(--fwmb-end-inset, 0.5rem);
+    padding: 0.25rem;
+}
 
 /* The 3D view's settings (Relief Emphasis): top start, where the information bar is on the flat
    map, above the 3D canvas, in the overlays' dark ink. The slider takes the overlay's colours. */
@@ -2894,17 +2919,19 @@
     margin-inline: 0.125rem 0.25rem;
 }
 
-/* The mode switch: Create and Explore, a two-way segmented control in the accent fill */
+/* The mode switch: Create and Explore, a two-way segmented control in the accent fill. Its two
+   segments fill it edge to edge, as the layer switcher's do (Ken, 2026-11-18) */
 .fwmb-mode-switch {
     display: inline-grid;
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
     height: 2.25rem;
-    padding: 0.1875rem;
-    gap: 0.125rem;
-    border-radius: 8px;
+    padding: 0;
+    gap: 0;
+    border-radius: 6px;
     background: var(--fwmb-bg-base);
     border: 1px solid var(--fwmb-border-strong);
+    overflow: hidden;
     flex: none;
 }
 .fwmb-mode-switch button {
@@ -2914,7 +2941,7 @@
     gap: 0.375rem;
     padding: 0 0.75rem;
     border: 0;
-    border-radius: 5px;
+    border-radius: 0;
     background: transparent;
     color: var(--fwmb-text-secondary);
     font: 700 0.8125rem/1 var(--fwmb-font-ui);
@@ -2928,6 +2955,122 @@
     background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-on-accent);
     box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
+}
+
+/* The world bar in the studio (S0 step 3): its spacer, the parts later tracks fill (disabled, with
+   their tooltip), and its fold forms (data-fold, see WorldBarFold). Every form is drawn; the fold
+   shows one. 0: full names; 1: short names; 2: Settlement maps leaves the bar for the layer menu;
+   3: the layer switcher becomes one menu button naming the map; 4: the world name ellipsises. */
+.fwmb-worldbar .fwmb-grow {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: default;
+}
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"]:hover {
+    background: transparent;
+}
+.fwmb-worldbar .fwmb-layer[aria-checked="true"][aria-disabled="true"] {
+    opacity: 1;
+}
+.fwmb-worldbar .fwmb-dropdown {
+    position: relative;
+    flex: none;
+    outline: none;
+}
+.fwmb-worldbar .fwmb-worldbar-menu {
+    display: flex;
+    min-width: 0;
+}
+/* A bar button in a dropdown keeps the bar's look (the dropdown's own button is a square kebab) */
+/* Every part of the bar is one height, and a segment fills its control: set here against the
+   dropdown's own square button and the host's button rules (Foundry sizes and spaces buttons) */
+.fwmb-worldbar :is(.fwmb-world-menu, .fwmb-barbtn) {
+    height: 2.25rem;
+    min-height: 0;
+    margin: 0;
+    box-sizing: border-box;
+    line-height: 1;
+}
+.fwmb-worldbar :is(.fwmb-layers, .fwmb-mode-switch) {
+    box-sizing: border-box;
+}
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-mode-switch button) {
+    height: auto;
+    min-height: 0;
+    align-self: stretch;
+    margin: 0;
+    box-sizing: border-box;
+    line-height: 1;
+    /* Square segments (the host rounds buttons), so the current layer's bar runs straight to its
+       ends; the control's own rounded corners clip the outermost */
+    border-radius: 0;
+}
+.fwmb-worldbar .fwmb-dropdown > .fwmb-world-menu {
+    width: auto;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    justify-content: flex-start;
+    color: var(--fwmb-text-primary);
+}
+.fwmb-worldbar .fwmb-dropdown > .fwmb-barbtn {
+    width: auto;
+    padding: 0 0.625rem;
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: 6px;
+    background: var(--fwmb-bg-raised);
+    justify-content: flex-start;
+    color: var(--fwmb-text-primary);
+}
+.fwmb-worldbar .fwmb-dropdown > :is(.fwmb-world-menu, .fwmb-barbtn):hover,
+.fwmb-worldbar .fwmb-dropdown:focus-within > :is(.fwmb-world-menu, .fwmb-barbtn) {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-accent-secondary);
+}
+.fwmb-worldbar .fwmb-dropdown-menu {
+    top: calc(100% + 0.25rem);
+    inset-inline-start: 0;
+    min-width: 13rem;
+}
+.fwmb-worldbar .fwmb-worldbar-world .fwmb-dropdown-menu {
+    inset-inline: auto 0;
+}
+.fwmb-worldbar .fwmb-fold-short,
+.fwmb-worldbar .fwmb-layers-menu {
+    display: none;
+}
+.fwmb-worldbar:not([data-fold="0"]) .fwmb-fold-full {
+    display: none;
+}
+.fwmb-worldbar:not([data-fold="0"]) .fwmb-fold-short {
+    display: inline;
+}
+.fwmb-worldbar:is([data-fold="2"], [data-fold="3"], [data-fold="4"]) .fwmb-worldbar-settlements {
+    display: none;
+}
+.fwmb-worldbar:is([data-fold="3"], [data-fold="4"]) .fwmb-layers {
+    display: none;
+}
+.fwmb-worldbar:is([data-fold="3"], [data-fold="4"]) .fwmb-layers-menu {
+    display: flex;
+}
+.fwmb-worldbar[data-fold="4"] .fwmb-worldbar-menu {
+    max-width: 9rem;
+}
+.fwmb-worldbar[data-fold="4"] .fwmb-world-menu {
+    min-width: 0;
+}
+/* Measuring each fold (see WorldBarFold): laid out at its natural width, its spacer at none */
+.fwmb-worldbar.fwmb-is-measuring {
+    width: max-content;
+}
+.fwmb-worldbar.fwmb-is-measuring .fwmb-grow {
+    flex: none;
+    width: 0;
 }
 
 /* v5: state marks, one set everywhere (layer switcher, Worlds, the overview, Run, menus). Icon and
@@ -5130,7 +5273,18 @@
     outline: none;
 }
 
+/* The studio is a column (v5, S0 step 3): the world bar across the top, then the body, which holds
+   the rail, the context panel, the map and the docked inspector side by side */
 .fwmb .fwmb-studio {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+.fwmb .fwmb-studio-body {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -5166,10 +5320,10 @@
     overflow-x: hidden;
 }
 
-/* The rail scrolls only once it has folded all it can (data-fwmb-short="files", see StudioLayout),
+/* The rail scrolls only once it has folded all it can (data-fwmb-short="scroll", see StudioLayout),
    so only then does it keep its scrollbar's gutter, widening by it so the stage names and buttons
    keep their room. The scrollbar is the studio's thin one (see APPLICATION SCROLLBARS). */
-.fwmb .fwmb-studio[data-fwmb-short="files"] .fwmb-toolbar {
+.fwmb .fwmb-studio[data-fwmb-short="scroll"] .fwmb-toolbar {
     flex-basis: calc(var(--fwmb-rail-width) + 0.5rem);
     width: calc(var(--fwmb-rail-width) + 0.5rem);
     scrollbar-gutter: stable;
@@ -5203,35 +5357,6 @@
 .fwmb-studio[data-fwmb-short] .fwmb-rail-more {
     display: flex;
 }
-/* Very short: the file actions follow into More (Help stays); More then carries Save's unsaved dot
-   and marks Maps in use */
-.fwmb-rail-more-files {
-    display: none;
-}
-.fwmb-studio[data-fwmb-short="files"] :is(.fwmb-rail-files, .fwmb-rail-sep--files) {
-    display: none;
-}
-.fwmb-studio[data-fwmb-short="files"] .fwmb-rail-more-files {
-    display: block;
-}
-.fwmb-studio[data-fwmb-short="files"] .fwmb-rail-more:has(.fwmb-rail-more-files .fwmb-is-dirty) > .fwmb-rail-btn {
-    position: relative;
-}
-.fwmb-studio[data-fwmb-short="files"] .fwmb-rail-more:has(.fwmb-rail-more-files .fwmb-is-dirty) > .fwmb-rail-btn::after {
-    content: "";
-    position: absolute;
-    top: 0.3125rem;
-    inset-inline-end: 0.3125rem;
-    width: 0.4375rem;
-    height: 0.4375rem;
-    border-radius: 50%;
-    background: var(--fwmb-accent-secondary);
-}
-.fwmb .fwmb-studio[data-fwmb-short="files"] .fwmb-rail-more:has(.fwmb-rail-more-files [aria-current="page"]) > .fwmb-rail-btn {
-    background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-on-accent);
-}
-
 /* More is a rail button like the others (the dropdown's own button look does not apply), and its
    menu marks the tool in use and whether the 3D view is on */
 .fwmb .fwmb-rail-more > .fwmb-rail-btn {

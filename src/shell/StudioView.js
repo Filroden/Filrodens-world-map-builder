@@ -84,6 +84,8 @@ export class StudioView {
 
     /** Resolves when the queued flush has run; every render() call that joined it gets this. */
     #flushed = null;
+    /** The last redraw asked for, which the next waits on (see render). */
+    #drawing = Promise.resolve();
 
     /** Regions drawn at least once. */
     #drawn = new Set();
@@ -139,7 +141,10 @@ export class StudioView {
         if (this.#destroyed) return Promise.resolve();
         if (!this.#pending) {
             this.#pending = new Set();
-            this.#flushed = Promise.resolve().then(() => this.#flush());
+            // After the redraw under way, if any: each builds its contexts when it starts, so one
+            // started later never lands before (and under) one started earlier
+            this.#flushed = this.#drawing.catch(() => {}).then(() => this.#flush());
+            this.#drawing = this.#flushed;
         }
         for (const id of regions) {
             if (!this.#regions[id]) throw new Error(`StudioView: unknown region "${id}"`);

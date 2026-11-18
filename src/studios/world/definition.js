@@ -3,10 +3,10 @@
  * types, the rail's stages and the tools in them, the occasional tools at the rail's foot, each
  * tool's Next footer and what its editing does (its state word).
  *
- * In S0 a world has its Surface map only. History and Travel are registered in Explore mode; until
- * the mode switch arrives (S0 step 3) the rail draws every mode's stages, so they keep their v4.3
- * place as the Explore stage. Reference image, Styles and icons and Maps are occasional tools (no
- * stage); Maps sits with the file actions at the rail's foot (see templates/shell/toolbar.hbs).
+ * In S0 a world has its Surface map only. The rail draws the open mode's stages (S0 step 3): Create's
+ * Shape, Populate and Finish, or Explore's one stage, History, Travel and the 3D view. Reference
+ * image and Styles and icons are occasional tools of Create (no stage); Maps (Worlds) has no stage
+ * either and opens from the world bar's name menu.
  */
 import { defineStudio } from "../../shell/StudioRegistry.js";
 
@@ -48,18 +48,19 @@ export const WORLD_DEFINITION = defineStudio({
         tool("export", "finish", "png", "FILRODENSWMB.UI.ToolExport"),
         tool("history", "explore", "history", "FILRODENSWMB.UI.ToolHistory", { mode: "explore" }),
         tool("travel", "explore", "travel-explore", "FILRODENSWMB.UI.ToolTravel", { mode: "explore" }),
+        // The map shown in 3D, with no panel; another Explore tool, or Create, goes back to the flat map
+        tool("threeD", "explore", "three-d", "FILRODENSWMB.UI.ThreeDView", { mode: "explore" }),
         tool("reference", null, "image", "FILRODENSWMB.UI.ToolReference"),
         tool("library", null, "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)
     // sits among them, and on the web the full-screen toggle (shown only where the host can go
-    // full screen)
+    // full screen). The 3D view is Explore's third tool (S0 step 3).
     occasional: [
         { tool: "reference" },
         { tool: "library" },
         { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },
-        { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
         { action: "toggleFullscreen", icon: "fullscreen", label: "FILRODENSWMB.UI.FullScreen", host: "fullscreen" },
     ],
     // The engine is named in the header of the tools it shapes

@@ -286,7 +286,10 @@ export class Overlay {
             this.#scrim.className = "fwmb-overlay-scrim";
             this.#host.append(this.#scrim);
         }
-        this.#host.append(this.#dialog);
+        // A docked panel is a column of the studio's body, beside the map (the frame's world bar
+        // runs above it); a modal one stands over the whole frame
+        const column = this.#placement === "docked" ? this.#host.querySelector(":scope > .fwmb-studio-body") : null;
+        (column ?? this.#host).append(this.#dialog);
         this.#dialog.addEventListener("click", this.#onClick);
         this.#dialog.addEventListener("keydown", this.#onKeydown);
         this.#dialog.addEventListener("submit", this.#onSubmit);

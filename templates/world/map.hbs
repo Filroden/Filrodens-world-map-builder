@@ -44,6 +44,14 @@
             {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="reliefEmphasis" label="FILRODENSWMB.UI.ReliefEmphasis" hint="FILRODENSWMB.UI.ReliefEmphasisHint" value=(lookup uiState 'reliefEmphasis') min=0 max=30 step=1}}
         </div>
 
+        {{!-- The 3D view's zoom, where the flat map's map controls are; Reset view returns to the
+              starting angle, height and zoom --}}
+        <div class="fwmb-map-overlay fwmb-map-overlay-3d fwmb-3d-zoom" role="toolbar" aria-label="{{localize 'FILRODENSWMB.UI.ThreeDZoomLabel'}}">
+            <button type="button" class="fwmb-map-btn" data-action="threeDZoom" data-zoom="out" aria-label="{{localize 'FILRODENSWMB.UI.ZoomOut'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}"><span class="fwmb-icon fwmb-icon--zoom-out" aria-hidden="true"></span></button>
+            <button type="button" class="fwmb-map-btn" data-action="threeDResetView" aria-label="{{localize 'FILRODENSWMB.UI.ThreeDResetView'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ThreeDResetView'}}"><span class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></span></button>
+            <button type="button" class="fwmb-map-btn" data-action="threeDZoom" data-zoom="in" aria-label="{{localize 'FILRODENSWMB.UI.ZoomIn'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}"><span class="fwmb-icon fwmb-icon--zoom-in" aria-hidden="true"></span></button>
+        </div>
+
         <div class="fwmb-map-overlay fwmb-map-controls" role="toolbar" aria-label="{{localize 'FILRODENSWMB.UI.MapControlsLabel'}}">
             {{!-- View filters: who the map is shown for --}}
             <div class="fwmb-map-control-group">

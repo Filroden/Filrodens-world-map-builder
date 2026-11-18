@@ -182,10 +182,29 @@ export class Scene3D {
         // shadow camera that covers the whole map
         this.#placeSun(width, height);
 
-        // 5. Position Camera
+        // 5. Position Camera, kept as the view Reset view returns to (see resetView)
         this.camera.position.set(0, Math.max(width, height) * 0.8, Math.max(width, height) * 0.8);
         this.controls.target.set(0, 0, 0);
         this.controls.update();
+        this.controls.saveState();
+    }
+
+    /** Back to the starting angle, height and zoom (the map controls' Reset view). */
+    resetView() {
+        this.controls.reset();
+    }
+
+    /**
+     * Moves the camera towards what it looks at (a factor below 1) or away from it (above 1), as
+     * the scroll wheel does, within the controls' distance limits.
+     * @param {number} factor
+     */
+    zoomBy(factor) {
+        const { camera, controls } = this;
+        const offset = camera.position.clone().sub(controls.target);
+        const distance = Math.min(Math.max(offset.length() * factor, controls.minDistance), controls.maxDistance);
+        camera.position.copy(controls.target).add(offset.setLength(distance));
+        controls.update();
     }
 
     /**

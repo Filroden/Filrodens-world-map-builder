@@ -37,8 +37,8 @@ test("the studio's width classes switch at 1,400 and 1,200px, and the rail folds
     const rail = [800, 640, 530];
     assert.equal(fold(900, rail), null, "it all fits");
     assert.equal(fold(700, rail), "", "the occasional tools fold");
-    assert.equal(fold(600, rail), "files", "the file actions fold too");
-    assert.equal(fold(400, rail), "files", "no further: the rail scrolls");
+    assert.equal(fold(600, rail), "scroll", "then the rail scrolls (the file actions are the world bar's)");
+    assert.equal(fold(400, rail), "scroll", "no further");
 });
 
 test("the rail holds the stages in order (the optional one last), then the occasional tools", () => {
@@ -48,12 +48,12 @@ test("the rail holds the stages in order (the optional one last), then the occas
             ["shape", ["scene", "terrain", "biomes", "features"]],
             ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
             ["finish", ["cartography", "export"]],
-            ["explore", ["history", "travel"]],
+            ["explore", ["history", "travel", "threeD"]],
         ],
     );
     assert.deepEqual(
         OCCASIONAL.map((entry) => entry.tool ?? entry.action ?? entry.menu),
-        ["reference", "library", "appearance", "threeDView", "toggleFullscreen"],
+        ["reference", "library", "appearance", "toggleFullscreen"],
     );
 });
 
