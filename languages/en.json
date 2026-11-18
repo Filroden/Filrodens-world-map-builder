@@ -2167,6 +2167,7 @@
     "FILRODENSWMB.UI.BackupDone": "Backed up {count} maps.",
     "FILRODENSWMB.UI.BackupImagesLeftOut": "{count} images couldn't be read and were left out of the backup.",
     "FILRODENSWMB.UI.BackupFailed": "The backup failed. The browser console has the details.",
+    "FILRODENSWMB.UI.MigrationBackupFailed": "Your maps were made into v5 worlds, but the backup before it couldn't be written (the browser console has the details). The maps are unchanged until you save one, so make a backup from the Maps panel before saving.",
     "FILRODENSWMB.UI.RestoreReading": "Reading the backup…",
     "FILRODENSWMB.UI.RestoreNothing": "This backup holds no maps.",
     "FILRODENSWMB.UI.RestoreIntro": "Choose the maps to restore. Each is added as a new saved map; a map marked Already saved is added as a copy, which you can review and delete.",

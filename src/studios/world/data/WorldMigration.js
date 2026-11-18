@@ -95,8 +95,9 @@ export class WorldMigration {
     /**
      * Saves the worlds the maps without one need (see plan). The first time a store with maps is
      * migrated, a backup of every map is written to the host's data first, where the host can keep
-     * one (Foundry).
-     * @returns {Promise<{worlds: number, maps: number, backup: string|null}>}
+     * one (Foundry). A backup that cannot be written is reported and the migration goes on: it only
+     * adds records, so the maps stay as they were until one is saved in v5 (Ken, 2026-11-18).
+     * @returns {Promise<{worlds: number, maps: number, backup: string|null, backupFailed?: boolean}>}
      */
     static async run() {
         const [maps, saved] = await Promise.all([platform.store.listMapData(), platform.store.listWorlds()]);
@@ -104,12 +105,21 @@ export class WorldMigration {
         const { worlds: records, metas } = WorldMigration.plan({ maps, worlds, icons: WorldMigration.hostIcons() });
         if (!metas.length) return { worlds: 0, maps: 0, backup: null };
 
-        // A backup that cannot be written stops the migration: nothing is changed without one
-        const backup = worlds.size === 0 ? await WorldMigration.#backUp(maps) : null;
+        let backup = null;
+        let backupFailed = false;
+        if (worlds.size === 0) {
+            try {
+                backup = await WorldMigration.#backUp(maps);
+            } catch (error) {
+                console.warn("FWMB | The backup before making maps into worlds could not be written:", error);
+                platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.MigrationBackupFailed"), { permanent: true });
+                backupFailed = true;
+            }
+        }
         // The worlds first: a map is only taken as migrated once it names a world that is saved
         for (const record of records) await platform.store.saveWorld(record);
         for (const { mapId, meta } of metas) await platform.store.saveMapMeta(mapId, meta);
-        return { worlds: records.length, maps: metas.length, backup };
+        return backupFailed ? { worlds: records.length, maps: metas.length, backup, backupFailed } : { worlds: records.length, maps: metas.length, backup };
     }
 
     /** The custom pin icons the host's settings hold (4.3 kept them there, one set for the host). */

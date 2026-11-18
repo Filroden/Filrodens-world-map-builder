@@ -175,3 +175,21 @@ test("on a host that keeps files, the first run writes a backup of every map fir
     await WorldMigration.run();
     assert.equal(kept.length, 1);
 });
+
+test("a backup that cannot be written is reported and the migration goes on", async () => {
+    const warnings = [];
+    const notify = { info() {}, warn: (text, options) => warnings.push({ text, options }), error() {} };
+    const i18n = { localize: (key) => key, format: (key) => key, lang: "en" };
+    const quiet = console.warn;
+    console.warn = () => {};
+    try {
+        installPlatform({ notify, i18n, store: { ...store, keepWorldFile: async () => { throw new Error("refused"); } } });
+        const saved = await store.saveMapData("Aethoria", data(), null, {});
+        const result = await WorldMigration.run();
+        assert.deepEqual(result, { worlds: 1, maps: 1, backup: null, backupFailed: true });
+        assert.equal((await store.loadMapMeta(saved.id)).worldId, saved.id);
+        assert.deepEqual(warnings, [{ text: "FILRODENSWMB.UI.MigrationBackupFailed", options: { permanent: true } }]);
+    } finally {
+        console.warn = quiet;
+    }
+});
