@@ -3140,6 +3140,9 @@
     padding-block: 3rem;
     text-align: center;
 }
+.fwmb .fwmb-worlds-empty p {
+    margin: 0;
+}
 .fwmb .fwmb-worlds-empty > .fwmb-icon {
     width: 2.5rem;
     height: 2.5rem;
@@ -4924,6 +4927,8 @@
     font-family: var(--fwmb-font-ui);
     font-size: var(--fwmb-size-13);
     transition: border-color 0.2s;
+    /* Foundry's light theme gives its fields an inner shadow; the module's have none */
+    box-shadow: none;
 }
 
 .fwmb input[type="number"],
@@ -5475,6 +5480,12 @@
     color: var(--fwmb-text-primary);
     background: var(--fwmb-bg-base) !important;
     --fwmb-dir-flip: 1;
+}
+
+/* Foundry gives an empty paragraph a line's height (p:empty); the module's empty ones hold
+   nothing until they are filled (a progress detail, a hint) */
+.fwmb p:empty {
+    min-height: 0;
 }
 
 /* UI direction handling for RTL languages */
@@ -6133,6 +6144,8 @@
 .fwmb .fwmb-slider-group input[type="range"]:disabled {
     opacity: 0.45;
     cursor: default;
+    /* Foundry greys a disabled or read-only range; ours dims it in its own colours */
+    filter: none;
 }
 
 /* Tool panel sliders (templates/parts/shared-range.hbs): name, info icon and value on one line
