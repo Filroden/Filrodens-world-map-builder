@@ -8,21 +8,15 @@ import {listTemplates, PAGE, SITE_EXCLUDED_FOLDERS, SITE_EXTENSIONS, SITE_FILES,
 //   npm run pack:web  the web version's site, into dist-web/ (see web-site.mjs for what it holds)
 const isWeb = process.argv.includes('--web');
 
-// design/ holds internal work (prototypes, harnesses, notes). A local pack keeps it, because the
-// test Foundry runs the module from dist/ and the prototypes are opened from there. A release
-// pack (CI is set on GitHub Actions) leaves it out, so the release zip never carries it even
-// though the folder is also gitignored and absent from a CI checkout.
-const isRelease = Boolean(process.env.CI);
-
 // .wrangler is Cloudflare's local cache from deploying the web version by hand, and Claude outputs
 // is a local folder of files shared while working; neither belongs in a pack. samples holds the
-// tutorial's map files, which the wiki links on GitHub and the module never reads
-const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', '.wrangler', 'Claude outputs', 'samples', 'scripts', 'tests', 'wiki'];
-if (isRelease) excludedFolders.push('design');
+// tutorial's map files, which the wiki links on GitHub and the module never reads. design holds
+// internal work (prototypes, harnesses, notes) that the module never reads, so no pack carries it
+const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', '.wrangler', 'Claude outputs', 'design', 'samples', 'scripts', 'tests', 'wiki'];
 
 // The web page, the web host's services and the libraries Foundry already provides (PixiJS and
 // Handlebars) are for the web version only. They are removed by path after the copy: the copy
-// leaves folders out by name wherever they are, which would also drop design/prototypes/web.
+// leaves folders out by name wherever they are, which would also drop any other folder named web.
 const webOnlyPaths = ['web', 'src/platform/web', 'vendor/pixi', 'vendor/handlebars'];
 
 function resetFolder(folder) {
