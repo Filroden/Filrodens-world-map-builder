@@ -5,7 +5,7 @@
  *
  * In S0 a world has its Surface map only. The rail draws the open mode's stages (S0 step 3): Create's
  * Shape, Populate and Finish, or Explore's one stage, History, Travel and the 3D view. Reference
- * image and Styles and icons are occasional tools of Create (no stage); Worlds has no stage either
+ * image is an occasional tool of Create (no stage); Worlds has no stage either
  * and opens from the world bar's name menu.
  *
  * The world has a rail of its own (S0 step 4), shown in either mode while World is chosen in the
@@ -62,18 +62,19 @@ export const WORLD_DEFINITION = defineStudio({
         // The map shown in 3D, with no panel; another Explore tool, or Create, goes back to the flat map
         tool("threeD", "explore", "three-d", "FILRODENSWMB.UI.ThreeDView", { mode: "explore" }),
         tool("reference", null, "image", "FILRODENSWMB.UI.ToolReference"),
-        tool("library", null, "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage"),
         // The world's own (S0 step 4), on the world's rail (see WorldEditors)
         tool("worldOverview", "world", "public", "FILRODENSWMB.UI.WorldOverview"),
         tool("worldSetup", "worldSettings", "tune", "FILRODENSWMB.UI.WorldSetup"),
-        later("worldCultures", "worldSettings", "castle", "FILRODENSWMB.UI.WorldCultures"),
-        later("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges"),
+        tool("worldCultures", "worldSettings", "castle", "FILRODENSWMB.UI.WorldCultures"),
+        tool("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges"),
         tool("worldNameStyle", "worldSettings", "insert-text", "FILRODENSWMB.UI.WorldNameStyle"),
-        later("worldStyles", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
+        // Styles and icons keeps its v4.3 id (library): it left the map's rail for the world's
+        tool("library", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
         tool("worldClimate", "worldSettings", "water-drop", "FILRODENSWMB.UI.WorldClimate"),
-        later("worldGenerateAll", "worldWhole", "generate", "FILRODENSWMB.UI.GenerateAll", "FILRODENSWMB.UI.GenerateAllLater"),
+        // Generate all acts at once (its dialogue), with no panel of its own
+        { ...tool("worldGenerateAll", "worldWhole", "generate", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
         later("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)
@@ -81,7 +82,6 @@ export const WORLD_DEFINITION = defineStudio({
     // full screen). The 3D view is Explore's third tool (S0 step 3).
     occasional: [
         { tool: "reference" },
-        { tool: "library" },
         { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },
         { action: "toggleFullscreen", icon: "fullscreen", label: "FILRODENSWMB.UI.FullScreen", host: "fullscreen" },
     ],

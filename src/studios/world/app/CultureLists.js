@@ -1,7 +1,7 @@
+import { WorldEditors } from "./WorldEditors.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { CultureEditor } from "./CultureEditor.js";
 import { Inspector } from "./Inspector.js";
-import { MapStateManager } from "./MapStateManager.js";
 import { ListNav } from "../../../shell/ListNav.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
 import { uniqueName } from "../mesh/LayerTree.js";
@@ -15,11 +15,12 @@ import { platform } from "../../../platform/index.js";
  * - **Open.** A row's click, or Enter, opens its culture in the inspector (see CultureEditor),
  *   focus staying on the row.
  * - **Add.** The list ends with "+ Culture". It puts a naming row at the list's foot with the next
- *   free name chosen; Enter (or leaving the field) makes the culture, as one undo step, and opens
+ *   free name chosen; Enter (or leaving the field) makes the culture and opens
  *   it in the inspector. Escape, or an empty name, records nothing. The list holds at most
  *   GENERATOR.CULTURES.MAX.
  * - **The row's menu.** Rename in its row; Duplicate adds "<name> copy" with its fields and
- *   homelands; Delete asks first. Each is one undo step.
+ *   homelands; Delete asks first. None is an undo step of the map: cultures are the world's, and the
+ *   Cultures editor's Revert changes puts the list back (S0 step 4b).
  *
  * With no cultures the run uses the single default culture and the panel's Name style, which the
  * Generation section shows only then. Any change to the cultures marks a run made before it out
@@ -85,7 +86,7 @@ export class CultureLists {
 
     /**
      * Enter in the naming row, or focus leaving it: the culture is made (or renamed) with the name
-     * typed, as one undo step. A new culture opens in the inspector. An empty name makes nothing.
+     * typed. A new culture opens in the inspector. An empty name makes nothing.
      * @returns {Promise<string|null>} The id of the culture made or renamed, or null.
      */
     static async confirm(app, value) {
@@ -97,7 +98,7 @@ export class CultureLists {
         if (name && naming.id) {
             const culture = CultureEditor.find(app, naming.id);
             if (culture && culture.name !== name) {
-                MapStateManager.pushVectorState(app);
+                if (WorldEditors.readOnly(app)) return false;
                 culture.name = name;
                 this.#changed(app);
             }
@@ -127,7 +128,7 @@ export class CultureLists {
 
     /**
      * Delete, once confirmed: the culture goes. Places a run named after it keep their names (their
-     * generated details still name the culture, as it was). One undo step.
+     * generated details still name the culture, as it was).
      * @returns {Promise<boolean>} Whether it was deleted.
      */
     static async delete(app, id) {
@@ -136,7 +137,7 @@ export class CultureLists {
         const message = platform.i18n.format("FILRODENSWMB.UI.CultureDeleteConfirm", { name: culture.name });
         const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.CultureDeleteTitle", { name: culture.name }), content: `<p>${Sanitize.escapeHtml(message)}</p>` });
         if (!confirmed) return false;
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         app.uiState.cultures = (app.uiState.cultures ?? []).filter((candidate) => candidate.id !== id);
         this.#changed(app);
         await Inspector.refresh(app);
@@ -145,10 +146,10 @@ export class CultureLists {
         return true;
     }
 
-    /** Adds a culture as one undo step, returning its id. */
+    /** Adds a culture, returning its id. */
     static #add(app, fields) {
         const culture = { id: platform.utils.randomID(), ...fields };
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         app.uiState.cultures ??= [];
         app.uiState.cultures.push(culture);
         this.#changed(app);

@@ -178,12 +178,12 @@ export class AgeEventRows {
     // ------------------------------------------------------------------ the place on the map
 
     /**
-     * Every event's place, to mark while the Generate tool is open (see HomelandMarkers): a hollow
-     * red marker, filled for the event being picked again.
+     * Every event's place, to mark while Peoples and realms or Ages and events is open (see
+     * CultureMarkers.TOOLS): a hollow red marker, filled for the event being picked again.
      * @returns {{x: number, y: number, color: string, filled: boolean}[]}
      */
     static markers(app) {
-        if (app.activeTool !== "generate") return [];
+        if (!CultureMarkers.TOOLS.has(app.activeTool)) return [];
         const markers = [];
         for (const age of app.uiState.generatorSettings?.ages ?? []) {
             (age.events ?? []).forEach((event, index) => {

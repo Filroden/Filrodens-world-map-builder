@@ -52,6 +52,15 @@ export class Shell {
     #entry;
 
     /**
+     * Registers each studio's own settings (the World studio's: the Generate guard's kept answer),
+     * at the host's start, before any setting is read.
+     * @param {Array<{registerSettings?: Function}>} studios
+     */
+    static registerSettings(studios) {
+        for (const studio of studios) studio.registerSettings?.();
+    }
+
+    /**
      * Runs what each studio prepares before any studio opens (the World studio makes saved maps
      * into worlds, for one), in the order the studios are given. A studio whose preparation fails
      * is reported and the others still run, so the studio can still open.

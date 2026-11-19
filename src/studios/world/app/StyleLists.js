@@ -8,6 +8,10 @@ import { getPinIconPickerList } from "../../../kernel/data/pinIcons.js";
 import { uniqueName } from "../mesh/LayerTree.js";
 import { platform } from "../../../platform/index.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
+import { FILRODENSWMB } from "../../../config.js";
+
+/** The natural features' label styles, which Name natural features looks up by id (see FEATURE_NAMES). */
+const FEATURE_LABEL_IDS = Object.freeze(new Set(Object.values(FILRODENSWMB.FEATURE_NAMES?.STYLES ?? {})));
 
 /** The style types in Styles and icons' order, each with its section and its strings. */
 const LISTS = Object.freeze([
@@ -35,6 +39,43 @@ const LISTS = Object.freeze([
  * The naming state lives on the studio (`app.styleNaming`), so a redraw of the panel keeps the
  * row and what was typed in it.
  */
+/**
+ * The reserved styles (S0 step 4b; board W3): those a generator looks up by their fixed id or
+ * tier, so a run can give what it makes their look. They keep their place in the world's styles:
+ * their look and name can change, but they cannot be deleted (Ken, 2026-11-19), and Styles and
+ * icons shows them apart, after the reader's own styles of their kind under a Reserved heading,
+ * each with a lock saying what uses it.
+ */
+export class ReservedStyles {
+    /** Why a style is reserved, as its lock's tooltip says it, or null for one of the reader's own. */
+    static reason(type, style) {
+        const { i18n } = platform;
+        const { GENERATOR, PINS } = FILRODENSWMB;
+        if (!style?.id) return null;
+        switch (type) {
+            case "Pin": {
+                const tier = style.tier ? PINS.DEFAULT_STYLES.find((seed) => seed.tier === style.tier) : null;
+                return tier ? i18n.format("FILRODENSWMB.UI.ReservedPinTier", { tier: i18n.localize(tier.name) }) : null;
+            }
+            case "Route":
+                return Object.values(GENERATOR.ROUTE_STYLES).some((classes) => Object.values(classes).includes(style.id)) ? i18n.localize("FILRODENSWMB.UI.ReservedRoute") : null;
+            case "Label": {
+                if (Object.values(GENERATOR.REGION_LABEL_STYLES).includes(style.id)) return i18n.localize("FILRODENSWMB.UI.ReservedRegionLabel");
+                if (PINS.DEFAULT_STYLES.some((seed) => seed.labelStyle === style.id)) return i18n.localize("FILRODENSWMB.UI.ReservedPlaceLabel");
+                if (FEATURE_LABEL_IDS.has(style.id)) return i18n.localize("FILRODENSWMB.UI.ReservedFeatureLabel");
+                return null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** Whether a style is reserved. */
+    static is(type, style) {
+        return this.reason(type, style) !== null;
+    }
+}
+
 export class StyleLists {
     /** The localisation key naming each style type's naming field. */
     static #NAMING_LABEL = "FILRODENSWMB.UI.StyleName";
@@ -49,21 +90,28 @@ export class StyleLists {
         const shown = Inspector.current(app);
         const naming = app.styleNaming ?? null;
         const byName = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+        const row = (type, style) => {
+            if (naming?.type === type && naming.id === style.id) return { naming: true, value: naming.value, label: this.#NAMING_LABEL };
+            const reason = ReservedStyles.reason(type, style);
+            return {
+                id: style.id,
+                type,
+                name: style.name,
+                usageCount: StyleEditors.usageCount(app, type, style.id),
+                selected: shown?.kind === StyleEditors.KINDS[type] && shown.ref.id === style.id,
+                preview: this.#preview(type, style),
+                reserved: reason,
+            };
+        };
         return LISTS.map((list) => {
             const spec = InspectorFields.STYLE_TYPES[list.type];
-            const styles = [...(app.uiState[spec.registryKey] ?? [])].sort(byName);
-            const rows = styles.map((style) => {
-                if (naming?.type === list.type && naming.id === style.id) return { naming: true, value: naming.value, label: this.#NAMING_LABEL };
-                return {
-                    id: style.id,
-                    name: style.name,
-                    usageCount: StyleEditors.usageCount(app, list.type, style.id),
-                    selected: shown?.kind === StyleEditors.KINDS[list.type] && shown.ref.id === style.id,
-                    preview: this.#preview(list.type, style),
-                };
-            });
+            const all = [...(app.uiState[spec.registryKey] ?? [])].sort(byName);
+            const own = all.filter((style) => !ReservedStyles.is(list.type, style));
+            const rows = own.map((style) => row(list.type, style));
             if (naming?.type === list.type && !naming.id) rows.push({ naming: true, value: naming.value, label: this.#NAMING_LABEL });
-            return { ...list, count: styles.length, rows, empty: styles.length === 0 && !naming };
+            // The kind's reserved styles after the reader's own, under their heading (see ReservedStyles)
+            const reserved = all.filter((style) => ReservedStyles.is(list.type, style)).map((style) => row(list.type, style));
+            return { ...list, count: all.length, rows, reserved, empty: own.length === 0 && !naming };
         });
     }
 
@@ -174,7 +222,8 @@ export class StyleLists {
     static async delete(app, type, id) {
         const style = StyleEditors.find(app, type, id);
         const config = MapDialogManager.QUICK_STYLE_CONFIG[type];
-        if (!style || !config) return false;
+        // A reserved style cannot be deleted: a generator looks it up (see ReservedStyles)
+        if (!style || !config || ReservedStyles.is(type, style)) return false;
         const count = StyleEditors.usageCount(app, type, id);
         const users = LISTS.find((list) => list.type === type).users;
         const name = style.name;

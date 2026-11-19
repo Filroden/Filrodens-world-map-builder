@@ -11,7 +11,8 @@ import { platform } from "../../../platform/index.js";
  *   sitting's changes have marked a run out of date;
  * - **Revert changes**: the group as it was before the first change in the sitting (since the world
  *   was opened, made or last saved), in one step. World settings are not in the map's undo (W2:
- *   "World settings have no undo: Revert changes puts the group back").
+ *   "World settings have no undo: Revert changes puts the group back"), but for Styles and icons:
+ *   a style's change reaches the map's own objects, so it stays an undo step of the map.
  * - On a held regional world the editor is read only, under the held banner naming the world it
  *   reads its settings from (its World setup is its own but fixed by its crop).
  *
@@ -20,7 +21,12 @@ import { platform } from "../../../platform/index.js";
  */
 export const WORLD_EDITORS = Object.freeze({
     worldSetup: Object.freeze({ group: "setup", icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede" }),
+    worldCultures: Object.freeze({ group: "cultures", icon: "castle", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede" }),
+    worldAges: Object.freeze({ group: "ages", icon: "history", label: "FILRODENSWMB.UI.WorldAges", lede: "FILRODENSWMB.UI.WorldAgesLede" }),
     worldNameStyle: Object.freeze({ group: "nameStyle", icon: "insert-text", label: "FILRODENSWMB.UI.WorldNameStyle", lede: "FILRODENSWMB.UI.WorldNameStyleLede" }),
+    // A style's change reaches the map's own objects that use it (its cascade), so Styles and icons
+    // keeps the map's undo rather than Revert changes (Ken, 2026-11-19)
+    library: Object.freeze({ group: "styles", icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary", lede: "FILRODENSWMB.UI.WorldStylesLede", undo: true }),
     worldBiomes: Object.freeze({ group: "biomes", icon: "forest", label: "FILRODENSWMB.UI.WorldBiomes", lede: "FILRODENSWMB.UI.WorldBiomesLede" }),
     worldClimate: Object.freeze({ group: "climate", icon: "water-drop", label: "FILRODENSWMB.UI.WorldClimate", lede: "FILRODENSWMB.UI.WorldClimateLede" }),
 });
@@ -36,6 +42,8 @@ const ASIDES = Object.freeze(new Set(["manage"]));
  */
 const STATE = Object.freeze({
     setup: Object.freeze(["latTop", "latBottom", "mapUnit", "world.areaFactor"]),
+    cultures: Object.freeze(["cultures"]),
+    ages: Object.freeze(["generatorSettings.ages"]),
     nameStyle: Object.freeze(["generatorSettings.nameBase"]),
     biomes: Object.freeze(["customBiomes", "nextCustomBiomeId", "@customBiomeColors"]),
     climate: Object.freeze(["globalTemp", "seasonOffset", "altCooling", "freezingThreshold", "globalMoisture", "noise.moisture.scale"]),
@@ -71,6 +79,14 @@ function write(app, key, value) {
 }
 
 export class WorldEditors {
+    /**
+     * Whether the world's settings are read only here: on a held regional world, which reads them
+     * from the world above it. Each editor's changes check it before they write.
+     */
+    static readOnly(app) {
+        return !!app?.world?.held;
+    }
+
     /** Whether a tool is a world settings editor. */
     static isEditor(tool) {
         return Object.hasOwn(WORLD_EDITORS, tool);
@@ -120,10 +136,12 @@ export class WorldEditors {
             lede: i18n.localize(editor.lede),
             reach: readers,
             changed,
-            changedLine: changed ? i18n.localize(editor.group === "nameStyle" ? "FILRODENSWMB.UI.WorldChangedNames" : "FILRODENSWMB.UI.WorldChangedRuns") : null,
+            changedLine: changed && !editor.undo ? i18n.localize(editor.group === "nameStyle" ? "FILRODENSWMB.UI.WorldChangedNames" : "FILRODENSWMB.UI.WorldChangedRuns") : null,
             held: !!heldBy,
             heldBanner: heldBy ? i18n.format(editor.group === "setup" ? "FILRODENSWMB.UI.WorldHeldSetup" : "FILRODENSWMB.UI.WorldHeldBanner", { name: heldBy }) : null,
-            canRevert: changed && !heldBy,
+            // Styles and icons: Undo, not Revert changes, takes a change back (see WORLD_EDITORS)
+            undo: !!editor.undo,
+            canRevert: changed && !heldBy && !editor.undo,
         };
     }
 }

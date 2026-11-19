@@ -91,6 +91,7 @@ import { HelpPanel } from "./HelpPanel.js";
 import { WorldsPanel } from "./WorldsPanel.js";
 import { WorldEditors } from "./WorldEditors.js";
 import { WorldMapCard, WorldOverview } from "./WorldOverview.js";
+import { GenerateAll } from "./GenerateAll.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
@@ -248,6 +249,7 @@ export class MapStudio {
         clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message)); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
+        generateAll()               { GenerateAll.open(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
         addAge()                    { GeneratePanel.editAges(this, "add"); },
@@ -896,7 +898,8 @@ export class MapStudio {
             ...stage,
             tools: stage.tools.map((tool) => ({
                 ...tool,
-                action: "openWorldTool",
+                // Generate all acts at once (its dialogue); the others open their panel
+                action: tool.act ?? "openWorldTool",
                 disabled: !!tool.later,
                 tooltip: !tool.later ? i18n.localize(tool.label) : tool.later === tool.label ? i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name: i18n.localize(tool.label) }) : i18n.localize(tool.later),
             })),
@@ -1523,9 +1526,11 @@ export class MapStudio {
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
             if (this.activeTool === "influences") context.influences = InfluenceView.context(this);
             if (this.activeTool === "generate") {
-                context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this) };
-                context.cultureList = CultureLists.context(this);
+                context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this), fromWorld: this.#readFromWorld(), generateAllLabel: GenerateAll.buttonLabel(this) };
             }
+            // The world's cultures and ages (S0 step 4b), as Peoples and realms drew them before
+            if (this.activeTool === "worldCultures") context.cultureList = CultureLists.context(this);
+            if (this.activeTool === "worldAges") context.generate = GeneratePanel.context(this);
 
             if (WorldEditors.isEditor(this.activeTool)) await this.#worldEditorContext(context);
             if (this.activeTool === "worldOverview") {
@@ -1594,8 +1599,8 @@ export class MapStudio {
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
         RouteTool.updateOverlays(this);
-        // An event's place is picked only while the Generate tool is open
-        if (this.activeTool !== "generate") AgeEventRows.stopPick(this);
+        // An event's place is picked only while a tool marking them is open (see CultureMarkers.TOOLS)
+        if (!CultureMarkers.TOOLS.has(this.activeTool)) AgeEventRows.stopPick(this);
         CultureMarkers.update(this, AgeEventRows.markers(this));
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
@@ -5005,7 +5010,7 @@ export class MapStudio {
      */
     #showRunInputs() {
         if (!this.modelRun) return;
-        if (this.activeTool === "generate") this.view?.render(["context"]);
+        if (CultureMarkers.TOOLS.has(this.activeTool)) this.view?.render(["context"]);
         ThematicView.renderLegend(this);
     }
 
@@ -5049,12 +5054,12 @@ export class MapStudio {
         // The Travel tool's network is built from the same input (see TravelNetwork)
         this.travelInputs = (this.travelInputs ?? 0) + 1;
         if (!lasting) {
-            if (this.activeTool === "generate") this.view?.render(["context"]);
+            if (CultureMarkers.TOOLS.has(this.activeTool)) this.view?.render(["context"]);
             return;
         }
         if (!this.modelRun || this.uiState.generatorStale) return;
         this.uiState.generatorStale = true;
-        if (this.activeTool === "generate") this.view?.render(["context"]);
+        if (CultureMarkers.TOOLS.has(this.activeTool)) this.view?.render(["context"]);
     }
 
     /** The same, for what changes the generator's input outside the studio's own handlers (a custom biome's Behaves like, the cultures). */
@@ -5650,10 +5655,12 @@ export class MapStudio {
         this.canvasEngine.resetCamera();
         this.#captureEditorBaseline();
         // Made from World setup: the new world's Surface map, on Map setup, is next
+        // (the world bar is drawn again with the rest below, so its switcher shows the map)
         if (this.definition.isWorldTool(this.activeTool)) {
             this.activeTool = "scene";
             this.#toolBeforeAside = null;
             this.#newWorldSetup = false;
+            this.view?.render(["worldbar"]);
         }
 
         // 5. Force UI to update
@@ -5731,7 +5738,13 @@ export class MapStudio {
     showMap() {
         if (!this.inWorld && this.activeTool !== "manage") return;
         Inspector.close(this);
-        return this.switchTool(this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
+        const kept = this.#modeTools[this.mode];
+        return this.switchTool(this.#isMapTool(kept) ? kept : MapStudio.#MODE_FIRST_TOOL[this.mode]);
+    }
+
+    /** Whether a tool is one of a map's, on its rail by stage: not the world's, nor Worlds. */
+    #isMapTool(tool) {
+        return !!tool && !!this.definition.tool(tool)?.stage && !this.definition.isWorldTool(tool);
     }
 
     /**
@@ -5780,6 +5793,22 @@ export class MapStudio {
         });
         if (this.activeTool === "worldNameStyle") context.generate = { nameBases: GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase) };
         if (this.activeTool === "worldSetup") context.worldSetup = { isNew: this.#newWorldSetup };
+    }
+
+    /**
+     * Peoples and realms' Read from the world (S0 step 4b; board S2): what this map's run reads
+     * from the world's settings, each with what it holds and a Go to its editor.
+     */
+    #readFromWorld() {
+        const { i18n } = platform;
+        const count = (n, one, many) => i18n.format(n === 1 ? one : many, { count: n });
+        const nameBase = GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase).find((choice) => choice.selected);
+        const row = (tool, icon, label, summary) => ({ tool, icon, label: i18n.localize(label), summary, goLabel: i18n.format("FILRODENSWMB.UI.GoTo", { name: i18n.localize(label) }) });
+        return [
+            row("worldCultures", "castle", "FILRODENSWMB.UI.WorldCultures", count((this.uiState.cultures ?? []).length, "FILRODENSWMB.UI.ReadCulturesOne", "FILRODENSWMB.UI.ReadCultures")),
+            row("worldAges", "history", "FILRODENSWMB.UI.WorldAges", count((this.uiState.generatorSettings?.ages ?? []).length, "FILRODENSWMB.UI.ReadAgesOne", "FILRODENSWMB.UI.ReadAges")),
+            row("worldNameStyle", "insert-text", "FILRODENSWMB.UI.WorldNameStyle", nameBase?.label ?? ""),
+        ];
     }
 
     /** The names of the settings groups changed since the world opened, for the overview's line. */
@@ -5893,12 +5922,12 @@ export class MapStudio {
         // Its own run, or its copy of its parent's (the mesh the run's cells need may not be built yet)
         const mode = kept?.mode ?? (this.modelRun || this.parentRun ? "explore" : "create");
         if (kept) this.#modeTools = { ...kept.tools };
-        else this.#modeTools = { create: this.mode === "create" && this.definition.tool(this.activeTool)?.stage ? this.activeTool : this.#modeTools.create, explore: null };
+        else this.#modeTools = { create: this.mode === "create" && this.#isMapTool(this.activeTool) ? this.activeTool : this.#modeTools.create, explore: null };
         if (mode === this.mode) {
             if (mode === "explore" && !this.definition.offers(this.activeTool, this.mapType, "explore")) await this.switchTool(this.#modeTools.explore ?? MapStudio.#MODE_FIRST_TOOL.explore);
         } else {
             this.mode = mode;
-            const tool = this.#modeTools[mode] && this.definition.offers(this.#modeTools[mode], this.mapType, mode) ? this.#modeTools[mode] : MapStudio.#MODE_FIRST_TOOL[mode];
+            const tool = this.#isMapTool(this.#modeTools[mode]) && this.definition.offers(this.#modeTools[mode], this.mapType, mode) ? this.#modeTools[mode] : MapStudio.#MODE_FIRST_TOOL[mode];
             await this.switchTool(tool, { force: true });
         }
         this.#rememberWorldMode();
@@ -5921,7 +5950,7 @@ export class MapStudio {
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
         const toolMode = this.definition.tool(newTool)?.mode;
         if (this.definition.isWorldTool(newTool)) this.#worldTool = newTool;
-        else if (toolMode && this.definition.tool(newTool)?.stage && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
+        else if (toolMode && this.#isMapTool(newTool) && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
         this.#rememberWorldMode();
 
         // 1. Teardown current state. Automatic generation always comes back on when the tool

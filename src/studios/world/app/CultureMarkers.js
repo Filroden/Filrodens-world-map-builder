@@ -1,5 +1,5 @@
+import { WorldEditors } from "./WorldEditors.js";
 import { FILRODENSWMB } from "../../../config.js";
-import { MapStateManager } from "./MapStateManager.js";
 import { platform } from "../../../platform/index.js";
 
 /**
@@ -19,13 +19,19 @@ export class CultureMarkers {
     static #picking = new WeakMap();
 
     /**
-     * Shows the markers the Generate tool shows, or none in any other tool, with `extra` markers
-     * beside the homelands (the ages' events' places; see AgeEventRows.markers).
+     * The tools that mark the homelands and the events' places on the map: Peoples and realms, and
+     * the world's Cultures and Ages and events (S0 step 4b), where they are picked.
+     */
+    static TOOLS = Object.freeze(new Set(["generate", "worldCultures", "worldAges"]));
+
+    /**
+     * Shows the markers those tools show, or none in any other tool, with `extra` markers beside
+     * the homelands (the ages' events' places; see AgeEventRows.markers).
      */
     static update(app, extra = []) {
         const layer = app.canvasEngine?.homelandMarkers;
         if (!layer) return;
-        layer.set(app.activeTool === "generate" ? [...this.markers(app), ...extra] : []);
+        layer.set(CultureMarkers.TOOLS.has(app.activeTool) ? [...this.markers(app), ...extra] : []);
     }
 
     /**
@@ -113,7 +119,7 @@ export class CultureMarkers {
             this.stopPick(app);
             return;
         }
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         culture.homelands = [...(culture.homelands ?? []), { x: Math.round(x), y: Math.round(y) }];
         this.stopPick(app);
         app.markGeneratorStale?.();

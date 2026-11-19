@@ -1,10 +1,10 @@
+import { WorldEditors } from "./WorldEditors.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { panelSettings, resolveEvents } from "../generator/GeneratorSettings.js";
 import { platform } from "../../../platform/index.js";
 import { AgeEventRows } from "./AgeEventRows.js";
 import { Generation } from "./Generation.js";
 import { Inspector } from "./Inspector.js";
-import { MapStateManager } from "./MapStateManager.js";
 
 /**
  * An age in the inspector (see Inspector), opened from its row in the Generate panel's Ages
@@ -12,8 +12,9 @@ import { MapStateManager } from "./MapStateManager.js";
  * and its events (see AgeEventRows: each event's kind, what it does, its culture or its place, and
  * + Event).
  *
- * Each field applies when committed, as one undo step (the undo snapshot holds the ages; see
- * MapStateManager.getVectorStateSnapshot), and marks a run made before it out of date. An age is
+ * Each field applies when committed. Ages are the world's (S0 step 4b), so a change is no undo step
+ * of the map: the Ages and events editor's Revert changes puts them back. A change marks a run
+ * made before it out of date. An age is
  * found by its id (GeneratorSettings.panelAges), so it stays open as the ages move.
  *
  * On a regional map holding its parent's run (see Generation.heldByParent) the age is shown read
@@ -77,7 +78,7 @@ export class AgeEditor {
             events: AgeEventRows.rows(app, age, { present: this.#isPresent(app, age) }),
             // Events that act on a realm or a town name them only after a run
             noRun: !app.modelRun && !Generation.heldByParent(app),
-            readOnly: Generation.heldByParent(app),
+            readOnly: Generation.heldByParent(app) || WorldEditors.readOnly(app),
             eventCount: age.events.length,
         };
     }
@@ -103,11 +104,11 @@ export class AgeEditor {
     }
 
     /**
-     * Writes an age changed (by `change`, given a copy) as one undo step, the run marked out of date
+     * Writes an age changed (by `change`, given a copy), the run marked out of date
      * and the panel drawn again (the inspector with it). Returns whether anything changed.
      */
     static change(app, id, change) {
-        if (Generation.heldByParent(app)) return false;
+        if (Generation.heldByParent(app) || WorldEditors.readOnly(app)) return false;
         const ages = this.ages(app);
         const index = ages.findIndex((age) => age.id === id);
         if (index < 0) return false;
@@ -115,7 +116,7 @@ export class AgeEditor {
         change(next);
         next.events = resolveEvents(next);
         if (JSON.stringify(next) === JSON.stringify(ages[index])) return false;
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         ages[index] = next;
         app.uiState.generatorSettings = panelSettings(app.uiState.generatorSettings);
         app.markGeneratorStale?.();
@@ -163,7 +164,7 @@ export class AgeEditor {
             pickPlace: (app, age, _ref, button) => {
                 const index = Number(button.dataset.index);
                 const kind = age.events[index]?.kind;
-                if (!AgeEventRows.isPlaced(kind) || Generation.heldByParent(app)) return;
+                if (!AgeEventRows.isPlaced(kind) || Generation.heldByParent(app) || WorldEditors.readOnly(app)) return;
                 AgeEventRows.togglePick(app, age.id, index, (place) => {
                     AgeEditor.change(app, age.id, (copy) => {
                         if (copy.events[index]?.kind === kind) copy.events[index].place = place;

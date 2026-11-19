@@ -20,6 +20,7 @@ Hooks.once("init", async () => {
 
     registerPinIconSettings();
     registerExportFormatSettings();
+    Shell.registerSettings(STUDIOS);
 
     // The module's own template helpers (a free-text field's maxlength), beside Foundry's
     registerModuleHelpers(Handlebars);
@@ -66,6 +67,8 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/shell/dialogs/shortcuts.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/terrain-upgrade.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/first-opening.hbs",
+        "modules/filrodens-world-map-builder/templates/world/dialogs/generate-all.hbs",
+        "modules/filrodens-world-map-builder/templates/world/dialogs/generate-guard.hbs",
 
         "modules/filrodens-world-map-builder/templates/shell/parts/bar-modes.hbs",
         "modules/filrodens-world-map-builder/templates/shell/parts/bar-pause.hbs",
@@ -102,6 +105,8 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/tools-worldNameStyle.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-worldBiomes.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-worldClimate.hbs",
+        "modules/filrodens-world-map-builder/templates/world/tools-worldCultures.hbs",
+        "modules/filrodens-world-map-builder/templates/world/tools-worldAges.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/label-fields.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/list-rows-label.hbs",
@@ -120,6 +125,8 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-cartography.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-empty.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-world.hbs",
+        "modules/filrodens-world-map-builder/templates/world/parts/world-cultures.hbs",
+        "modules/filrodens-world-map-builder/templates/world/parts/world-ages.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-features.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-influences.hbs",
         "modules/filrodens-world-map-builder/templates/world/parts/toolbar-infrastructure.hbs",

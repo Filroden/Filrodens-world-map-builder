@@ -53,7 +53,7 @@ test("the rail holds the stages in order (the optional one last), then the occas
     );
     assert.deepEqual(
         OCCASIONAL.map((entry) => entry.tool ?? entry.action ?? entry.menu),
-        ["reference", "library", "appearance", "toggleFullscreen"],
+        ["reference", "appearance", "toggleFullscreen"],
     );
 });
 

@@ -1,7 +1,7 @@
-// The Generate panel's Ages list and an age in the inspector (AgeEditor, AgeEventRows), drawn from
-// the real templates in a happy-dom document: each age a row in brief opening it in the inspector;
-// + Age opening the new present; the era, strife and events in their sections, each change one
-// undo step marking a run out of date; events added, changed and removed; a place chosen on the
+// The world's Ages and events editor (S0 step 4b) and an age in the inspector (AgeEditor,
+// AgeEventRows), drawn from the real templates in a happy-dom document: each age a row in brief
+// opening it in the inspector; + Age opening the new present; the era, strife and events in their
+// sections, each change marking a run out of date and none an undo step of the map; events added, changed and removed; a place chosen on the
 // map (water refused) and its marker; the age staying open as it moves.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -28,7 +28,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-age.hbs", "world/tools-generate.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-age.hbs", "world/tools-generate.hbs", "world/parts/world-editor-head.hbs", "world/parts/world-ages.hbs", "world/tools-worldAges.hbs"]);
 
 // A dialogue choice: `choose(options)` answers it (the rule editor's), by default with Cancel
 const answers = { confirm: true, choose: async () => "cancel" };
@@ -50,7 +50,6 @@ installPlatform({
     },
 });
 
-const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
 const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
 const { AgeEditor } = await import("../../src/studios/world/app/AgeEditor.js");
@@ -106,13 +105,15 @@ async function drawPanel(app) {
         panel = app.root.appendChild(document.createElement("div"));
         panel.className = "fwmb-context-panel";
     }
-    const generate = GeneratePanel.context(app);
-    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-generate.hbs", { generate, cultureList: { rows: [] } });
+    // Peoples and realms, then the world's Ages and events (S0 step 4b), as the panel draws each
+    const generate = { ...GeneratePanel.context(app), fromWorld: [{ tool: "worldNameStyle", icon: "insert-text", label: "WorldNameStyle", summary: "" }] };
+    panel.innerHTML = (await templates.render("modules/filrodens-world-map-builder/templates/world/tools-generate.hbs", { generate })) + (await templates.render("modules/filrodens-world-map-builder/templates/world/tools-worldAges.hbs", { generate, worldEditor: { reach: "", group: "ages" } }));
 }
 
 const body = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-body");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-const undo = (app) => VectorHistory.step(app, true);
+// Ages are the world's (S0 step 4b): no change is an undo step of the map (Revert changes puts them back)
+const noUndo = (app) => assert.equal(app.pinHistory.length, 0, "no undo step of the map");
 const ages = (app) => app.uiState.generatorSettings.ages;
 const present = (app) => ages(app).at(-1);
 async function choose(app, name, value) {
@@ -145,11 +146,10 @@ test("the Ages list: each age a row in brief, opening it in the inspector; + Age
     await settle();
     assert.equal(ages(app).length, 3);
     assert.ok(Inspector.shows(app, "age", present(app).id), "the new present opens");
-    undo(app);
-    assert.equal(ages(app).length, 2, "one undo step");
+    noUndo(app);
 });
 
-test("an age's era, strife and events apply as one undo step each, marking a run out of date, and the age stays open as it moves", async () => {
+test("an age's era, strife and events apply at once, no undo step, marking a run out of date, and the age stays open as it moves", async () => {
     const app = studio();
     await drawPanel(app);
     const id = present(app).id;
@@ -162,8 +162,7 @@ test("an age's era, strife and events apply as one undo step each, marking a run
     assert.equal(present(app).strife, "warTorn");
     assert.match(body(app).textContent, /GenerateStrifeHintWarTorn/);
     assert.equal(app.stale, 2);
-    undo(app);
-    assert.equal(present(app).strife, "troubled");
+    noUndo(app);
     // An event added, made a civil war, another added, the culture of a peoples event changed
     assert.match(body(app).textContent, /GenerateEventsNoRun/, "before a run, how events find their realm");
     await press(app, "addEvent");
@@ -203,8 +202,7 @@ test("an age's era, strife and events apply as one undo step each, marking a run
     assert.equal(present(app).events[1].place, null);
     await press(app, "removeEvent", 0);
     assert.deepEqual(present(app).events.map((event) => event.kind), ["civilWar"]);
-    undo(app);
-    assert.equal(present(app).events.length, 2, "Remove is one undo step");
+    noUndo(app);
     // Moved earlier, the age stays open under its new name
     GeneratePanel.editAges(app, "up", 1);
     await settle();

@@ -1000,6 +1000,9 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+    /* Set in full, so a host's own input rules (Foundry's pointer and its reset look) do not reach it */
+    appearance: auto;
+    cursor: default;
 }
 .fwmb-row {
     display: flex;
@@ -1909,7 +1912,33 @@
 }
 .fwmb-generate-action {
     display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
     margin: 0.5rem;
+}
+/* Peoples and realms' Read from the world (S0 step 4b): each world setting this map's run reads,
+   what it holds now, and Go to its editor */
+.fwmb .fwmb-go-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-block: 0.25rem;
+}
+.fwmb .fwmb-go-row > .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-go-row-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.fwmb .fwmb-go-row-text .fwmb-meta {
+    color: var(--fwmb-text-muted);
+    font-size: var(--fwmb-size-12);
 }
 .fwmb .fwmb-generate-action .fwmb-btn {
     flex: 1;
@@ -2427,6 +2456,63 @@
 }
 .fwmb-steps b {
     color: var(--fwmb-text-primary);
+}
+
+/* Styles and icons: a kind's reserved styles under their heading, after its own (S0 step 4b) */
+.fwmb .fwmb-list-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.5rem 0.25rem;
+    border-top: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-secondary);
+    font-size: var(--fwmb-size-12);
+    font-weight: 700;
+    letter-spacing: var(--fwmb-letter-spacing-wide);
+    text-transform: uppercase;
+}
+.fwmb .fwmb-list-heading .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+/* A culture's Dwelling and Mining affinity, drawn for the Underground track (S0 step 4b) */
+.fwmb .fwmb-culture-later {
+    opacity: 0.6;
+}
+
+/* Generate all's and the guard's dialogues (S0 step 4b): the choice cards one above the other,
+   each card's text a column; a checkbox with its label at the footer's start */
+.fwmb .fwmb-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-block: 0.75rem;
+}
+.fwmb .fwmb-choice {
+    cursor: pointer;
+}
+.fwmb .fwmb-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+.fwmb .fwmb-choice-text .fwmb-hint,
+.fwmb .fwmb-choice-text .fwmb-meta {
+    margin: 0;
+}
+.fwmb .fwmb-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+.fwmb .fwmb-generate-all-dialog .fwmb-steps {
+    margin-block: 0.75rem;
+}
+.fwmb .fwmb-overlay:is(.fwmb-generate-all-dialog, .fwmb-guard-dialog) {
+    width: min(34rem, calc(100% - 2rem));
 }
 
 /* v5: an action list: more than two or three secondary actions become one card of rows (icon, bold

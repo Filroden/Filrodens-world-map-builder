@@ -119,6 +119,7 @@ async function start() {
     registerPinIconSettings();
     registerExportFormatSettings();
     registerThemeSettings();
+    Shell.registerSettings(STUDIOS);
     // The colour theme chosen in the studio, on the frame and on <body> (where the tooltip is)
     attachTheme(frame);
     attachTheme(document.body);

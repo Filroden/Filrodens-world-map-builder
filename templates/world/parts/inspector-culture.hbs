@@ -2,13 +2,17 @@
     The inspector's culture (see CultureEditor): its name, colour and name style; then, in folding
     sections, how open and how dense it is; its habitat (its climate from chosen biomes or from
     zones, relief as a band on one track, coast and river from avoids to seeks); and its
-    homelands. Every field applies when committed, one undo step each (see Inspector).
+    homelands. Every field applies when committed (see Inspector): cultures are the world's (S0
+    step 4b), so no change is an undo step of the map. Dwelling and Mining affinity are drawn for
+    the Underground track, disabled. Read only on a held regional world.
 --}}
 <datalist id="fwmb-inspector-colors">
     {{#each palette}}
     <option value="{{this}}"></option>
     {{/each}}
 </datalist>
+{{#if readOnly}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.CultureHeldNotice"}}</p>{{/if}}
+<fieldset class="fwmb-world-editor"{{#if readOnly}} disabled{{/if}}>
 <div class="fwmb-group">
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
@@ -39,6 +43,16 @@
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="cultureOpenness" label="FILRODENSWMB.UI.CultureOpenness" hint="FILRODENSWMB.UI.CultureOpennessHint" value=fields.openness.value min=fields.openness.min max=fields.openness.max step=fields.openness.step resetTo=fields.openness.resetTo}}
     <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureClosed"}}</span><span>{{localize "FILRODENSWMB.UI.CultureOpen"}}</span></div>
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="cultureDensity" label="FILRODENSWMB.UI.CultureDensity" hint="FILRODENSWMB.UI.CultureDensityHint" value=fields.density.value min=fields.density.min max=fields.density.max step=fields.density.step resetTo=fields.density.resetTo}}
+    {{!-- Where it lives and how it takes to mining: the Underground track's, drawn disabled until then --}}
+    <div class="fwmb-culture-later" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureUndergroundLater'}}">
+        <div class="fwmb-form-group">
+            <label for="fwmb-inspector-culture-dwelling">{{localize "FILRODENSWMB.UI.CultureDwelling"}}</label>
+            <div class="fwmb-form-fields">
+                <select id="fwmb-inspector-culture-dwelling" disabled><option>{{localize "FILRODENSWMB.UI.CultureDwellingSurface"}}</option></select>
+            </div>
+        </div>
+        {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="cultureMiningLater" label="FILRODENSWMB.UI.CultureMining" value=0 min=0 max=1 step=0.1 disabled=true}}
+    </div>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="cultureHabitat" title="FILRODENSWMB.UI.CultureHabitat"}}
@@ -122,3 +136,4 @@
         {{/if}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+</fieldset>

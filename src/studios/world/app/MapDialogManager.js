@@ -776,6 +776,18 @@ export class MapDialogManager {
 
     // --- MASS EDIT ---
 
+    /**
+     * Moves a dialogue's footer start item (the content's `.fwmb-start`: a setting such as Ask
+     * each time, or Save world when it finishes) onto the footer's line, before the buttons, as
+     * the design system draws it.
+     * @param {HTMLElement} element - The dialogue, as onRender gives it.
+     */
+    static footerStart(element) {
+        const start = element.querySelector(".fwmb-overlay-body .fwmb-start, form .fwmb-start");
+        const footer = element.querySelector(".fwmb-overlay-footer");
+        if (start && footer) footer.prepend(start);
+    }
+
     /** Mass edit of the chosen items of a kind (see MassEdit). */
     static onMassEdit(app, _event, target) {
         return MassEdit.open(app, target.dataset.type);

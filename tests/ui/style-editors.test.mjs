@@ -32,7 +32,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-route-style.hbs", "world/parts/inspector-region-style.hbs", "world/parts/inspector-label-style.hbs", "world/parts/inspector-pin-style.hbs", "world/tools-library.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-route-style.hbs", "world/parts/inspector-region-style.hbs", "world/parts/inspector-label-style.hbs", "world/parts/inspector-pin-style.hbs", "world/parts/world-editor-head.hbs", "world/tools-library.hbs"]);
 
 const answers = { prompt: null, confirm: true, confirmed: [] };
 let host = null;

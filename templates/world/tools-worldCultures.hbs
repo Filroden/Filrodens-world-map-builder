@@ -1,0 +1,9 @@
+{{!--
+    Cultures (S0 step 4b): the world's cultures, which every map's run reads, each opening in the
+    culture inspector (its homelands are picked on the map in view). Read only on a held regional
+    world. No undo: Revert changes puts the list back (see WorldEditors).
+--}}
+{{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
+<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
+{{> "modules/filrodens-world-map-builder/templates/world/parts/world-cultures.hbs"}}
+</fieldset>

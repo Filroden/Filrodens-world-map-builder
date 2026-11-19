@@ -1,3 +1,5 @@
+import { GenerateGuard } from "./GenerateGuard.js";
+import { WorldEditors } from "./WorldEditors.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
@@ -7,7 +9,6 @@ import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../../../platform/index.js";
 import { Generation } from "./Generation.js";
 import { Inspector } from "./Inspector.js";
-import { MapStateManager } from "./MapStateManager.js";
 import { isKept } from "./Regeneration.js";
 import { RunInputs } from "./RunInputs.js";
 
@@ -157,7 +158,7 @@ export class GeneratePanel {
             if (!ages[other]) return;
             [ages[index], ages[other]] = [ages[other], ages[index]];
         } else return;
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         settings.ages = ages;
         app.uiState.generatorSettings = panelSettings(settings);
         app.markGeneratorStale?.();
@@ -386,6 +387,9 @@ export class GeneratePanel {
 
     /** Generate (or Generate again): the run, then the panel redrawn with its results. */
     static async generate(app) {
+        // The guard: a map that reads another out-of-date map asks first (none does in S0; see GenerateGuard)
+        const first = await GenerateGuard.before(app, platform.i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"));
+        if (first === null) return false;
         const done = await Generation.run(app);
         if (done) app.view?.render(["context"]);
         return done;

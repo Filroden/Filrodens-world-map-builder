@@ -1,7 +1,7 @@
-// The Generate panel's cultures (CultureLists) and a culture in the inspector (CultureEditor),
+// The world's Cultures editor (CultureLists; S0 step 4b) and a culture in the inspector (CultureEditor),
 // drawn from the real templates in a happy-dom document: the add row names and makes a culture
 // with the default culture's fields and the panel's name style; Rename, Duplicate and Delete; each
-// change one undo step that marks a run out of date; the inspector's fields, its relief band
+// change marking a run out of date, none an undo step of the map (cultures are the world's); the inspector's fields, its relief band
 // (RangeTrack: keys, quick picks, double-click to the whole track, kept as no limit), its climate
 // (chosen biomes, or zones through the rule editor; an older culture's bands as its one zone; the
 // warning when it takes in most of the land), Use auto, and a realm's ruling culture in its details.
@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-culture.hbs", "world/tools-generate.hbs", "world/dialogs/culture-zones-editor.hbs", "world/dialogs/biome-rule-editor.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/range-band.hbs", "world/parts/inspector-culture.hbs", "world/parts/world-editor-head.hbs", "world/parts/world-cultures.hbs", "world/tools-worldCultures.hbs", "world/dialogs/culture-zones-editor.hbs", "world/dialogs/biome-rule-editor.hbs"]);
 
 // A dialogue choice: `choose(options)` answers it (the rule editor's), by default with Cancel
 const answers = { confirm: true, choose: async () => "cancel" };
@@ -55,7 +55,6 @@ installPlatform({
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { CultureEditor } = await import("../../src/studios/world/app/CultureEditor.js");
 const { CultureLists } = await import("../../src/studios/world/app/CultureLists.js");
-const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { RangeTrack } = await import("../../src/shell/RangeTrack.js");
 const { CultureMarkers } = await import("../../src/studios/world/app/CultureMarkers.js");
 const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
@@ -118,12 +117,13 @@ async function drawPanel(app) {
         panel = app.root.appendChild(document.createElement("div"));
         panel.className = "fwmb-context-panel";
     }
-    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-generate.hbs", { generate: { nameBases: [], world: [], output: { places: [], routes: [] } }, cultureList: CultureLists.context(app) });
+    panel.innerHTML = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-worldCultures.hbs", { worldEditor: { reach: "", group: "cultures" }, cultureList: CultureLists.context(app) });
 }
 
 const form = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-body");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-const undo = (app) => VectorHistory.step(app, true);
+// Cultures are the world's (S0 step 4b): no change is an undo step of the map (Revert changes puts them back)
+const noUndo = (app) => assert.equal(app.pinHistory.length, 0, "no undo step of the map");
 const culture = (app, index = 0) => app.uiState.cultures[index];
 
 async function addCulture(app, name) {
@@ -131,10 +131,9 @@ async function addCulture(app, name) {
     return CultureLists.confirm(app, name);
 }
 
-test("the add row makes a culture with the default culture's fields and the panel's name style, opens it, and is one undo step", async () => {
+test("the add row makes a culture with the default culture's fields and the panel's name style, opens it, and is no undo step", async () => {
     const app = studio();
     await drawPanel(app);
-    assert.ok(app.root.querySelector('.fwmb-context-panel [data-action="openWorldTool"][data-tool="worldNameStyle"]'), "with no cultures, a Go to the world's default name style");
     await CultureLists.startAdding(app);
     assert.equal(app.root.querySelector("[data-culture-naming]").value, "FILRODENSWMB.UI.CultureNewName");
     const id = await CultureLists.confirm(app, "Hillfolk");
@@ -144,26 +143,22 @@ test("the add row makes a culture with the default culture's fields and the pane
     assert.equal(made.id, id);
     assert.ok(app.root.querySelector("dialog.fwmb-inspector--culture"), "opened in the inspector");
     assert.equal(app.stale, 1, "a run made before is out of date");
-    assert.ok(app.root.querySelector('.fwmb-context-panel [data-action="openWorldTool"][data-tool="worldNameStyle"]'), "and with cultures too, for land no culture names");
-    const second = await addCulture(app, "Lowlanders");
+    await addCulture(app, "Lowlanders");
     assert.notEqual(culture(app, 1).color, made.color, "the next unused colour");
-    undo(app);
-    assert.equal(app.uiState.cultures.length, 1);
-    assert.ok(!app.uiState.cultures.some((each) => each.id === second));
+    noUndo(app);
     await CultureLists.startAdding(app);
     assert.equal(await CultureLists.confirm(app, "   "), null, "an empty name makes nothing");
-    assert.equal(app.uiState.cultures.length, 1);
+    assert.equal(app.uiState.cultures.length, 2);
 });
 
-test("Rename, Duplicate and Delete are each one undo step", async () => {
+test("Rename, Duplicate and Delete are no undo steps", async () => {
     const app = studio();
     const id = await addCulture(app, "Hillfolk");
     culture(app).homelands = [{ x: 4, y: 5 }];
     await CultureLists.startRename(app, id);
     await CultureLists.confirm(app, "Hill folk");
     assert.equal(culture(app).name, "Hill folk");
-    undo(app);
-    assert.equal(culture(app).name, "Hillfolk");
+    noUndo(app);
     const copy = await CultureLists.duplicate(app, id);
     assert.equal(culture(app, 1).id, copy);
     assert.match(culture(app, 1).name, /StyleCopyName/);
@@ -173,11 +168,10 @@ test("Rename, Duplicate and Delete are each one undo step", async () => {
     answers.confirm = true;
     assert.equal(await CultureLists.delete(app, id), true);
     assert.deepEqual(app.uiState.cultures.map((each) => each.id), [copy]);
-    undo(app);
-    assert.deepEqual(app.uiState.cultures.map((each) => each.id), [id, copy]);
+    noUndo(app);
 });
 
-test("the inspector's fields apply as one undo step each, and a run made before is out of date", async () => {
+test("the inspector's fields apply no undo step each, and a run made before is out of date", async () => {
     const app = studio();
     await addCulture(app, "Hillfolk");
     const stale = app.stale;
@@ -191,9 +185,7 @@ test("the inspector's fields apply as one undo step each, and a run made before 
     assert.equal(culture(app).nameBase, "Dwarven");
     assert.equal(culture(app).openness, 0.2);
     assert.ok(app.stale > stale);
-    undo(app);
-    assert.equal(culture(app).openness, 0.5);
-    assert.equal(culture(app).nameBase, "Dwarven");
+    noUndo(app);
 });
 
 test("the relief band moves with the keys and its quick picks, returns to no limit on double-click", async () => {
@@ -213,8 +205,7 @@ test("the relief band moves with the keys and its quick picks, returns to no lim
     form(app).querySelector('[data-range-band] input[name="habitatRelief"]').closest("[data-range-band]").querySelector("[data-band-track]").dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
     await settle();
     assert.equal(culture(app).habitat.relief, null);
-    undo(app);
-    assert.deepEqual(culture(app).habitat.relief, [0.02, 0.06]);
+    noUndo(app);
 });
 
 /** The studio with one new culture, open in the inspector. */
@@ -235,7 +226,7 @@ const commitField = async (field, value) => {
     await settle();
 };
 
-test("a new culture's climate is its chosen biomes: none at first; ticking one chooses it, as one undo step", async () => {
+test("a new culture's climate is its chosen biomes: none at first; ticking one chooses it, no undo step", async () => {
     const app = await withCulture();
     assert.equal(form(app).elements.habitatClimate.value, "biomes");
     const boxes = () => [...form(app).querySelectorAll('input[name="habitatBiome"]')];
@@ -247,12 +238,11 @@ test("a new culture's climate is its chosen biomes: none at first; ticking one c
     assert.ok(app.stale > stale, "a run made before is out of date");
     await commitField(boxes().find((box) => box.value === "10"), true);
     assert.deepEqual(culture(app).habitat.biomes, [7, 10]);
-    undo(app);
-    assert.deepEqual(culture(app).habitat.biomes, [7]);
+    noUndo(app);
     // Unticking the last biome is a change too (the list is only shorter)
     await CultureEditor.open(app, culture(app).id);
     await commitField(boxes().find((box) => box.value === "7"), false);
-    assert.deepEqual(culture(app).habitat.biomes, []);
+    assert.deepEqual(culture(app).habitat.biomes, [10]);
 });
 
 test("a zone deleted in the rule editor is gone on Accept", async () => {
@@ -312,7 +302,7 @@ test("the map's land custom biomes can be chosen; one that cannot show on land i
     assert.deepEqual(culture(app).habitat.biomes, [40]);
 });
 
-test("Zones: none at first, then set in the rule editor on Accept, as one undo step; Cancel changes nothing", async () => {
+test("Zones: none at first, then set in the rule editor on Accept, no undo step; Cancel changes nothing", async () => {
     const app = await withCulture();
     await commitField(form(app).elements.habitatClimate, "zones");
     assert.equal(culture(app).habitat.climate, "zones");
@@ -344,12 +334,11 @@ test("Zones: none at first, then set in the rule editor on Accept, as one undo s
     await settle();
     await settle();
     assert.equal(culture(app).habitat.zones.length, 1);
-    undo(app);
-    assert.deepEqual(culture(app).habitat.zones, []);
+    noUndo(app);
     // Back to biomes: its biomes and zones are both kept
     await commitField(form(app).elements.habitatClimate, "biomes");
     assert.equal(culture(app).habitat.climate, "biomes");
-    assert.deepEqual(culture(app).habitat.zones, []);
+    assert.equal(culture(app).habitat.zones.length, 1);
 });
 
 test("an older culture's bands show as its one zone, and become that zone when a change is written", async () => {
@@ -362,8 +351,7 @@ test("an older culture's bands show as its one zone, and become that zone when a
     assert.equal(written.climate, "zones");
     assert.deepEqual(written.zones, [zoneFromBands(habitat)]);
     assert.ok(!("temperature" in written) && !("height" in written) && !("moisture" in written), "the bands are its zone now");
-    undo(app);
-    assert.deepEqual(culture(app).habitat, habitat);
+    noUndo(app);
 });
 
 test("a climate taking in most of the map's land is warned of", async () => {
@@ -405,7 +393,7 @@ test("the rule editor marks a run out of date when its rules change while a cult
     assert.equal(app.stale, 1);
 });
 
-test("Use auto takes the culture's homelands away, as one undo step", async () => {
+test("Use auto takes the culture's homelands away, no undo step", async () => {
     const app = studio();
     const id = await addCulture(app, "Hillfolk");
     culture(app).homelands = [{ x: 4, y: 5 }, { x: 9, y: 9 }];
@@ -413,8 +401,7 @@ test("Use auto takes the culture's homelands away, as one undo step", async () =
     form(app).querySelector('[data-inspector-action="autoHomelands"]').click();
     await settle();
     assert.deepEqual(culture(app).homelands, []);
-    undo(app);
-    assert.equal(culture(app).homelands.length, 2);
+    noUndo(app);
 });
 
 test("a handle's keys: a step, ten steps, the ends; never past the other end", () => {
@@ -453,8 +440,7 @@ test("Add homeland: the next click on land adds one as an undo step; water is re
     // The studio redraws the inspector after the panel (see MapStudio's afterRegionsDrawn)
     await Inspector.refresh(app);
     assert.match(form(app).querySelector(".fwmb-homeland-row").textContent, /CultureHomelandAt/);
-    undo(app);
-    assert.deepEqual(culture(app).homelands, []);
+    noUndo(app);
     // Escape ends a pick; so does the inspector closing
     CultureMarkers.togglePick(app, id);
     assert.equal(CultureMarkers.handleKey(app, { key: "Escape" }), true);
@@ -465,7 +451,7 @@ test("Add homeland: the next click on land adds one as an undo step; water is re
     assert.equal(app.canvasEngine.pickPointerTool, null);
 });
 
-test("Remove takes one homeland away, as one undo step", async () => {
+test("Remove takes one homeland away, no undo step", async () => {
     const app = studio();
     await addCulture(app, "Hillfolk");
     culture(app).homelands = [{ x: 6, y: 1 }, { x: 8, y: 8 }];
@@ -473,8 +459,7 @@ test("Remove takes one homeland away, as one undo step", async () => {
     form(app).querySelector('[data-inspector-action="removeHomeland"][data-index="0"]').click();
     await settle();
     assert.deepEqual(culture(app).homelands, [{ x: 8, y: 8 }]);
-    undo(app);
-    assert.equal(culture(app).homelands.length, 2);
+    noUndo(app);
 });
 
 test("the markers: given homelands filled, a run's placed homeland hollow, only in the Generate tool", async () => {
@@ -514,4 +499,18 @@ test("generated details name cultures by id (a deleted one as the run knew it), 
     const ruling = (region) => GeneratedDetails.forRegion(app, region).find((row) => row.label === "FILRODENSWMB.UI.GeneratedRulingCulture");
     assert.equal(ruling(realm).value, "Hillfolk");
     assert.equal(ruling(app.layerSets[0].levels[0].regions[0]), undefined);
+});
+
+test("on a held regional world the cultures are read only: nothing is added, renamed or changed", async () => {
+    const app = await withCulture();
+    app.world = { held: true };
+    const before = structuredClone(app.uiState.cultures);
+    await CultureLists.startAdding(app);
+    await CultureLists.confirm(app, "Seafolk");
+    await CultureLists.startRename(app, culture(app).id);
+    await CultureLists.confirm(app, "Renamed");
+    await commitField(form(app).elements.cultureOpenness, "0.1");
+    assert.deepEqual(app.uiState.cultures, before);
+    await drawPanel(app);
+    assert.ok(app.root.querySelector("fieldset.fwmb-world-editor"), "the editor's fieldset, which a held world disables");
 });

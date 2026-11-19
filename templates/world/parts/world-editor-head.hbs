@@ -1,7 +1,8 @@
 {{!--
     The head of a world settings editor (S0 step 4; board W2), above its sections: the lede, the
     held banner on a held regional world (its editors read only), and the reach line: what reads
-    this group, whether this sitting's changes have marked a run out of date, and Revert changes.
+    this group, whether this sitting's changes have marked a run out of date, and Revert changes
+    (for Styles and icons, a note that Undo takes a change back, since it reaches the map's objects).
     See WorldEditors.head.
 --}}
 <p class="fwmb-lede">{{worldEditor.lede}}</p>
@@ -12,8 +13,8 @@
 </div>
 {{/if}}
 <div class="fwmb-reach">
-    <span>{{worldEditor.reach}}{{#if worldEditor.changedLine}} {{worldEditor.changedLine}}{{/if}}</span>
-    {{#unless worldEditor.held}}
+    <span>{{worldEditor.reach}}{{#if worldEditor.changedLine}} {{worldEditor.changedLine}}{{/if}}{{#if worldEditor.undo}} {{localize "FILRODENSWMB.UI.WorldStylesUndo"}}{{/if}}</span>
+    {{#if worldEditor.undo}}{{else if worldEditor.held}}{{else}}
     <button type="button" class="fwmb-btn" data-action="revertWorldGroup" data-group="{{worldEditor.group}}"{{#unless worldEditor.canRevert}} disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.WorldRevertHint'}}"><span class="fwmb-icon fwmb-icon--history" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldRevert"}}</button>
-    {{/unless}}
+    {{/if}}
 </div>

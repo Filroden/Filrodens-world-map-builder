@@ -1,0 +1,19 @@
+{{!--
+    Generate all (S0 step 4b; board S2; see GenerateAll): the maps of the world that need a run, in
+    the order they run (surface first), each as Generate again runs it, keeping its edited and
+    locked items; the maps already up to date; the held regional worlds left out; and, at the
+    footer's start, Save world when it finishes.
+--}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateAllLede"}}</p>
+{{#if nothing}}
+<p>{{localize "FILRODENSWMB.UI.GenerateAllNothing"}}</p>
+{{else}}
+<ol class="fwmb-steps">
+    {{#each run}}<li><b>{{this.name}}</b> · {{this.line}}</li>{{/each}}
+</ol>
+{{/if}}
+{{#if current.length}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateAllUpToDate"}} {{#each current}}{{this.name}}{{#unless @last}}, {{/unless}}{{/each}}</p>{{/if}}
+{{#if heldLine}}<p class="fwmb-hint">{{heldLine}}</p>{{/if}}
+{{#unless nothing}}
+<label class="fwmb-start fwmb-checkbox-label"><input type="checkbox" name="saveWhenDone" class="fwmb-checkbox" /> {{localize "FILRODENSWMB.UI.GenerateAllSave"}}</label>
+{{/unless}}

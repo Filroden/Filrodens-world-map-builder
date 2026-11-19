@@ -69,8 +69,8 @@ test("the world's rail: the overview, the seven settings, the whole world, none 
     const rail = WORLD_DEFINITION.worldRail("surface").map((stage) => `${stage.id}:${stage.tools.map((tool) => tool.id + (tool.later ? "(later)" : "")).join(",")}`);
     assert.deepEqual(rail, [
         "world:worldOverview",
-        "worldSettings:worldSetup,worldCultures(later),worldAges(later),worldNameStyle,worldStyles(later),worldBiomes,worldClimate",
-        "worldWhole:worldGenerateAll(later),worldCut(later)",
+        "worldSettings:worldSetup,worldCultures,worldAges,worldNameStyle,library,worldBiomes,worldClimate",
+        "worldWhole:worldGenerateAll,worldCut(later)",
     ]);
     for (const tool of ["worldOverview", ...Object.keys(WORLD_EDITORS)]) {
         assert.ok(WORLD_DEFINITION.isWorldTool(tool), `${tool} is the world's`);
@@ -81,19 +81,21 @@ test("the world's rail: the overview, the seven settings, the whole world, none 
         assert.ok(!map.some((tool) => WORLD_DEFINITION.isWorldTool(tool)), `none on the map's ${mode} rail`);
     }
     assert.ok(!WORLD_DEFINITION.isWorldTool("terrain") && !WORLD_DEFINITION.isWorldTool("manage"));
-    assert.deepEqual(Object.values(WORLD_EDITORS).map((editor) => editor.group), ["setup", "nameStyle", "biomes", "climate"]);
+    assert.deepEqual(Object.values(WORLD_EDITORS).map((editor) => editor.group), ["setup", "cultures", "ages", "nameStyle", "styles", "biomes", "climate"]);
+    assert.equal(WORLD_DEFINITION.tool("worldGenerateAll").act, "generateAll", "Generate all acts at once");
     assert.ok(WorldEditors.isAside("manage") && !WorldEditors.isAside("worldClimate"), "only Worlds closes back to the tool left");
 });
 
-test("the world's rail drawn: its tools open as the world's, the parts to come disabled with their tooltips", async () => {
-    const railStages = WORLD_DEFINITION.worldRail("surface").map((stage) => ({ ...stage, tools: stage.tools.map((tool) => ({ ...tool, action: "openWorldTool", disabled: !!tool.later, tooltip: tool.later ? "later" : null })) }));
+test("the world's rail drawn: its tools open as the world's, Generate all acts, the part to come disabled with its tooltip", async () => {
+    const railStages = WORLD_DEFINITION.worldRail("surface").map((stage) => ({ ...stage, tools: stage.tools.map((tool) => ({ ...tool, action: tool.act ?? "openWorldTool", disabled: !!tool.later, tooltip: tool.later ? "later" : null })) }));
     const box = await render("shell/toolbar.hbs", { railWorld: true, railStages, railOccasional: [], activeTool: "worldClimate" });
     assert.ok(box.querySelector("nav.fwmb-rail--world"));
     assert.deepEqual([...box.querySelectorAll(".fwmb-rail-stage")].map((stage) => stage.textContent), ["StageWorld", "StageWorldSettings", "StageWorldWhole"]);
     assert.equal(box.querySelector('[aria-current="page"]').dataset.tool, "worldClimate");
-    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldNameStyle", "worldBiomes", "worldClimate"]);
+    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldCultures", "worldAges", "worldNameStyle", "library", "worldBiomes", "worldClimate"]);
+    assert.equal(box.querySelector('[data-action="generateAll"]').dataset.tool, "worldGenerateAll");
     const off = [...box.querySelectorAll('.fwmb-rail-btn[aria-disabled="true"]')];
-    assert.equal(off.length, 5);
+    assert.deepEqual(off.map((button) => button.getAttribute("aria-label")), ["CutRegionalWorld"]);
     assert.ok(off.every((button) => !button.dataset.action && button.dataset.tooltip === "later"));
 });
 
@@ -116,6 +118,11 @@ test("a group captured and put back: each editor's state, the biome colours incl
     assert.deepEqual([app.uiState.customBiomes.map((biome) => biome.id), app.uiState.nextCustomBiomeId, app.customBiomeColors], [[14], 15, { GRASSLAND: [1, 2, 3] }]);
     app.uiState.customBiomes[0].name = "Heath";
     assert.equal(captured.biomes.customBiomes[0].name, "Moor", "put back as a copy, not shared");
+    app.uiState.cultures = [];
+    app.uiState.generatorSettings.ages = [{}];
+    WorldEditors.restore(app, captured, "cultures");
+    WorldEditors.restore(app, captured, "ages");
+    assert.deepEqual([app.uiState.cultures.length, app.uiState.generatorSettings.ages.length, app.uiState.generatorSettings.nameBase], [4, 3, "English"], "cultures and ages put back, the name style kept");
     assert.equal(WorldEditors.restore(app, null, "setup"), false);
 });
 

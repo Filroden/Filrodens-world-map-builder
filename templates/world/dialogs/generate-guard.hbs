@@ -1,0 +1,28 @@
+{{!--
+    The single Generate's guard (S0 step 4b; board B4; see GenerateGuard): asked when the map reads
+    another map whose run is out of date. Run the maps it reads first, in order, then this one; or
+    this map only, reading the other maps as they were last run. Each choice gives its own time.
+    Ask each time sits at the footer's start: unticked, the choice is kept and not asked again.
+--}}
+<p class="fwmb-hint">{{lede}}</p>
+<div class="fwmb-choices" role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.GuardTitle'}}">
+    <label class="fwmb-choice" aria-checked="true">
+        <input type="radio" name="guardChoice" value="chain" class="fwmb-visually-hidden" checked />
+        <span class="fwmb-radio" aria-hidden="true"></span>
+        <span class="fwmb-choice-text">
+            <b>{{localize "FILRODENSWMB.UI.GuardChain"}}</b>
+            <ol class="fwmb-steps">{{#each chain}}<li>{{this.name}}</li>{{/each}}<li><b>{{target}}</b></li></ol>
+            {{#if chainTime}}<span class="fwmb-meta">{{chainTime}}</span>{{/if}}
+        </span>
+    </label>
+    <label class="fwmb-choice" aria-checked="false">
+        <input type="radio" name="guardChoice" value="only" class="fwmb-visually-hidden" />
+        <span class="fwmb-radio" aria-hidden="true"></span>
+        <span class="fwmb-choice-text">
+            <b>{{localize "FILRODENSWMB.UI.GuardOnly"}}</b>
+            <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.GuardOnlyNote"}}</span>
+            {{#if onlyTime}}<span class="fwmb-meta">{{onlyTime}}</span>{{/if}}
+        </span>
+    </label>
+</div>
+<label class="fwmb-start fwmb-checkbox-label"><input type="checkbox" name="askEachTime" class="fwmb-checkbox" checked /> {{localize "FILRODENSWMB.UI.GuardAskEachTime"}}</label>

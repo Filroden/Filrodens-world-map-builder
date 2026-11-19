@@ -1,0 +1,29 @@
+{{!--
+    The world's ages and events (S0 step 4b; the Ages and events editor): each age's row with its
+    summary, moved earlier or later or removed, opening in the age inspector, and the add row.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldAges" title="FILRODENSWMB.UI.SectionGenerateAges" count=generate.ages.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
+    <p class="fwmb-hint">{{#if generate.ages.held}}{{localize "FILRODENSWMB.UI.GenerateAgesHeldHint"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateAgesHint"}}{{/if}}</p>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateAges'}}" data-list-nav class="fwmb-list-container fwmb-space-before">
+        {{#each generate.ages.rows}}
+        <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item fwmb-age-row" data-id="{{this.id}}" data-action="openAge">
+            <span class="fwmb-age-row-text fwmb-flex-1">
+                <span class="fwmb-name">{{this.label}}</span>
+                <span class="fwmb-meta">{{this.summary}}</span>
+            </span>
+            {{#unless this.held}}
+            <span class="fwmb-actions">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeUp" data-age="{{this.index}}" {{#unless this.canUp}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}"><i class="fwmb-icon fwmb-icon--arrow-upward"></i></button>
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeDown" data-age="{{this.index}}" {{#unless this.canDown}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}"><i class="fwmb-icon fwmb-icon--arrow-downward"></i></button>
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeAge" data-age="{{this.index}}" {{#unless this.canRemove}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
+            </span>
+            {{/unless}}
+        </div>
+        {{/each}}
+        {{#if generate.ages.canAdd}}
+        <div class="fwmb-list-add" role="none">
+            <button type="button" class="fwmb-btn fwmb-btn--subtle" role="option" aria-selected="false" tabindex="-1" data-list-item data-action="addAge"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.GenerateAgeAdd"}}</button>
+        </div>
+        {{/if}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

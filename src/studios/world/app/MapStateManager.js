@@ -324,10 +324,6 @@ export class MapStateManager {
             mapDecorations: platform.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
-            // The Generate panel's cultures, edited as the styles are (see CultureLists)
-            cultures: platform.utils.deepClone(app.uiState?.cultures ?? []),
-            // The Generate panel's ages, edited in their inspector (see AgeEditor)
-            ages: platform.utils.deepClone(app.uiState?.generatorSettings?.ages ?? null),
             // What the last fill-in read (see Infilling.inputs), so undoing a fill-in gives back the one before
             infill: app.infillInputs ? { ...app.infillInputs } : null,
             styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
@@ -361,9 +357,7 @@ export class MapStateManager {
         app.mapDecorations = state.mapDecorations || app.mapDecorations;
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
-        if (Array.isArray(state.cultures)) app.uiState.cultures = state.cultures;
         if ("infill" in state) app.infillInputs = state.infill;
-        if (Array.isArray(state.ages)) app.uiState.generatorSettings = { ...(app.uiState.generatorSettings ?? {}), ages: state.ages };
         for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
     }
 

@@ -53,9 +53,11 @@ export class Generation {
      * run is added beside it). Does nothing while the map's mesh or terrain is not ready, or when
      * other cancellable work is under way.
      * @param {object} app - The studio.
+     * @param {{confirmed?: boolean}} [options] - `confirmed`: asked already (Generate all), so
+     *     Generate again's question is not asked again.
      * @returns {Promise<boolean>} Whether content was added.
      */
-    static async run(app) {
+    static async run(app, { confirmed = false } = {}) {
         if (this.heldByParent(app)) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.GenerateHeldByParentWarn"));
             return false;
@@ -67,7 +69,8 @@ export class Generation {
         const settings = panelSettings(app.uiState.generatorSettings);
         // Use the default styles, when the reader has not chosen, follows whether the map's styles are an older set
         settings.output.defaultStyles ??= this.stylesLookOlder(app);
-        if (!(await this.#confirmAgain(app))) return false;
+        // Generate all has asked already, for every map it runs
+        if (!confirmed && !(await this.#confirmAgain(app))) return false;
         let result;
         try {
             result = await app.runCancellable(this.#stageText(STAGES[0].id, 0), (signal, overlay) => this.#runWork(app, settings, signal, overlay));

@@ -1,3 +1,4 @@
+import { WorldEditors } from "./WorldEditors.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { typed } from "../data/MapRules.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
@@ -18,8 +19,9 @@ import { platform } from "../../../platform/index.js";
  * CultureClimate; relief as a band on one track; coast and river from avoids to seeks); and its
  * homelands.
  *
- * Each field applies when committed, as one undo step (the undo snapshot holds the cultures; see
- * MapStateManager.getVectorStateSnapshot), and marks a run made before it out of date. A culture's
+ * Each field applies when committed. Cultures are the world's (S0 step 4b), so a change is no undo
+ * step of the map: the Cultures editor's Revert changes puts the list back. A change marks a run
+ * made before it out of date. A culture's
  * shape is MapRules' CULTURE; the run reads it through CultureInput.
  *
  * A culture saved before the climate choice has temperature, moisture and height bands instead;
@@ -116,6 +118,8 @@ export class CultureEditor {
                 relief: { ...band(habitat.relief, 0, reliefMax), min: 0, max: reliefMax, step: STEP / 2, zones: reliefZones },
             },
             climate: this.#climateContext(app, climate),
+            // A held regional world reads its cultures from the world above it
+            readOnly: WorldEditors.readOnly(app),
             homelands: (culture.homelands ?? []).map((point, index) => ({ index, label: platform.i18n.format("FILRODENSWMB.UI.CultureHomelandAt", { number: index + 1, x: Math.round(point.x), y: Math.round(point.y) }) })),
             picking: CultureMarkers.picking(app, culture.id),
             canAddHomeland: (culture.homelands ?? []).length < FILRODENSWMB.GENERATOR.CULTURES.MAX_HOMELANDS,
@@ -256,7 +260,7 @@ export class CultureEditor {
     }
 
     /**
-     * Applies what changed, as one undo step. A run made before is then out of date, unless only
+     * Applies what changed (no undo step: the world's setting). A run made before is then out of date, unless only
      * the culture's name or colour changed: Generate reads neither (places are named in its name
      * style, and what a run made names its cultures by id), so the map is drawn again at once in
      * the new colour instead (the Culture layer and its legend take the map culture's own).
@@ -265,7 +269,7 @@ export class CultureEditor {
         const values = typed("culture", this.#read(app, culture, form), culture);
         if (!InspectorFields.differs(culture, values)) return false;
         const generatorReads = this.#generatorReading(culture) !== this.#generatorReading({ ...culture, ...values });
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         Object.assign(culture, values);
         if (generatorReads) app.markGeneratorStale?.();
         else app._repaintVectors?.();
@@ -274,7 +278,7 @@ export class CultureEditor {
         return true;
     }
 
-    /** Edit zones: the rule editor on the culture's zones; on Accept, they are its climate, as one undo step. */
+    /** Edit zones: the rule editor on the culture's zones; on Accept, they are its climate. */
     static async #editZones(app, culture) {
         const climate = climateOf(culture.habitat);
         const zones = await RuleEditorDialog.editZones(app, { name: culture.name, color: culture.color, zones: climate.zones });
@@ -283,7 +287,7 @@ export class CultureEditor {
         for (const key of OLD_BANDS) delete habitat[key];
         const values = typed("culture", { ...culture, habitat }, culture);
         if (!InspectorFields.differs(culture, values)) return;
-        MapStateManager.pushVectorState(app);
+        if (WorldEditors.readOnly(app)) return false;
         Object.assign(culture, values);
         app.markGeneratorStale?.();
         app.view?.render(["context"]);
@@ -308,7 +312,7 @@ export class CultureEditor {
             removeHomeland: (app, culture, _ref, button) => {
                 const index = Number(button.dataset.index);
                 if (!Number.isInteger(index) || !culture.homelands?.[index]) return;
-                MapStateManager.pushVectorState(app);
+                if (WorldEditors.readOnly(app)) return false;
                 culture.homelands = culture.homelands.filter((_, at) => at !== index);
                 app.markGeneratorStale?.();
                 app.view?.render(["context"]);
@@ -317,7 +321,7 @@ export class CultureEditor {
             // Auto: the culture's homelands go, and a run places one
             autoHomelands: (app, culture) => {
                 if (!(culture.homelands ?? []).length) return;
-                MapStateManager.pushVectorState(app);
+                if (WorldEditors.readOnly(app)) return false;
                 culture.homelands = [];
                 app.markGeneratorStale?.();
                 app.view?.render(["context"]);
