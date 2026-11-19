@@ -18,11 +18,6 @@ const ENGINES = Object.freeze({
     guided: "FILRODENSWMB.UI.EngineShortGuided",
 });
 
-/** Each map type's name and icon, as a world's maps are listed (S0 has the Surface map only). */
-const MAP_KINDS = Object.freeze({
-    surface: Object.freeze({ label: "FILRODENSWMB.UI.LayerSurfaceFull", icon: "landscape" }),
-});
-
 /**
  * Worlds (v5, S0 step 3b; board W9): the worlds saved here, opened from the world bar's name menu
  * or the bar's Open world, and what the studio opens on. It fills the studio's body beside the
@@ -32,8 +27,8 @@ const MAP_KINDS = Object.freeze({
  * world not saved since v5), its marks, a line of what it is (its engine, its maps, when saved)
  * and its regional worlds counted. Search (as the panel's other lists, ListQuery) keeps the
  * families in which a world matches, the card naming each regional world that matched as a chip
- * to choose. A card or chip chosen shows the world in the inspector (WorldEditor): the family's
- * tree, the world's maps and setup, Open and its actions.
+ * to choose. A card or chip chosen shows the world in the inspector (WorldEditor): Open, what it
+ * is, the family's tree and its actions.
  *
  * What a card shows is read from Worlds.tree() each time the panel is drawn, and kept (by studio)
  * for the inspector, whose `find` cannot wait on the store.
@@ -54,18 +49,8 @@ export class WorldsPanel {
      * @returns {Promise<object>}
      */
     static async context(app) {
-        const tree = await Worlds.tree();
-        const index = new Map();
-        const renaming = this.#renaming.get(app);
-        const walk = (nodes, parent, root) => {
-            for (const node of nodes) {
-                if (renaming?.has(node.id)) node.name = renaming.get(node.id);
-                index.set(node.id, { ...node, parentName: parent?.name ?? null, rootId: root?.id ?? node.id });
-                walk(node.children, node, root ?? node);
-            }
-        };
-        walk(tree, null, null);
-        this.#index.set(app, index);
+        const tree = await WorldsPanel.load(app);
+        const index = this.#index.get(app);
 
         const query = ListQuery.of(app, "worlds").search;
         const needle = query.trim().toLocaleLowerCase();
@@ -104,6 +89,28 @@ export class WorldsPanel {
             ...(regionalCount ? [regionalCount === 1 ? i18n.localize("FILRODENSWMB.UI.WorldRegionalOne") : i18n.format("FILRODENSWMB.UI.WorldRegionalCount", { count: regionalCount })] : []),
         ].join(" · ");
         return { query, web, summary, empty: index.size === 0, noMatches: index.size > 0 && cards.length === 0, cards };
+    }
+
+    /**
+     * Reads the worlds saved here (Worlds.tree) and keeps them, by studio, for the inspector
+     * (WorldEditor's find, which cannot wait on the store): Worlds and the world overview both
+     * show a world in it.
+     * @returns {Promise<object[]>} The tree's top-level worlds.
+     */
+    static async load(app) {
+        const tree = await Worlds.tree();
+        const index = new Map();
+        const renaming = this.#renaming.get(app);
+        const walk = (nodes, parent, root) => {
+            for (const node of nodes) {
+                if (renaming?.has(node.id)) node.name = renaming.get(node.id);
+                index.set(node.id, { ...node, parentName: parent?.name ?? null, rootId: root?.id ?? node.id });
+                walk(node.children, node, root ?? node);
+            }
+        };
+        walk(tree, null, null);
+        this.#index.set(app, index);
+        return tree;
     }
 
     /** A world and every regional world under it, the world first. */
@@ -196,12 +203,13 @@ export class WorldsPanel {
 }
 
 /**
- * A world in the inspector (from Worlds): its name, renamed in place; its family as a tree (the
- * world it belongs to at the top, each regional world under the one it was cut from), each row
- * chosen to show that world, this one lit and the search's matches marked; what it is; its maps,
- * with their marks and when each was saved; World setup in brief; Open; its actions (Cut again…,
- * until step 5 off; Clone as new…, for a regional world; Duplicate; Export world); Delete… apart.
- * Each action is the studio's (MapStudio.worldAction).
+ * A world in the inspector, chosen in Worlds or among the world overview's regional worlds: its
+ * name, renamed in place; Open; what it is; its family as a tree (the world it belongs to at the
+ * top, each regional world under the one it was cut from), each row chosen to show that world,
+ * this one lit and the search's matches marked; its actions (Cut again…, until step 5 off; Clone
+ * as new…, for a regional world; Duplicate; Export world); Delete… apart. What a world holds (its
+ * maps, its settings) is the world overview's, once it is open. Each action is the studio's
+ * (MapStudio.worldAction).
  */
 export const WorldEditor = Object.freeze({
     id: "world",
@@ -216,8 +224,6 @@ export const WorldEditor = Object.freeze({
         world,
         family: WorldEditor.family(app, world),
         about: WorldEditor.about(world),
-        maps: WorldEditor.maps(world),
-        setup: WorldEditor.setup(world),
         isOpen: app.world?.id === world.id,
         held: world.held,
         hasMap: !!world.mapId,
@@ -252,31 +258,6 @@ export const WorldEditor = Object.freeze({
             for (const child of node.children) walk(child, depth + 1);
         };
         walk(root, 0);
-        return rows;
-    },
-
-    /** Each of its maps: its name and icon, its marks, its revision and when it was saved. */
-    maps(world) {
-        const { i18n } = platform;
-        return world.maps.map((map) => {
-            const kind = MAP_KINDS[map.type] ?? MAP_KINDS.surface;
-            const marks = [];
-            if (map.run === false && !world.held) marks.push(MARKS.noRun);
-            if (map.run !== false && map.older) marks.push(MARKS.older);
-            const saved = Date.parse(map.savedAt ?? "");
-            const meta = [Number.isFinite(saved) ? WorldsPanel.savedLabel(saved) : null, map.revision ? i18n.format("FILRODENSWMB.UI.WorldMapRevision", { revision: map.revision }) : null].filter(Boolean).join(" · ");
-            return { name: i18n.localize(kind.label), icon: kind.icon, meta, marks: marks.map((mark) => ({ ...mark, label: i18n.localize(mark.label) })) };
-        });
-    },
-
-    /** World setup in brief: the engine, the frame's size and the seed. */
-    setup(world) {
-        const { i18n } = platform;
-        const { engine, frame, seed } = world.setup ?? {};
-        const rows = [];
-        if (ENGINES[engine]) rows.push({ label: i18n.localize("FILRODENSWMB.UI.WorldSetupEngine"), value: i18n.localize(ENGINES[engine]) });
-        if (Number.isFinite(frame?.width) && Number.isFinite(frame?.height)) rows.push({ label: i18n.localize("FILRODENSWMB.UI.WorldSetupFrame"), value: `${frame.width} × ${frame.height}` });
-        if (seed !== null && seed !== undefined && seed !== "") rows.push({ label: i18n.localize("FILRODENSWMB.UI.WorldSetupSeed"), value: String(seed) });
         return rows;
     },
 

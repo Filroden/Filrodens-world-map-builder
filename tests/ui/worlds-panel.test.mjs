@@ -1,7 +1,7 @@
 // Worlds (WorldsPanel, S0 step 3b), drawn from the real templates in happy-dom over a web store:
 // a card per world of its own (thumbnail or icon, marks, its line, its regional worlds counted),
 // Search keeping families and naming the regional worlds that matched as chips, the head and foot;
-// and a world in the inspector (WorldEditor): its family's tree, its maps and setup, what it is,
+// and a world in the inspector (WorldEditor): its family's tree, what it is,
 // Open, the actions a world of its kind has, and renaming through its Name field.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -146,7 +146,7 @@ test("the summary says where the worlds are kept and how many there are", async 
     assert.equal((await WorldsPanel.context(studio())).summary, "WorldsSavedWeb · WorldsCount 2 · WorldRegionalCount 2");
 });
 
-test("a world in the inspector: its family's tree, its maps and setup, what it is, Open and its actions", async () => {
+test("a world in the inspector: its family's tree, what it is, Open and its actions (its maps and settings are the overview's)", async () => {
     const { top, region, coast, old } = await worlds();
     const app = studio({ id: top.id });
     await WorldsPanel.context(app);
@@ -162,8 +162,8 @@ test("a world in the inspector: its family's tree, its maps and setup, what it i
     assert.deepEqual(tree(topBox), ["1:Aethoria*", "2:Westmarch", "3:Westmarch coast"]);
     assert.deepEqual(actions(topBox), ["open", "duplicate", "exportWorld", "delete"]);
     assert.ok(topBox.querySelector('[data-inspector-action="open"]').disabled, "the world open now cannot be opened again");
-    assert.match(topBox.querySelector(".fwmb-worlds-map").textContent, /LayerSurfaceFull[\s\S]*WorldSavedToday · WorldMapRevision 1/);
-    assert.deepEqual([...topBox.querySelectorAll(".fwmb-worlds-setup dd")].map((value) => value.textContent), ["EngineShortAdvanced", "1200 × 800", "4242"]);
+    assert.match(topBox.textContent, /WorldAboutWorld/);
+    assert.equal(topBox.querySelector(".fwmb-worlds-map, .fwmb-worlds-setup"), null, "no maps or setup: those are the world overview's");
 
     const coastBox = await body(coast);
     assert.deepEqual(tree(coastBox), ["1:Aethoria", "2:Westmarch", "3:Westmarch coast*"], "the whole family, from the top");
@@ -171,7 +171,6 @@ test("a world in the inspector: its family's tree, its maps and setup, what it i
     assert.deepEqual(actions(coastBox), ["open", "cloneAsNew", "duplicate", "exportWorld", "delete"]);
     assert.ok(coastBox.querySelector(".fwmb-action-row[disabled]").textContent.includes("WorldCutAgain"), "Cut again is shown, off");
     assert.match(coastBox.textContent, /WorldAboutHeld Westmarch/);
-    assert.match(coastBox.querySelector(".fwmb-worlds-map").textContent, /MarkOlderGenerator/);
     assert.equal(WorldEditor.header(app, WorldsPanel.find(app, region.id)).subtitle, "WorldKindRegional");
 
     assert.equal((await body(old)).querySelector(".fwmb-worlds-family"), null, "a world alone has no family to show");

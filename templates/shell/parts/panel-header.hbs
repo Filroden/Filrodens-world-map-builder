@@ -1,11 +1,13 @@
 {{!-- The panel's header: the tool's name, and where it sits in the order of work (its stage and
      step, and the map's engine for the tools the engine shapes), and Explore's read-only tag. See
-     MapStudio's #panelContext. Worlds, which is not on the rail, has Close, back to the tool left;
-     as a board (Cards) that is a button naming where it goes back to, as board W9 has it. --}}
+     MapStudio's #panelContext. A world settings editor carries the World tag (board W2). Worlds,
+     off every rail, has Close back to the tool left: on its board, a button naming where it goes
+     back to, as board W9 has it. The world's tools have none: a map in the layer switcher leaves them. --}}
 <div class="fwmb-panel-header">
     <h2 class="fwmb-panel-title">{{panel.title}}</h2>
     {{#if panel.tag}}<span class="fwmb-tag">{{panel.tag}}</span>{{/if}}
+    {{#if panel.worldTag}}<span class="fwmb-tag" data-tooltip="{{localize 'FILRODENSWMB.UI.WorldTagHint'}}"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldTag"}}</span>{{/if}}
     {{#if panel.meta}}<span class="fwmb-meta">{{panel.meta}}</span>{{/if}}
-    {{#if panel.board}}<button type="button" class="fwmb-btn fwmb-panel-close" data-action="{{panel.closes}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>{{panel.back}}</button>
-    {{else if panel.closes}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-panel-close" data-action="{{panel.closes}}" aria-label="{{localize 'FILRODENSWMB.UI.Close'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Close'}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span></button>{{/if}}
+    {{#if panel.closes}}{{#if panel.board}}<button type="button" class="fwmb-btn fwmb-panel-close" data-action="{{panel.closes}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>{{panel.back}}</button>
+    {{else}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-panel-close" data-action="{{panel.closes}}" aria-label="{{localize 'FILRODENSWMB.UI.Close'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Close'}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span></button>{{/if}}{{/if}}
 </div>

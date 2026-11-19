@@ -2,11 +2,12 @@
     The tool panel: its header, the tool's own sections (templates/tools-<tool>.hbs), the state
     block while the tool can edit the map, and the Next footer; for a tool that has them, a head and
     a foot kept above and below the scroll (panelHeadPartial, panelFootPartial: Worlds' search and
-    actions). A board panel (Worlds' Cards, fwmb-panel--board) fills the studio's body beside the
-    inspector, the rail and the map hidden. While a brush is in use the
+    actions). A board panel (fwmb-panel--board) fills the studio's body beside the inspector in the
+    map's place: Worlds with the rail hidden too, the world overview (fwmb-panel--board-rail)
+    beside the world's rail. While a brush is in use the
     sections whose settings regenerate the map are paused (fwmb-locked).
 --}}
-<form class="{{#if isLocked}}fwmb-locked{{/if}}{{#if panel.board}} fwmb-panel--board{{/if}}" aria-label="{{panel.title}}">
+<form class="{{#if isLocked}}fwmb-locked{{/if}}{{#if panel.board}} fwmb-panel--board{{#if panel.boardRail}} fwmb-panel--board-rail{{/if}}{{/if}}" aria-label="{{panel.title}}">
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/panel-header.hbs"}}
     {{#if panelHeadPartial}}<div class="fwmb-panel-head">{{> (lookup . 'panelHeadPartial') }}</div>{{/if}}
     <div class="fwmb-panel-scroll fwmb-scrollable">

@@ -1,5 +1,7 @@
 {{!-- The bar's state readout: what the tool is doing (Viewing, or its state word while editing) and
-     the object being worked on, in the secondary accent. See MapStudio's #barContext. --}}
+     the object being worked on, in the secondary accent. See MapStudio's #barContext. The world's
+     tools have none: their bar names the map shown instead. --}}
+{{#if bar.state}}
 <span class="fwmb-state" role="status">
     {{#if bar.state.object}}
         {{bar.state.word}}
@@ -11,3 +13,4 @@
         {{bar.state.word}}
     {{/if}}
 </span>
+{{/if}}

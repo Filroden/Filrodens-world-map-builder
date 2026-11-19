@@ -25,6 +25,8 @@ export const MODES = Object.freeze(["create", "explore"]);
  * @property {string[]} mapTypes - The map types that offer it.
  * @property {{tool: string, reason: string}|null} next - The Next footer: the tool that follows and why.
  * @property {string|Object<string, string>|null} stateWord - What its editing does, by name or by mode.
+ * @property {string} [later] - For a part a later step builds, the localisation key of its tooltip:
+ *     it is drawn in its place, disabled (S0's placeholders).
  */
 
 /**
@@ -48,6 +50,9 @@ const fail = (studio, message) => {
  * @param {string} spec.label - Localisation key of its name.
  * @param {string[]} spec.mapTypes - Its map types, the first being the one a new world opens on.
  * @param {StageDefinition[]} spec.stages - The rail's stages, in order.
+ * @param {StageDefinition[]} [spec.worldStages] - The world's rail (v5, S0 step 4): its stages, in
+ *     order. Their tools are the world's, not a map's: the rail shows them while the world, not
+ *     one of its maps, is chosen in the layer switcher, in either mode.
  * @param {ToolDefinition[]} spec.tools - Its tools, in rail order within each stage.
  * @param {object[]} [spec.occasional] - The occasional entries at the rail's foot, in order: a
  *     registered tool ({tool}), a menu ({menu, icon, label}) or an action ({action, icon, label, host}).
@@ -55,11 +60,12 @@ const fail = (studio, message) => {
  * @returns {Readonly<object>}
  */
 export function defineStudio(spec) {
-    const { id, label, mapTypes, stages, tools, occasional = [], engineInHeader = [] } = spec;
+    const { id, label, mapTypes, stages, worldStages = [], tools, occasional = [], engineInHeader = [] } = spec;
     if (!id) fail("?", "has no id");
     if (!label) fail(id, "has no label");
     if (!mapTypes?.length) fail(id, "has no map types");
-    const stageIds = new Set(stages.map((stage) => stage.id));
+    const worldStageIds = new Set(worldStages.map((stage) => stage.id));
+    const stageIds = new Set([...stages, ...worldStages].map((stage) => stage.id));
     const byId = new Map();
     for (const tool of tools) {
         if (byId.has(tool.id)) fail(id, `registers ${tool.id} twice`);
@@ -76,13 +82,16 @@ export function defineStudio(spec) {
         if (entry.tool && byId.get(entry.tool)?.stage !== null) fail(id, `occasional ${entry.tool} is not an occasional tool`);
     }
 
-    const offered = (tool, mapType, mode) => tool.mapTypes.includes(mapType) && (mode == null || tool.mode === mode);
+    // The world's tools are either mode's: the world is edited and read from the same rail
+    const offered = (tool, mapType, mode) => tool.mapTypes.includes(mapType) && (mode == null || tool.mode === mode || worldStageIds.has(tool.stage));
+    const freezeStage = (stage) => Object.freeze({ numbered: true, optional: false, ...stage });
 
     return Object.freeze({
         id,
         label,
         mapTypes: Object.freeze([...mapTypes]),
-        stages: Object.freeze(stages.map((stage) => Object.freeze({ numbered: true, optional: false, ...stage }))),
+        stages: Object.freeze(stages.map(freezeStage)),
+        worldStages: Object.freeze(worldStages.map((stage) => freezeStage({ numbered: false, ...stage }))),
         occasional: Object.freeze(occasional.map((entry) => Object.freeze({ ...entry }))),
         engineInHeader: Object.freeze([...engineInHeader]),
 
@@ -100,9 +109,21 @@ export function defineStudio(spec) {
             return !!tool && offered(tool, mapType, mode);
         },
 
-        /** A stage by id, or null. */
+        /** A stage by id (a map's or the world's), or null. */
         stage(stageId) {
-            return this.stages.find((stage) => stage.id === stageId) ?? null;
+            return this.stages.find((stage) => stage.id === stageId) ?? this.worldStages.find((stage) => stage.id === stageId) ?? null;
+        },
+
+        /** Whether a tool is the world's (on the world's rail) rather than a map's. */
+        isWorldTool(toolId) {
+            return worldStageIds.has(byId.get(toolId)?.stage);
+        },
+
+        /** The world's rail for a map type: its stages, each with its tools in order (empty ones left out). */
+        worldRail(mapType) {
+            return this.worldStages
+                .map((stage) => ({ ...stage, tools: this.tools.filter((tool) => tool.stage === stage.id && tool.mapTypes.includes(mapType)) }))
+                .filter((stage) => stage.tools.length);
         },
 
         /**

@@ -30,16 +30,9 @@
     </div>
     {{/if}}
 
-    <div class="fwmb-form-group">
-        <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateDefaultNameStyle"}}</label>
-        <div class="fwmb-form-fields">
-            <select id="fwmb-generator-name-base" name="generator.nameBase">
-                {{#each generate.nameBases}}
-                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
-                {{/each}}
-            </select>
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateDefaultNameStyleHint'}}"></i>
-        </div>
+    <div class="fwmb-goto">
+        <p>{{localize "FILRODENSWMB.UI.NameStyleWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuNameStylePath"}}</b></p>
+        <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldNameStyle">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
     </div>
 
     {{#if generate.held}}{{else if generate.estimate}}

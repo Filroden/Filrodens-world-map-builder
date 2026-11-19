@@ -225,9 +225,8 @@ test("a regional map holding its parent's run: no Generate, the world and ages r
     assert.match(panel.textContent, /GenerateHeldBadge/);
     assert.doesNotMatch(panel.textContent, /GenerateInheritedNotice|GenerateOlderRevisionHint/, "no notice about generating here");
     assert.equal(panel.querySelector('[name="generator.seed"]'), null, "no seed");
-    const nameStyle = panel.querySelector('[name="generator.nameBase"]');
-    assert.ok(nameStyle && !nameStyle.disabled, "the default name style, still live: Fill in and Name all use it");
-    assert.match(panel.textContent, /GenerateDefaultNameStyle/);
+    assert.equal(panel.querySelector('[name="generator.nameBase"]'), null, "the default name style is the world's (World › Default name style, read only on a held world)");
+    assert.ok(panel.querySelector('[data-action="openWorldTool"][data-tool="worldNameStyle"]'), "a Go to it");
     assert.equal(panel.querySelector('[data-section="generateOutput"]'), null, "no Output");
     const sliders = [...panel.querySelectorAll('input[name^="generator.world."]')];
     assert.equal(sliders.length, 4);

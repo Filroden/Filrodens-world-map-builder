@@ -24,11 +24,11 @@ test("the bar folds as little as it can: the first level that fits, the last whe
     assert.equal(foldLevel(widths, 700), 5);
 });
 
-test("each fold has its form in the stylesheet, and Save world, the modes and World never fold", () => {
+test("each fold has its form in the stylesheet, and Save world and the modes never fold", () => {
     const foldRules = [...CSS.matchAll(/\.fwmb-worldbar(?::not\()?(?::is\()?\[data-fold[^{]*\{[^}]*\}/g)].map((match) => match[0]);
     assert.ok(foldRules.length >= 5, "the folds' rules");
     for (const rule of foldRules) {
-        for (const never of [".fwmb-save", ".fwmb-mode-switch", ".fwmb-worldbar-world"]) assert.ok(!rule.includes(never), `${never} is never folded: ${rule.slice(0, 80)}`);
+        for (const never of [".fwmb-save", ".fwmb-mode-switch"]) assert.ok(!rule.includes(never), `${never} is never folded: ${rule.slice(0, 80)}`);
     }
     // Open world and Save as into the menu from 1, short names from 2, Settlement maps gone from 3,
     // the layer menu from 4, the name shortened at 5
@@ -38,7 +38,8 @@ test("each fold has its form in the stylesheet, and Save world, the modes and Wo
     assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="3"\], \[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-worldbar-settlements \{\s*display: none;/);
     assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-layers-menu \{\s*display: flex;/);
     assert.match(CSS, /\.fwmb-worldbar\[data-fold="5"\] \.fwmb-worldbar-menu \{\s*max-width:/);
-    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-worldbar-files", "fwmb-layers", "fwmb-layers-menu", "fwmb-worldbar-settlements", "fwmb-mode-switch", "fwmb-worldbar-world"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
+    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-worldbar-files", "fwmb-layers", "fwmb-layer--world", "fwmb-layers-menu", "fwmb-worldbar-settlements", "fwmb-mode-switch"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
+    assert.ok(!TEMPLATE.includes("fwmb-worldbar-world"), "no World menu: the world's tools are the world's rail (World in the layer switcher)");
 });
 
 test("parts later tracks fill are drawn disabled, keeping their tooltips (aria-disabled, never disabled)", () => {

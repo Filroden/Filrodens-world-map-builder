@@ -881,7 +881,7 @@ async function biomeStudio(biome = {}) {
     return app;
 }
 
-test("a custom biome opens in the inspector; each field applies as one undo step, repainting the map and redrawing the bar", async () => {
+test("a custom biome opens in the inspector; each field applies at once (the world's, so no undo step), repainting the map and redrawing the bar", async () => {
     const app = await biomeStudio();
     await BiomeEditor.open(app, 14);
     assert.deepEqual(Inspector.inspected(app), { biome: 14 }, "its row is marked");
@@ -889,17 +889,18 @@ test("a custom biome opens in the inspector; each field applies as one undo step
 
     await commit(app, "biomeColor", "#123456");
     assert.deepEqual(app.uiState.customBiomes[0].color, [0x12, 0x34, 0x56]);
-    assert.equal(steps(app), 1);
+    assert.equal(steps(app), 0, "the biomes are the world's: Revert changes, not undo (S0 step 4)");
     assert.equal(app.repaints, 1, "the map is repainted in the biome's new colour");
     assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices are drawn again");
     assert.equal(app.stale, 0, "Generate does not read a biome's colour");
 
+    const repaints = app.repaints;
     await commit(app, "biomeColor", "#123456");
-    assert.equal(steps(app), 1, "the same value again records nothing");
+    assert.equal(app.repaints, repaints, "the same value again changes nothing");
 
     await commit(app, "biomePlacement", "landUnderwater");
     assert.equal(app.uiState.customBiomes[0].placement, "landUnderwater");
-    assert.equal(steps(app), 2);
+    assert.equal(steps(app), 0);
 });
 
 test("Own numbers: hidden until ticked, its sliders starting from Behaves like; ticking and changing them is what Generate reads", async () => {
@@ -929,7 +930,7 @@ test("Own numbers: hidden until ticked, its sliders starting from Behaves like; 
     await commit(app, "biomeOwnNumbers", false);
     assert.equal(app.uiState.customBiomes[0].properties, null, "cleared: none of its own");
     assert.equal(app.stale, 4);
-    assert.equal(steps(app), 4);
+    assert.equal(steps(app), 0, "none an undo step: the biomes are the world's");
 });
 
 test("Add makes a custom biome and opens it; Delete asks, removes it, closes the inspector and leaves the bar on Grassland", async () => {
@@ -939,7 +940,7 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     assert.equal(app.uiState.customBiomes.at(-1).name, "FILRODENSWMB.UI.NewCustomBiomeName {\"number\":2}");
     assert.ok(Inspector.shows(app, "biome", 15));
     assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices list it at once");
-    assert.equal(steps(app), 1);
+    assert.equal(steps(app), 0);
 
     await BiomeEditor.open(app, 14);
     form(app).querySelector('[data-inspector-action="delete"]').click();
@@ -950,7 +951,7 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     assert.equal(app.uiState.brushBiome, FILRODENSWMB.BIOME_IDS.GRASSLAND);
     assert.equal(app.stale, 1, "it behaved like Taiga, so a run made with it is out of date");
     VectorHistory.step(app, true);
-    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
+    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [15], "undo leaves the world's biomes alone");
 });
 
 test("while a culture's climate is chosen biomes, a custom biome's placement and its deletion mark a run out of date", async () => {

@@ -17,8 +17,9 @@ const TEMPLATE = "modules/filrodens-world-map-builder/templates/world/parts/insp
  * (Behaves like, and Own numbers with a slider per property, GENERATOR.BIOME_PROPERTIES); and
  * Delete. Rules are edited for every biome at once in the rule editor, from the Edit biomes section.
  *
- * Each field applies when committed, as one undo step (the undo history keeps the custom biomes,
- * see MapStateManager.getVectorStateSnapshot). The map is repainted, since a biome's colour and
+ * Each field applies when committed. The biomes are the world's (World › Biomes, S0 step 4), so a
+ * change is not an undo step of the map: Revert changes puts the table back (see WorldEditors).
+ * The map is repainted, since a biome's colour and
  * placement show on it, and the panel's list and the bar's biome choices are drawn again, since
  * they name it. A change to what Generate reads of the biome marks a run Out of date: its Behaves
  * like and own numbers, and, while a culture's climate is chosen biomes (see CultureClimate), its
@@ -117,7 +118,6 @@ export class BiomeEditor {
         const current = { name: biome.name, code: biome.code ?? null, color: biome.color, placement: BiomePlacement.placementOfCustom(biome), behavesLike: biome.behavesLike ?? null, properties: biome.properties ?? null };
         if (JSON.stringify(current) === JSON.stringify({ ...current, ...values })) return false;
         const readBefore = BiomeEditor.#generatorReading(app, biome);
-        MapStateManager.pushVectorState(app);
         Object.assign(biome, values);
         // Superseded by `placement`, which takes priority over it anyway (see
         // BiomePlacement.placementOfCustom); dropped so an older map's flag is not carried forward
@@ -136,12 +136,11 @@ export class BiomeEditor {
     }
 
     /**
-     * Adds a custom biome with the next free id and opens it in the inspector, as one undo step.
+     * Adds a custom biome with the next free id and opens it in the inspector,.
      * It has no rules, so it only lies where it is painted until the rule editor gives it some.
      * @returns {Promise<number>} Its id.
      */
     static async add(app) {
-        MapStateManager.pushVectorState(app);
         const id = MapStateManager.getNextCustomBiomeId(app.uiState);
         const name = platform.i18n.format("FILRODENSWMB.UI.NewCustomBiomeName", { number: (app.uiState.customBiomes ?? []).length + 1 });
         app.uiState.customBiomes ??= [];
@@ -152,7 +151,7 @@ export class BiomeEditor {
     }
 
     /**
-     * Deletes a custom biome, after asking, as one undo step.
+     * Deletes a custom biome, after asking,.
      *
      * Only `uiState.customBiomes` changes: painted pixels and brush strokes naming the biome's id
      * are left as they are, since the undo history cannot restore raster data. A pixel whose id
@@ -169,7 +168,6 @@ export class BiomeEditor {
             content: `<p>${Sanitize.escapeHtml(platform.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"))}</p>`,
         });
         if (!confirmed) return false;
-        MapStateManager.pushVectorState(app);
         // Its land now behaves as the biome beneath, so a run made while it behaved as another, or
         // with numbers of its own, is out of date; and so is one with a culture whose climate is
         // chosen biomes, since its land now shows the biome beneath

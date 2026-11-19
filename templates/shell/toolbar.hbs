@@ -1,6 +1,9 @@
 {{!--
     The rail: the open mode's tools grouped by stage (Create's Shape, Populate and Finish, or
-    Explore's one stage), then the occasional tools, then Help at its foot. The file actions
+    Explore's one stage), then the occasional tools, then Help at its foot. While the world is
+    being worked on (World in the layer switcher, S0 step 4) it is the world's rail instead: the
+    overview, the settings editors and the whole world's actions, parts still to be built drawn
+    disabled with their tooltips, and only the menus and toggles among the occasional tools. The file actions
     (Save world, Save as, Worlds) are the world bar's (v5, S0 step 3). Every button is
     icon-only, named by its aria-label and tooltip, and the arrow keys move along the rail (see
     MapStudio's rail keys).
@@ -11,14 +14,20 @@
     Appearance's two groups inline. Help, last, never folds. When it is narrow the
     rail goes compact and the stage names are hidden visually, but stay as the groups' names.
 --}}
-<nav aria-label="{{localize 'FILRODENSWMB.UI.RailLabel'}}">
+<nav aria-label="{{#if railWorld}}{{localize 'FILRODENSWMB.UI.RailWorldLabel'}}{{else}}{{localize 'FILRODENSWMB.UI.RailLabel'}}{{/if}}"{{#if railWorld}} class="fwmb-rail--world"{{/if}}>
     {{#each railStages}}
     <div class="fwmb-rail-group" role="group" aria-labelledby="fwmb-rail-stage-{{this.id}}">
         <span class="fwmb-rail-stage" id="fwmb-rail-stage-{{this.id}}" data-tooltip="{{localize this.label}}">{{localize this.label}}</span>
         {{#each this.tools}}
-        <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="{{this.id}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-current="{{#if (eq ../../activeTool this.id)}}page{{else}}false{{/if}}">
+        {{#if this.disabled}}
+        <button type="button" class="fwmb-rail-btn" aria-disabled="true" aria-label="{{localize this.label}}" data-tooltip="{{this.tooltip}}">
             <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
         </button>
+        {{else}}
+        <button type="button" class="fwmb-rail-btn" data-action="{{#if this.action}}{{this.action}}{{else}}changeTool{{/if}}" data-tool="{{this.id}}" aria-label="{{localize this.label}}" data-tooltip="{{#if this.tooltip}}{{this.tooltip}}{{else}}{{localize this.label}}{{/if}}" aria-current="{{#if (eq ../../activeTool this.id)}}page{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+        </button>
+        {{/if}}
         {{/each}}
     </div>
     {{/each}}

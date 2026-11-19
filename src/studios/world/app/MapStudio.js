@@ -89,6 +89,8 @@ import { moveAlongModes } from "../../../shell/BarFold.js";
 import { AppearanceMenu } from "../../../shell/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { WorldsPanel } from "./WorldsPanel.js";
+import { WorldEditors } from "./WorldEditors.js";
+import { WorldMapCard, WorldOverview } from "./WorldOverview.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
@@ -286,6 +288,11 @@ export class MapStudio {
         importSettings(e, t)            { this._onImportSettings(e, t); },
         selectWorld(e, t)               { this._onSelectWorld(e, t); },
         closeWorlds()                   { this._onCloseWorlds(); },
+        showWorld()                     { this.showWorld(); },
+        showMap()                       { this.showMap(); },
+        selectMapCard(e)                { this.#selectMapCard(e); },
+        openWorldTool(_e, t)            { this.openWorldTool(t.dataset.tool, t.dataset.section); },
+        revertWorldGroup(_e, t)         { this.revertWorldGroup(t.dataset.group); },
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
         nudgeReference(e, t)            { this._onNudgeReference(e, t); },
         randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
@@ -882,9 +889,24 @@ export class MapStudio {
             if (entry.host === "fullscreen") return { ...entry, ...this.#fullscreenState() };
             return { ...entry, pressed: false };
         });
+        // The world's rail while the world is being worked on (S0 step 4): its tools open through
+        // openWorldTool, and the parts a later step builds are drawn disabled with their tooltips
+        const { i18n } = platform;
+        const worldRail = () => definition.worldRail(this.mapType).map((stage) => ({
+            ...stage,
+            tools: stage.tools.map((tool) => ({
+                ...tool,
+                action: "openWorldTool",
+                disabled: !!tool.later,
+                tooltip: !tool.later ? i18n.localize(tool.label) : tool.later === tool.label ? i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name: i18n.localize(tool.label) }) : i18n.localize(tool.later),
+            })),
+        }));
+        const inWorld = this.inWorld;
         return {
-            railStages: definition.railStages(this.mapType, this.mode),
-            railOccasional: occasional,
+            railWorld: inWorld,
+            railStages: inWorld ? worldRail() : definition.railStages(this.mapType, this.mode),
+            // A map's occasional tools are its own; the menus and toggles are on both rails
+            railOccasional: inWorld ? occasional.filter((entry) => !entry.tool) : occasional,
             railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
             helpOpen: HelpPanel.shows(this),
         };
@@ -899,36 +921,30 @@ export class MapStudio {
         const { i18n } = platform;
         const notBuilt = (name) => i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name });
         const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
-        const surface = { id: "surface", icon: "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: true };
+        // World, then the world's maps: the switcher says what is being worked on (S0 step 4)
+        // In Worlds no world is being worked on yet, so neither is lit
+        const inWorld = this.inWorld;
+        const inWorlds = this.activeTool === "manage";
+        const worldName = i18n.localize("FILRODENSWMB.UI.LayerWorld");
+        const world = { id: "world", icon: "public", full: worldName, short: worldName, tooltip: i18n.localize("FILRODENSWMB.UI.LayerWorldHint"), current: inWorld, action: inWorld ? null : "showWorld" };
+        const surface = { id: "surface", icon: "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: !inWorld && !inWorlds, action: inWorld || inWorlds ? "showMap" : null };
         surface.tooltip = surface.full;
         const geologyName = i18n.localize("FILRODENSWMB.UI.LayerGeologyFull");
         const geology = { id: "geology", icon: "strata", full: geologyName, short: i18n.localize("FILRODENSWMB.UI.LayerGeology"), disabled: true, tooltip: notBuilt(geologyName) };
-        const item = (key, icon, separated = false) => ({ label: i18n.localize(key), icon, separated, tooltip: notBuilt(i18n.localize(key)) });
+        const current = inWorld ? world : surface;
         return {
             name,
             nameMenuLabel: i18n.format("FILRODENSWMB.UI.WorldNameMenuHint", { name }),
             saved: !!this.#saveId,
             dirty: this.#dirty,
             saveLabel: this.#saveLabel(),
-            layers: [surface, geology],
-            current: surface,
-            layerMenuLabel: i18n.format("FILRODENSWMB.UI.LayerMenuHint", { map: surface.full }),
+            layers: [world, surface, geology],
+            current,
+            layerMenuLabel: i18n.format("FILRODENSWMB.UI.LayerMenuHint", { map: current.full }),
             addMap: notBuilt(i18n.localize("FILRODENSWMB.UI.AddMap")),
             settlementMaps: notBuilt(i18n.localize("FILRODENSWMB.UI.SettlementMaps")),
             mode: this.mode,
             fold: this.root?.querySelector(":scope > .fwmb-worldbar")?.dataset.fold ?? "1",
-            worldMenu: [
-                item("FILRODENSWMB.UI.WorldOverview", "public"),
-                item("FILRODENSWMB.UI.WorldSetup", "tune", true),
-                item("FILRODENSWMB.UI.WorldCultures", "castle"),
-                item("FILRODENSWMB.UI.WorldAges", "history"),
-                item("FILRODENSWMB.UI.WorldNameStyle", "insert-text"),
-                item("FILRODENSWMB.UI.ToolLibrary", "palette"),
-                item("FILRODENSWMB.UI.WorldBiomes", "forest"),
-                item("FILRODENSWMB.UI.WorldClimate", "water-drop"),
-                item("FILRODENSWMB.UI.GenerateAll", "generate", true),
-                item("FILRODENSWMB.UI.CutRegionalWorld", "crop"),
-            ],
         };
     }
 
@@ -1047,9 +1063,12 @@ export class MapStudio {
             title: i18n.localize(entry?.label ?? ""),
             // Explore's tools read the map and change nothing on it
             tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
+            // A world settings editor's: what it edits is the world's, not this map's (board W2)
+            worldTag: WorldEditors.isEditor(tool),
             meta,
-            // Worlds is opened from the world bar, not the rail, so it closes from its own header
-            closes: tool === "manage" ? "closeWorlds" : null,
+            // Worlds is off every rail and closes from its own header; the world's tools are left by
+            // choosing a map in the layer switcher
+            closes: WorldEditors.isAside(tool) ? "closeWorlds" : null,
             state: this.#stateBlockContext(),
             next: next ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
         };
@@ -1340,6 +1359,10 @@ export class MapStudio {
 
             if (editableTools.includes(this.activeTool)) {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-${this.activeTool}.hbs`;
+            } else if (this.inWorld && this.activeTool !== "worldOverview") {
+                // A world tool beside the map: the map shown, and that the world's settings reach every map
+                context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-world.hbs`;
+                context.bar.state = null;
             } else {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-empty.hbs`;
             }
@@ -1504,6 +1527,15 @@ export class MapStudio {
                 context.cultureList = CultureLists.context(this);
             }
 
+            if (WorldEditors.isEditor(this.activeTool)) await this.#worldEditorContext(context);
+            if (this.activeTool === "worldOverview") {
+                context.overview = await WorldOverview.context(this, { dirtyGroups: this.#unsavedGroupNames() });
+                // A board beside the world's rail, in the map's place (board W1)
+                context.panel.board = true;
+                context.panel.boardRail = true;
+                context.panel.title = context.overview.title;
+                context.panel.meta = context.overview.line;
+            }
             if (this.activeTool === "manage") {
                 context.worlds = await WorldsPanel.context(this);
                 // Worlds fills the studio's body beside the inspector (board W9)
@@ -1757,6 +1789,11 @@ export class MapStudio {
         });
         root.addEventListener("input", (event) => this.#routeFieldEvent(event));
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
+        // A world settings editor's head says whether this sitting changed its group (Revert
+        // changes), so a change there draws the panel again once the change has been applied
+        root.addEventListener("change", (event) => {
+            if (event.target.closest?.(".fwmb-world-editor")) setTimeout(() => this.view?.render(["context"]), 0);
+        });
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
         root.addEventListener("pointerover", (event) => this.#nameUnsaved(event));
         root.addEventListener("focusin", (event) => this.#nameUnsaved(event));
@@ -2623,7 +2660,10 @@ export class MapStudio {
             await this.generateTerrain();
             this.isDirty = false;
             // Unless a map was loaded meanwhile, the new map gets its (empty) display mesh
-            if (!this.currentSaveId) MeshIntegration.startNewMap(this);
+            if (!this.currentSaveId) {
+                MeshIntegration.startNewMap(this);
+                this.#captureEditorBaseline();
+            }
         }, 50);
     }
 
@@ -2831,7 +2871,7 @@ export class MapStudio {
 
         let layer = "terrain";
         if (this.activeTool === "scene") layer = "scene";
-        if (this.activeTool === "biomes") layer = "biome";
+        if (this.activeTool === "biomes" || this.activeTool === "worldBiomes") layer = "biome";
         if (this.activeTool === "features") layer = "features";
         if (this.activeTool === "infrastructure") layer = "infrastructure";
         if (this.activeTool === "regions") layer = "regions";
@@ -4906,6 +4946,7 @@ export class MapStudio {
         if (!result) return null;
         this.world = result.world;
         this.worldSettingsOpened = settings;
+        this.#captureEditorBaseline();
         this.view?.render(["worldbar"]);
         return { mapId: result.maps[0].id, name: this.currentSaveName };
     }
@@ -5607,6 +5648,13 @@ export class MapStudio {
         MeshIntegration.startNewMap(this);
         this.#updateGrid();
         this.canvasEngine.resetCamera();
+        this.#captureEditorBaseline();
+        // Made from World setup: the new world's Surface map, on Map setup, is next
+        if (this.definition.isWorldTool(this.activeTool)) {
+            this.activeTool = "scene";
+            this.#toolBeforeAside = null;
+            this.#newWorldSetup = false;
+        }
 
         // 5. Force UI to update
         this.view?.render(["toolbar", "context", "editToolbar"]);
@@ -5622,8 +5670,22 @@ export class MapStudio {
     /** How far one press of the 3D view's zoom buttons moves the camera. */
     static #THREE_D_ZOOM = 0.8;
 
-    /** The tool open when Worlds was opened, which its Close goes back to. */
-    #toolBeforeWorlds = null;
+    /**
+     * The tool open when an aside was opened (Worlds, the world overview, a world settings editor:
+     * tools off the rail, see WorldEditors.isAside), which its Close or Back to goes back to. Going
+     * from one aside to another keeps it.
+     */
+    #toolBeforeAside = null;
+
+    /** New world opened World setup for a world still to be made (its button is Create world). */
+    #newWorldSetup = false;
+
+    /**
+     * The world's settings as they were when the world was opened, made or last saved, for each
+     * editor's Revert changes: the state the editors write (WorldEditors.capture) and the settings
+     * as the world record holds them (to tell whether a group has changed since).
+     */
+    #editorBaseline = null;
 
     /** A card or chip in Worlds: chosen, it shows in the inspector; a second click opens the world. */
     _onSelectWorld(event, target) {
@@ -5634,11 +5696,156 @@ export class MapStudio {
         return WorldsPanel.select(this, worldId);
     }
 
-    /** Worlds' Close: the tool it was opened from (in the mode now shown), else the mode's first. */
+    /**
+     * An aside's Close or Back to (Worlds, the overview, a world settings editor): the tool it was
+     * opened from (in the mode now shown), else the mode's first.
+     */
     _onCloseWorlds() {
-        const kept = this.#toolBeforeWorlds;
-        const tool = kept && kept !== "manage" && this.definition.offers(kept, this.mapType, this.mode) ? kept : (this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
+        const kept = this.#toolBeforeAside;
+        const tool = kept && !WorldEditors.isAside(kept) && this.definition.offers(kept, this.mapType, this.mode) ? kept : (this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
         return this.switchTool(tool);
+    }
+
+    /** Whether the world, not one of its maps, is being worked on: a tool of the world's rail is open. */
+    get inWorld() {
+        return this.definition.isWorldTool(this.activeTool);
+    }
+
+    /** What the layer switcher shows as worked on: the world, a map, or neither (in Worlds). */
+    #workingOn() {
+        if (this.inWorld) return "world";
+        return this.activeTool === "manage" ? "worlds" : "map";
+    }
+
+    /** The world's tool last open, which choosing World in the layer switcher opens again. */
+    #worldTool = "worldOverview";
+
+    /** World in the layer switcher: the world's rail, on the world tool last open (the overview at first). */
+    showWorld() {
+        if (this.inWorld) return;
+        if (this.activeTool === "manage") Inspector.close(this);
+        return this.openWorldTool(this.#worldTool);
+    }
+
+    /** A map in the layer switcher (S0: the Surface map): its rail, on the tool last open in the mode. */
+    showMap() {
+        if (!this.inWorld && this.activeTool !== "manage") return;
+        Inspector.close(this);
+        return this.switchTool(this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
+    }
+
+    /**
+     * A map's card in the overview: chosen, the map shows in the inspector (WorldMapCard); a second
+     * click goes to the map, as a world's card in Worlds opens the world.
+     */
+    #selectMapCard(event) {
+        if (event?.detail === 2) return this.showMap();
+        return Inspector.open(this, WorldMapCard, { id: "surface" }, { keepFocus: true });
+    }
+
+    /**
+     * Opens one of the world's tools from the World menu, the overview or a Go block: the overview,
+     * a world settings editor, or (until S0 step 4b) the tool that still holds a world setting, at
+     * its section. An editor edits, so Explore gives way to Create first; the overview is either's.
+     * @param {string} tool
+     * @param {string} [section] - A section of the tool's panel to open and show.
+     */
+    async openWorldTool(tool, section) {
+        if (!tool || !this.definition.tool(tool) || this.definition.tool(tool).later) return;
+        if (tool !== "worldOverview" && this.mode !== "create") {
+            await this.enterMode("create");
+        }
+        await this.switchTool(tool);
+        if (!section) return;
+        await this.view?.render(["context"]);
+        const details = this.root?.querySelector(`.fwmb-context-panel details[data-section="${section}"]`);
+        if (!details) return;
+        details.open = true;
+        details.scrollIntoView({ block: "start" });
+    }
+
+    /**
+     * A world settings editor's context: its head (what a change reaches, whether this sitting
+     * has changed it, the held banner) and what its sections read.
+     */
+    async #worldEditorContext(context) {
+        const editor = WorldEditors.of(this.activeTool);
+        const node = this.world ? await WorldOverview.nodeOf(this.world.id) : null;
+        const parent = node?.parentId ? await WorldOverview.nodeOf(node.parentId) : null;
+        context.worldEditor = WorldEditors.head(this, {
+            tool: this.activeTool,
+            changed: this.worldGroupChanged(editor.group),
+            heldCount: (node?.children ?? []).filter((child) => child.held).length,
+            heldBy: this.world?.held ? WorldsPanel.named(parent ?? { name: "" }) : null,
+        });
+        if (this.activeTool === "worldNameStyle") context.generate = { nameBases: GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase) };
+        if (this.activeTool === "worldSetup") context.worldSetup = { isNew: this.#newWorldSetup };
+    }
+
+    /** The names of the settings groups changed since the world opened, for the overview's line. */
+    #unsavedGroupNames() {
+        const opened = this.worldSettingsOpened;
+        if (!opened) return [];
+        const names = { setup: "WorldSetup", cultures: "WorldCultures", ages: "WorldAges", nameStyle: "WorldNameStyle", styles: "ToolLibrary", biomes: "WorldBiomes", climate: "WorldClimate", icons: "ToolLibrary" };
+        return [...new Set(WorldRecord.changedGroups(opened, this.#worldSettingsNow()).map((group) => names[group]).filter(Boolean))].map((key) => platform.i18n.localize(`FILRODENSWMB.UI.${key}`));
+    }
+
+    /** Takes the world's settings as they are now as each editor's point to revert to (see #editorBaseline). */
+    #captureEditorBaseline() {
+        this.#editorBaseline = { values: WorldEditors.capture(this), settings: this.#worldSettingsNow() };
+    }
+
+    /** Whether a settings group has changed since the world was opened, made or last saved. */
+    worldGroupChanged(group) {
+        if (!this.#editorBaseline) return false;
+        return JSON.stringify(this.#editorBaseline.settings?.[group] ?? null) !== JSON.stringify(this.#worldSettingsNow()[group] ?? null);
+    }
+
+    /**
+     * Revert changes (a world settings editor): the group as it was before the first change in
+     * this sitting, in one step, then what it reaches drawn again. Like any change it marks the
+     * runs that read it out of date, and the world unsaved until saved.
+     * @param {string} group
+     */
+    async revertWorldGroup(group) {
+        if (this.world?.held || !this.worldGroupChanged(group)) return;
+        if (!WorldEditors.restore(this, this.#editorBaseline.values, group)) return;
+        this.#showRestoredFields(group);
+        switch (group) {
+            case "setup":
+                this.#applyWorldScale();
+                this._repaintVectors();
+                this.debouncedGenerateClimate();
+                this.#markGeneratorStale();
+                break;
+            case "climate":
+                this.debouncedGenerateClimate();
+                this.#markGeneratorStale();
+                break;
+            case "biomes":
+                this._repaintCanvas();
+                this.#markGeneratorStale();
+                break;
+            default:
+                break;
+        }
+        this.markDirty();
+        await this.view?.render(["context", "worldbar", "editToolbar"]);
+    }
+
+    /**
+     * Puts a reverted group's values in the panel's fields at once. The map's parameters are read
+     * from the open fields (see MapStateManager.getMapParameters), so a field still showing the
+     * change would write it back before the panel is drawn again.
+     * @param {string} group
+     */
+    #showRestoredFields(group) {
+        for (const key of Object.keys(this.#editorBaseline.values[group] ?? {})) {
+            const input = Object.hasOwn(this.uiState, key) ? this.root?.querySelector(`[name="${key}"]`) : null;
+            if (!input) continue;
+            if (RangeCurve.isCurved(input)) RangeCurve.setValue(input, this.uiState[key]);
+            else input.value = this.uiState[key];
+        }
     }
 
     /**
@@ -5660,7 +5867,8 @@ export class MapStudio {
      * @param {"create"|"explore"} mode
      */
     async enterMode(mode) {
-        if (!["create", "explore"].includes(mode) || mode === this.mode) return;
+        // From the world's rail, either mode goes to the map (in that mode)
+        if (!["create", "explore"].includes(mode) || (mode === this.mode && !this.inWorld)) return;
         this.mode = mode;
         const kept = this.#modeTools[mode];
         const tool = kept && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode];
@@ -5705,12 +5913,15 @@ export class MapStudio {
      */
     async switchTool(newTool, { force = false } = {}) {
         if (this.activeTool === newTool && !force) return;
+        const wasOn = this.#workingOn();
         // Worlds' Close goes back to the tool it was opened from
-        if (newTool === "manage" && this.activeTool !== "manage") this.#toolBeforeWorlds = this.activeTool;
+        if (WorldEditors.isAside(newTool) && !WorldEditors.isAside(this.activeTool)) this.#toolBeforeAside = this.activeTool;
+        if (newTool !== "worldSetup") this.#newWorldSetup = false;
         // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
         const toolMode = this.definition.tool(newTool)?.mode;
-        if (toolMode && this.definition.tool(newTool)?.stage && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
+        if (this.definition.isWorldTool(newTool)) this.#worldTool = newTool;
+        else if (toolMode && this.definition.tool(newTool)?.stage && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
         this.#rememberWorldMode();
 
         // 1. Teardown current state. Automatic generation always comes back on when the tool
@@ -5742,9 +5953,9 @@ export class MapStudio {
         // The Travel tool takes the map's clicks for its start while it is open
         TravelView.toolChanged(this);
 
-        // 4. Paint
+        // 4. Paint (the world bar too when the world or a map comes to be worked on: its switcher)
         this._repaintVectors();
-        this.view?.render(["toolbar", "context", "editToolbar"]);
+        this.view?.render(["toolbar", "context", "editToolbar", ...(wasOn !== this.#workingOn() ? ["worldbar"] : [])]);
         this.#updateCanvasHint();
         if (newTool === "threeD" && !this.scene3D) await this._onThreeDView();
     }
@@ -6463,6 +6674,7 @@ export class MapStudio {
             // The settings as loaded (the defaults a load fills in included): a save that leaves
             // them so does not raise their revision. Nothing below changes them.
             this.worldSettingsOpened = this.#worldSettingsNow();
+            this.#captureEditorBaseline();
             this.inheritedStrokes = world?.held && RegionalRecord.isCurrent(world.regional) ? (RegionalRecord.forMap(world.regional, mapId)?.inheritedStrokes ?? 0) : undefined;
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
@@ -6503,19 +6715,15 @@ export class MapStudio {
     }
 
     /**
-     * New world (the world bar's name menu). Until World setup arrives (S0 step 4), a new world is
-     * made as a new map was: Create opens on Map setup, its Create new map section open, and its
-     * button asks about unsaved changes before it makes the world.
+     * New world (the world bar's name menu, Worlds): World setup for a world still to be made, in
+     * Create, its button Create world, which asks about unsaved changes before it makes the world
+     * (S0 step 4; Ken, 2026-11-19).
      */
     async _onNewWorld() {
-        if (this.mode !== "create") await this.enterMode("create");
-        await this.switchTool("scene");
+        await this.openWorldTool("worldSetup");
+        this.#newWorldSetup = true;
         await this.view?.render(["context"]);
-        const section = this.root?.querySelector('.fwmb-context-panel details[data-section="generation"]');
-        if (!section) return;
-        section.open = true;
-        section.scrollIntoView({ block: "start" });
-        section.querySelector("select, input")?.focus({ preventScroll: true });
+        this.root?.querySelector('.fwmb-context-panel details[data-section="generation"] select, .fwmb-context-panel details[data-section="generation"] input')?.focus({ preventScroll: true });
     }
 
     /** Export world (the world bar's name menu): the open world as last saved, in a world file (see MapTransfer). */

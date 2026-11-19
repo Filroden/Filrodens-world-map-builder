@@ -298,12 +298,8 @@ export class MapStateManager {
     /**
      * Generates a deep-cloned snapshot of the current vector state.
      *
-     * Custom Biomes (`uiState.customBiomes` - name/code/colour/rules) are included here too,
-     * even though they're `uiState` rather than a `MapStudio` vector array like the rest of
-     * this snapshot - every biome-add/edit/delete action calls `pushVectorState` before
-     * applying its change (see MapDialogManager), which only works if a biome change is part of
-     * what gets undone. Leaving `customBiomes` out would make Ctrl+Z after renaming, recolouring
-     * or editing the auto-generation rules of a custom biome have no effect on it at all.
+     * The custom biomes are not in it (S0 step 4): they are the world's (World › Biomes), whose
+     * changes are put back by Revert changes, not undone with the map's edits (see WorldEditors).
      *
      * The layer sets are included (their levels, regions and styles), but not the owner arrays
      * of the levels: those are far larger and change by patches, which have history entries of
@@ -328,7 +324,6 @@ export class MapStateManager {
             mapDecorations: platform.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
-            customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
             // The Generate panel's cultures, edited as the styles are (see CultureLists)
             cultures: platform.utils.deepClone(app.uiState?.cultures ?? []),
             // The Generate panel's ages, edited in their inspector (see AgeEditor)
@@ -366,7 +361,6 @@ export class MapStateManager {
         app.mapDecorations = state.mapDecorations || app.mapDecorations;
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
-        app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
         if (Array.isArray(state.cultures)) app.uiState.cultures = state.cultures;
         if ("infill" in state) app.infillInputs = state.infill;
         if (Array.isArray(state.ages)) app.uiState.generatorSettings = { ...(app.uiState.generatorSettings ?? {}), ages: state.ages };

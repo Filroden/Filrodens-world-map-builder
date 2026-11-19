@@ -1,0 +1,19 @@
+{{!--
+    The head of a world settings editor (S0 step 4; board W2), above its sections: the lede, the
+    held banner on a held regional world (its editors read only), and the reach line: what reads
+    this group, whether this sitting's changes have marked a run out of date, and Revert changes.
+    See WorldEditors.head.
+--}}
+<p class="fwmb-lede">{{worldEditor.lede}}</p>
+{{#if worldEditor.held}}
+<div class="fwmb-held" role="note">
+    <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldHeldTitle"}}</span>
+    <span>{{worldEditor.heldBanner}}</span>
+</div>
+{{/if}}
+<div class="fwmb-reach">
+    <span>{{worldEditor.reach}}{{#if worldEditor.changedLine}} {{worldEditor.changedLine}}{{/if}}</span>
+    {{#unless worldEditor.held}}
+    <button type="button" class="fwmb-btn" data-action="revertWorldGroup" data-group="{{worldEditor.group}}"{{#unless worldEditor.canRevert}} disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.WorldRevertHint'}}"><span class="fwmb-icon fwmb-icon--history" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldRevert"}}</button>
+    {{/unless}}
+</div>

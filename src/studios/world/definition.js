@@ -5,8 +5,12 @@
  *
  * In S0 a world has its Surface map only. The rail draws the open mode's stages (S0 step 3): Create's
  * Shape, Populate and Finish, or Explore's one stage, History, Travel and the 3D view. Reference
- * image and Styles and icons are occasional tools of Create (no stage); Maps (Worlds) has no stage
- * either and opens from the world bar's name menu.
+ * image and Styles and icons are occasional tools of Create (no stage); Worlds has no stage either
+ * and opens from the world bar's name menu.
+ *
+ * The world has a rail of its own (S0 step 4), shown in either mode while World is chosen in the
+ * layer switcher: the overview, the world's settings editors, and what acts on the whole world.
+ * Parts a later step builds are drawn in their places, disabled, with a tooltip (`later`).
  */
 import { defineStudio } from "../../shell/StudioRegistry.js";
 
@@ -15,6 +19,8 @@ const SURFACE = ["surface"];
 /** A tool on the Surface map, in Create unless said. */
 const tool = (id, stage, icon, label, { mode = "create", next = null, stateWord = null } = {}) => ({ id, stage, mode, icon, label, mapTypes: SURFACE, next, stateWord });
 const next = (toolId, reason) => ({ tool: toolId, reason });
+/** A part of the world's rail a later step builds: drawn in its place, disabled ("…: not built yet" unless said). */
+const later = (id, stage, icon, label, tooltip = null) => ({ ...tool(id, stage, icon, label), later: tooltip ?? label });
 
 export const WORLD_DEFINITION = defineStudio({
     id: "world",
@@ -28,6 +34,11 @@ export const WORLD_DEFINITION = defineStudio({
         { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", numbered: false },
         { id: "finish", label: "FILRODENSWMB.UI.StageFinish" },
         { id: "explore", label: "FILRODENSWMB.UI.StageExplore", numbered: false, optional: true },
+    ],
+    worldStages: [
+        { id: "world", label: "FILRODENSWMB.UI.StageWorld" },
+        { id: "worldSettings", label: "FILRODENSWMB.UI.StageWorldSettings" },
+        { id: "worldWhole", label: "FILRODENSWMB.UI.StageWorldWhole" },
     ],
     // What the pointer does while a tool is editing, named in the state block and on the bar: a
     // word per tool, or per mode where the tool's modes do different things (STATE_WORDS gives each
@@ -53,6 +64,17 @@ export const WORLD_DEFINITION = defineStudio({
         tool("reference", null, "image", "FILRODENSWMB.UI.ToolReference"),
         tool("library", null, "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage"),
+        // The world's own (S0 step 4), on the world's rail (see WorldEditors)
+        tool("worldOverview", "world", "public", "FILRODENSWMB.UI.WorldOverview"),
+        tool("worldSetup", "worldSettings", "tune", "FILRODENSWMB.UI.WorldSetup"),
+        later("worldCultures", "worldSettings", "castle", "FILRODENSWMB.UI.WorldCultures"),
+        later("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges"),
+        tool("worldNameStyle", "worldSettings", "insert-text", "FILRODENSWMB.UI.WorldNameStyle"),
+        later("worldStyles", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
+        tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
+        tool("worldClimate", "worldSettings", "water-drop", "FILRODENSWMB.UI.WorldClimate"),
+        later("worldGenerateAll", "worldWhole", "generate", "FILRODENSWMB.UI.GenerateAll", "FILRODENSWMB.UI.GenerateAllLater"),
+        later("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)
     // sits among them, and on the web the full-screen toggle (shown only where the host can go

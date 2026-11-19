@@ -1,0 +1,55 @@
+{{!--
+    Biomes (S0 step 4): the world's biome table, every map reading it. The built-in biomes'
+    colours, and the custom biomes, each opening in the inspector (BiomeEditor), with the rule
+    editor; painting them stays the Biomes tool's. Read only on a held regional world.
+--}}
+{{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
+<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="biomeColours" title="FILRODENSWMB.UI.SectionEditBiomes" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <div class="fwmb-biome-legend">
+        {{#each biomeList}}
+            {{#unless this.isCustom}}
+                <div class="fwmb-biome-item">
+                    <input type="color" class="fwmb-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" aria-label="{{localize this.label}}" />
+                    <label class="fwmb-biome-label">{{localize this.label}}</label>
+                </div>
+            {{/unless}}
+        {{/each}}
+    </div>
+
+    <div class="fwmb-subsection-heading">
+        <span>{{localize "FILRODENSWMB.UI.SettingsCustomBiomes"}}</span>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="addCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.AddCustomBiome'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.AddCustomBiome'}}">
+            <i class="fwmb-icon fwmb-icon--add"></i>
+        </button>
+    </div>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsCustomBiomes'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+        {{#each customBiomes}}
+            <div role="option" aria-selected="{{#if (eq @root.inspected.biome this.id)}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomBiome">
+                <div class="fwmb-swatch" style="background-color: {{this.hex}};"></div>
+                {{#if this.hasRules}}<i class="fwmb-icon fwmb-icon--tune fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+                {{#if this.code}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeCodeTooltip' code=this.code}}">{{this.code}}</span>{{/if}}
+                <span class="fwmb-actions">
+                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">
+                        <i class="fwmb-icon fwmb-icon--delete"></i>
+                    </button>
+                </span>
+            </div>
+        {{else}}
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomBiomes"}}</div>
+        {{/each}}
+    </div>
+
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn" data-action="openBiomeRuleEditor">
+            <i class="fwmb-icon fwmb-icon--tune"></i>
+            {{localize "FILRODENSWMB.UI.OpenRuleEditor"}}
+        </button>
+
+        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--subtle" id="fwmb-preview-fallback-btn" aria-label="{{localize 'FILRODENSWMB.UI.PreviewFallbackCoverageHint'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PreviewFallbackCoverageHint'}}">
+            <i class="fwmb-icon fwmb-icon--visibility"></i>
+        </button>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+</fieldset>

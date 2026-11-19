@@ -1,97 +1,21 @@
 {{!--
-    New map (tool id "scene"): the engine, seed, size, latitude and area factor a map is made with;
+    Map setup (tool id "scene"): the Surface map's own settings. Updating it to the latest engine;
     a guided map's land masks (drawn with the bar's Land and Ocean modes); and a regional map cut
-    from this one (the crop is the bar's Crop mode). The grid is in Cartography.
+    from this one (the crop is the bar's Crop mode). What a world is made with (its engine, seed,
+    size, latitudes, area factor and unit) is the world's, in World setup (S0 step 4). The grid is
+    in Cartography.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generation" title="FILRODENSWMB.UI.SectionMapSetup" badge="FILRODENSWMB.UI.BadgeCreatesMap"}}
-    {{#if terrainUpgradeAvailable}}
-        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
-            <i class="fwmb-icon fwmb-icon--sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
-        </button>
-    {{/if}}
-
-    <div class="fwmb-form-group">
-        <label for="fwmb-generation-engine">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
-        <div class="fwmb-form-fields">
-            <select id="fwmb-generation-engine" name="generationEngine">
-                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}}</option>
-                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}}</option>
-                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{engineLabels.flat}}</option>
-                {{!-- Legacy terrain is offered only on a map made with it: new maps use the other engines --}}
-                {{#if (eq uiState.generationEngine "standard")}}
-                    <option value="standard" selected>{{engineLabels.standard}}</option>
-                {{/if}}
-            </select>
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{#if (eq uiState.generationEngine 'flat')}}{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}{{else if (eq uiState.generationEngine 'advanced')}}{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}{{else if (eq uiState.generationEngine 'guided')}}{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}{{/if}}"></i>
-        </div>
-    </div>
-
-    {{#unless (eq uiState.generationEngine "flat")}}
-        <div class="fwmb-form-group">
-            <label for="fwmb-map-seed">{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
-            <div class="fwmb-form-fields">
-                <input type="text" id="fwmb-map-seed" name="mapSeed" maxlength="{{fwmbTextLimit 'name'}}" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SeedHint'}}" />
-                <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeSeed" aria-label="{{localize 'FILRODENSWMB.UI.Randomize'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
-                    <i class="fwmb-icon fwmb-icon--shuffle"></i>
-                </button>
-            </div>
-        </div>
-    {{/unless}}
-
-    <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.MapSize"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" name="mapWidth" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapWidth'}}" />
-            <span class="fwmb-times">×</span>
-            <input type="number" name="mapHeight" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapHeight'}}" />
-            <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
-        </div>
-    </div>
-
-    {{#if (eq uiState.generationEngine "flat")}}
-        <!-- Read when the map is created (Create new map), not when it is ticked -->
-        <div class="fwmb-form-group">
-            <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
-                <input type="checkbox" name="flatTexture" class="fwmb-checkbox" {{#if uiState.flatTexture}}checked{{/if}} />
-                {{localize "FILRODENSWMB.UI.FlatTexture"}}
-            </label>
-        </div>
-    {{/if}}
-
-    <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatTop'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatTop'}}" />
-            <span class="fwmb-times">{{localize "FILRODENSWMB.UI.LatitudeTo"}}</span>
-            <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatBottom'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatBottom'}}" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LatitudeHint'}}"></i>
-        </div>
-    </div>
-
-    <div class="fwmb-form-group">
-        <label for="fwmb-area-factor">{{localize "FILRODENSWMB.UI.AreaFactor"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" id="fwmb-area-factor" name="worldAreaFactor" value="{{worldAreaFactor}}" min="{{areaFactorRange.min}}" max="{{areaFactorRange.max}}" step="1" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.AreaFactorHint'}}"></i>
-        </div>
-    </div>
-
-    {{!-- The map's unit: the name every distance shown is labelled with (see MapUnit). Its input is
-         not named after the state key, so a save's read of the panel never parses it as a number --}}
-    <div class="fwmb-form-group">
-        <label for="fwmb-map-unit">{{localize "FILRODENSWMB.UI.MapUnit"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-map-unit" name="mapUnitName" value="{{mapUnit}}" maxlength="{{fwmbTextLimit 'name'}}" aria-describedby="fwmb-pixel-scale" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MapUnitHint'}}"></i>
-        </div>
-    </div>
-    {{!-- What one pixel measures, written in place as the latitudes, area factor or unit change --}}
-    <p class="fwmb-hint" id="fwmb-pixel-scale" data-pixel-scale>{{pixelScale}}</p>
-
-    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="applyResolution">
-        {{localize "FILRODENSWMB.UI.ApplyResolution"}}
+{{#if terrainUpgradeAvailable}}
+<div class="fwmb-tool-content">
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
+        <i class="fwmb-icon fwmb-icon--sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
     </button>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+</div>
+{{/if}}
+<div class="fwmb-goto">
+    <p>{{localize "FILRODENSWMB.UI.MapSetupWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuSetupPath"}}</b></p>
+    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldSetup">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+</div>
 
 {{#if (eq uiState.generationEngine "guided")}}
     {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="landMasks" title="FILRODENSWMB.UI.LandMasks" badge="FILRODENSWMB.UI.BadgeRebuildsMap"}}

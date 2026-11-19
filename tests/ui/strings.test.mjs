@@ -137,11 +137,14 @@ test("en.json is US English, and en-gb.json gives the British spelling of every 
     }
 });
 
-/** Words that keep their capital inside a sentence-case label (Create and Explore are the studio's two modes, named). */
+/**
+ * Words that keep their capital inside a sentence-case label (Create and Explore are the studio's
+ * two modes, named; Surface, Geology, Underground and Aerial name a world's kinds of map).
+ */
 const PROPER = new Set(
     `Foundry VTT Filroden Filroden's World Map Builder Delaunay Pixi Three Handlebars Material Symbols Pinhead Atkinson Hyperlegible
     Sora Barlow Semi Condensed Noto Serif Sans Ko-fi GitHub Sponsors Ctrl Shift Alt Enter Escape Esc Backspace Tab Space Home End
-    American Political Create Explore`.split(/\s+/),
+    American Political Create Explore Surface Geology Underground Aerial`.split(/\s+/),
 );
 /**
  * Strings that are the pattern of a proper name rather than a label: the generator names a castle
@@ -156,8 +159,9 @@ test("labels are in sentence case", () => {
     const titled = [];
     for (const [key, text] of Object.entries(EN)) {
         if (!isLabel(text) || text === "Filroden's World Map Builder" || isNamePattern(key)) continue;
-        // A word may start a label, or follow a colon, a sentence's end or a "+" (Ctrl+Click)
-        const words = [...text.matchAll(/(^|[\s(/,-])([A-Z][a-z][A-Za-z'’]*)/g)].filter((match) => match.index > 0 && !/[:+]\s*$/.test(text.slice(0, match.index + match[1].length)));
+        // A word may start a label, or follow a colon, a sentence's end, a "+" (Ctrl+Click) or a
+        // menu path's "›" (World › Climate base: each step is the name of a menu's item)
+        const words = [...text.matchAll(/(^|[\s(/,-])([A-Z][a-z][A-Za-z'’]*)/g)].filter((match) => match.index > 0 && !/[:+›]\s*$/.test(text.slice(0, match.index + match[1].length)));
         // A word with a capital inside it is a name (OrbitControls, GitHub), not a title-cased one
         const capitals = words.map((match) => match[2]).filter((word) => !PROPER.has(word) && !PROPER.has(word.replace(/['’]s$/, "")) && !/[A-Z]/.test(word.slice(1)));
         if (capitals.length) titled.push(`${key}: ${text}`);

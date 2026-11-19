@@ -1,0 +1,14 @@
+{{!--
+    One of the open world's maps in the inspector, chosen from its card in the world overview (see
+    WorldMapCard): its thumbnail, whether it has been populated and its marks, when it was saved
+    with its revision, and Go to the map (as a second click on its card does).
+--}}
+<div class="fwmb-group">
+    {{#if map.thumbnail}}<img class="fwmb-world-map-thumb" src="{{map.thumbnail}}" alt="">{{/if}}
+    <p class="fwmb-hint">{{map.meta}}</p>
+    {{#if map.marks.length}}<div class="fwmb-world-map-marks">{{#each map.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</div>{{/if}}
+    <p class="fwmb-meta">{{map.saved}}</p>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="showMap"><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldGoToMap"}}</button>
+    </div>
+</div>

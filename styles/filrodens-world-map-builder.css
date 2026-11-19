@@ -1664,6 +1664,14 @@
     background: var(--fwmb-bg-hover);
     color: var(--fwmb-text-primary);
 }
+/* A part of the world's rail a later step builds: drawn in its place, its tooltip kept */
+.fwmb-rail-btn[aria-disabled="true"] {
+    opacity: 0.4;
+    cursor: default;
+}
+.fwmb-rail-btn[aria-disabled="true"]:hover {
+    background: transparent;
+}
 .fwmb-rail-btn:is([aria-pressed="true"], [aria-current="page"]) {
     background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-on-accent);
@@ -3038,9 +3046,6 @@
     inset-inline-start: 0;
     min-width: 13rem;
 }
-.fwmb-worldbar .fwmb-worldbar-world .fwmb-dropdown-menu {
-    inset-inline: auto 0;
-}
 .fwmb-worldbar .fwmb-fold-short,
 .fwmb-worldbar .fwmb-layers-menu {
     display: none;
@@ -3090,9 +3095,10 @@
 }
 
 /* Worlds (S0 step 3b; board W9): the panel fills the studio's body beside the docked inspector,
-   the rail and the map hidden (the canvas keeps its size, a zero-sized container being ignored);
+   the rail and the map hidden (the world overview keeps the world's rail) (the canvas keeps its size, a zero-sized container being ignored);
    search in a head above the scroll, the cards in it, the actions in a foot below */
-.fwmb .fwmb-studio:has(.fwmb-panel--board) .fwmb-studio-body > :is(.fwmb-toolbar, .fwmb-map) {
+.fwmb .fwmb-studio:has(.fwmb-panel--board) .fwmb-studio-body > .fwmb-map,
+.fwmb .fwmb-studio:has(.fwmb-panel--board:not(.fwmb-panel--board-rail)) .fwmb-studio-body > .fwmb-toolbar {
     display: none;
 }
 .fwmb .fwmb-context-panel.fwmb-panel--board {
@@ -3152,7 +3158,8 @@
 /* The cards: a world and, with a search, the chips of its regional worlds that matched */
 .fwmb .fwmb-worlds-cards {
     grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-    align-items: start;
+    /* A row's cards share the tallest one's height */
+    align-items: stretch;
     padding-block: 0.75rem;
 }
 .fwmb .fwmb-worlds-card {
@@ -3162,6 +3169,7 @@
     min-width: 0;
 }
 .fwmb .fwmb-worlds-cards .fwmb-card {
+    flex: 1 0 auto;
     align-items: stretch;
     justify-content: flex-start;
     width: 100%;
@@ -3279,60 +3287,118 @@
     text-decoration-thickness: 2px;
     text-underline-offset: 0.2em;
 }
-.fwmb .fwmb-worlds-family .fwmb-name,
-.fwmb .fwmb-worlds-map .fwmb-name {
+.fwmb .fwmb-worlds-family .fwmb-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.fwmb .fwmb-worlds-family .fwmb-icon,
-.fwmb .fwmb-worlds-map > .fwmb-icon {
+.fwmb .fwmb-worlds-family .fwmb-icon {
     width: 1rem;
     height: 1rem;
     flex: none;
     color: var(--fwmb-text-secondary);
 }
 
-/* Its maps, and World setup in brief */
-.fwmb .fwmb-worlds-maps {
+/* A map of the open world in the inspector, chosen in the world overview */
+.fwmb .fwmb-world-map-thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 6px;
+}
+.fwmb .fwmb-world-map-marks {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 0.25rem;
 }
-.fwmb .fwmb-worlds-map {
+
+/* The world overview (S0 step 4; board W1), a board as Worlds is, beside the world's rail: its
+   groups of cards in one column (the world's tools are the rail's) */
+.fwmb .fwmb-panel--board .fwmb-panel-scroll:has(> .fwmb-overview) {
+    padding: 0;
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
 }
-.fwmb .fwmb-worlds-map-text {
+.fwmb .fwmb-overview {
+    flex: 1;
+    min-height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+}
+.fwmb .fwmb-overview-cards {
+    align-items: stretch;
+}
+
+.fwmb .fwmb-overview-group {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    gap: 0.5rem;
+}
+.fwmb .fwmb-overview-group .fwmb-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb .fwmb-overview-group .fwmb-hint {
+    margin: 0;
+}
+.fwmb .fwmb-overview-cards .fwmb-card {
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+}
+.fwmb .fwmb-overview-cards .fwmb-card-thumb {
+    display: block;
+    flex: none;
+}
+.fwmb .fwmb-overview-cards .fwmb-card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.fwmb .fwmb-overview-cards .fwmb-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb .fwmb-overview-cards .fwmb-card-title .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-overview-cards .fwmb-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-overview-cards .fwmb-card-line {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-overview-cards .fwmb-card[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.6;
+}
+/* Add a map and Cut regional world…: the icon, name and kinds centred in a dashed card */
+.fwmb .fwmb-overview-cards .fwmb-card--add {
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    text-align: center;
+}
+/* A world settings editor's sections sit in a fieldset, so a held regional world's are read only
+   at once (disabled); it draws nothing of its own */
+.fwmb .fwmb-world-editor {
+    display: contents;
+    margin: 0;
+    padding: 0;
+    border: 0;
     min-width: 0;
 }
-.fwmb .fwmb-worlds-setup {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.25rem 0.75rem;
-    margin: 0.5rem 0 0;
-    font-size: var(--fwmb-size-12);
-}
-/* Set in full: Foundry's own dl rules give a dt an inline block, a dark text shadow and its
-   emphatic colour, and a dd an indent and its primary colour */
-.fwmb .fwmb-worlds-setup dt {
-    display: block;
-    margin: 0;
-    color: var(--fwmb-text-secondary);
-    text-shadow: none;
-}
-.fwmb .fwmb-worlds-setup dd {
-    margin: 0;
-    color: var(--fwmb-text-primary);
-    text-shadow: none;
-    overflow-wrap: anywhere;
+.fwmb .fwmb-context-panel > .fwmb-panel-scroll > .fwmb-goto {
+    margin: 0.5rem;
 }
 
 /* v5: state marks, one set everywhere (layer switcher, Worlds, the overview, Run, menus). Icon and
@@ -5011,6 +5077,11 @@
     border-radius: var(--fwmb-radius-medium);
 }
 
+/* A hidden option (the biome brush's Erase, chosen only by its own button) stays out of the list */
+.fwmb option[hidden] {
+    display: none;
+}
+
 .fwmb option:hover,
 .fwmb option:focus {
     background: var(--fwmb-bg-hover);
@@ -6368,6 +6439,37 @@
    on one row: when it runs short it folds (data-fold, set by BarFold through StudioLayout), first
    moving the least-used modes into More, then showing the modes not in use as icons, then the
    sliders' labels as icons. The mode in use always keeps its label. */
+/* The context bar beside a world tool: the map shown, then the reminder that the world's
+   settings reach every map (S0 step 4); the reminder gives way first */
+.fwmb .fwmb-bar-world {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+.fwmb .fwmb-bar-world-map {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: none;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-bar-world-map b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb .fwmb-bar-world-map .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb .fwmb-bar-world-hint {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--fwmb-text-muted);
+    font-size: var(--fwmb-size-12);
+}
+
 .fwmb .fwmb-edit-toolbar {
     flex: 0 0 auto;
     display: flex;
