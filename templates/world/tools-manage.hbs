@@ -1,91 +1,44 @@
-<div class="fwmb-tool-content">
-    {{#*inline "mapNode"}}
-        <div class="fwmb-accordion-group">
-            <div class="fwmb-map-card" data-id="{{this.id}}">
-                <div class="fwmb-map-card-info">
-                    {{this.name}}
-                </div>
-
-                <div class="fwmb-map-card-actions">
-                    <button type="button" data-action="manageMap" data-action-type="load" data-tooltip="{{localize 'FILRODENSWMB.UI.Load'}}">
-                        <i class="fwmb-icon fwmb-icon--file-open"></i>
-                    </button>
-
-                    <div class="fwmb-dropdown" tabindex="0">
-                        <button type="button" aria-label="{{localize 'FILRODENSWMB.UI.MapActions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MapActions'}}">
-                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
-                        </button>
-
-                        <div class="fwmb-dropdown-menu">
-                            <button type="button" data-action="manageMap" data-action-type="rename">
-                                <i class="fwmb-icon fwmb-icon--edit"></i>
-                                {{localize "FILRODENSWMB.UI.Rename"}}
-                            </button>
-                            <button type="button" data-action="manageMap" data-action-type="duplicate">
-                                <i class="fwmb-icon fwmb-icon--content-copy"></i>
-                                {{localize "FILRODENSWMB.UI.Duplicate"}}
-                            </button>
-                            {{!-- Only a regional map has a parent to leave; a top map's copy is Duplicate --}}
-                            {{#if this.parentId}}
-                            <button type="button" data-action="manageMap" data-action-type="promote">
-                                <i class="fwmb-icon fwmb-icon--upgrade"></i>
-                                {{localize "FILRODENSWMB.UI.Promote"}}
-                            </button>
-                            {{/if}}
-                            <button type="button" data-action="manageMap" data-action-type="export">
-                                <i class="fwmb-icon fwmb-icon--file-export"></i>
-                                {{localize "FILRODENSWMB.UI.Export"}}
-                            </button>
-                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger fwmb-menu-item--separated">
-                                <i class="fwmb-icon fwmb-icon--delete"></i>
-                                {{localize "FILRODENSWMB.UI.Delete"}}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{#if this.children.length}}
-                <div class="fwmb-accordion-content fwmb-accordion-content--nested">
-                    {{#each this.children}}
-                        {{> mapNode this}}
-                    {{/each}}
-                </div>
-            {{/if}}
+{{!--
+    Worlds (v5, S0 step 3b; board W9), opened from the world bar (Open world, the name menu) and
+    what the studio opens on: a card per world of its own, filling the studio's body beside the
+    inspector. Each card has its Surface map's thumbnail (or its map type's icon), its name, its
+    marks, a line of what it is, and its regional worlds counted; with a search, the regional
+    worlds that matched in its family as chips. A card or chip chosen shows that world in the
+    inspector (WorldEditor), where its family's tree leads to the rest; a double-click opens it.
+    Search sits in the head above the scroll (tools-manage-head.hbs), the actions in the foot below
+    it (tools-manage-foot.hbs), and the header's Back to goes back to the map. See WorldsPanel.
+--}}
+<div class="fwmb-tool-content fwmb-worlds">
+    {{#if worlds.empty}}
+        <div class="fwmb-empty-state fwmb-worlds-empty">
+            <span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>
+            <p>{{localize "FILRODENSWMB.UI.NoSavedWorlds"}}</p>
+            <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
         </div>
-    {{/inline}}
-
-    <div class="fwmb-panel-header">
-        <h3>{{localize "FILRODENSWMB.UI.SavedMaps"}}</h3>
-    </div>
-
-    <div class="fwmb-map-list fwmb-scrollable fwmb-scrollable--stable">
-        {{#each savedMaps}}
-            {{> mapNode this}}
-        {{else}}
-            <div class="fwmb-empty-state">
-                <p>{{localize "FILRODENSWMB.UI.NoSavedMaps"}}</p>
+    {{else if worlds.noMatches}}
+        <div class="fwmb-empty-state"><p>{{localize "FILRODENSWMB.UI.WorldsNoMatches"}}</p></div>
+    {{else}}
+        <div class="fwmb-cards fwmb-worlds-cards" data-list-nav>
+            {{#each worlds.cards}}
+            <div class="fwmb-worlds-card">
+                <button type="button" class="fwmb-card" data-action="selectWorld" data-world-id="{{this.id}}" data-list-item tabindex="-1" aria-current="{{#if this.selected}}true{{else}}false{{/if}}" aria-label="{{this.name}}">
+                    <span class="fwmb-card-thumb">
+                        {{#if this.thumbnail}}<img src="{{this.thumbnail}}" alt="">{{else}}<span class="fwmb-card-thumb-icon"><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span></span>{{/if}}
+                    </span>
+                    <span class="fwmb-card-body">
+                        <span class="fwmb-card-title">{{this.name}}</span>
+                        {{#if this.meta}}<span class="fwmb-card-meta fwmb-card-line">{{this.meta}}</span>{{/if}}
+                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
+                        {{#if this.regional}}<span class="fwmb-card-meta"><span class="fwmb-chip"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{this.regional}}</span></span>{{/if}}
+                    </span>
+                </button>
+                {{#if this.matches.length}}
+                <div class="fwmb-worlds-matches" aria-label="{{localize 'FILRODENSWMB.UI.WorldsMatchesLabel'}}">
+                    {{#each this.matches}}<button type="button" class="fwmb-worlds-match" data-action="selectWorld" data-world-id="{{this.id}}" aria-current="{{#if this.selected}}true{{else}}false{{/if}}"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{this.name}}</button>{{/each}}
+                </div>
+                {{/if}}
             </div>
-        {{/each}}
-    </div>
-
-    <div class="fwmb-divider"></div>
-
-    <button type="button" class="fwmb-btn" data-action="importMapJson">
-        <i class="fwmb-icon fwmb-icon--upload-file"></i>
-        {{localize "FILRODENSWMB.UI.ImportJSON"}}
-    </button>
-
-    {{!-- Every saved map in one file (MapTransfer): the web's safeguard against cleared browser storage, a world's backup in Foundry --}}
-    <div class="fwmb-backup">
-        <h4 class="fwmb-backup-heading">{{localize "FILRODENSWMB.UI.BackupHeading"}}</h4>
-        <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}">
-            <i class="fwmb-icon fwmb-icon--file-export"></i>
-            {{localize "FILRODENSWMB.UI.BackUpAllMaps"}}
-        </button>
-        <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}">
-            <i class="fwmb-icon fwmb-icon--upload-file"></i>
-            {{localize "FILRODENSWMB.UI.RestoreFromBackup"}}
-        </button>
-    </div>
+            {{/each}}
+        </div>
+    {{/if}}
 </div>

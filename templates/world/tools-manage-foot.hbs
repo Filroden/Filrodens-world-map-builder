@@ -1,0 +1,13 @@
+{{!--
+    Worlds' actions (S0 step 3b), kept below the panel's scroll so they show however many worlds
+    there are: New world and Import world, then the backups, each button an equal share of its row.
+    Back up all writes every saved world in one file (MapTransfer): on the web the safeguard against
+    cleared browser storage.
+--}}
+<div class="fwmb-worlds-foot">
+    <button type="button" class="fwmb-btn" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
+    <button type="button" class="fwmb-btn" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
+    <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.BackUpAllMaps"}}</button>
+    <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.RestoreFromBackup"}}</button>
+    {{#if worlds.web}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.WorldsBackupHint"}}</p>{{/if}}
+</div>

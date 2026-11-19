@@ -5,17 +5,18 @@ import { foldLevel } from "./BarFold.js";
  * studio supports and never wraps; when its contents are wider than the room it has, it folds in a
  * fixed order, each level keeping what the one before gave up:
  *
- * - 0: full map names;
- * - 1: short names;
- * - 2: Settlement maps leaves the bar for the layer menu;
- * - 3: the layer switcher becomes one menu button naming the map;
- * - 4: the world name ellipsises.
+ * - 0: Open world and Save as beside Save world, and full map names;
+ * - 1: Open world and Save as go into the world name menu (Ken, 2026-11-19);
+ * - 2: short names;
+ * - 3: Settlement maps leaves the bar for the layer menu;
+ * - 4: the layer switcher becomes one menu button naming the map;
+ * - 5: the world name ellipsises.
  *
  * Save world, the mode switch and World never fold. The template draws every form and the
  * stylesheet shows the one for the bar's data-fold, so a fold never redraws the bar. The choice is
  * the context bar's (BarFold.foldLevel): the first level whose natural width fits.
  */
-export const WORLD_BAR_LEVELS = 5;
+export const WORLD_BAR_LEVELS = 6;
 
 /**
  * The bar's natural width at each fold level, measured by laying it out at its content's width

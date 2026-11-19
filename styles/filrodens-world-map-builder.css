@@ -864,6 +864,9 @@
     padding: 0.625rem 0.75rem;
     border-bottom: 1px solid var(--fwmb-border-main);
 }
+.fwmb-panel-header .fwmb-panel-close {
+    margin-inline-start: auto;
+}
 .fwmb-panel-header .fwmb-meta {
     color: var(--fwmb-text-muted);
     font-size: 0.75rem;
@@ -2434,6 +2437,8 @@
     align-items: center;
     gap: 0.625rem;
     min-height: 2.25rem;
+    /* A button: the hosts give buttons a fixed height, which a row of two lines outgrows */
+    height: auto;
     padding: 0.375rem 0.75rem;
     border: 0;
     border-bottom: 1px solid var(--fwmb-border-subtle);
@@ -2476,11 +2481,8 @@
     font-size: 0.75rem;
     line-height: 1rem;
 }
-.fwmb-action-row::after {
-    content: "›";
-    color: var(--fwmb-text-muted);
-    font-size: 1rem;
-}
+/* No chevron at a row's end (Ken, 2026-11-19): a row is the action itself, not a way into a menu.
+   A label ending in "…" asks something first; one without acts at once and says what it did. */
 .fwmb-foot-danger {
     display: flex;
     justify-content: flex-end;
@@ -3043,26 +3045,40 @@
 .fwmb-worldbar .fwmb-layers-menu {
     display: none;
 }
-.fwmb-worldbar:not([data-fold="0"]) .fwmb-fold-full {
+/* 0: Open world and Save as beside Save world, and so not in the name menu; from 1, in the menu */
+.fwmb-worldbar:not([data-fold="0"]) .fwmb-worldbar-files {
     display: none;
 }
-.fwmb-worldbar:not([data-fold="0"]) .fwmb-fold-short {
+.fwmb-worldbar[data-fold="0"] .fwmb-fold-menu {
+    display: none;
+}
+.fwmb-worldbar:is([data-fold="0"], [data-fold="1"]) .fwmb-fold-short {
+    display: none;
+}
+.fwmb-worldbar:not([data-fold="0"], [data-fold="1"]) .fwmb-fold-full {
+    display: none;
+}
+.fwmb-worldbar:not([data-fold="0"], [data-fold="1"]) .fwmb-fold-short {
     display: inline;
 }
-.fwmb-worldbar:is([data-fold="2"], [data-fold="3"], [data-fold="4"]) .fwmb-worldbar-settlements {
+.fwmb-worldbar:is([data-fold="3"], [data-fold="4"], [data-fold="5"]) .fwmb-worldbar-settlements {
     display: none;
 }
-.fwmb-worldbar:is([data-fold="3"], [data-fold="4"]) .fwmb-layers {
+.fwmb-worldbar:is([data-fold="4"], [data-fold="5"]) .fwmb-layers {
     display: none;
 }
-.fwmb-worldbar:is([data-fold="3"], [data-fold="4"]) .fwmb-layers-menu {
+.fwmb-worldbar:is([data-fold="4"], [data-fold="5"]) .fwmb-layers-menu {
     display: flex;
 }
-.fwmb-worldbar[data-fold="4"] .fwmb-worldbar-menu {
+.fwmb-worldbar[data-fold="5"] .fwmb-worldbar-menu {
     max-width: 9rem;
 }
-.fwmb-worldbar[data-fold="4"] .fwmb-world-menu {
+.fwmb-worldbar[data-fold="5"] .fwmb-world-menu {
     min-width: 0;
+}
+.fwmb-worldbar .fwmb-worldbar-files {
+    display: flex;
+    gap: 0.25rem;
 }
 /* Measuring each fold (see WorldBarFold): laid out at its natural width, its spacer at none */
 .fwmb-worldbar.fwmb-is-measuring {
@@ -3071,6 +3087,249 @@
 .fwmb-worldbar.fwmb-is-measuring .fwmb-grow {
     flex: none;
     width: 0;
+}
+
+/* Worlds (S0 step 3b; board W9): the panel fills the studio's body beside the docked inspector,
+   the rail and the map hidden (the canvas keeps its size, a zero-sized container being ignored);
+   search in a head above the scroll, the cards in it, the actions in a foot below */
+.fwmb .fwmb-studio:has(.fwmb-panel--board) .fwmb-studio-body > :is(.fwmb-toolbar, .fwmb-map) {
+    display: none;
+}
+.fwmb .fwmb-context-panel.fwmb-panel--board {
+    flex: 1 1 auto;
+    width: auto;
+    border-inline-end: 0;
+}
+.fwmb .fwmb-panel--board .fwmb-panel-header {
+    padding-block: 0.75rem;
+}
+.fwmb .fwmb-panel--board .fwmb-panel-title {
+    font-size: 1.125rem;
+}
+.fwmb .fwmb-panel--board :is(.fwmb-panel-head, .fwmb-panel-scroll, .fwmb-panel-foot) {
+    padding-inline: 1.25rem;
+}
+.fwmb .fwmb-panel--board .fwmb-panel-close {
+    margin-inline-start: auto;
+    width: auto;
+}
+.fwmb .fwmb-panel-head {
+    flex: none;
+    padding-block: 0.5rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb .fwmb-worlds-head {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.fwmb .fwmb-worlds-head .fwmb-input {
+    flex: 0 1 20rem;
+    min-width: 0;
+}
+.fwmb .fwmb-worlds {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.fwmb .fwmb-worlds-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding-block: 3rem;
+    text-align: center;
+}
+.fwmb .fwmb-worlds-empty > .fwmb-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--fwmb-text-muted);
+}
+
+/* The cards: a world and, with a search, the chips of its regional worlds that matched */
+.fwmb .fwmb-worlds-cards {
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    align-items: start;
+    padding-block: 0.75rem;
+}
+.fwmb .fwmb-worlds-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+}
+.fwmb .fwmb-worlds-cards .fwmb-card {
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+    cursor: pointer;
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: inherit;
+    overflow: hidden;
+}
+.fwmb .fwmb-worlds-cards .fwmb-card-thumb {
+    display: block;
+    flex: none;
+}
+.fwmb .fwmb-worlds-cards .fwmb-card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.fwmb .fwmb-worlds-cards .fwmb-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-worlds-cards .fwmb-card-line {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-card-thumb-icon {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--fwmb-text-muted);
+}
+.fwmb .fwmb-card-thumb-icon .fwmb-icon {
+    width: 2rem;
+    height: 2rem;
+}
+.fwmb .fwmb-worlds-matches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-worlds-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+    height: auto;
+    min-height: 1.75rem;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 999px;
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: inherit;
+    font-size: var(--fwmb-size-12);
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb .fwmb-worlds-match:is(:hover, :focus-visible) {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb .fwmb-worlds-match[aria-current="true"] {
+    border-color: var(--fwmb-border-selected);
+    background: var(--fwmb-bg-selected);
+}
+.fwmb .fwmb-worlds-match .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: none;
+}
+
+/* The foot: the four actions, each an equal share of the row */
+.fwmb .fwmb-panel-foot {
+    flex: none;
+    padding-block: 0.625rem;
+    border-top: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
+}
+.fwmb .fwmb-worlds-foot {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.375rem;
+    max-width: 48rem;
+}
+.fwmb .fwmb-worlds-foot .fwmb-btn {
+    min-width: 0;
+    justify-content: center;
+}
+.fwmb .fwmb-worlds-foot .fwmb-hint {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+/* A world in the inspector: its family as a tree, each row choosing that world */
+.fwmb .fwmb-worlds-family .fwmb-list-item {
+    width: 100%;
+    height: auto;
+    padding-inline-start: calc(0.5rem + var(--depth, 0) * 1.125rem);
+    border: 0;
+    background: none;
+    color: var(--fwmb-text-primary);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.fwmb .fwmb-worlds-family .fwmb-list-item[aria-selected="true"] {
+    cursor: default;
+}
+.fwmb .fwmb-worlds-family .fwmb-is-match .fwmb-name {
+    text-decoration: underline;
+    text-decoration-color: var(--fwmb-accent-secondary);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+}
+.fwmb .fwmb-worlds-family .fwmb-name,
+.fwmb .fwmb-worlds-map .fwmb-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb .fwmb-worlds-family .fwmb-icon,
+.fwmb .fwmb-worlds-map > .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    color: var(--fwmb-text-secondary);
+}
+
+/* Its maps, and World setup in brief */
+.fwmb .fwmb-worlds-maps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-worlds-map {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.fwmb .fwmb-worlds-map-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.fwmb .fwmb-worlds-setup {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.75rem;
+    margin: 0.5rem 0 0;
+    font-size: var(--fwmb-size-12);
+}
+/* Set in full: Foundry's own dl rules give a dt an inline block, a dark text shadow and its
+   emphatic colour, and a dd an indent and its primary colour */
+.fwmb .fwmb-worlds-setup dt {
+    display: block;
+    margin: 0;
+    color: var(--fwmb-text-secondary);
+    text-shadow: none;
+}
+.fwmb .fwmb-worlds-setup dd {
+    margin: 0;
+    color: var(--fwmb-text-primary);
+    text-shadow: none;
+    overflow-wrap: anywhere;
 }
 
 /* v5: state marks, one set everywhere (layer switcher, Worlds, the overview, Run, menus). Icon and
@@ -3422,6 +3681,8 @@
 .fwmb-card {
     display: flex;
     flex-direction: column;
+    /* Often a button, which the hosts give a fixed height */
+    height: auto;
     text-align: start;
     padding: 0;
     border: 1px solid var(--fwmb-border-main);
@@ -6756,19 +7017,12 @@ input.fwmb-swatch {
     background-color: #689cd1;
 }
 
-/* Maps tool: the Backup group under the import (Back up all maps, Restore from backup) */
+/* Worlds: the Backup group under New world and Import world (Back up all, Restore…) */
 .fwmb-backup {
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-4);
     margin-block-start: var(--fwmb-size-10);
-}
-.fwmb-backup-heading {
-    font-family: var(--fwmb-font-display);
-    font-weight: 600;
-    color: var(--fwmb-text-secondary);
-    font-size: var(--fwmb-size-12);
-    margin: 0;
 }
 
 /* Restore from backup: the backup's maps as a tree of ticks, regional maps indented */
@@ -6792,46 +7046,7 @@ input.fwmb-swatch {
     overflow-wrap: anywhere;
 }
 
-/* Manage Maps Card UI */
-.fwmb-panel-header h3 {
-    font-family: var(--fwmb-font-display);
-    font-weight: 600;
-    color: var(--fwmb-text-primary);
-    font-size: var(--fwmb-size-14);
-    margin: 0;
-}
-
-.fwmb-map-list {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    gap: var(--fwmb-size-16);
-    overflow-y: auto;
-}
-
-.fwmb-map-card {
-    background: var(--fwmb-bg-raised);
-    border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-large);
-    padding: var(--fwmb-size-10);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.fwmb-map-card-info {
-    font-size: var(--fwmb-size-13);
-    color: var(--fwmb-text-primary);
-    font-weight: bold;
-}
-
-.fwmb-map-card-actions {
-    display: flex;
-    gap: var(--fwmb-size-8);
-}
-
-/* Base button styling for Load and Kebab */
-.fwmb-map-card-actions > button,
+/* A dropdown's button (a row's kebab) */
 .fwmb-dropdown > button {
     width: var(--fwmb-control-height);
     height: var(--fwmb-control-height);
@@ -6847,7 +7062,6 @@ input.fwmb-swatch {
     transition: background 0.2s ease;
 }
 
-.fwmb-map-card-actions > button:hover,
 .fwmb-dropdown > button:hover {
     background: var(--fwmb-bg-hover);
     color: var(--fwmb-text-primary);

@@ -15,12 +15,13 @@ const TEMPLATE = readFileSync(`${ROOT}templates/shell/worldbar.hbs`, "utf8");
 const EN = JSON.parse(readFileSync(`${ROOT}languages/en.json`, "utf8"));
 
 test("the bar folds as little as it can: the first level that fits, the last when none does", () => {
-    const widths = [1500, 1380, 1210, 1020, 900];
+    const widths = [1700, 1500, 1380, 1210, 1020, 900];
     assert.equal(WORLD_BAR_LEVELS, widths.length);
-    assert.equal(foldLevel(widths, 1600), 0);
-    assert.equal(foldLevel(widths, 1400), 1);
-    assert.equal(foldLevel(widths, 1100), 3);
-    assert.equal(foldLevel(widths, 700), 4);
+    assert.equal(foldLevel(widths, 1800), 0);
+    assert.equal(foldLevel(widths, 1600), 1);
+    assert.equal(foldLevel(widths, 1400), 2);
+    assert.equal(foldLevel(widths, 1100), 4);
+    assert.equal(foldLevel(widths, 700), 5);
 });
 
 test("each fold has its form in the stylesheet, and Save world, the modes and World never fold", () => {
@@ -29,12 +30,15 @@ test("each fold has its form in the stylesheet, and Save world, the modes and Wo
     for (const rule of foldRules) {
         for (const never of [".fwmb-save", ".fwmb-mode-switch", ".fwmb-worldbar-world"]) assert.ok(!rule.includes(never), `${never} is never folded: ${rule.slice(0, 80)}`);
     }
-    // Short names from 1, Settlement maps gone from 2, the layer menu from 3, the name shortened at 4
-    assert.match(CSS, /\.fwmb-worldbar:not\(\[data-fold="0"\]\) \.fwmb-fold-short \{\s*display: inline;/);
-    assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="2"\], \[data-fold="3"\], \[data-fold="4"\]\) \.fwmb-worldbar-settlements \{\s*display: none;/);
-    assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="3"\], \[data-fold="4"\]\) \.fwmb-layers-menu \{\s*display: flex;/);
-    assert.match(CSS, /\.fwmb-worldbar\[data-fold="4"\] \.fwmb-worldbar-menu \{\s*max-width:/);
-    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-layers", "fwmb-layers-menu", "fwmb-worldbar-settlements", "fwmb-mode-switch", "fwmb-worldbar-world"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
+    // Open world and Save as into the menu from 1, short names from 2, Settlement maps gone from 3,
+    // the layer menu from 4, the name shortened at 5
+    assert.match(CSS, /\.fwmb-worldbar:not\(\[data-fold="0"\]\) \.fwmb-worldbar-files \{\s*display: none;/);
+    assert.match(CSS, /\.fwmb-worldbar\[data-fold="0"\] \.fwmb-fold-menu \{\s*display: none;/);
+    assert.match(CSS, /\.fwmb-worldbar:not\(\[data-fold="0"\], \[data-fold="1"\]\) \.fwmb-fold-short \{\s*display: inline;/);
+    assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="3"\], \[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-worldbar-settlements \{\s*display: none;/);
+    assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-layers-menu \{\s*display: flex;/);
+    assert.match(CSS, /\.fwmb-worldbar\[data-fold="5"\] \.fwmb-worldbar-menu \{\s*max-width:/);
+    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-worldbar-files", "fwmb-layers", "fwmb-layers-menu", "fwmb-worldbar-settlements", "fwmb-mode-switch", "fwmb-worldbar-world"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
 });
 
 test("parts later tracks fill are drawn disabled, keeping their tooltips (aria-disabled, never disabled)", () => {

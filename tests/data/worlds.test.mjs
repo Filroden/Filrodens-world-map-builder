@@ -31,7 +31,7 @@ test("a new world is saved with its settings and its Surface map at revision 1",
     assert.equal(world.formatVersion, WORLD_FORMAT);
     assert.equal(world.settingsRevision, 1);
     assert.ok(world.settingsSavedAt);
-    assert.deepEqual(world.maps, [{ id: maps[0].id, type: "surface" }]);
+    assert.deepEqual(world.maps, [{ id: maps[0].id, type: "surface", revision: 1, savedAt: world.settingsSavedAt }], "each map's revision and save time kept for Worlds");
     const meta = await platform.store.loadMapMeta(maps[0].id);
     assert.deepEqual(meta, { worldId: world.id, mapType: "surface", revision: 1, savedAt: world.settingsSavedAt });
     assert.deepEqual((await Worlds.get(world.id)).settings, SETTINGS);
@@ -214,4 +214,47 @@ test("a held world released by its parent's deletion drops its record and blobs"
     assert.equal(released.held, false);
     assert.equal(released.regional, null);
     assert.deepEqual(await platform.store.listMapBlobs(mapId), []);
+});
+
+// Worlds' cards and marks (S0 step 3b)
+const THUMB = "data:image/webp;base64,UklGRg==";
+
+test("a map's card keeps a small image thumbnail, its run flags, its revision and save time, and nothing else", () => {
+    assert.deepEqual(WorldRecord.mapCard({ thumbnail: THUMB, run: true, older: false, junk: 1 }), { thumbnail: THUMB, run: true, older: false });
+    assert.deepEqual(WorldRecord.mapCard({ thumbnail: "javascript:alert(1)", run: "yes" }), {});
+    assert.deepEqual(WorldRecord.mapCard({ thumbnail: `data:image/webp;base64,${"A".repeat(300 * 1024)}` }), {}, "too large a thumbnail is dropped");
+    assert.deepEqual(WorldRecord.mapCard(null), {});
+    assert.deepEqual(WorldRecord.mapCard({ revision: 3, savedAt: "2026-11-18T10:00:00.000Z" }), { revision: 3, savedAt: "2026-11-18T10:00:00.000Z" });
+    assert.deepEqual(WorldRecord.mapCard({ revision: 0, savedAt: "not a date" }), {}, "a damaged revision or time is dropped");
+});
+
+test("a world's marks: Regional world when held, Older generator, and No run only for a world of its own", () => {
+    const world = (map, held = false) => ({ held, maps: [{ id: "m", type: "surface", ...map }] });
+    assert.deepEqual(WorldRecord.marks(world({ run: true, older: false })), []);
+    assert.deepEqual(WorldRecord.marks(world({ run: true, older: true })), ["older"]);
+    assert.deepEqual(WorldRecord.marks(world({ run: false, older: true })), ["noRun"]);
+    assert.deepEqual(WorldRecord.marks(world({ run: false }, true)), ["held"]);
+    assert.deepEqual(WorldRecord.marks(world({})), [], "a world not yet migrated says nothing");
+});
+
+test("a save keeps each map's card, a save without one keeps the world's, and the tree shows it", async () => {
+    const { world, maps } = await Worlds.save({ world: null, name: "Carded", settings: SETTINGS, maps: [surface(undefined, { card: { thumbnail: THUMB, run: true, older: true } })] });
+    assert.deepEqual(world.maps, [{ id: maps[0].id, type: "surface", thumbnail: THUMB, run: true, older: true, revision: 1, savedAt: world.settingsSavedAt }]);
+    const again = await Worlds.save({ world, name: "Carded", settings: SETTINGS, maps: [surface(undefined, { id: maps[0].id })] });
+    assert.equal(again.world.maps[0].thumbnail, THUMB);
+    assert.equal(again.world.maps[0].revision, 2, "the changed map's new revision");
+    const [setupNode] = await Worlds.tree();
+    assert.deepEqual(Object.keys(setupNode.setup), ["engine", "seed", "frame"]);
+    const [node] = await Worlds.tree();
+    assert.equal(node.thumbnail, THUMB);
+    assert.deepEqual(node.marks, ["older"]);
+    assert.deepEqual(node.maps, again.world.maps);
+});
+
+test("Duplicate takes each map's card to the copy", async () => {
+    const { world } = await Worlds.save({ world: null, name: "Carded", settings: SETTINGS, maps: [surface(undefined, { card: { thumbnail: THUMB, run: true } })] });
+    const copy = await Worlds.copy(world.id, "Carded (copy)");
+    assert.equal(copy.maps[0].thumbnail, THUMB);
+    assert.equal(copy.maps[0].run, true);
+    assert.notEqual(copy.maps[0].id, world.maps[0].id);
 });

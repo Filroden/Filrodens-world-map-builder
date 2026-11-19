@@ -1514,6 +1514,26 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * A small picture of the map for its card in Worlds (S0 step 3b): drawn as an export draws it,
+     * at the scale that makes its long side `side` pixels, as a WebP (a JPEG where the browser
+     * cannot write WebP). Null when the map cannot be drawn.
+     * @param {number} [side=320]
+     * @returns {string|null} A data URL.
+     */
+    thumbnail(side = 320) {
+        try {
+            const longest = Math.max(this.mapWidth, this.mapHeight);
+            if (!(longest > 0)) return null;
+            const canvas = this.#renderForExport(Math.min(1, side / longest));
+            const webp = canvas.toDataURL("image/webp", 0.8);
+            return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", 0.8);
+        } catch (error) {
+            console.warn("FWMB | The map's thumbnail could not be drawn:", error);
+            return null;
+        }
+    }
+
     /** The largest tile an export draws at once: EXPORT_PNG.TILE_PX, or less if the graphics card's textures are smaller. */
     #exportTileLimit() {
         return Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, this.maxTextureSize());

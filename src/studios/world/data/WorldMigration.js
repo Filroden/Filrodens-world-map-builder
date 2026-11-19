@@ -8,6 +8,7 @@ import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
 import { ParentRunRecovery } from "../app/ParentRunRecovery.js";
 import { StrokeHistory } from "../tools/StrokeHistory.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 
 /** The style lists a held regional map's own additions are carried up from (see #carryUp). */
 const STYLE_LISTS = Object.freeze(["route", "label", "region", "pin"]);
@@ -85,6 +86,19 @@ export class WorldMigration {
             records.set(record.id, record);
             changed.add(record.id);
             metas.push({ mapId: map.id, meta: { worldId: record.id, mapType: MAP_TYPES.SURFACE, revision: 1, savedAt: null } });
+        }
+        // Each map's card (WorldRecord.mapCard) where it has none yet (a world 2a or this run made):
+        // whether it has a run and whether an older generator made it; its thumbnail comes with
+        // its next save
+        for (const record of records.values()) {
+            for (const entry of record.maps ?? []) {
+                if (typeof entry.run === "boolean") continue;
+                const saved = byMap.get(entry.id);
+                if (!saved) continue;
+                entry.run = !!saved.hasModelRun || !!saved.mapData?.parentRun;
+                entry.older = GeneratorRevision.isOlder(saved.mapData);
+                changed.add(record.id);
+            }
         }
         for (const record of records.values()) {
             if (!record.held || RegionalRecord.isCurrent(record.regional)) continue;

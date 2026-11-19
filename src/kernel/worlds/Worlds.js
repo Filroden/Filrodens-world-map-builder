@@ -60,13 +60,35 @@ export class Worlds {
     }
 
     /**
-     * Every world as a tree for the Maps panel: worlds with no parent (or whose parent is no longer
+     * Every world as a tree for Worlds: worlds with no parent (or whose parent is no longer
      * saved) at the top, each with the regional worlds cut from it, each level sorted by name.
      * @returns {Promise<Array<{id: string, name: string, mapId: string|null, parentId: string|null, held: boolean, children: Array}>>}
      */
     static async tree() {
         const worlds = await Worlds.all();
-        const nodes = new Map([...worlds.values()].map((world) => [world.id, { id: world.id, name: world.name || "", mapId: Worlds.mapOf(world), parentId: world.parentWorldId ?? null, held: world.held === true, children: [] }]));
+        const nodes = new Map(
+            [...worlds.values()].map((world) => {
+                const surface = (world.maps ?? []).find((map) => map.type === MAP_TYPES.SURFACE) ?? null;
+                const setup = world.settings?.setup ?? {};
+                return [
+                    world.id,
+                    {
+                        id: world.id,
+                        name: world.name || "",
+                        mapId: Worlds.mapOf(world),
+                        parentId: world.parentWorldId ?? null,
+                        held: world.held === true,
+                        maps: (world.maps ?? []).map((map) => ({ ...map })),
+                        thumbnail: surface?.thumbnail ?? null,
+                        marks: WorldRecord.marks(world),
+                        // World setup in brief, and when anything of the world was last saved changed
+                        setup: { engine: typeof setup.engine === "string" ? setup.engine : null, seed: setup.seed ?? null, frame: setup.frame ?? null },
+                        settingsSavedAt: world.settingsSavedAt ?? null,
+                        children: [],
+                    },
+                ];
+            }),
+        );
         const roots = [];
         for (const node of nodes.values()) (nodes.get(node.parentId)?.children ?? roots).push(node);
         const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
@@ -82,7 +104,9 @@ export class Worlds {
      * @param {string} options.name - The world's name (its maps are named after it).
      * @param {object} options.settings - The world's settings as they are now (for a held world,
      *     only its setup is written).
-     * @param {Array<{id: string|null, type: string, data: object, owners?: object, modelRun?: object|null, summary?: object, changed: boolean}>} options.maps
+     * @param {Array<{id: string|null, type: string, data: object, owners?: object, modelRun?: object|null, summary?: object, changed: boolean, card?: object}>} options.maps
+     *     Each map, with `card` what Worlds shows of it (WorldRecord.mapCard: its thumbnail, whether
+     *     it has a run, whether an older generator made it); left out keeps the world's.
      * @param {boolean} [options.asNew=false] - Save as a new world (Save as): a held world's copy is
      *     held by the same parent.
      * @param {object|null} [options.regional] - The held world's record as the open map changed it
@@ -125,7 +149,7 @@ export class Worlds {
             if (map.studio) meta.studio = map.studio;
             const saved = await platform.store.saveMapData(name, map.data, existingId, { owners: map.owners ?? null, modelRun: map.modelRun, meta, summary: map.summary ?? null });
             if (!saved) return null;
-            savedMaps.push({ id: saved.id, type: map.type, from: map.id ?? null });
+            savedMaps.push({ id: saved.id, type: map.type, from: map.id ?? null, card: map.card ?? null, revision: meta.revision, savedAt: meta.savedAt });
         }
         if (fresh && record.regional) {
             // Save as: the copy's maps take their part of the record, and its blobs, under their new ids
@@ -134,7 +158,9 @@ export class Worlds {
             record.regional = RegionalRecord.remap(record.regional, renamed);
         }
         for (const map of savedMaps) await Worlds.#keepBlobs(record, map.id);
-        record.maps = mergeMaps(record.maps, savedMaps.map(({ id, type }) => ({ id, type })));
+        // Each map's card (WorldRecord.mapCard): as the save gives it, else as the world held it
+        const held = new Map((record.maps ?? []).map((entry) => [entry.type, entry]));
+        record.maps = mergeMaps(record.maps, savedMaps.map(({ id, type, card, revision, savedAt }) => ({ ...WorldRecord.mapCard({ ...(card ?? held.get(type)), revision, savedAt }), id, type })));
 
         if (!(await platform.store.saveWorld(record))) return null;
         return { world: record, maps: savedMaps.map(({ id, type }) => ({ id, type })) };
@@ -254,7 +280,7 @@ export class Worlds {
             if (!duplicate) continue;
             const previous = await platform.store.loadMapMeta(map.id);
             await platform.store.saveMapMeta(duplicate.id, { ...(previous ?? {}), worldId: copy.id, mapType: map.type, revision: 1, savedAt: stamp });
-            maps.push({ id: duplicate.id, type: map.type });
+            maps.push({ ...WorldRecord.mapCard(map), id: duplicate.id, type: map.type });
             renamed.set(map.id, duplicate.id);
         }
         return maps;

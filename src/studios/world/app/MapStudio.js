@@ -88,6 +88,7 @@ import { StudioLayout } from "../../../shell/StudioLayout.js";
 import { moveAlongModes } from "../../../shell/BarFold.js";
 import { AppearanceMenu } from "../../../shell/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
+import { WorldsPanel } from "./WorldsPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
@@ -283,7 +284,8 @@ export class MapStudio {
         backUpMaps(e, t)                { this._onBackUpMaps(e, t); },
         restoreBackup(e, t)             { this._onRestoreBackup(e, t); },
         importSettings(e, t)            { this._onImportSettings(e, t); },
-        manageMap(e, t)                 { this._onManageMapAction(e, t); },
+        selectWorld(e, t)               { this._onSelectWorld(e, t); },
+        closeWorlds()                   { this._onCloseWorlds(); },
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
         nudgeReference(e, t)            { this._onNudgeReference(e, t); },
         randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
@@ -496,7 +498,9 @@ export class MapStudio {
         // The map type in view: a world has its Surface map only until Layers 1
         this.mapType = this.definition.mapTypes[0];
         this.canvasEngine = null;
-        this.activeTool = "scene";
+        // The studio opens on Worlds (Ken, 2026-11-19): its Back to goes to the new world it made,
+        // on Map setup (see #modeTools), as the studio opened before
+        this.activeTool = "manage";
         this.viewFilters = { all: true, gm: true, none: false };
 
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
@@ -1044,6 +1048,8 @@ export class MapStudio {
             // Explore's tools read the map and change nothing on it
             tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
             meta,
+            // Worlds is opened from the world bar, not the rail, so it closes from its own header
+            closes: tool === "manage" ? "closeWorlds" : null,
             state: this.#stateBlockContext(),
             next: next ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
         };
@@ -1452,6 +1458,10 @@ export class MapStudio {
 
         if (regionId === "context") {
             context.toolPartial = `${TEMPLATE_ROOT}world/tools-${this.activeTool}.hbs`;
+            // A head and a foot kept above and below the panel's scroll: Worlds' search and view, and
+            // its New world, Import world and backups
+            context.panelHeadPartial = this.activeTool === "manage" ? `${TEMPLATE_ROOT}world/tools-manage-head.hbs` : null;
+            context.panelFootPartial = this.activeTool === "manage" ? `${TEMPLATE_ROOT}world/tools-manage-foot.hbs` : null;
 
             context.massEditMode = { ...this.massEditMode };
             context.massEditCount = {
@@ -1495,7 +1505,11 @@ export class MapStudio {
             }
 
             if (this.activeTool === "manage") {
-                context.savedMaps = MapStudio.#namedMaps(MapStudio.#worldRows(await Worlds.tree()));
+                context.worlds = await WorldsPanel.context(this);
+                // Worlds fills the studio's body beside the inspector (board W9)
+                context.panel.board = true;
+                context.panel.meta = context.worlds.summary;
+                context.panel.back = this.world?.name ? platform.i18n.format("FILRODENSWMB.UI.WorldsBackTo", { name: this.world.name }) : platform.i18n.localize("FILRODENSWMB.UI.WorldsBackToMap");
             }
         }
 
@@ -4855,6 +4869,16 @@ export class MapStudio {
      * @param {boolean} asNew - Whether this is Save as (a copy of the open world).
      * @returns {Promise<{mapId: string, name: string}|null>}
      */
+    /**
+     * What Worlds shows of the map being saved (WorldRecord.mapCard): a thumbnail drawn afresh when
+     * the map changed or has none yet, whether it has a run, whether an older generator made it.
+     */
+    #mapCard(payload, modelRun, changed) {
+        const kept = this.world?.maps?.find((map) => map.type === MAP_TYPES.SURFACE)?.thumbnail ?? null;
+        const thumbnail = changed || !kept ? (this.canvasEngine?.thumbnail?.() ?? kept) : kept;
+        return { ...(thumbnail ? { thumbnail } : {}), run: !!(modelRun || payload?.parentRun), older: GeneratorRevision.isOlder(payload) };
+    }
+
     async #saveWorld(createsNewMap, asNew) {
         // A map saved before v5 that was opened before it had a world (one imported while the
         // studio was open, say) is given one first, so its save does not make a second map
@@ -4873,7 +4897,7 @@ export class MapStudio {
             world: this.world,
             name: this.currentSaveName,
             settings,
-            maps: [{ id: createsNewMap ? null : this.currentSaveId, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun, summary: payload, changed: this.isDirty || createsNewMap }],
+            maps: [{ id: createsNewMap ? null : this.currentSaveId, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun, summary: payload, changed: this.isDirty || createsNewMap, card: this.#mapCard(payload, modelRun, this.isDirty || createsNewMap) }],
             asNew: asNew && !!this.world,
             // A held world writes only its own World setup, so only that can change its revision
             settingsChanged: opened ? WorldRecord.changedGroups(this.world?.held ? { setup: opened.setup } : opened, this.world?.held ? { setup: settings.setup } : settings).length > 0 : undefined,
@@ -5598,6 +5622,35 @@ export class MapStudio {
     /** How far one press of the 3D view's zoom buttons moves the camera. */
     static #THREE_D_ZOOM = 0.8;
 
+    /** The tool open when Worlds was opened, which its Close goes back to. */
+    #toolBeforeWorlds = null;
+
+    /** A card or chip in Worlds: chosen, it shows in the inspector; a second click opens the world. */
+    _onSelectWorld(event, target) {
+        const worldId = target.dataset.worldId;
+        const world = WorldsPanel.find(this, worldId);
+        if (!world) return;
+        if (event?.detail === 2 && world.mapId) return this.openWorld(world.mapId, world.name);
+        return WorldsPanel.select(this, worldId);
+    }
+
+    /** Worlds' Close: the tool it was opened from (in the mode now shown), else the mode's first. */
+    _onCloseWorlds() {
+        const kept = this.#toolBeforeWorlds;
+        const tool = kept && kept !== "manage" && this.definition.offers(kept, this.mapType, this.mode) ? kept : (this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
+        return this.switchTool(tool);
+    }
+
+    /**
+     * Opens a world from Worlds (its Surface map). The load leaves Worlds for the tool it was opened
+     * from, as Close does, once any unsaved changes have been settled (see #handleMapLoad).
+     * @param {string} mapId
+     * @param {string} name
+     */
+    async openWorld(mapId, name) {
+        await this.worldAction("load", mapId, name);
+    }
+
     /** The tool each mode opens on when none of its tools has been open yet. */
     static #MODE_FIRST_TOOL = Object.freeze({ create: "scene", explore: "history" });
 
@@ -5652,6 +5705,8 @@ export class MapStudio {
      */
     async switchTool(newTool, { force = false } = {}) {
         if (this.activeTool === newTool && !force) return;
+        // Worlds' Close goes back to the tool it was opened from
+        if (newTool === "manage" && this.activeTool !== "manage") this.#toolBeforeWorlds = this.activeTool;
         // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
         const toolMode = this.definition.tool(newTool)?.mode;
@@ -6368,38 +6423,39 @@ export class MapStudio {
     /**
      * Unified router for the inline CRUD buttons on the Manage Maps cards.
      */
-    async _onManageMapAction(event, target) {
-        const action = target.dataset.actionType;
-        const card = target.closest(".fwmb-map-card");
-        if (!action || !card) return;
-
-        const mapId = card.dataset.id;
-
-        // Dictionary Routing Pattern
-        const actionHandlers = {
-            load: () => this.#handleMapLoad(mapId, card),
+    /**
+     * A world's action, from Worlds' rows and cards or the world inspector (WorldEditor): on the
+     * world whose Surface map is `mapId`, named `name`.
+     * @param {"load"|"rename"|"duplicate"|"promote"|"export"|"delete"} action
+     */
+    async worldAction(action, mapId, name, value) {
+        const handlers = {
+            load: () => this.#handleMapLoad(mapId, name),
             delete: () => this.#handleMapDelete(mapId),
-            rename: () => this.#handleMapRename(mapId, card),
-            duplicate: () => this.#handleMapDuplicate(mapId, card),
-            promote: () => this.#handleMapPromote(mapId, card),
-            export: () => this.#handleMapExport(mapId, card),
+            rename: () => this.#handleMapRename(mapId, name, value),
+            duplicate: () => this.#handleMapDuplicate(mapId, name),
+            promote: () => this.#handleMapPromote(mapId, name),
+            export: () => this.#handleMapExport(mapId, name),
         };
-
-        if (actionHandlers[action]) {
-            await actionHandlers[action]();
-        }
+        await handlers[action]?.();
     }
 
-    async #handleMapLoad(mapId, card) {
+    async #handleMapLoad(mapId, name) {
         const canLoad = await this.#gateUnsavedChanges();
         if (!canLoad) return;
+        // Opened from Worlds: leave it first, so the load draws on the map in view and not on Worlds
+        // and its inspector redrawn at every step (which slowed a load to tens of seconds)
+        if (this.activeTool === "manage") {
+            Inspector.close(this);
+            await this._onCloseWorlds();
+        }
 
         // The map's data with its world's settings merged in (see WorldMaps)
         const loaded = await WorldMaps.load(mapId);
         if (loaded) {
             const { payload, world, settings } = loaded;
             this.currentSaveId = mapId;
-            this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+            this.currentSaveName = name;
             this.world = world;
             this.worldSettingsOpened = settings;
             this.#useWorldIcons(settings?.icons ?? WorldMigration.hostIcons());
@@ -6607,23 +6663,10 @@ export class MapStudio {
         this.view?.render(["context"]);
     }
 
-    /**
-     * The saved worlds as the Maps tool lists them until Worlds replaces it (S0 step 3): a row per
-     * world, keyed by its Surface map's id (the row's actions are the map's), its regional worlds
-     * under it.
-     */
-    static #worldRows(tree) {
-        return tree.filter((node) => node.mapId).map((node) => ({ id: node.mapId, worldId: node.id, name: node.name, parentId: node.parentId, held: node.held, children: MapStudio.#worldRows(node.children) }));
-    }
-
-    /** The saved maps as the Maps tool lists them, a map saved without a name named "Unnamed map". */
-    static #namedMaps(maps) {
-        return maps.map((map) => ({ ...map, name: map.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedMap"), children: MapStudio.#namedMaps(map.children ?? []) }));
-    }
-
-    async #handleMapRename(mapId, card) {
-        const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        const newName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName);
+    /** Renames a world: to the name given (Worlds' inspector), else to one asked for. */
+    async #handleMapRename(mapId, name, given) {
+        const currentName = name;
+        const newName = given ?? (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName));
 
         if (newName && newName !== currentName) {
             // The world and its maps (see Worlds.rename)
@@ -6631,25 +6674,33 @@ export class MapStudio {
             if (worldId) await Worlds.rename(worldId, newName);
             else await platform.store.renameSavedMap(mapId, newName);
 
-            if (this.currentSaveId === mapId) {
+            const isOpen = this.currentSaveId === mapId;
+            if (isOpen) {
                 this.currentSaveName = newName;
                 if (this.world) this.world = { ...this.world, name: newName };
             }
-            this.view?.render(["context"]);
+            this.view?.render(isOpen ? ["context", "worldbar"] : ["context"]);
         }
     }
 
-    async #handleMapDuplicate(mapId, card) {
-        const name = card.querySelector(".fwmb-map-card-info").textContent.trim();
+    async #handleMapDuplicate(mapId, name) {
         const copyName = platform.i18n.format("FILRODENSWMB.UI.CopyMapName", { name });
         // The world and its maps, not its regional worlds (see Worlds.copy)
         const worldId = await MapStudio.#worldIdOf(mapId);
-        if (worldId) await Worlds.copy(worldId, copyName);
-        else await platform.store.duplicateSavedMap(mapId, copyName);
-        this.view?.render(["context"]);
+        const copy = worldId ? await Worlds.copy(worldId, copyName) : await platform.store.duplicateSavedMap(mapId, copyName);
+        if (!copy) return;
+        // Nothing on screen says it was done, so say so, and show the copy where Worlds is open
+        platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.DuplicatedAs", { name: copyName }));
+        await this.#showMadeWorld(worldId ? copy.id : null);
     }
 
-    async #handleMapPromote(mapId, card) {
+    /** Draws Worlds again and, where it is open, shows a world just made (a copy, a clone) in the inspector. */
+    async #showMadeWorld(worldId) {
+        await this.view?.render(["context"]);
+        if (worldId && this.activeTool === "manage") WorldsPanel.select(this, worldId);
+    }
+
+    async #handleMapPromote(mapId, name) {
         const confirmed = await MapDialogManager._confirmDialog(
             platform.i18n.localize("FILRODENSWMB.UI.Promote"),
             platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm"),
@@ -6660,19 +6711,19 @@ export class MapStudio {
         // cut from its parent (see Worlds.cloneAsNew); its map no longer names the parent's map
         const worldId = await MapStudio.#worldIdOf(mapId);
         if (!worldId) return;
-        const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+        const originalName = name;
         const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
         const clone = await Worlds.cloneAsNew(worldId, newName);
         if (clone) {
             for (const map of clone.maps) await platform.store.updateMapDataFields(map.id, { parentId: null });
-            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess"));
-            this.view?.render(["context"]);
+            platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.PromoteSuccess", { name: newName }));
+            await this.#showMadeWorld(clone.id);
         }
     }
 
     /** Export JSON: the map in one file, with its images and custom pin icons (see MapTransfer.exportMap). */
-    async #handleMapExport(mapId, card) {
-        await MapTransfer.exportMap(mapId, card.querySelector(".fwmb-map-card-info").textContent.trim());
+    async #handleMapExport(mapId, name) {
+        await MapTransfer.exportMap(mapId, name);
     }
 
     _onNudgeNoise(event, target) {

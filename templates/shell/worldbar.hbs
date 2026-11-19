@@ -4,8 +4,10 @@
     World menu at the end. It never wraps: as it narrows it folds (data-fold, see WorldBarFold), and
     this template draws every fold's form so a fold never redraws it:
 
-    - 0: full map names; 1: short names; 2: Settlement maps leaves the bar for the layer menu;
-    - 3: the layer switcher becomes one menu button naming the map; 4: the world name ellipsises.
+    - 0: Open world and Save as beside Save world, full map names; 1: those two go into the name
+      menu (fwmb-fold-menu items show only once folded); 2: short names; 3: Settlement maps leaves
+      the bar for the layer menu; 4: the layer switcher becomes one menu button naming the map;
+      5: the world name ellipsises.
 
     Save world, the mode switch and World never fold. Parts later tracks fill (Geology, Add a map,
     Settlement maps, and the World menu's items until S0 step 4) are drawn in their places and
@@ -20,9 +22,9 @@
             <span class="fwmb-caret" aria-hidden="true"></span>
         </button>
         <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.WorldNameMenu'}}">
-            <button type="button" role="menuitem" data-action="changeTool" data-tool="manage"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuWorlds"}}</button>
+            <button type="button" role="menuitem" class="fwmb-fold-menu" data-action="changeTool" data-tool="manage"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuOpenWorld"}}</button>
             <button type="button" role="menuitem" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
-            <button type="button" role="menuitem" data-action="saveMapAs"><span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuSaveAs"}}</button>
+            <button type="button" role="menuitem" class="fwmb-fold-menu" data-action="saveMapAs"><span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuSaveAs"}}</button>
             {{#if worldBar.saved}}
             <button type="button" role="menuitem" data-action="exportOpenWorld"><span class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuExportWorld"}}</button>
             {{else}}
@@ -35,6 +37,11 @@
     <button type="button" class="fwmb-barbtn fwmb-barbtn--icon fwmb-save{{#if worldBar.dirty}} fwmb-is-dirty{{/if}}" data-action="saveMap" aria-label="{{worldBar.saveLabel}}" data-tooltip="{{worldBar.saveLabel}}">
         <span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>
     </button>
+    {{!-- Open world and Save as beside Save world while there is room (fold 0), else in the name menu --}}
+    <div class="fwmb-worldbar-files">
+        <button type="button" class="fwmb-barbtn" data-action="changeTool" data-tool="manage"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuOpenWorld"}}</button>
+        <button type="button" class="fwmb-barbtn" data-action="saveMapAs"><span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuSaveAs"}}</button>
+    </div>
 
     <span class="fwmb-sep" aria-hidden="true"></span>
 

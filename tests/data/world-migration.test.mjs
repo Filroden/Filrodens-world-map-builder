@@ -46,7 +46,8 @@ test("a map becomes a world of one Surface map, at revision 1, with the host's i
     assert.equal(world.name, "Aethoria");
     assert.equal(world.formatVersion, 5);
     assert.equal(world.settingsRevision, 1);
-    assert.deepEqual(world.maps, [{ id: "m1", type: "surface" }]);
+    // Its card: no run, and (a bare test map with no generator revision) made by an older generator
+    assert.deepEqual(world.maps, [{ id: "m1", type: "surface", run: false, older: true }]);
     assert.equal(world.held, false);
     assert.equal(world.parentWorldId, null);
     assert.deepEqual(world.settings.icons, ICONS);

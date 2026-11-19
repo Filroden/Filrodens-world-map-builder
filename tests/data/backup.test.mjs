@@ -280,10 +280,17 @@ test("a format 2 backup holds the worlds and blobs, and hands each map back with
     assert.equal(backup.blobBytes("../manifest"), null);
 });
 
+test("a format 2 backup keeps each map's card", () => {
+    const thumbnail = "data:image/jpeg;base64,/9j/4A==";
+    const { bytes } = worldsBackup({ worlds: (list) => [{ ...list[0], maps: [{ ...list[0].maps[0], thumbnail, run: true, older: false }] }, list[1]] });
+    const [top] = Backup.read(bytes).worlds;
+    assert.deepEqual(top.maps[0], { thumbnail, run: true, older: false, id: "mapTopAAAAAAAAAA", type: "surface" });
+});
+
 test("a format 2 backup's damaged worlds are read safely", () => {
     const { bytes } = worldsBackup({
         worlds: (list) => [
-            { ...list[0], name: { evil: true }, maps: [...list[0].maps, { id: "mapNotInBackup", type: "surface" }, { id: "mapRegionAAAAAAA", type: "nope" }], settings: { cultures: "broken", junk: { a: 1 } }, settingsRevision: -4 },
+            { ...list[0], name: { evil: true }, maps: [{ ...list[0].maps[0], thumbnail: "javascript:x", run: "yes" }, ...list[0].maps.slice(1), { id: "mapNotInBackup", type: "surface" }, { id: "mapRegionAAAAAAA", type: "nope" }], settings: { cultures: "broken", junk: { a: 1 } }, settingsRevision: -4 },
             { ...list[1], parentWorldId: "worldRegionAAAAA", regional: { version: 1, maps: [{ mapId: "mapRegionAAAAAAA", cutBase: "../x", inheritedStrokes: "lots" }] } },
             { id: "worldTopAAAAAAAA", name: "Repeated" },
             { id: "../bad" },
@@ -293,7 +300,7 @@ test("a format 2 backup's damaged worlds are read safely", () => {
     assert.equal(worlds.length, 2);
     const [top, region] = worlds;
     assert.equal(top.name, "");
-    assert.deepEqual(top.maps, [{ id: "mapTopAAAAAAAAAA", type: "surface" }]);
+    assert.deepEqual(top.maps, [{ id: "mapTopAAAAAAAAAA", type: "surface" }], "a card that fails its check is dropped");
     assert.deepEqual(Object.keys(top.settings), ["icons"]);
     assert.equal(top.settingsRevision, 1);
     assert.equal(region.parentWorldId, null, "a world cannot be its own parent");

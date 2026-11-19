@@ -41,8 +41,48 @@ export const MAP_TYPES = Object.freeze({ SURFACE: "surface" });
 
 const copy = (value) => (value === undefined ? undefined : structuredClone(value));
 
+/** The largest thumbnail a map's card keeps (a data URL), well past the 320px images the studio makes. */
+const MAX_THUMBNAIL = 256 * 1024;
+const THUMBNAIL = /^data:image\/(?:webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/;
+
 export class WorldRecord {
     /** A new world's pin icons: the built-ins only, none hidden. */
+    /**
+     * What Worlds shows of a map, kept on its entry in the world's `maps` (S0 step 3b): its
+     * thumbnail (a small image drawn at each save), whether it has a run, and whether an older
+     * generator made it. Read safely: a field that is not one is left out.
+     * @param {*} card
+     * @returns {{thumbnail?: string, run?: boolean, older?: boolean}}
+     */
+    static mapCard(card) {
+        const out = {};
+        if (!card || typeof card !== "object") return out;
+        if (typeof card.thumbnail === "string" && card.thumbnail.length <= MAX_THUMBNAIL && THUMBNAIL.test(card.thumbnail)) out.thumbnail = card.thumbnail;
+        if (typeof card.run === "boolean") out.run = card.run;
+        if (typeof card.older === "boolean") out.older = card.older;
+        // The map's revision and last changed save, as its record has them (shown in Worlds)
+        if (Number.isInteger(card.revision) && card.revision >= 1) out.revision = card.revision;
+        if (typeof card.savedAt === "string" && card.savedAt.length <= 40 && Number.isFinite(Date.parse(card.savedAt))) out.savedAt = card.savedAt;
+        return out;
+    }
+
+    /**
+     * A world's state marks, as Worlds shows them (one set everywhere, S0 step 6 brings the rest):
+     * `held` (a regional world reading its parent's settings), `older` (its Surface map made with
+     * an older generator), `noRun` (its Surface map has no run yet). Out of date comes with step 5.
+     * @param {object} world
+     * @returns {string[]}
+     */
+    static marks(world) {
+        const surface = (world?.maps ?? []).find((map) => map.type === MAP_TYPES.SURFACE);
+        const marks = [];
+        if (world?.held) marks.push("held");
+        // An older generator matters to a map it has run on
+        if (surface?.older && surface.run !== false) marks.push("older");
+        if (surface && surface.run === false && !world?.held) marks.push("noRun");
+        return marks;
+    }
+
     static emptyIcons() {
         return { custom: [], disabled: [] };
     }
@@ -66,7 +106,8 @@ export class WorldRecord {
             settings: { icons: WorldRecord.emptyIcons(), ...copy(settings) },
             settingsRevision: 1,
             settingsSavedAt: null,
-            maps: maps.map(({ id: mapId, type }) => ({ id: mapId, type })),
+            // Each map's card (what Worlds shows of it) as checked, with its id and type
+            maps: maps.map((map) => ({ ...WorldRecord.mapCard(map), id: map.id, type: map.type })),
             parentWorldId,
             held: held === true,
             regional: null,

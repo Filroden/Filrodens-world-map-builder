@@ -1,0 +1,88 @@
+{{!--
+    A world in the inspector, chosen in Worlds (see WorldEditor): its name, renamed as the field is
+    committed; Open; its family as a tree (the world it belongs to at the top, each regional world
+    under the one it was cut from), each row choosing that world, this one lit, the search's
+    matches marked; what it is, its maps and World setup in brief; the action list (Cut again… is off
+    until regional worlds can be cut again, Clone as new… only for a regional world); Delete… apart.
+    A label ending in "…" asks something first; one without acts at once.
+--}}
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-world-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-world-name" name="worldName" maxlength="{{fwmbTextLimit 'name'}}" value="{{world.name}}" />
+        </div>
+    </div>
+    {{#if hasMap}}
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="open"{{#if isOpen}} disabled{{/if}}><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{#if isOpen}}{{localize "FILRODENSWMB.UI.WorldIsOpen"}}{{else}}{{localize "FILRODENSWMB.UI.WorldOpen"}}{{/if}}</button>
+    </div>
+    {{/if}}
+</div>
+
+{{#if family.length}}
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.WorldFamily"}}</div>
+    <div class="fwmb-list fwmb-worlds-family" role="tree" aria-label="{{localize 'FILRODENSWMB.UI.WorldFamily'}}">
+        {{#each family}}
+        <button type="button" class="fwmb-list-item{{#if this.match}} fwmb-is-match{{/if}}" role="treeitem" aria-level="{{this.level}}" style="--depth: {{this.depth}}" aria-selected="{{#if this.current}}true{{else}}false{{/if}}"{{#unless this.current}} data-inspector-action="showWorld" data-world-id="{{this.id}}"{{/unless}}>
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+            <span class="fwmb-name">{{this.name}}</span>
+            {{#if this.held}}<span class="fwmb-state-mark fwmb-state-mark--held" data-tooltip="{{localize 'FILRODENSWMB.UI.MarkRegionalWorld'}}" aria-label="{{localize 'FILRODENSWMB.UI.MarkRegionalWorld'}}"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span></span>{{/if}}
+        </button>
+        {{/each}}
+    </div>
+</div>
+{{/if}}
+
+{{#if maps.length}}
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.WorldMaps"}}</div>
+    {{!-- What the world is, here rather than under its name: its length varies, and up there it
+         moved Open and the family's tree each time another world was chosen --}}
+    <p class="fwmb-hint">{{about}}</p>
+    <div class="fwmb-worlds-maps">
+        {{#each maps}}
+        <div class="fwmb-worlds-map">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+            <span class="fwmb-worlds-map-text"><span class="fwmb-name">{{this.name}}</span>{{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}</span>
+            {{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}
+        </div>
+        {{/each}}
+    </div>
+    {{#if setup.length}}
+    <dl class="fwmb-worlds-setup">
+        {{#each setup}}<dt>{{this.label}}</dt><dd>{{this.value}}</dd>{{/each}}
+    </dl>
+    {{/if}}
+</div>
+{{/if}}
+
+{{#if hasMap}}
+<div class="fwmb-action-list">
+    {{#if world.parentId}}
+    <button type="button" class="fwmb-action-row" disabled>
+        <span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>
+        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.WorldCutAgain"}}</b><span>{{localize "FILRODENSWMB.UI.WorldCutAgainSoon"}}</span></span>
+    </button>
+    {{/if}}
+    {{#if held}}
+    <button type="button" class="fwmb-action-row" data-inspector-action="cloneAsNew">
+        <span class="fwmb-icon fwmb-icon--content-copy" aria-hidden="true"></span>
+        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.WorldCloneAsNew"}}</b><span>{{localize "FILRODENSWMB.UI.WorldCloneAsNewNote"}}</span></span>
+    </button>
+    {{/if}}
+    <button type="button" class="fwmb-action-row" data-inspector-action="duplicate">
+        <span class="fwmb-icon fwmb-icon--content-copy" aria-hidden="true"></span>
+        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.Duplicate"}}</b><span>{{#if held}}{{localize "FILRODENSWMB.UI.WorldDuplicateHeldNote"}}{{else}}{{localize "FILRODENSWMB.UI.WorldDuplicateNote"}}{{/if}}</span></span>
+    </button>
+    <button type="button" class="fwmb-action-row" data-inspector-action="exportWorld">
+        <span class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></span>
+        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.MenuExportWorld"}}</b><span>{{localize "FILRODENSWMB.UI.WorldExportNote"}}</span></span>
+    </button>
+</div>
+{{/if}}
+
+<div class="fwmb-foot-danger">
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-inspector-action="delete"><span class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DeleteEllipsis"}}</button>
+</div>

@@ -15,7 +15,7 @@ import { WorldSettings } from "../data/WorldSettings.js";
 import { Blobs } from "../../../kernel/data/Blobs.js";
 import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
 import { MapDialogManager } from "./MapDialogManager.js";
-import { MAP_TYPES } from "../../../kernel/worlds/WorldRecord.js";
+import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 
 const RESTORE_TEMPLATE = "modules/filrodens-world-map-builder/templates/world/dialogs/restore-backup.hbs";
 const BYTES_PER_MEGABYTE = 1048576;
@@ -339,7 +339,7 @@ export class MapTransfer {
     /**
      * The worlds of a format 2 backup set up again over the maps restored (each restored map was
      * made a world of its own as it arrived, see #bringIn): each world's parent and whether it is
-     * held, its regional record and blobs. A held world is held again under its
+     * held, its regional record and blobs, and each map's card. A held world is held again under its
      * parent's restored copy, or under its parent when that is still saved here; with neither, it
      * is released as a world of its own with the settings it read (as deleting its parent would),
      * and named in the summary (Ken, 2026-11-18).
@@ -364,6 +364,9 @@ export class MapTransfer {
             // Named as its map arrived (made unique among the maps saved here)
             const record = { ...arrived, parentWorldId: parentId, held };
             delete record.migration;
+            // Each map's card as the backup kept it (its thumbnail, its run), on its restored copy
+            const cards = new Map(restoredMaps.map((map) => [newIds.get(map.id), WorldRecord.mapCard(map)]));
+            record.maps = (arrived.maps ?? []).map((map) => ({ ...map, ...cards.get(map.id), id: map.id, type: map.type }));
             if (held) {
                 record.settings = { setup: structuredClone(arrived.settings?.setup ?? {}) };
                 const renamed = new Map(restoredMaps.map((map) => [map.id, newIds.get(map.id)]));

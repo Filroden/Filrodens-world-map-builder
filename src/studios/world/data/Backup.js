@@ -260,7 +260,7 @@ function readWorlds(list, mapIds) {
     for (const world of list) {
         if (!world || typeof world !== "object" || !Sanitize.isId(world.id) || seen.has(world.id)) continue;
         seen.add(world.id);
-        const maps = (Array.isArray(world.maps) ? world.maps : []).filter((map) => Sanitize.isId(map?.id) && mapIds.has(map.id) && !claimed.has(map.id) && Object.values(MAP_TYPES).includes(map.type)).map(({ id, type }) => ({ id, type }));
+        const maps = (Array.isArray(world.maps) ? world.maps : []).filter((map) => Sanitize.isId(map?.id) && mapIds.has(map.id) && !claimed.has(map.id) && Object.values(MAP_TYPES).includes(map.type)).map((map) => ({ ...WorldRecord.mapCard(map), id: map.id, type: map.type }));
         for (const map of maps) claimed.add(map.id);
         const settings = {};
         const given = world.settings && typeof world.settings === "object" && !Array.isArray(world.settings) ? world.settings : {};
