@@ -9,6 +9,10 @@
 --}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="featureNames" title="FILRODENSWMB.UI.SectionFeatureNames"}}
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FeatureNamesHint"}}</p>
+    <div class="fwmb-goto">
+        <p>{{localize "FILRODENSWMB.UI.NamingWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuCulturesPath"}}</b></p>
+        <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldCultures">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+    </div>
     <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="nameFeatures" data-tooltip="{{localize 'FILRODENSWMB.UI.FeatureNamesButtonHint'}}">
         <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.FeatureNamesRun"}}
     </button>

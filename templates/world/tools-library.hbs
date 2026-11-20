@@ -1,95 +1,34 @@
 {{!--
-    Styles and icons (tool id "library"; on the world's rail from S0 step 4b): the world's styles
-    for pins, routes, regions and labels (see StyleLists), each row with a preview and how many
-    objects use it, opened in the inspector by a click or Enter, with Rename, Duplicate and Delete
-    in its menu, and each list's own styles ending in its add row; then, under a Reserved heading,
-    the kind's styles a generator looks up (see ReservedStyles), each with a lock saying what uses
-    it and no Delete; the pin
-    icons on offer; and the file that shares the custom biomes and styles with another world. A
-    style's change reaches the map's own objects, so it stays an undo step of the map. Read only on
-    a held regional world.
+    Styles and icons (tool id "library"; on the world's rail from S0 step 4b; a page from step 4c-1,
+    board C7): the world's styles for pins, routes, regions and labels (see StyleLists) in one table
+    grouped by kind, each row with a preview, its kind and how many objects on the map use it,
+    opened in the inspector by a click or Enter, with Rename, Duplicate and Delete in its menu, each
+    kind's own styles first, then its reserved ones (see ReservedStyles), each with a lock saying
+    what uses it and no Delete; Import and Export styles at the head (the file carries the custom
+    biomes too); then the pin icons on offer. A style's change reaches the map's own objects, so it
+    stays an undo step of the map (Undo and Redo in the page's head). Read only on a held regional
+    world.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="shareStyles" title="FILRODENSWMB.UI.SectionShareStyles"}}
-    <div class="fwmb-btn-row">
-        <button type="button" class="fwmb-btn" data-action="exportSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportSettingsHint'}}">
-            <i class="fwmb-icon fwmb-icon--file-export"></i>
-            {{localize "FILRODENSWMB.UI.ExportSettings"}}
-        </button>
-        <button type="button" class="fwmb-btn" data-action="importSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ImportSettingsHint'}}">
-            <i class="fwmb-icon fwmb-icon--upload-file"></i>
-            {{localize "FILRODENSWMB.UI.ImportSettings"}}
-        </button>
-    </div>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
-
-{{#each styleLists}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id=this.section title=this.title count=this.count}}
-    <div role="listbox" aria-label="{{localize this.title}}" data-list-nav data-style-list="{{this.type}}" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-        {{#each this.rows}}
-            {{#if this.naming}}
-            <div class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true">
-                <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-style-naming data-panel-ui autocomplete="off" spellcheck="false" />
-            </div>
-            {{else}}
-            <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-style-type="{{../type}}" data-action="openStyle">
-                {{> styleRowPreview this.preview}}
-                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
-                <span class="fwmb-meta fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
-                <span class="fwmb-actions">
-                    <div class="fwmb-dropdown fwmb-row-menu">
-                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
-                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
-                        </button>
-                        <div class="fwmb-dropdown-menu">
-                            <button type="button" data-action="renameStyle"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
-                            <button type="button" data-action="duplicateStyle"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
-                            <button type="button" data-action="deleteStyle" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
-                        </div>
-                    </div>
-                </span>
-            </div>
-            {{/if}}
-        {{/each}}
-        {{#if this.empty}}<div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>{{/if}}
-        <div class="fwmb-list-add" role="none">
-            <button type="button" class="fwmb-btn fwmb-btn--subtle" role="option" aria-selected="false" tabindex="-1" data-list-item data-action="addStyle" data-style-type="{{this.type}}">
-                <i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize this.add}}
-            </button>
-        </div>
-        {{#if this.reserved.length}}
-        {{!-- The kind's reserved styles (see ReservedStyles): changed but never deleted, each lock saying what uses it --}}
-        <div class="fwmb-list-heading" role="presentation" data-tooltip="{{localize 'FILRODENSWMB.UI.ReservedStylesHint'}}"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SectionReservedStyles"}}</div>
-        {{#each this.reserved}}
-            {{#if this.naming}}
-            <div class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true">
-                <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-style-naming data-panel-ui autocomplete="off" spellcheck="false" />
-            </div>
-            {{else}}
-            <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item fwmb-is-reserved" data-id="{{this.id}}" data-style-type="{{../type}}" data-action="openStyle">
-                {{> styleRowPreview this.preview}}
-                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
-                <span class="fwmb-state-mark fwmb-state-mark--held" data-tooltip="{{this.reserved}}" aria-label="{{this.reserved}}"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span></span>
-                <span class="fwmb-meta fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
-                <span class="fwmb-actions">
-                    <div class="fwmb-dropdown fwmb-row-menu">
-                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
-                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
-                        </button>
-                        <div class="fwmb-dropdown-menu">
-                            <button type="button" data-action="renameStyle"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
-                            <button type="button" data-action="duplicateStyle"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
-                        </div>
-                    </div>
-                </span>
-            </div>
-            {{/if}}
-        {{/each}}
-        {{/if}}
-    </div>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
-{{/each}}
+<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.held}} disabled{{/if}}>
+<div class="fwmb-page-bar">
+    <span class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SectionStyles"}} <span class="fwmb-badge fwmb-badge--count">{{styleCount}}</span></span>
+    <button type="button" class="fwmb-btn" data-action="importSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ImportSettingsHint'}}"><i class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ImportStyles"}}</button>
+    <button type="button" class="fwmb-btn" data-action="exportSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportSettingsHint'}}"><i class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ExportStyles"}}</button>
+</div>
+<div class="fwmb-world-table-wrap fwmb-world-table-wrap--scroll">
+<table class="fwmb-world-table" role="grid" aria-label="{{localize 'FILRODENSWMB.UI.SectionStyles'}}">
+    <thead><tr><th scope="col">{{localize "FILRODENSWMB.UI.StyleColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.KindColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.UsedByColumn"}}</th></tr></thead>
+    {{#each styleLists}}
+    <tbody aria-label="{{localize this.title}}" data-list-nav data-style-list="{{this.type}}">
+    <tr class="fwmb-table-group"><td colspan="3"><span class="fwmb-table-group-head">{{localize this.title}} <span class="fwmb-badge fwmb-badge--count">{{this.count}}</span><button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="addStyle" data-style-type="{{this.type}}"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize this.add}}</button></span></td></tr>
+    {{#each this.rows}}{{> styleRow this type=../type reservedRow=false}}{{/each}}
+    {{#if this.empty}}<tr class="fwmb-table-empty"><td colspan="3">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</td></tr>{{/if}}
+    {{#each this.reserved}}{{> styleRow this type=../type reservedRow=true}}{{/each}}
+    </tbody>
+    {{/each}}
+</table>
+</div>
 
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="builtinPinIcons" title="FILRODENSWMB.UI.SettingsBuiltinPinIcons" closed=true}}
     <div class="fwmb-hint fwmb-long">{{localize "FILRODENSWMB.UI.BuiltinPinIconsHint"}}</div>
@@ -148,4 +87,35 @@
 {{#if fill}}<span class="fwmb-chip-swatch{{#unless color}} fwmb-chip-swatch--none{{/unless}}" aria-hidden="true" {{#if color}}style="--swatch: {{color}}"{{/if}}></span>{{/if}}
 {{#if text}}<span class="fwmb-style-preview fwmb-style-preview--text" aria-hidden="true" style="font-family: &quot;{{family}}&quot;; color: {{color}}; font-weight: {{weight}}; font-style: {{slant}};">Aa</span>{{/if}}
 {{#if icon}}<i class="fwmb-icon fwmb-pin-style-glyph {{#unless isCustom}}fwmb-icon--{{key}}{{/unless}}" aria-hidden="true" {{#if isCustom}}style="--fwmb-mask: url('{{path}}');"{{/if}}></i>{{/if}}
+{{/inline}}
+
+{{#*inline "styleRow"}}
+{{#if naming}}
+<tr class="fwmb-table-naming" aria-selected="true"><td colspan="3">
+    <input type="text" class="fwmb-input" value="{{value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize label}}" data-style-naming data-panel-ui autocomplete="off" spellcheck="false" />
+</td></tr>
+{{else}}
+<tr aria-selected="{{#if selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="{{#if reservedRow}}fwmb-is-reserved{{/if}}" data-id="{{id}}" data-style-type="{{type}}" data-action="openStyle">
+    <td><span class="fwmb-table-name">{{> styleRowPreview preview}}<b>{{name}}</b></span></td>
+    <td>{{#if reservedRow}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.ReservedStylesHint'}}"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SectionReservedStyles"}}</span>{{else}}<span class="fwmb-badge">{{localize "FILRODENSWMB.UI.Custom"}}</span>{{/if}}</td>
+    <td class="fwmb-table-wrap">
+        <span class="fwmb-table-used">
+        {{#if reservedRow}}<span class="fwmb-table-lock"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{reserved}}</span>{{/if}}
+        <span class="fwmb-hint" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=usageCount}}">{{localize "FILRODENSWMB.UI.StyleUsedOnMap" count=usageCount}}</span>
+        <span class="fwmb-table-actions">
+            <div class="fwmb-dropdown fwmb-row-menu">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                    <i class="fwmb-icon fwmb-icon--more-vert"></i>
+                </button>
+                <div class="fwmb-dropdown-menu">
+                    <button type="button" data-action="renameStyle"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
+                    <button type="button" data-action="duplicateStyle"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
+                    {{#unless reservedRow}}<button type="button" data-action="deleteStyle" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>{{/unless}}
+                </div>
+            </div>
+        </span>
+        </span>
+    </td>
+</tr>
+{{/if}}
 {{/inline}}

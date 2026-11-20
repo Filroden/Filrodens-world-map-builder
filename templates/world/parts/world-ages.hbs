@@ -1,29 +1,39 @@
 {{!--
-    The world's ages and events (S0 step 4b; the Ages and events editor): each age's row with its
-    summary, moved earlier or later or removed, opening in the age inspector, and the add row.
+    The world's ages and events (S0 step 4b; a table from step 4c-1, board C6): a row an age, oldest
+    first (the last is the present), with its era, strife and events, opening in the age inspector,
+    and moved earlier or later or removed from its row; Age at the head adds one.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldAges" title="FILRODENSWMB.UI.SectionGenerateAges" count=generate.ages.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
-    <p class="fwmb-hint">{{#if generate.ages.held}}{{localize "FILRODENSWMB.UI.GenerateAgesHeldHint"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateAgesHint"}}{{/if}}</p>
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateAges'}}" data-list-nav class="fwmb-list-container fwmb-space-before">
-        {{#each generate.ages.rows}}
-        <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item fwmb-age-row" data-id="{{this.id}}" data-action="openAge">
-            <span class="fwmb-age-row-text fwmb-flex-1">
-                <span class="fwmb-name">{{this.label}}</span>
-                <span class="fwmb-meta">{{this.summary}}</span>
-            </span>
+<div class="fwmb-page-bar">
+    <span class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SectionGenerateAges"}} <span class="fwmb-badge fwmb-badge--count">{{generate.ages.count}}</span></span>
+    {{#if generate.ages.canAdd}}<button type="button" class="fwmb-btn fwmb-btn--primary" data-action="addAge"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.GenerateAgeAdd"}}</button>{{/if}}
+</div>
+{{!-- The page's lede says what the ages are; only a held world's note adds to it --}}
+{{#if generate.ages.held}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateAgesHeldHint"}}</p>{{/if}}
+<div class="fwmb-world-table-wrap{{#if generate.ages.scrolls}} fwmb-world-table-wrap--scroll{{/if}}">
+<table class="fwmb-world-table" role="grid" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateAges'}}" data-list-nav>
+    <thead><tr>
+        <th scope="col">{{localize "FILRODENSWMB.UI.AgeColumn"}}</th>
+        <th scope="col">{{localize "FILRODENSWMB.UI.GenerateEra"}}</th>
+        <th scope="col">{{localize "FILRODENSWMB.UI.GenerateStrife"}}</th>
+        <th scope="col">{{localize "FILRODENSWMB.UI.GenerateEvents"}}</th>
+        <th scope="col"><span class="fwmb-visually-hidden">{{localize "FILRODENSWMB.UI.MoreOptions"}}</span></th>
+    </tr></thead>
+    <tbody>
+    {{#each generate.ages.rows}}
+    <tr class="fwmb-age-row" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item data-id="{{this.id}}" data-action="openAge">
+        <td><b>{{this.label}}</b></td>
+        <td>{{this.era}}</td>
+        <td>{{this.strife}}</td>
+        <td class="fwmb-table-wrap">{{#if this.events}}{{this.events}}{{else}}<span class="fwmb-hint">{{localize "FILRODENSWMB.UI.AgeNoEvents"}}</span>{{/if}}</td>
+        <td class="fwmb-table-actions">
             {{#unless this.held}}
-            <span class="fwmb-actions">
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeUp" data-age="{{this.index}}" {{#unless this.canUp}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}"><i class="fwmb-icon fwmb-icon--arrow-upward"></i></button>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeDown" data-age="{{this.index}}" {{#unless this.canDown}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}"><i class="fwmb-icon fwmb-icon--arrow-downward"></i></button>
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeAge" data-age="{{this.index}}" {{#unless this.canRemove}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
-            </span>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeUp" data-age="{{this.index}}" {{#unless this.canUp}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}"><i class="fwmb-icon fwmb-icon--arrow-upward"></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeDown" data-age="{{this.index}}" {{#unless this.canDown}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}"><i class="fwmb-icon fwmb-icon--arrow-downward"></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeAge" data-age="{{this.index}}" {{#unless this.canRemove}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
             {{/unless}}
-        </div>
-        {{/each}}
-        {{#if generate.ages.canAdd}}
-        <div class="fwmb-list-add" role="none">
-            <button type="button" class="fwmb-btn fwmb-btn--subtle" role="option" aria-selected="false" tabindex="-1" data-list-item data-action="addAge"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.GenerateAgeAdd"}}</button>
-        </div>
-        {{/if}}
-    </div>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+        </td>
+    </tr>
+    {{/each}}
+    </tbody>
+</table>
+</div>

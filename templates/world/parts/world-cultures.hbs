@@ -1,42 +1,53 @@
 {{!--
-    The world's cultures (S0 step 4b; the Cultures editor): the list with its add row, each opening
-    in the culture inspector, with Rename, Duplicate and Delete in its menu (see CultureLists).
+    The world's cultures (S0 step 4b; a table from step 4c-1, board C5): a row a culture with its
+    naming style, and its Dwelling and Mining affinity (the Underground track's, shown as the
+    inspector shows them until then), each opening in the culture inspector, with Duplicate and
+    Delete in its menu (renaming is the inspector's Name field, or Rename in the menu); the naming row
+    while a culture is added or renamed (see CultureLists).
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldCultures" title="FILRODENSWMB.UI.SectionGenerateCultures" count=cultureList.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
-    <p class="fwmb-hint">{{#if cultureList.count}}{{localize "FILRODENSWMB.UI.CulturesHint"}}{{else}}{{localize "FILRODENSWMB.UI.CulturesNoneHint"}}{{/if}}</p>
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateCultures'}}" data-list-nav data-culture-list class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-        {{#each cultureList.rows}}
-            {{#if this.naming}}
-            <div class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true">
-                <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-culture-naming data-panel-ui autocomplete="off" spellcheck="false" />
-            </div>
-            {{else}}
-            <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="openCulture">
-                <span class="fwmb-chip-swatch" aria-hidden="true" style="--swatch: {{this.color}}"></span>
-                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
-                <span class="fwmb-meta" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateNameStyle'}}">{{this.names}}</span>
-                <span class="fwmb-actions">
-                    <div class="fwmb-dropdown fwmb-row-menu">
-                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
-                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
-                        </button>
-                        <div class="fwmb-dropdown-menu">
-                            <button type="button" data-action="renameCulture"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
-                            <button type="button" data-action="duplicateCulture"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
-                            <button type="button" data-action="deleteCulture" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
-                        </div>
+<div class="fwmb-page-bar">
+    <span class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SectionGenerateCultures"}} <span class="fwmb-badge fwmb-badge--count">{{cultureList.count}}</span></span>
+    {{#if cultureList.canAdd}}<button type="button" class="fwmb-btn fwmb-btn--primary" data-action="addCulture"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.CultureAddOne"}}</button>{{/if}}
+</div>
+{{!-- The page's lede says what the cultures are; with none, what happens instead --}}
+{{#unless cultureList.count}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CulturesNoneHint"}}</p>{{/unless}}
+<div class="fwmb-world-table-wrap{{#if cultureList.scrolls}} fwmb-world-table-wrap--scroll{{/if}}">
+<table class="fwmb-world-table" role="grid" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateCultures'}}" data-list-nav data-culture-list>
+    <thead><tr>
+        <th scope="col">{{localize "FILRODENSWMB.UI.CultureColumn"}}</th>
+        <th scope="col">{{localize "FILRODENSWMB.UI.GenerateNameStyle"}}</th>
+        <th scope="col" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureUndergroundLater'}}">{{localize "FILRODENSWMB.UI.CultureDwelling"}}</th>
+        <th scope="col" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureUndergroundLater'}}">{{localize "FILRODENSWMB.UI.CultureMining"}}</th>
+        <th scope="col"><span class="fwmb-visually-hidden">{{localize "FILRODENSWMB.UI.MoreOptions"}}</span></th>
+    </tr></thead>
+    <tbody>
+    {{#each cultureList.rows}}
+        {{#if this.naming}}
+        <tr class="fwmb-table-naming" aria-selected="true"><td colspan="5">
+            <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-culture-naming data-panel-ui autocomplete="off" spellcheck="false" />
+        </td></tr>
+        {{else}}
+        <tr aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item data-id="{{this.id}}" data-action="openCulture">
+            <td><span class="fwmb-table-name"><span class="fwmb-chip-swatch" aria-hidden="true" style="--swatch: {{this.color}}"></span><b>{{this.name}}</b></span></td>
+            <td>{{this.names}}</td>
+            <td class="fwmb-table-later">{{localize "FILRODENSWMB.UI.CultureDwellingSurface"}}</td>
+            <td class="fwmb-table-later">{{localize "FILRODENSWMB.UI.CultureMiningNone"}}</td>
+            <td class="fwmb-table-actions">
+                <div class="fwmb-dropdown fwmb-row-menu">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                        <i class="fwmb-icon fwmb-icon--more-vert"></i>
+                    </button>
+                    <div class="fwmb-dropdown-menu">
+                        <button type="button" data-action="renameCulture"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
+                        <button type="button" data-action="duplicateCulture"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
+                        <button type="button" data-action="deleteCulture" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
                     </div>
-                </span>
-            </div>
-            {{/if}}
-        {{/each}}
-        {{#if cultureList.empty}}<div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.CulturesEmpty"}}</div>{{/if}}
-        {{#if cultureList.canAdd}}
-        <div class="fwmb-list-add" role="none">
-            <button type="button" class="fwmb-btn fwmb-btn--subtle" role="option" aria-selected="false" tabindex="-1" data-list-item data-action="addCulture">
-                <i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.CultureAdd"}}
-            </button>
-        </div>
+                </div>
+            </td>
+        </tr>
         {{/if}}
-    </div>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+    {{/each}}
+    {{#if cultureList.empty}}<tr class="fwmb-table-empty"><td colspan="5">{{localize "FILRODENSWMB.UI.CulturesEmpty"}}</td></tr>{{/if}}
+    </tbody>
+</table>
+</div>

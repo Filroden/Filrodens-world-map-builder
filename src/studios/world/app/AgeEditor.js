@@ -65,6 +65,20 @@ export class AgeEditor {
         return parts.join(" · ");
     }
 
+    /**
+     * An age's columns in the Ages and events page's table: its era, its strife, and its events as
+     * one line ("Hillfolk invade, Plague"), or null when it has none.
+     */
+    static columns(app, age) {
+        const cultures = app.uiState?.cultures ?? [];
+        const events = (age.events ?? []).map((event) => AgeEventRows.label(event, cultures)).filter(Boolean);
+        return {
+            era: platform.i18n.localize(`FILRODENSWMB.UI.GenerateEra${capitalise(age.era)}`),
+            strife: platform.i18n.localize(`FILRODENSWMB.UI.GenerateStrife${capitalise(age.strife)}`),
+            events: events.length ? events.join(", ") : null,
+        };
+    }
+
     /** The template's context. */
     static #context(app, age) {
         const G = FILRODENSWMB.GENERATOR;

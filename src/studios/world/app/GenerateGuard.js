@@ -93,7 +93,7 @@ export class GenerateGuard {
                 {
                     action: "generate",
                     label: i18n.localize("FILRODENSWMB.UI.GenerateRun"),
-                    icon: "fwmb-icon fwmb-icon--generate",
+                    icon: "fwmb-icon fwmb-icon--run",
                     tone: "positive",
                     default: true,
                     callback: (form) => {

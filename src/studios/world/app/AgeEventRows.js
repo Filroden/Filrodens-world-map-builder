@@ -202,6 +202,14 @@ export class AgeEventRows {
         return current?.age === ageId && current?.event === index;
     }
 
+    /** The event whose place the next click sets, as a line ("Hillfolk invade"), or null. */
+    static pickingName(app) {
+        if (!this.picking(app)) return null;
+        const current = this.#picking.get(app);
+        const age = (app.uiState.generatorSettings?.ages ?? []).find((each) => each.id === current.age);
+        return this.label(age?.events?.[current.event], app.uiState.cultures ?? []);
+    }
+
     /**
      * Choose on map: the next click on land sets the event's place, through `set(place)`; pressed
      * again, it stops.

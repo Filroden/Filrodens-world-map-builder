@@ -1,20 +1,23 @@
 {{!--
-    The head of a world settings editor (S0 step 4; board W2), above its sections: the lede, the
-    held banner on a held regional world (its editors read only), and the reach line: what reads
-    this group, whether this sitting's changes have marked a run out of date, and Revert changes
-    (for Styles and icons, a note that Undo takes a change back, since it reaches the map's objects).
-    See WorldEditors.head.
+    The top of a world page's body (S0 step 4c-1; the design system's WorldPage), above its
+    sections: the held banner on a held regional world (its page read only, Open parent world
+    settings drawn until step 5 builds it), then Read by: a chip for each map tool that reads the
+    page, its map and a Go there (the mirror of Peoples and realms' Read from the world), and the
+    regional worlds a change reaches too. See WorldEditors.head and MapStudio's #readByChips.
 --}}
-<p class="fwmb-lede">{{worldEditor.lede}}</p>
 {{#if worldEditor.held}}
 <div class="fwmb-held" role="note">
     <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldHeldTitle"}}</span>
     <span>{{worldEditor.heldBanner}}</span>
+    <button type="button" class="fwmb-btn" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.OpenParentSettingsLater'}}"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenParentSettings"}}</button>
 </div>
 {{/if}}
-<div class="fwmb-reach">
-    <span>{{worldEditor.reach}}{{#if worldEditor.changedLine}} {{worldEditor.changedLine}}{{/if}}{{#if worldEditor.undo}} {{localize "FILRODENSWMB.UI.WorldStylesUndo"}}{{/if}}</span>
-    {{#if worldEditor.undo}}{{else if worldEditor.held}}{{else}}
-    <button type="button" class="fwmb-btn" data-action="revertWorldGroup" data-group="{{worldEditor.group}}"{{#unless worldEditor.canRevert}} disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.WorldRevertHint'}}"><span class="fwmb-icon fwmb-icon--history" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldRevert"}}</button>
-    {{/if}}
+{{#if worldEditor.readBy.length}}
+<div class="fwmb-readby" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ReadBy'}}">
+    <span class="fwmb-readby-head">{{localize "FILRODENSWMB.UI.ReadBy"}}</span>
+    {{#each worldEditor.readBy}}
+    <span class="fwmb-readby-chip"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.name}} <span class="fwmb-readby-map">· {{this.map}}</span><button type="button" class="fwmb-btn fwmb-btn--go" data-action="goToMapTool" data-tool="{{this.tool}}" aria-label="{{this.goLabel}}"{{#if this.disabled}} aria-disabled="true"{{/if}}{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}>{{localize "FILRODENSWMB.UI.Go"}}</button></span>
+    {{/each}}
+    {{#if worldEditor.heldReach}}<span class="fwmb-hint">{{worldEditor.heldReach}}</span>{{/if}}
 </div>
+{{/if}}

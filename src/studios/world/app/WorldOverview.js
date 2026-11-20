@@ -46,8 +46,13 @@ export class WorldOverview {
             selected: inspected.world === child.id,
         }));
 
+        const name = world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
         return {
             title: world?.name || i18n.localize("FILRODENSWMB.UI.OverviewUnsaved"),
+            // The two groups (round 4c, board C3): what is in the world, and the worlds cut from it
+            inTitle: i18n.format("FILRODENSWMB.UI.OverviewInWorld", { name }),
+            relatedTitle: i18n.format("FILRODENSWMB.UI.OverviewCutFrom", { name }),
+            relatedHint: i18n.format("FILRODENSWMB.UI.OverviewCutFromHint", { name }),
             line: WorldOverview.line(app, dirtyGroups),
             maps: [surfaceCard],
             regional,

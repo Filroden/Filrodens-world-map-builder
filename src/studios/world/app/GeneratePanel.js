@@ -124,6 +124,8 @@ export class GeneratePanel {
                 id: age.id,
                 label: AgeEditor.label(ages, index),
                 summary: AgeEditor.summary(age),
+                // The Ages and events page's columns (S0 step 4c-1, board C6)
+                ...AgeEditor.columns(app, age),
                 selected: shown?.kind === AgeEditor.KIND && shown.ref.id === age.id,
                 canUp: index > 0,
                 canDown: index < ages.length - 1,
@@ -132,6 +134,8 @@ export class GeneratePanel {
             })),
             canAdd: !held && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES,
             count: ages.length,
+            // As the cultures' table: more than a few rows may scroll (WorldEditors.SCROLL_ROWS)
+            scrolls: ages.length > WorldEditors.SCROLL_ROWS,
         };
     }
 

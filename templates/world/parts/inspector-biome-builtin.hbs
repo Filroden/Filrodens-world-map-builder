@@ -1,0 +1,44 @@
+{{!--
+    The inspector's built-in biome (S0 step 4c-1; see BiomeEditor.BUILT_IN), chosen in the world's
+    Biomes page: its name, its colour (the world's, applied when committed and put back by Revert
+    changes), where it can lie and the four numbers Generate reads of it, read only, and the rule
+    editor, since the climate places it. A built-in biome cannot be deleted.
+--}}
+<datalist id="fwmb-inspector-biome-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.Name"}}</span>
+        <div class="fwmb-form-fields"><span>{{biome.name}}</span></div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-biome-color">{{localize "FILRODENSWMB.UI.BiomeColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-biome-color" class="fwmb-swatch" name="biomeColor" value="{{biome.hex}}" list="fwmb-inspector-biome-colors" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.BiomePlacement"}}</span>
+        <div class="fwmb-form-fields"><span>{{biome.where}}</span></div>
+    </div>
+</div>
+
+{{#if biome.properties}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectorBiomeGenerate" title="FILRODENSWMB.UI.InspectorBiomeGenerate"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.BiomeBuiltInNumbersHint"}}</p>
+    <dl class="fwmb-biome-readings">
+        {{#each @root.biome.properties}}
+        <div class="fwmb-biome-reading"><dt data-tooltip="{{localize this.hint}}">{{localize this.label}}</dt><dd class="fwmb-readout">{{this.value}}</dd></div>
+        {{/each}}
+    </dl>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectorBiomeRules" title="FILRODENSWMB.UI.BiomePlacedByClimate"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.BiomePlacedByClimateHint"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="openBiomeRuleEditor"><i class="fwmb-icon fwmb-icon--tune" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.RuleEditorOpen"}}</button>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

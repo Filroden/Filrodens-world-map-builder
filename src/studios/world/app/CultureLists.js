@@ -52,7 +52,9 @@ export class CultureLists {
             };
         });
         if (naming && !naming.id) rows.push({ naming: true, value: naming.value, label: this.#NAMING_LABEL });
-        return { rows, count: cultures.length, empty: cultures.length === 0 && !naming, canAdd: cultures.length < FILRODENSWMB.GENERATOR.CULTURES.MAX };
+        // A table of more than a few rows may be squeezed and scroll on a short page (see the
+        // stylesheet's fwmb-world-table-wrap--scroll); a shorter one keeps its height
+        return { rows, count: cultures.length, scrolls: rows.length > WorldEditors.SCROLL_ROWS, empty: cultures.length === 0 && !naming, canAdd: cultures.length < FILRODENSWMB.GENERATOR.CULTURES.MAX };
     }
 
     /** + Culture: a naming row at the list's foot. */

@@ -1,8 +1,11 @@
 {{!--
-    The context bar while a world tool is open beside the map (S0 step 4): the map shown on the
-    canvas, and a reminder that the world's settings reach every map in the world, not just this one.
+    The context bar while a world page has given way to the map (S0 step 4c-1): a homeland or an
+    event's place is being picked on the Surface map, from the Cultures or Ages and events page's
+    inspector (until step 4c-2 moves both to each map's Peoples and realms; board C10's state).
+    Done, Escape or the click that places it brings the page back.
 --}}
 <div class="fwmb-contents fwmb-bar-world">
-    <span class="fwmb-bar-world-map"><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldBarShowing"}} <b>{{localize "FILRODENSWMB.UI.LayerSurfaceFull"}}</b></span>
-    <span class="fwmb-bar-world-hint">{{localize "FILRODENSWMB.UI.WorldBarHint"}}</span>
+    <span class="fwmb-bar-world-map"><span class="fwmb-icon fwmb-icon--place" aria-hidden="true"></span>{{worldPick.label}} <b>{{worldPick.name}}</b></span>
+    <span class="fwmb-bar-world-hint">{{localize "FILRODENSWMB.UI.PickingHint"}}</span>
+    <button type="button" class="fwmb-btn fwmb-bar-world-done" data-action="stopWorldPick">{{localize "FILRODENSWMB.UI.Done"}}</button>
 </div>

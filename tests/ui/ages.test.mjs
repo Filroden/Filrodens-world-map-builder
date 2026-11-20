@@ -129,13 +129,15 @@ async function press(app, action, index = null) {
     await settle();
 }
 
-test("the Ages list: each age a row in brief, opening it in the inspector; + Age opens the new present", async () => {
+test("the Ages table: each age a row with its era, strife and events, opening it in the inspector; + Age opens the new present", async () => {
     const app = studio();
     await drawPanel(app);
-    const rows = [...app.root.querySelectorAll(".fwmb-age-row")];
+    const rows = [...app.root.querySelectorAll("tr.fwmb-age-row")];
     assert.equal(rows.length, 2);
     assert.match(rows[1].textContent, /GenerateAgePresent/);
-    assert.match(rows[1].textContent, /GenerateAgeEventsOne/);
+    assert.equal(rows[1].querySelectorAll("td").length, 5, "age, era, strife, events and its row actions");
+    assert.match(rows[1].cells[3].textContent, /GenerateEvent/, "its event named");
+    assert.match(rows[0].cells[3].textContent, /AgeNoEvents/, "none");
     await AgeEditor.open(app, rows[1].dataset.id);
     assert.ok(app.root.querySelector("dialog.fwmb-inspector--age"), "opened in the inspector");
     await drawPanel(app);

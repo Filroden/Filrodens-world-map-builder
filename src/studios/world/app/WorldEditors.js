@@ -1,34 +1,37 @@
 import { platform } from "../../../platform/index.js";
 
 /**
- * The world settings editors (v5, S0 step 4; boards W1 to W3): the world's settings, edited in the
- * panel beside the map in view. They are on the world's own rail (definition.js's world stages),
- * shown while World is chosen in the layer switcher, so the rail and the switcher both say the
- * world, not one of its maps, is being worked on. Each is one settings group of the world record
- * (see WorldSettings), and its panel opens with the same head:
- * - the **World** tag;
- * - what a change reaches (the world's maps, the regional worlds it holds) and whether this
- *   sitting's changes have marked a run out of date;
- * - **Revert changes**: the group as it was before the first change in the sitting (since the world
- *   was opened, made or last saved), in one step. World settings are not in the map's undo (W2:
- *   "World settings have no undo: Revert changes puts the group back"), but for Styles and icons:
- *   a style's change reaches the map's own objects, so it stays an undo step of the map.
- * - On a held regional world the editor is read only, under the held banner naming the world it
- *   reads its settings from (its World setup is its own but fixed by its crop).
+ * The world settings editors (v5, S0 step 4; round 4c's pages, step 4c-1; boards C1, C4 to C9): the
+ * world's settings, each on a page of its own beside the world's rail. The world's settings need
+ * no view of a map, so a page has no canvas: the layout itself says the world, not one of its maps,
+ * is being worked on. Each edits settings groups of the world record (see WorldSettings), and its
+ * page opens with the same head:
+ * - the world's name, the page's title and the **World** tag;
+ * - whether this sitting has changed it, and **Revert changes**: its groups as they were before the
+ *   first change in the sitting (since the world was opened, made or last saved), in one step.
+ *   World settings are not in the map's undo, but for Styles and icons: a style's change reaches the
+ *   map's own objects, so it stays an undo step of the map, and its head has Undo and Redo;
+ * - the lede, then **Read by**: each map tool that reads the page, with a Go to it (`readBy`, the
+ *   mirror of Peoples and realms' Read from the world);
+ * - on a held regional world, the held banner naming the world it reads its settings from, the
+ *   page read only (its World setup is its own but fixed by its crop).
  *
  * Here is what the studio needs to know of each editor; the studio itself captures and restores a
  * group (MapStudio.revertWorldGroup), since that needs its private redraws.
  */
 export const WORLD_EDITORS = Object.freeze({
-    worldSetup: Object.freeze({ group: "setup", icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede" }),
-    worldCultures: Object.freeze({ group: "cultures", icon: "castle", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede" }),
-    worldAges: Object.freeze({ group: "ages", icon: "history", label: "FILRODENSWMB.UI.WorldAges", lede: "FILRODENSWMB.UI.WorldAgesLede" }),
-    worldNameStyle: Object.freeze({ group: "nameStyle", icon: "insert-text", label: "FILRODENSWMB.UI.WorldNameStyle", lede: "FILRODENSWMB.UI.WorldNameStyleLede" }),
+    // The frame's latitudes reach the climate, and through it the biomes (the Surface map's Climate
+    // tool from step 4c-2); its area factor and unit the scale bar, travel and the run's areas
+    worldSetup: Object.freeze({ groups: ["setup"], icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede", readBy: ["biomes", "cartography", "travel", "generate"] }),
+    // The cultures and the default naming style, one page (round 4c): every random name reads them
+    worldCultures: Object.freeze({ groups: ["cultures", "nameStyle"], icon: "groups", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede", readBy: ["generate", "history", "infrastructure", "regions", "labels", "features"] }),
+    worldAges: Object.freeze({ groups: ["ages"], icon: "history", label: "FILRODENSWMB.UI.WorldAges", lede: "FILRODENSWMB.UI.WorldAgesLede", readBy: ["generate", "history"] }),
     // A style's change reaches the map's own objects that use it (its cascade), so Styles and icons
     // keeps the map's undo rather than Revert changes (Ken, 2026-11-19)
-    library: Object.freeze({ group: "styles", icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary", lede: "FILRODENSWMB.UI.WorldStylesLede", undo: true }),
-    worldBiomes: Object.freeze({ group: "biomes", icon: "forest", label: "FILRODENSWMB.UI.WorldBiomes", lede: "FILRODENSWMB.UI.WorldBiomesLede" }),
-    worldClimate: Object.freeze({ group: "climate", icon: "water-drop", label: "FILRODENSWMB.UI.WorldClimate", lede: "FILRODENSWMB.UI.WorldClimateLede" }),
+    library: Object.freeze({ groups: ["styles", "icons"], icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary", lede: "FILRODENSWMB.UI.WorldStylesLede", undo: true, readBy: ["infrastructure", "regions", "labels", "generate"] }),
+    worldBiomes: Object.freeze({ groups: ["biomes"], icon: "forest", label: "FILRODENSWMB.UI.WorldBiomes", lede: "FILRODENSWMB.UI.WorldBiomesLede", readBy: ["biomes", "generate", "travel"] }),
+    // Until step 4c-2 makes it the Surface map's Climate tool
+    worldClimate: Object.freeze({ groups: ["climate"], icon: "water-drop", label: "FILRODENSWMB.UI.WorldClimate", lede: "FILRODENSWMB.UI.WorldClimateLede", readBy: ["biomes", "generate"] }),
 });
 
 /** The tools off every rail, with a Close back to the tool left: Worlds. */
@@ -116,29 +119,39 @@ export class WorldEditors {
     }
 
     /**
-     * The editor's head, as its template reads it (parts/world-editor-head.hbs).
+     * More rows than this and a page's table may shrink to scroll on a short window, down to its
+     * minimum height (the stylesheet's fwmb-world-table-wrap--scroll); a shorter one keeps its
+     * height, so it never collapses (Ken, 2026-11-20).
+     */
+    static SCROLL_ROWS = 4;
+
+    /**
+     * The page's head and intro, as its templates read them (parts/world-page-head.hbs and
+     * parts/world-editor-head.hbs).
      * @param {object} app
      * @param {object} options
      * @param {string} options.tool - The editor's tool id.
-     * @param {boolean} options.changed - Whether its group has changed in this sitting.
+     * @param {boolean} options.changed - Whether one of its groups has changed in this sitting.
      * @param {number} options.heldCount - How many regional worlds this world holds.
      * @param {string|null} options.heldBy - For a held regional world, the world its settings come from.
+     * @param {object[]} [options.readBy] - Its Read by chips (see MapStudio's #readByChips).
      */
-    static head(app, { tool, changed, heldCount, heldBy }) {
+    static head(app, { tool, changed, heldCount, heldBy, readBy = [] }) {
         const { i18n } = platform;
         const editor = WORLD_EDITORS[tool];
-        const surface = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
-        const readers = heldCount
-            ? i18n.format(heldCount === 1 ? "FILRODENSWMB.UI.WorldReachHeldOne" : "FILRODENSWMB.UI.WorldReachHeld", { map: surface, count: heldCount })
-            : i18n.format("FILRODENSWMB.UI.WorldReach", { map: surface });
+        let changes = i18n.localize("FILRODENSWMB.UI.WorldNoChanges");
+        if (editor.undo) changes = i18n.localize("FILRODENSWMB.UI.WorldStylesUndo");
+        else if (changed) changes = i18n.localize("FILRODENSWMB.UI.WorldChangedRuns");
         return {
-            group: editor.group,
+            tool,
             lede: i18n.localize(editor.lede),
-            reach: readers,
+            changes,
             changed,
-            changedLine: changed && !editor.undo ? i18n.localize(editor.group === "nameStyle" ? "FILRODENSWMB.UI.WorldChangedNames" : "FILRODENSWMB.UI.WorldChangedRuns") : null,
+            // The regional worlds a change reaches too, after the map tools that read it
+            heldReach: heldCount && !heldBy ? i18n.format(heldCount === 1 ? "FILRODENSWMB.UI.ReadByHeldOne" : "FILRODENSWMB.UI.ReadByHeld", { count: heldCount }) : null,
+            readBy,
             held: !!heldBy,
-            heldBanner: heldBy ? i18n.format(editor.group === "setup" ? "FILRODENSWMB.UI.WorldHeldSetup" : "FILRODENSWMB.UI.WorldHeldBanner", { name: heldBy }) : null,
+            heldBanner: heldBy ? i18n.format(editor.groups.includes("setup") ? "FILRODENSWMB.UI.WorldHeldSetup" : "FILRODENSWMB.UI.WorldHeldBanner", { name: heldBy }) : null,
             // Styles and icons: Undo, not Revert changes, takes a change back (see WORLD_EDITORS)
             undo: !!editor.undo,
             canRevert: changed && !heldBy && !editor.undo,

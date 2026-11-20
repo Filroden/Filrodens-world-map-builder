@@ -1,9 +1,10 @@
 {{!--
-    Ages and events (S0 step 4b): the world's ages, which every map's run lives through, each
-    opening in the age inspector. Read only on a held regional world. No undo: Revert changes puts
+    Ages and events (S0 step 4b; a page from step 4c-1, board C6): the world's ages, which every
+    map's run lives through, as a table, each opening in the age inspector (its events' places are
+    picked there on the Surface map until step 4c-2). Read only on a held regional world. No undo: Revert changes puts
     the list back (see WorldEditors).
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.held}} disabled{{/if}}>
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-ages.hbs"}}
 </fieldset>

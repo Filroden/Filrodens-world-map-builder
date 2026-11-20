@@ -102,7 +102,7 @@ export class GenerateAll {
         const content = await platform.templates.render(DIALOG_TEMPLATE, context);
         const buttons = [{ action: "cancel", label: i18n.localize(context.nothing ? "FILRODENSWMB.UI.Close" : "FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null }];
         if (!context.nothing) {
-            buttons.push({ action: "run", label: i18n.format(plan.run.length === 1 ? "FILRODENSWMB.UI.GenerateAllRunOne" : "FILRODENSWMB.UI.GenerateAllRun", { count: plan.run.length }), icon: "fwmb-icon fwmb-icon--generate", tone: "positive", default: true, callback: (form) => ({ save: !!(form.closest("dialog") ?? form).querySelector('input[name="saveWhenDone"]')?.checked }) });
+            buttons.push({ action: "run", label: i18n.format(plan.run.length === 1 ? "FILRODENSWMB.UI.GenerateAllRunOne" : "FILRODENSWMB.UI.GenerateAllRun", { count: plan.run.length }), icon: "fwmb-icon fwmb-icon--run", tone: "positive", default: true, callback: (form) => ({ save: !!(form.closest("dialog") ?? form).querySelector('input[name="saveWhenDone"]')?.checked }) });
         }
         const answer = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-generate-all-dialog"],

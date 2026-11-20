@@ -120,6 +120,13 @@
 .fwmb-icon--warning-mark {
     --fwmb-mask: url("../assets/icons/warning_mark.svg");
 }
+/* Generate's run arrow, and Cultures' people (round 4c; Material Symbols) */
+.fwmb-icon--run {
+    --fwmb-mask: url("../assets/icons/play_arrow.svg");
+}
+.fwmb-icon--groups {
+    --fwmb-mask: url("../assets/icons/groups.svg");
+}
 .fwmb-icon--tune {
     --fwmb-mask: url("../assets/icons/tune.svg");
 }
@@ -1651,6 +1658,13 @@
 }
 .fwmb-rail-group:first-child .fwmb-rail-stage {
     margin-top: 0.25rem;
+}
+/* The world's rail names its groups in two words (World settings, All maps): a name too long for
+   the rail's width wraps onto a second line rather than being cut short (round 4c) */
+.fwmb-rail--world .fwmb-rail-stage {
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
 }
 .fwmb-rail-btn {
     width: 2.25rem;
@@ -3201,9 +3215,41 @@
 .fwmb .fwmb-panel--board :is(.fwmb-panel-head, .fwmb-panel-scroll, .fwmb-panel-foot) {
     padding-inline: 1.25rem;
 }
+/* A board's content keeps clear of the studio's edge at its foot too, as at its sides (Ken,
+   2026-11-20): the panel's scroll has no padding at its end, a panel's last section being enough */
+.fwmb .fwmb-panel--board .fwmb-panel-scroll {
+    padding-block-end: 1.25rem;
+}
 .fwmb .fwmb-panel--board .fwmb-panel-close {
     margin-inline-start: auto;
     width: auto;
+}
+/* A world page (S0 step 4c-1; WorldPage) is a board beside the world's rail with its own head (see
+   the "v5 4c" block). While a homeland or an event's place is picked on the map from one, the page
+   gives way to the map and its context bar (board C10's state), the rail and inspector staying. */
+.fwmb .fwmb-studio:has(.fwmb-panel--picking) .fwmb-studio-body > .fwmb-context-panel {
+    display: none;
+}
+/* Below 1,200px the inspector lies over a world page rather than narrowing it, its labels stacked */
+.fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page) .fwmb-studio-body {
+    position: relative;
+}
+.fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page) .fwmb-studio-body > .fwmb-overlay-docked {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 5;
+    /* Lying over the page, it casts a shadow across it, so it reads as over the page, not beside it */
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
+}
+/* The page's head, its lede, Read by and the bars keep clear of the inspector lying over it, so
+   Revert changes, the Go buttons and the adding buttons stay in reach; only the tables run under it */
+.fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page):has(.fwmb-studio-body > .fwmb-overlay-docked[open]) :is(.fwmb-page-head, .fwmb-page-lede, .fwmb-page-body > .fwmb-readby, .fwmb-page-body > .fwmb-held, .fwmb-page-stack > :not(.fwmb-world-table-wrap)) {
+    padding-inline-end: calc(var(--fwmb-inspector-width) + 1.25rem);
+}
+.fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page) .fwmb-overlay-docked .fwmb-form-group {
+    flex-direction: column;
+    align-items: stretch;
 }
 .fwmb .fwmb-panel-head {
     flex: none;
@@ -3404,14 +3450,14 @@
 
 /* The world overview (S0 step 4; board W1), a board as Worlds is, beside the world's rail: its
    groups of cards in one column (the world's tools are the rail's) */
-.fwmb .fwmb-panel--board .fwmb-panel-scroll:has(> .fwmb-overview) {
-    padding: 0;
-    display: flex;
-}
 .fwmb .fwmb-overview {
-    flex: 1;
-    min-height: 100%;
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.fwmb .fwmb-card-opens .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
 }
 .fwmb .fwmb-overview-cards {
     align-items: stretch;
@@ -4894,6 +4940,393 @@
     .fwmb-filename .fwmb-input {
         height: 2.75rem;
         padding: 0 0.75rem;
+    }
+}
+
+/* ---------- v5 4c: world pages (round 4c, Ken 2026-11-19; the design system's WorldPage) ----------
+   World settings need no map, so the world's tools are pages: they fill the studio's body beside the
+   world's rail, with no canvas, and the docked inspector for the chosen row. What tells the world from
+   a map is the layout (a page, not a panel and canvas), not a colour: no new tokens. */
+.fwmb-world-page,
+.fwmb .fwmb-context-panel.fwmb-panel--page {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--fwmb-bg-base);
+}
+.fwmb-page-head {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 3.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--fwmb-bg-panel);
+    border-bottom: 1px solid var(--fwmb-border-main);
+}
+.fwmb-page-crumb {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+    color: var(--fwmb-text-muted);
+    font-size: 0.8125rem;
+}
+.fwmb-page-crumb .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb .fwmb-page-title {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font: 600 1.25rem/1.5rem var(--fwmb-font-display);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-page-head .fwmb-page-changes {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+}
+.fwmb-page-history {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-page-lede {
+    flex: none;
+    margin: 0;
+    padding: 0.5rem 1.25rem 0.625rem;
+    background: var(--fwmb-bg-panel);
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+}
+.fwmb .fwmb-panel-scroll.fwmb-page-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.875rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+/* Read by: the mirror of Peoples and realms' Read from the world, a Go a map tool that reads the page */
+.fwmb-readby {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-readby-head {
+    font: 700 0.6875rem/0.875rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-readby-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.875rem;
+    padding: 0 0.25rem 0 0.5rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 6px;
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+.fwmb-readby-chip .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-accent-main);
+}
+.fwmb-readby-chip .fwmb-readby-map {
+    color: var(--fwmb-text-muted);
+}
+.fwmb .fwmb-readby-chip .fwmb-btn--go {
+    height: 1.375rem;
+    min-height: 0;
+    padding: 0 0.4375rem;
+    font-size: 0.6875rem;
+}
+.fwmb-readby .fwmb-hint {
+    margin: 0;
+}
+/* The page's table: a row a biome, culture, age or style; the chosen row in the inspector */
+.fwmb-world-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 0.8125rem;
+}
+.fwmb .fwmb-world-table {
+    margin: 0;
+}
+/* Set in full: the host's table rules (bold, left-aligned heads with rounded corners) stay out */
+.fwmb .fwmb-world-table :is(thead, tbody, tr) {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    font-weight: 400;
+    text-align: start;
+}
+.fwmb .fwmb-world-table th {
+    text-align: start;
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-muted);
+    font: 700 0.6875rem/0.875rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: none;
+}
+.fwmb .fwmb-world-table td {
+    padding: 0.4375rem 0.625rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-secondary);
+    white-space: nowrap;
+    background: none;
+}
+.fwmb .fwmb-world-table td b {
+    color: var(--fwmb-text-primary);
+    font-weight: 700;
+}
+.fwmb-world-table tr:last-child td {
+    border-bottom: 0;
+}
+.fwmb .fwmb-world-table :is(th, td).fwmb-num {
+    text-align: end;
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-world-table td.fwmb-num {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-world-table tbody tr[data-list-item] {
+    cursor: pointer;
+}
+.fwmb .fwmb-world-table tbody tr[data-list-item]:hover td {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb .fwmb-world-table tr[aria-selected="true"] td {
+    background: var(--fwmb-bg-selected);
+}
+.fwmb-world-table tr[aria-selected="true"] td:first-child {
+    box-shadow: inset 3px 0 0 var(--fwmb-accent-secondary);
+}
+.fwmb-world-table tr[data-list-item]:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: -2px;
+}
+.fwmb .fwmb-world-table tr.fwmb-table-group td {
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-muted);
+    font: 700 0.6875rem/0.875rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: default;
+}
+/* A page's parts: a form's width, a stack of sections, the bar above a table, and the table's cells */
+.fwmb .fwmb-page-body > .fwmb-world-editor {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.fwmb .fwmb-page-form {
+    max-width: 40rem;
+}
+.fwmb .fwmb-page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.fwmb .fwmb-page-stack > :is(.fwmb-hint, .fwmb-section) {
+    margin: 0;
+}
+.fwmb .fwmb-world-table .fwmb-badge .fwmb-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+.fwmb-page-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-page-bar > .fwmb-section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0 auto 0 0;
+}
+.fwmb-table-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-table-name .fwmb-rule-indicator {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--fwmb-text-muted);
+}
+.fwmb .fwmb-world-table td.fwmb-table-wrap {
+    white-space: normal;
+}
+.fwmb .fwmb-world-table td.fwmb-table-later {
+    color: var(--fwmb-text-muted);
+}
+.fwmb .fwmb-world-table td.fwmb-table-actions {
+    width: 1%;
+    padding-block: 0;
+    text-align: end;
+}
+.fwmb .fwmb-world-table :is(td.fwmb-table-actions, .fwmb-table-actions) .fwmb-btn {
+    vertical-align: middle;
+}
+.fwmb .fwmb-world-table tr:is(.fwmb-table-naming, .fwmb-table-empty) td {
+    padding-block: 0.25rem;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-table-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-table-group-head .fwmb-btn {
+    margin-inline-start: auto;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.fwmb-table-used {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-table-used .fwmb-hint {
+    margin: 0;
+}
+.fwmb-table-used .fwmb-table-actions {
+    margin-inline-start: auto;
+}
+.fwmb-table-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-table-lock .fwmb-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: none;
+    color: var(--fwmb-accent-main);
+}
+/* A built-in biome's numbers in the inspector, read only; dt and dd set in full against the host's */
+.fwmb .fwmb-biome-readings {
+    margin: 0;
+    display: grid;
+    gap: 0.25rem;
+}
+.fwmb .fwmb-biome-reading {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.fwmb .fwmb-biome-reading :is(dt, dd) {
+    margin: 0;
+    padding: 0;
+    font-weight: 400;
+    text-shadow: none;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-biome-reading dd {
+    color: var(--fwmb-text-primary);
+}
+/* A page's table scrolls, not the page (Ken, 2026-11-20): the head, Read by and the bar above the
+   table stay in view; the table is as tall as its rows, never growing past them. A table of more
+   than a few rows (--scroll, WorldEditors.SCROLL_ROWS) shrinks to the height left once its rows
+   would run past it, but not below 10rem, where the page scrolls instead; a shorter one keeps its
+   height. Its column heads stay at its top while it scrolls */
+.fwmb .fwmb-page-body > .fwmb-world-editor.fwmb-page-stack {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.fwmb .fwmb-page-stack > :not(.fwmb-world-table-wrap) {
+    flex: none;
+}
+.fwmb .fwmb-world-table-wrap {
+    flex: none;
+    overflow: auto;
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+}
+.fwmb .fwmb-world-table-wrap--scroll {
+    flex: 0 1 auto;
+    min-height: 10rem;
+}
+.fwmb .fwmb-world-table-wrap > .fwmb-world-table {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+}
+.fwmb .fwmb-world-table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--fwmb-bg-panel);
+}
+/* The overview: what is in the world (solid) apart from the worlds cut from it (dashed) */
+.fwmb-world-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+    background: var(--fwmb-bg-panel);
+}
+.fwmb-world-group--related {
+    background: transparent;
+    border: 1px dashed var(--fwmb-border-strong);
+}
+.fwmb-world-group-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+.fwmb-world-group-head .fwmb-icon {
+    color: var(--fwmb-accent-main);
+    margin-top: 0.125rem;
+}
+.fwmb-world-group-head b {
+    display: block;
+    font: 600 0.875rem/1.25rem var(--fwmb-font-display);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-world-group-head .fwmb-hint {
+    display: block;
+    margin: 0;
+}
+@media (pointer: coarse) {
+    .fwmb-world-table td {
+        height: 2.75rem;
+    }
+    .fwmb-readby-chip {
+        height: 2.75rem;
+    }
+    .fwmb .fwmb-readby-chip .fwmb-btn--go {
+        height: 2.25rem;
     }
 }
 
@@ -6525,13 +6958,18 @@
    on one row: when it runs short it folds (data-fold, set by BarFold through StudioLayout), first
    moving the least-used modes into More, then showing the modes not in use as icons, then the
    sliders' labels as icons. The mode in use always keeps its label. */
-/* The context bar beside a world tool: the map shown, then the reminder that the world's
-   settings reach every map (S0 step 4); the reminder gives way first */
+/* The context bar while a world page gives way to the map (S0 step 4c-1): what is being placed
+   and for whom, the hint (which gives way first), and Done at the end (board C10) */
 .fwmb .fwmb-bar-world {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     min-width: 0;
+    flex: 1;
+}
+.fwmb .fwmb-bar-world-done {
+    margin-inline-start: auto;
+    flex: none;
 }
 .fwmb .fwmb-bar-world-map {
     display: inline-flex;

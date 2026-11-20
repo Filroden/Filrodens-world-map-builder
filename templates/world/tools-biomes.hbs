@@ -14,6 +14,14 @@
 
 
 
+{{!-- The rule coverage preview shows on the map, so it lives here rather than on the world's
+     Biomes page (S0 step 4c-1): hover it to light every area using a default biome --}}
+<div class="fwmb-btn-row">
+    <button type="button" class="fwmb-btn" id="fwmb-preview-fallback-btn" data-tooltip="{{localize 'FILRODENSWMB.UI.PreviewFallbackCoverageHint'}}">
+        <i class="fwmb-icon fwmb-icon--visibility" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.PreviewFallbackCoverage"}}
+    </button>
+</div>
+
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="biomeDisplay" title="FILRODENSWMB.UI.SectionDisplay" badge="FILRODENSWMB.UI.BadgeInstant" instant=true closed=true}}
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="biomeAlphaActive" label="FILRODENSWMB.UI.ActiveBiomeOpacity" value=(lookup uiState 'biomeAlphaActive') min=0 max=1 step=0.05}}
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="biomeAlphaInactive" label="FILRODENSWMB.UI.InactiveBiomeOpacity" value=(lookup uiState 'biomeAlphaInactive') min=0 max=1 step=0.05}}

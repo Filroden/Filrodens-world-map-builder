@@ -64,6 +64,12 @@ export class CultureMarkers {
         return cultureId ? current === cultureId : current !== null;
     }
 
+    /** The name of the culture whose homeland the next click adds, or null. */
+    static pickingName(app) {
+        const id = this.#picking.get(app) ?? null;
+        return id ? ((app.uiState.cultures ?? []).find((each) => each.id === id)?.name ?? null) : null;
+    }
+
     /** Add homeland: the next click on the map's land adds one; pressed again, it stops. */
     static togglePick(app, cultureId) {
         if (this.picking(app, cultureId)) this.stopPick(app);

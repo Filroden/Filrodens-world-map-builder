@@ -216,6 +216,7 @@ export class MapStudio {
         // --- Custom biomes, in the inspector (see BiomeEditor), and the dialogues ---
         addCustomBiome()        { BiomeEditor.add(this); },
         editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) BiomeEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        editBuiltInBiome(_e, t) { BiomeEditor.openBuiltIn(this, t.dataset.biomeKey, MapStudio.#FROM_LIST); },
         deleteCustomBiome(_e, t) { BiomeEditor.delete(this, MapStudio.#rowId(t)); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         // Add decoration's menu: an image of the user's (a dialogue) or one the module draws
@@ -294,7 +295,9 @@ export class MapStudio {
         showMap()                       { this.showMap(); },
         selectMapCard(e)                { this.#selectMapCard(e); },
         openWorldTool(_e, t)            { this.openWorldTool(t.dataset.tool, t.dataset.section); },
-        revertWorldGroup(_e, t)         { this.revertWorldGroup(t.dataset.group); },
+        revertWorldGroup(_e, t)         { this.revertWorldGroup(t.dataset.tool); },
+        goToMapTool(_e, t)              { this.goToMapTool(t.dataset.tool); },
+        stopWorldPick()                 { this.#stopWorldPick(); },
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
         nudgeReference(e, t)            { this._onNudgeReference(e, t); },
         randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
@@ -1066,8 +1069,12 @@ export class MapStudio {
             title: i18n.localize(entry?.label ?? ""),
             // Explore's tools read the map and change nothing on it
             tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
-            // A world settings editor's: what it edits is the world's, not this map's (board W2)
+            // A world settings editor's: what it edits is the world's, not this map's (board W2);
+            // it is drawn as a page with no canvas (round 4c), but while a homeland or an event's
+            // place is picked on the map
             worldTag: WorldEditors.isEditor(tool),
+            page: WorldEditors.isEditor(tool) && !this.#worldPicking(),
+            picking: WorldEditors.isEditor(tool) && this.#worldPicking(),
             meta,
             // Worlds is off every rail and closes from its own header; the world's tools are left by
             // choosing a map in the layer switcher
@@ -1362,10 +1369,11 @@ export class MapStudio {
 
             if (editableTools.includes(this.activeTool)) {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-${this.activeTool}.hbs`;
-            } else if (this.inWorld && this.activeTool !== "worldOverview") {
-                // A world tool beside the map: the map shown, and that the world's settings reach every map
+            } else if (WorldEditors.isEditor(this.activeTool) && this.#worldPicking()) {
+                // A world page giving way to the map while a homeland or an event's place is picked
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-world.hbs`;
                 context.bar.state = null;
+                context.worldPick = this.#worldPickContext();
             } else {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-empty.hbs`;
             }
@@ -1399,6 +1407,7 @@ export class MapStudio {
         }));
 
         context.biomeList = [...builtInBiomes, ...customBiomesMapped];
+        if (this.activeTool === "worldBiomes") context.biomeTable = BiomeEditor.table(this, context.biomeList);
         context.biomeGroups = MapStudio.#groupBiomesByPlacement(context.biomeList);
         context.layerGroups = this.#layerGroupsContext();
 
@@ -1480,7 +1489,10 @@ export class MapStudio {
         context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
         context.customRegionStyles = [...(this.uiState.customRegionStyles || [])].sort(alphaSort);
         // Styles and icons' style lists
-        if (this.activeTool === "library") context.styleLists = StyleLists.context(this);
+        if (this.activeTool === "library") {
+            context.styleLists = StyleLists.context(this);
+            context.styleCount = context.styleLists.reduce((sum, list) => sum + list.count, 0);
+        }
 
         if (regionId === "context") {
             context.toolPartial = `${TEMPLATE_ROOT}world/tools-${this.activeTool}.hbs`;
@@ -1533,13 +1545,21 @@ export class MapStudio {
             if (this.activeTool === "worldAges") context.generate = GeneratePanel.context(this);
 
             if (WorldEditors.isEditor(this.activeTool)) await this.#worldEditorContext(context);
-            if (this.activeTool === "worldOverview") {
-                context.overview = await WorldOverview.context(this, { dirtyGroups: this.#unsavedGroupNames() });
-                // A board beside the world's rail, in the map's place (board W1)
+            // A world page fills the body beside the world's rail, in the panel and map's place
+            if (context.panel.page) {
                 context.panel.board = true;
                 context.panel.boardRail = true;
-                context.panel.title = context.overview.title;
-                context.panel.meta = context.overview.line;
+            }
+            if (this.activeTool === "worldOverview") {
+                context.overview = await WorldOverview.context(this, { dirtyGroups: this.#unsavedGroupNames() });
+                // A page beside the world's rail, with no canvas (board C3): the world's name as its
+                // crumb and its line as the lede
+                context.panel.board = true;
+                context.panel.boardRail = true;
+                context.panel.page = true;
+                context.panel.overview = true;
+                context.panel.crumb = this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+                context.panel.worldEditor = { lede: context.overview.line };
             }
             if (this.activeTool === "manage") {
                 context.worlds = await WorldsPanel.context(this);
@@ -1767,7 +1787,7 @@ export class MapStudio {
         this.#layout.start();
 
         for (const [action, direction] of [["undoBrush", "undo"], ["redoBrush", "redo"]]) {
-            const button = this.view.root.querySelector(`[data-action="${action}"]`);
+            const button = this.view.root.querySelector(`.fwmb-map [data-action="${action}"]`);
             button?.addEventListener("pointerenter", () => this.#previewActionBounds(direction));
             button?.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
         }
@@ -2075,25 +2095,23 @@ export class MapStudio {
         this.#updateHistoryButtons();
     }
 
+    /**
+     * Undo and Redo, wherever they are drawn: the canvas's overlay, and the head of Styles and
+     * icons' page (S0 step 4c-1), which has no canvas but whose changes are undo steps of the map.
+     */
     #updateHistoryButtons() {
-        const undoBtn = this.root.querySelector('[data-action="undoBrush"]');
-        const redoBtn = this.root.querySelector('[data-action="redoBrush"]');
-
         const undoCount = this.globalHistoryLedger?.length ?? 0;
         const redoCount = this.globalRedoLedger?.length ?? 0;
-
-        if (undoBtn) {
-            // While a route is being placed, Undo takes its last waypoint back (see #processHistoryStep)
-            const drafting = RouteTool.drafting(this);
+        // While a route is being placed, Undo takes its last waypoint back (see #processHistoryStep)
+        const drafting = RouteTool.drafting(this);
+        for (const undoBtn of this.root.querySelectorAll('[data-action="undoBrush"]')) {
             undoBtn.disabled = undoCount === 0 && !drafting;
             if (drafting) undoBtn.dataset.tooltip = platform.i18n.localize("FILRODENSWMB.UI.UndoWaypoint");
             else undoBtn.dataset.tooltip = undoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Undo");
         }
-
-        if (redoBtn) {
+        for (const redoBtn of this.root.querySelectorAll('[data-action="redoBrush"]')) {
             redoBtn.disabled = redoCount === 0;
-            redoBtn.dataset.tooltip =
-                redoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Redo");
+            redoBtn.dataset.tooltip = redoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Redo");
         }
     }
 
@@ -2788,14 +2806,19 @@ export class MapStudio {
         CanvasHints.render(element, CanvasHints.getItems(context, { touch }), (key) => platform.i18n.localize(key));
     }
 
-    /** The list of canvas actions brought up to date outside a redraw (a culture's homeland pick starting or ending). */
+    /**
+     * The list of canvas actions brought up to date outside a redraw (a culture's homeland pick, or
+     * an event's place, starting or ending). On a world page the pick also swaps the page for the
+     * map and back (see #worldPicking).
+     */
     refreshCanvasHint() {
         this.#updateCanvasHint();
+        if (WorldEditors.isEditor(this.activeTool)) this.view?.render(["context", "editToolbar"]);
     }
 
     /** The id of the list row an action's button sits in. */
     static #rowId(target) {
-        return target.closest(".fwmb-list-item")?.dataset.id ?? null;
+        return target.closest(".fwmb-list-item, tr[data-list-item]")?.dataset.id ?? null;
     }
 
     /** The label a Labels list row names: its id, its owner's type ("custom" for a standalone label) and level. */
@@ -5787,12 +5810,87 @@ export class MapStudio {
         const parent = node?.parentId ? await WorldOverview.nodeOf(node.parentId) : null;
         context.worldEditor = WorldEditors.head(this, {
             tool: this.activeTool,
-            changed: this.worldGroupChanged(editor.group),
+            changed: editor.groups.some((group) => this.worldGroupChanged(group)),
             heldCount: (node?.children ?? []).filter((child) => child.held).length,
             heldBy: this.world?.held ? WorldsPanel.named(parent ?? { name: "" }) : null,
+            readBy: this.#readByChips(editor.readBy),
         });
-        if (this.activeTool === "worldNameStyle") context.generate = { nameBases: GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase) };
-        if (this.activeTool === "worldSetup") context.worldSetup = { isNew: this.#newWorldSetup };
+        if (context.panel?.page) {
+            context.panel.crumb = this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+            context.panel.worldEditor = context.worldEditor;
+        }
+        if (this.activeTool === "worldCultures") context.generate = { nameBases: GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase) };
+        // The world's frame as it is (its fields below are a new world's until step 4c-2)
+        if (this.activeTool === "worldSetup") context.worldSetup = { isNew: this.#newWorldSetup, width: this.mapWidth, height: this.mapHeight };
+    }
+
+    /**
+     * A world page's Read by (round 4c): a chip for each map tool that reads it, on each map that
+     * has the tool (S0: the Surface map), with a Go that switches to that map and opens the tool.
+     * An Explore tool needs a run to show anything, so its Go waits for one.
+     * @param {string[]} tools
+     */
+    #readByChips(tools = []) {
+        const { i18n } = platform;
+        const map = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
+        const hasRun = !!(this.modelRun || this.parentRun);
+        return tools
+            .map((id) => this.definition.tool(id))
+            .filter((entry) => entry && this.#isMapTool(entry.id) && this.definition.offers(entry.id, this.mapType, entry.mode))
+            .map((entry) => {
+                const name = i18n.localize(entry.label);
+                const explore = entry.mode === "explore";
+                return {
+                    tool: entry.id,
+                    icon: entry.icon,
+                    name,
+                    map: explore ? i18n.format("FILRODENSWMB.UI.ReadByExplore", { map }) : map,
+                    goLabel: i18n.format("FILRODENSWMB.UI.GoToOn", { name, map }),
+                    disabled: explore && !hasRun,
+                    tooltip: explore && !hasRun ? i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") : null,
+                };
+            });
+    }
+
+    /**
+     * A Read by chip's Go: the map that has the tool (S0: the Surface map), in the tool's mode, with
+     * the tool open. The World segment returns to the page left.
+     * @param {string} tool
+     */
+    async goToMapTool(tool) {
+        const entry = this.definition.tool(tool);
+        if (!entry || !this.#isMapTool(tool) || !this.definition.offers(tool, this.mapType, entry.mode)) return;
+        if (entry.mode === "explore" && !(this.modelRun || this.parentRun)) return;
+        Inspector.close(this);
+        this.mode = entry.mode;
+        await this.switchTool(tool, { force: true });
+        this.#rememberWorldMode();
+        this.view?.render(["worldbar", "toolbar"]);
+    }
+
+    /**
+     * Whether a homeland or an event's place is being picked on the map from a world page: the page
+     * gives way to the Surface map's canvas until the pick ends (until step 4c-2 moves both to each
+     * map's Peoples and realms).
+     */
+    #worldPicking() {
+        return CultureMarkers.picking(this) || AgeEventRows.picking(this);
+    }
+
+    /** What the picking bar names: what is being placed, and for which culture or event. */
+    #worldPickContext() {
+        const { i18n } = platform;
+        const culture = CultureMarkers.pickingName(this);
+        if (culture) return { label: i18n.localize("FILRODENSWMB.UI.PickingHomeland"), name: culture };
+        return { label: i18n.localize("FILRODENSWMB.UI.PickingEventPlace"), name: AgeEventRows.pickingName(this) ?? "" };
+    }
+
+    /** The picking bar's Done: the pick ends with nothing placed, and the page comes back. */
+    #stopWorldPick() {
+        CultureMarkers.stopPick(this);
+        AgeEventRows.stopPick(this);
+        this.view?.render(["context", "editToolbar"]);
+        Inspector.refresh(this);
     }
 
     /**
@@ -5805,9 +5903,9 @@ export class MapStudio {
         const nameBase = GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase).find((choice) => choice.selected);
         const row = (tool, icon, label, summary) => ({ tool, icon, label: i18n.localize(label), summary, goLabel: i18n.format("FILRODENSWMB.UI.GoTo", { name: i18n.localize(label) }) });
         return [
-            row("worldCultures", "castle", "FILRODENSWMB.UI.WorldCultures", count((this.uiState.cultures ?? []).length, "FILRODENSWMB.UI.ReadCulturesOne", "FILRODENSWMB.UI.ReadCultures")),
+            // The cultures and the default naming style are one page (round 4c, board C10)
+            row("worldCultures", "groups", "FILRODENSWMB.UI.WorldCultures", i18n.format("FILRODENSWMB.UI.ReadCulturesNaming", { cultures: count((this.uiState.cultures ?? []).length, "FILRODENSWMB.UI.ReadCulturesOne", "FILRODENSWMB.UI.ReadCultures"), naming: nameBase?.label ?? "" })),
             row("worldAges", "history", "FILRODENSWMB.UI.WorldAges", count((this.uiState.generatorSettings?.ages ?? []).length, "FILRODENSWMB.UI.ReadAgesOne", "FILRODENSWMB.UI.ReadAges")),
-            row("worldNameStyle", "insert-text", "FILRODENSWMB.UI.WorldNameStyle", nameBase?.label ?? ""),
         ];
     }
 
@@ -5831,35 +5929,64 @@ export class MapStudio {
     }
 
     /**
-     * Revert changes (a world settings editor): the group as it was before the first change in
-     * this sitting, in one step, then what it reaches drawn again. Like any change it marks the
-     * runs that read it out of date, and the world unsaved until saved.
-     * @param {string} group
+     * Revert changes (a world page): its groups as they were before the first change in this
+     * sitting, in one step, then what they reach drawn again. Like any change it marks the runs
+     * that read them out of date, and the world unsaved until saved.
+     * @param {string} tool - The page's tool id.
      */
-    async revertWorldGroup(group) {
-        if (this.world?.held || !this.worldGroupChanged(group)) return;
-        if (!WorldEditors.restore(this, this.#editorBaseline.values, group)) return;
-        this.#showRestoredFields(group);
-        switch (group) {
-            case "setup":
-                this.#applyWorldScale();
-                this._repaintVectors();
-                this.debouncedGenerateClimate();
-                this.#markGeneratorStale();
-                break;
-            case "climate":
-                this.debouncedGenerateClimate();
-                this.#markGeneratorStale();
-                break;
-            case "biomes":
-                this._repaintCanvas();
-                this.#markGeneratorStale();
-                break;
-            default:
-                break;
+    async revertWorldGroup(tool) {
+        const editor = WorldEditors.of(tool);
+        const groups = (editor?.groups ?? []).filter((group) => this.worldGroupChanged(group));
+        if (this.world?.held || editor?.undo || !groups.length) return;
+        // Revert changes cannot itself be taken back, and a sitting's work can be long, so it asks
+        // first, naming the page and that everything since the world was opened or saved goes
+        if (!(await this.#confirmRevert(editor))) return;
+        for (const group of groups) {
+            if (!WorldEditors.restore(this, this.#editorBaseline.values, group)) continue;
+            this.#showRestoredFields(group);
+            switch (group) {
+                case "setup":
+                    this.#applyWorldScale();
+                    this._repaintVectors();
+                    this.debouncedGenerateClimate();
+                    this.#markGeneratorStale();
+                    break;
+                case "climate":
+                    this.debouncedGenerateClimate();
+                    this.#markGeneratorStale();
+                    break;
+                case "biomes":
+                    this._repaintCanvas();
+                    this.#markGeneratorStale();
+                    break;
+                default:
+                    break;
+            }
         }
         this.markDirty();
         await this.view?.render(["context", "worldbar", "editToolbar"]);
+    }
+
+    /**
+     * Asks before Revert changes (Ken, 2026-11-20): it cannot be undone, so the page's whole sitting
+     * of work would otherwise go at one click. Cancel is the default.
+     * @param {object} editor - The page's entry in WORLD_EDITORS.
+     * @returns {Promise<boolean>} Whether to revert.
+     */
+    async #confirmRevert(editor) {
+        const { i18n } = platform;
+        const page = i18n.localize(editor.label);
+        const choice = await platform.dialogs.choose({
+            title: i18n.format("FILRODENSWMB.UI.WorldRevertTitle", { page }),
+            icon: "fwmb-icon fwmb-icon--history",
+            content: `<p>${Sanitize.escapeHtml(i18n.format("FILRODENSWMB.UI.WorldRevertConfirm", { page }))}</p>`,
+            buttons: [
+                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                { action: "revert", label: i18n.localize("FILRODENSWMB.UI.WorldRevert"), icon: "fwmb-icon fwmb-icon--history", tone: "negative" },
+            ],
+            dismissed: "cancel",
+        });
+        return choice === "revert";
     }
 
     /**

@@ -12,11 +12,11 @@
 {{#unless generate.held}}
 <div class="fwmb-generate-action">
     <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-action="generateWorld" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateRunHint'}}">
-        {{#if generate.hasRun}}{{localize "FILRODENSWMB.UI.GenerateAgain"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateRun"}}{{/if}}
+        <span class="fwmb-icon fwmb-icon--run" aria-hidden="true"></span>{{#if generate.hasRun}}{{localize "FILRODENSWMB.UI.GenerateAgain"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateRun"}}{{/if}}
     </button>
     {{!-- Every map of the world that needs it, in order (S0 step 4b; see GenerateAll) --}}
     <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="generateAll" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAllHint'}}">
-        <span class="fwmb-icon fwmb-icon--generate" aria-hidden="true"></span>{{generate.generateAllLabel}}
+        <span class="fwmb-icon fwmb-icon--run" aria-hidden="true"></span>{{generate.generateAllLabel}}
     </button>
 </div>
 {{/unless}}

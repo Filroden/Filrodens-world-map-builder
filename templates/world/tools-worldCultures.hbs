@@ -1,9 +1,25 @@
 {{!--
-    Cultures (S0 step 4b): the world's cultures, which every map's run reads, each opening in the
-    culture inspector (its homelands are picked on the map in view). Read only on a held regional
-    world. No undo: Revert changes puts the list back (see WorldEditors).
+    Cultures (S0 step 4b; a page from step 4c-1, boards C5 and C8): first Naming, the default naming
+    style (the fallback for places no culture names), then the world's cultures, which every map's
+    run reads, as a table, each opening in the culture inspector. Its homelands are picked there on
+    the Surface map until step 4c-2 moves them to each map's Peoples and realms. Read only on a held
+    regional world. No undo: Revert changes puts the list and the naming style back (see
+    WorldEditors).
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.held}} disabled{{/if}}>
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="naming" title="FILRODENSWMB.UI.SectionNaming"}}
+<div class="fwmb-form-group">
+    <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateDefaultNameStyle"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-generator-name-base" name="generator.nameBase">
+            {{#each generate.nameBases}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+</div>
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateDefaultNameStyleHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-cultures.hbs"}}
 </fieldset>

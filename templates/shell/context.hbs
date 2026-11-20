@@ -4,13 +4,17 @@
     a foot kept above and below the scroll (panelHeadPartial, panelFootPartial: Worlds' search and
     actions). A board panel (fwmb-panel--board) fills the studio's body beside the inspector in the
     map's place: Worlds with the rail hidden too, the world overview (fwmb-panel--board-rail)
-    beside the world's rail. While a brush is in use the
+    beside the world's rail. A world page (panel.page; S0 step 4c-1) is a board beside the world's
+    rail with its own head (parts/page-head.hbs) in the panel header's place; while a homeland or an
+    event's place is picked on the map from one (panel.picking) the panel gives way to the map. While
+    a brush is in use the
     sections whose settings regenerate the map are paused (fwmb-locked).
 --}}
-<form class="{{#if isLocked}}fwmb-locked{{/if}}{{#if panel.board}} fwmb-panel--board{{#if panel.boardRail}} fwmb-panel--board-rail{{/if}}{{/if}}" aria-label="{{panel.title}}">
-    {{> "modules/filrodens-world-map-builder/templates/shell/parts/panel-header.hbs"}}
+<form class="{{#if isLocked}}fwmb-locked{{/if}}{{#if panel.board}} fwmb-panel--board{{#if panel.boardRail}} fwmb-panel--board-rail{{/if}}{{/if}}{{#if panel.page}} fwmb-panel--page{{/if}}{{#if panel.picking}} fwmb-panel--picking{{/if}}" aria-label="{{panel.title}}">
+    {{#if panel.page}}{{> "modules/filrodens-world-map-builder/templates/shell/parts/page-head.hbs"}}
+    {{else}}{{> "modules/filrodens-world-map-builder/templates/shell/parts/panel-header.hbs"}}{{/if}}
     {{#if panelHeadPartial}}<div class="fwmb-panel-head">{{> (lookup . 'panelHeadPartial') }}</div>{{/if}}
-    <div class="fwmb-panel-scroll fwmb-scrollable">
+    <div class="fwmb-panel-scroll fwmb-scrollable{{#if panel.page}} fwmb-page-body{{/if}}">
         {{> (lookup . 'toolPartial') }}
         {{> "modules/filrodens-world-map-builder/templates/world/parts/state-block.hbs"}}
         {{> "modules/filrodens-world-map-builder/templates/shell/parts/next.hbs"}}

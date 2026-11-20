@@ -145,15 +145,16 @@ test("reserved styles: what a generator looks up, said on each lock; Delete refu
     assert.deepEqual([pins.rows.map((row) => row.name), pins.reserved.map((row) => row.name), pins.count], [["Mine"], ["Capital"], 2], "the reader's own, then the reserved under their heading");
     assert.deepEqual(lists.find((list) => list.type === "Route").reserved.map((row) => row.name), ["Trunk road"]);
     const box = await render("world/tools-library.hbs", { worldEditor: WorldEditors.head({}, { tool: "library", changed: true, heldCount: 0, heldBy: null }), styleLists: lists, builtinPinIcons: [], customPinIcons: [] });
-    const pinList = box.querySelector('[data-section="pinStyles"]');
-    assert.ok(pinList.querySelector(".fwmb-list-heading"));
-    const reservedRows = [...pinList.querySelectorAll(".fwmb-list-item.fwmb-is-reserved")];
+    // One table grouped by kind (S0 step 4c-1, board C7): a body a kind, the reserved after the reader's own
+    const pinList = box.querySelector('tbody[data-style-list="Pin"]');
+    assert.ok(pinList.querySelector(".fwmb-table-group"));
+    const reservedRows = [...pinList.querySelectorAll("tr.fwmb-is-reserved")];
     assert.equal(reservedRows.length, 1);
     assert.equal(reservedRows[0].querySelectorAll('[data-action="deleteStyle"]').length, 0, "no Delete");
-    assert.ok(reservedRows[0].querySelector(".fwmb-state-mark--held[data-tooltip]"), "the lock says what uses it");
-    assert.equal(pinList.querySelectorAll('.fwmb-list-item:not(.fwmb-is-reserved) [data-action="deleteStyle"]').length, 1, "the reader's own keeps Delete");
+    assert.match(reservedRows[0].querySelector(".fwmb-table-lock").textContent, /ReservedPinTier/, "the lock says what uses it");
+    assert.equal(pinList.querySelectorAll('tr[data-list-item]:not(.fwmb-is-reserved) [data-action="deleteStyle"]').length, 1, "the reader's own keeps Delete");
     assert.equal(box.querySelector('[data-action="revertWorldGroup"]'), null, "Styles and icons keeps the map's undo");
-    assert.match(box.querySelector(".fwmb-reach").textContent, /WorldStylesUndo/);
+    assert.ok(box.querySelector('.fwmb-page-bar [data-action="importSettings"]') && box.querySelector('.fwmb-page-bar [data-action="exportSettings"]'), "Import and Export styles at the head");
     const { StyleLists: Lists } = await import("../../src/studios/world/app/StyleLists.js");
     assert.equal(await Lists.delete(app, "Route", GENERATOR.ROUTE_STYLES.road.trunk), false, "Delete refused");
     assert.equal(app.uiState.customRouteStyles.length, 1);

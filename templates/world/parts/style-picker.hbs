@@ -1,12 +1,13 @@
 {{!--
     The style picker beside a styled kind's fields in the inspector (see InspectorFields): the
     style the object follows, or Custom, and Save as…, which makes a style from the object's
-    fields and connects the object to it.
+    fields and connects the object to it; then a Go to the world's Styles and icons, where the
+    styles are edited (S0 step 4c-1).
 
     Parameters:
       name: the select's name (regionQuickStyle, routeQuickStyle, labelQuickStyle)
       choices: InspectorFields.styleChoices: { value, name, selected }, Custom first
-      type: the style type Save as… makes (Region, Route, Label; see InspectorFields.STYLE_TYPES)
+      type: the style type Save as… makes (Pin, Region, Route, Label; see InspectorFields.STYLE_TYPES)
 --}}
 <div class="fwmb-form-group">
     <label class="fwmb-label" for="fwmb-inspector-{{name}}">{{localize "FILRODENSWMB.UI.InspectorStyle"}}</label>
@@ -18,4 +19,8 @@
         </select>
         <button type="button" class="fwmb-btn fwmb-btn--secondary" data-inspector-action="saveStyle" data-style-type="{{type}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveStyleAsHint'}}">{{localize "FILRODENSWMB.UI.SaveStyleAs"}}</button>
     </div>
+</div>
+<div class="fwmb-goto">
+    <p>{{localize "FILRODENSWMB.UI.StylesWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuStylesPath"}}</b></p>
+    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="library">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
 </div>

@@ -1,11 +1,53 @@
 {{!--
-    World setup (S0 step 4): what the world is made with. Its engine, seed and size make a new world
-    (Create new world, which asks about the open world first; New world opens here with Create
-    world); its latitudes, area factor and unit change in place, marking the runs out of date. On a
-    held regional world all of it is its own, fixed by its crop, and read only.
+    World setup (S0 step 4; a page from step 4c-1, boards C4 and C9): the world's frame, which every
+    map in it shares: its size (fixed once a map is made), latitudes, area factor and unit, the last
+    three changed in place, marking the runs out of date. Then, until step 4c-2 moves the terrain
+    engine and the seed to the Surface map's Map setup, what makes a new world: its engine, seed and
+    size (Create new world, which asks about the open world first; New world opens here with Create
+    world). On a held regional world all of it is its own, fixed by its crop, and read only.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-form"{{#if worldEditor.held}} disabled{{/if}}>
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldScale" title="FILRODENSWMB.UI.WorldSetupFrame" badge="FILRODENSWMB.UI.BadgeRebuildsClimate" rebuilds=true}}
+    <div class="fwmb-form-group">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.MapSize"}}</span>
+        <div class="fwmb-form-fields">
+            <span class="fwmb-readout">{{numberFormat worldSetup.width decimals=0}} × {{numberFormat worldSetup.height decimals=0}} {{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span>
+            <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.WorldSizeFixed"}}</span>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatTop'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatTop'}}" />
+            <span class="fwmb-times">{{localize "FILRODENSWMB.UI.LatitudeTo"}}</span>
+            <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatBottom'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatBottom'}}" />
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LatitudeHint'}}"></i>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label for="fwmb-area-factor">{{localize "FILRODENSWMB.UI.AreaFactor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="number" id="fwmb-area-factor" name="worldAreaFactor" value="{{worldAreaFactor}}" min="{{areaFactorRange.min}}" max="{{areaFactorRange.max}}" step="1" />
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.AreaFactorHint'}}"></i>
+        </div>
+    </div>
+
+    {{!-- The map's unit: the name every distance shown is labelled with (see MapUnit). Its input is
+         not named after the state key, so a save's read of the panel never parses it as a number --}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-map-unit">{{localize "FILRODENSWMB.UI.MapUnit"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-map-unit" name="mapUnitName" value="{{mapUnit}}" maxlength="{{fwmbTextLimit 'name'}}" aria-describedby="fwmb-pixel-scale" />
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MapUnitHint'}}"></i>
+        </div>
+    </div>
+    {{!-- What one pixel measures, written in place as the latitudes, area factor or unit change --}}
+    <p class="fwmb-hint" id="fwmb-pixel-scale" data-pixel-scale>{{pixelScale}}</p>
+
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generation" title="FILRODENSWMB.UI.WorldSetupNew" badge="FILRODENSWMB.UI.BadgeCreatesWorld"}}
     <div class="fwmb-form-group">
         <label for="fwmb-generation-engine">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
@@ -61,36 +103,4 @@
     </button>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldScale" title="FILRODENSWMB.UI.WorldSetupInPlace" badge="FILRODENSWMB.UI.BadgeRebuildsClimate" rebuilds=true}}
-    <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatTop'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatTop'}}" />
-            <span class="fwmb-times">{{localize "FILRODENSWMB.UI.LatitudeTo"}}</span>
-            <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" aria-label="{{localize 'FILRODENSWMB.UI.LatBottom'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LatBottom'}}" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LatitudeHint'}}"></i>
-        </div>
-    </div>
-
-    <div class="fwmb-form-group">
-        <label for="fwmb-area-factor">{{localize "FILRODENSWMB.UI.AreaFactor"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" id="fwmb-area-factor" name="worldAreaFactor" value="{{worldAreaFactor}}" min="{{areaFactorRange.min}}" max="{{areaFactorRange.max}}" step="1" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.AreaFactorHint'}}"></i>
-        </div>
-    </div>
-
-    {{!-- The map's unit: the name every distance shown is labelled with (see MapUnit). Its input is
-         not named after the state key, so a save's read of the panel never parses it as a number --}}
-    <div class="fwmb-form-group">
-        <label for="fwmb-map-unit">{{localize "FILRODENSWMB.UI.MapUnit"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-map-unit" name="mapUnitName" value="{{mapUnit}}" maxlength="{{fwmbTextLimit 'name'}}" aria-describedby="fwmb-pixel-scale" />
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MapUnitHint'}}"></i>
-        </div>
-    </div>
-    {{!-- What one pixel measures, written in place as the latitudes, area factor or unit change --}}
-    <p class="fwmb-hint" id="fwmb-pixel-scale" data-pixel-scale>{{pixelScale}}</p>
-
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 </fieldset>

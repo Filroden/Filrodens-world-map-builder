@@ -36,7 +36,6 @@ export const WORLD_DEFINITION = defineStudio({
         { id: "explore", label: "FILRODENSWMB.UI.StageExplore", numbered: false, optional: true },
     ],
     worldStages: [
-        { id: "world", label: "FILRODENSWMB.UI.StageWorld" },
         { id: "worldSettings", label: "FILRODENSWMB.UI.StageWorldSettings" },
         { id: "worldWhole", label: "FILRODENSWMB.UI.StageWorldWhole" },
     ],
@@ -64,17 +63,17 @@ export const WORLD_DEFINITION = defineStudio({
         tool("reference", null, "image", "FILRODENSWMB.UI.ToolReference"),
         tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage"),
         // The world's own (S0 step 4), on the world's rail (see WorldEditors)
-        tool("worldOverview", "world", "public", "FILRODENSWMB.UI.WorldOverview"),
+        tool("worldOverview", "worldSettings", "public", "FILRODENSWMB.UI.WorldOverview"),
         tool("worldSetup", "worldSettings", "tune", "FILRODENSWMB.UI.WorldSetup"),
-        tool("worldCultures", "worldSettings", "castle", "FILRODENSWMB.UI.WorldCultures"),
+        tool("worldCultures", "worldSettings", "groups", "FILRODENSWMB.UI.WorldCultures"),
         tool("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges"),
-        tool("worldNameStyle", "worldSettings", "insert-text", "FILRODENSWMB.UI.WorldNameStyle"),
         // Styles and icons keeps its v4.3 id (library): it left the map's rail for the world's
         tool("library", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
+        // Until S0 step 4c-2 makes it the Surface map's Climate tool (round 4c)
         tool("worldClimate", "worldSettings", "water-drop", "FILRODENSWMB.UI.WorldClimate"),
         // Generate all acts at once (its dialogue), with no panel of its own
-        { ...tool("worldGenerateAll", "worldWhole", "generate", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
+        { ...tool("worldGenerateAll", "worldWhole", "run", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
         later("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)

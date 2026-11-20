@@ -70,6 +70,11 @@
     </div>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectorBiomeRules" title="FILRODENSWMB.UI.BiomePlacedByClimate"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.BiomePlacedByClimateHint"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="openBiomeRuleEditor"><i class="fwmb-icon fwmb-icon--tune" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.RuleEditorOpen"}}</button>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
 </div>

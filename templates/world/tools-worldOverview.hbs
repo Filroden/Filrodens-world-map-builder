@@ -1,13 +1,15 @@
 {{!--
-    The world overview (S0 step 4; board W1), the world's rail's first tool: the open world's
-    maps, settlement maps and regional worlds as cards, in the map's place beside the world's rail
-    and the inspector. A card is chosen as in Worlds: one click shows it in the inspector, a second
+    The world overview (S0 step 4; a page from step 4c-1, board C3), the world's rail's first tool:
+    what is in the world (its maps and settlement maps, a solid group) apart from the regional
+    worlds cut from it (separate worlds reading its settings while held, a dashed group), as cards,
+    beside the world's rail and the inspector. A card is chosen as in Worlds: one click shows it in the inspector, a second
     goes to the map or opens the regional world. Parts a later track builds are drawn in their
     places, disabled: Add a map (Layers 1), the settlement maps (L-surface) and Cut regional
     world… (step 5). See WorldOverview.
 --}}
 <div class="fwmb-overview">
-    <section class="fwmb-overview-main" aria-label="{{localize 'FILRODENSWMB.UI.WorldOverview'}}">
+    <section class="fwmb-world-group" aria-labelledby="fwmb-overview-in">
+        <div class="fwmb-world-group-head"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span><div><b id="fwmb-overview-in">{{overview.inTitle}}</b><span class="fwmb-hint">{{localize "FILRODENSWMB.UI.OverviewInHint"}}</span></div></div>
         <div class="fwmb-overview-group">
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.OverviewMaps"}} <span class="fwmb-badge fwmb-badge--count">{{overview.maps.length}}</span></div>
             <div class="fwmb-cards fwmb-overview-cards">
@@ -30,6 +32,10 @@
             <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.OverviewSettlementsLater"}}</p>
         </div>
 
+    </section>
+
+    <section class="fwmb-world-group fwmb-world-group--related" aria-labelledby="fwmb-overview-related">
+        <div class="fwmb-world-group-head"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span><div><b id="fwmb-overview-related">{{overview.relatedTitle}}</b><span class="fwmb-hint">{{overview.relatedHint}}</span></div></div>
         <div class="fwmb-overview-group">
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.OverviewRegional"}} <span class="fwmb-badge fwmb-badge--count">{{overview.regional.length}}</span></div>
             <div class="fwmb-cards fwmb-overview-cards">
@@ -40,6 +46,7 @@
                         <span class="fwmb-card-title"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{this.name}}</span>
                         {{#if this.meta}}<span class="fwmb-card-meta fwmb-card-line">{{this.meta}}</span>{{/if}}
                         {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
+                        <span class="fwmb-card-meta fwmb-card-opens"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OverviewOpensOwn"}}</span>
                     </span>
                 </button>
                 {{/each}}

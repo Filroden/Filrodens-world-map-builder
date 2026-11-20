@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../../../config.js";
 import { Inspector } from "./Inspector.js";
+import { WorldEditors } from "./WorldEditors.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { ColorMath } from "../../../kernel/util/ColorMath.js";
@@ -10,6 +11,10 @@ import { platform } from "../../../platform/index.js";
 import { typed } from "../data/MapRules.js";
 
 const TEMPLATE = "modules/filrodens-world-map-builder/templates/world/parts/inspector-biome.hbs";
+const TEMPLATE_BUILT_IN = "modules/filrodens-world-map-builder/templates/world/parts/inspector-biome-builtin.hbs";
+
+/** How a number Generate reads is shown in the Biomes page's table. */
+const shown = (value) => (Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "–");
 
 /**
  * A custom biome in the inspector (see Inspector), opened from its row in Biomes' Edit biomes
@@ -54,6 +59,83 @@ export class BiomeEditor {
             delete: (app, biome) => BiomeEditor.delete(app, biome.id),
         },
     });
+
+    /**
+     * A built-in biome in the inspector (S0 step 4c-1, board C1): its name, its colour (the one
+     * thing of it the world changes), where it can lie and the numbers Generate reads of it, read
+     * only, and the rule editor, since the climate places it.
+     */
+    static openBuiltIn(app, key, options) {
+        return Inspector.open(app, this.BUILT_IN, { key: String(key ?? "") }, options);
+    }
+
+    /** A built-in biome by its key, as the inspector and the table show it, or null. */
+    static builtIn(app, key) {
+        if (!Object.hasOwn(FILRODENSWMB.BIOMES, key) || !Object.hasOwn(FILRODENSWMB.BIOME_IDS, key) || key.toLowerCase().startsWith("custom")) return null;
+        const rgb = app.customBiomeColors?.[key] || FILRODENSWMB.BIOMES[key];
+        const numbers = FILRODENSWMB.GENERATOR.BIOMES[key] ?? null;
+        return {
+            key,
+            name: platform.i18n.localize(`FILRODENSWMB.BIOMES.${key}`),
+            hex: ColorMath.rgbToHex(rgb),
+            where: platform.i18n.localize(BiomePlacement.labelOf(BiomePlacement.placementOfBuiltIn(key))),
+            properties: numbers ? FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => ({ label: property.label, hint: property.hint, value: shown(numbers[property.key]) })) : null,
+        };
+    }
+
+    static BUILT_IN = Object.freeze({
+        id: "builtInBiome",
+        template: TEMPLATE_BUILT_IN,
+        find: (app, { key }) => BiomeEditor.builtIn(app, key),
+        header: (_app, biome) => ({ title: biome.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleBuiltInBiome"), swatch: biome.hex }),
+        context: (_app, biome) => ({ biome, palette: FILRODENSWMB.LABELS?.PRESETS || [] }),
+        apply: (app, biome, _ref, form) => BiomeEditor.#applyBuiltIn(app, biome, form.elements),
+        actions: {},
+    });
+
+    /** A built-in biome's colour, as the world's: the map repainted, the table drawn again. */
+    static #applyBuiltIn(app, biome, elements) {
+        const hex = elements.biomeColor?.value;
+        if (!hex || hex.toLowerCase() === biome.hex.toLowerCase() || WorldEditors.readOnly(app)) return false;
+        app.customBiomeColors[biome.key] = ColorMath.hexToRgb(hex);
+        BiomeEditor.#redraw(app);
+        return true;
+    }
+
+    /**
+     * The Biomes page's table (S0 step 4c-1, board C1): a row a biome, built-in then custom, with its
+     * kind, where it can lie and the four numbers Generate reads; a custom biome with no numbers of
+     * its own says which biome it behaves like.
+     * @param {object} app
+     * @param {object[]} biomeList - The studio's biomes as the panels list them (built-in, then custom).
+     */
+    static table(app, biomeList) {
+        const { i18n } = platform;
+        const shownNow = Inspector.current(app);
+        const builtInKind = i18n.localize("FILRODENSWMB.UI.BiomeKindBuiltIn");
+        const customKind = i18n.localize("FILRODENSWMB.UI.BiomeKindCustom");
+        const keys = FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => property.key);
+        let builtIns = 0;
+        const rows = biomeList.map((entry) => {
+            const where = i18n.localize(BiomePlacement.labelOf(entry.placement));
+            if (!entry.isCustom) {
+                builtIns += 1;
+                const numbers = FILRODENSWMB.GENERATOR.BIOMES[entry.key];
+                return { key: entry.key, isCustom: false, name: i18n.localize(entry.label), hex: entry.hex, kind: builtInKind, where, numbers: keys.map((key) => shown(numbers?.[key])), selected: shownNow?.kind === BiomeEditor.BUILT_IN && shownNow.ref.key === entry.key };
+            }
+            const biome = BiomeEditor.find(app, entry.id);
+            const row = { id: entry.id, isCustom: true, name: entry.label, code: biome?.code ?? null, hex: entry.hex, kind: customKind, where, hasRules: (biome?.rules ?? []).length > 0, selected: shownNow?.kind === BiomeEditor.KIND && shownNow.ref.id === entry.id };
+            if (biome?.properties) return { ...row, numbers: keys.map((key) => shown(startingNumbers(biome)[key])) };
+            const like = biome?.behavesLike && FILRODENSWMB.GENERATOR.BIOMES[biome.behavesLike] ? i18n.localize(`FILRODENSWMB.BIOMES.${biome.behavesLike}`) : i18n.localize("FILRODENSWMB.UI.BiomeBehavesLikeUnderlying").toLowerCase();
+            return { ...row, behaves: i18n.format("FILRODENSWMB.UI.BiomeBehavesLikeRow", { name: like }) };
+        });
+        const custom = rows.length - builtIns;
+        return {
+            rows,
+            properties: FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => ({ label: property.label, hint: property.hint })),
+            count: i18n.format("FILRODENSWMB.UI.BiomeTableCount", { builtIn: builtIns, custom }),
+        };
+    }
 
     static #context(biome) {
         const numbers = startingNumbers(biome);

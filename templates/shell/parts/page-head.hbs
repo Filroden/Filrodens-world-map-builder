@@ -1,0 +1,26 @@
+{{!--
+    A world page's head (S0 step 4c-1; the design system's WorldPage): the world's name as a crumb,
+    the page's title and the World tag, then what this sitting has changed and Revert changes (on
+    Styles and icons, whose changes are undo steps of the map, Undo and Redo instead; a held regional
+    world's pages have neither), and the lede under it. The overview (panel.overview) has only the
+    crumb, its title and its line as the lede. See WorldEditors.head.
+--}}
+<div class="fwmb-page-head">
+    <span class="fwmb-page-crumb"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>{{panel.crumb}} ›</span>
+    <h2 class="fwmb-page-title">{{panel.title}}</h2>
+    {{#unless panel.overview}}
+    <span class="fwmb-tag" data-tooltip="{{localize 'FILRODENSWMB.UI.WorldTagHint'}}"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldTag"}}</span>
+    {{#unless panel.worldEditor.held}}
+    <span class="fwmb-page-changes">{{panel.worldEditor.changes}}</span>
+    {{#if panel.worldEditor.undo}}
+    <span class="fwmb-page-history">
+        <button type="button" class="fwmb-btn" data-action="undoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Undo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}"><span class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.Undo"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--square" data-action="redoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Redo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}"><span class="fwmb-icon fwmb-icon--redo" aria-hidden="true"></span></button>
+    </span>
+    {{else}}
+    <button type="button" class="fwmb-btn" data-action="revertWorldGroup" data-tool="{{panel.worldEditor.tool}}"{{#unless panel.worldEditor.canRevert}} disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.WorldRevertHint'}}"><span class="fwmb-icon fwmb-icon--history" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldRevert"}}</button>
+    {{/if}}
+    {{/unless}}
+    {{/unless}}
+</div>
+<p class="fwmb-page-lede">{{panel.worldEditor.lede}}</p>
