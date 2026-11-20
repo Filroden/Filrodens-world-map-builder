@@ -28,11 +28,13 @@ export class RegionalExtractor {
      * @param {boolean} [options.mesh] - False to leave out the regions and routes, which need the
      *     regional map's own mesh built: the crop fingerprint reads those from the parent instead
      *     (see CropFingerprint).
+     * @param {boolean} [options.align] - Whether the crop is fitted to the parent's grid (see
+     *     planCrop); the panel's tick (regionalAlignGrid) by default.
      * @returns {{payload: object, owners: Object<string, string>|null, plan: object}} The regional map's
      *     data, ready to save, the encoded owner arrays to save beside it (null for a map whose
      *     regions are polygons; see platform.store.saveMapData), and the crop as planCrop fitted it.
      */
-    static createPayload(app, drawnCropBox, { targetWidth: requestedWidth, mesh = true } = {}) {
+    static createPayload(app, drawnCropBox, { targetWidth: requestedWidth, mesh = true, align = app.uiState?.regionalAlignGrid !== false } = {}) {
         const state = platform.utils.deepClone(app.uiState);
         // Read before the state is scaled to the crop: the parent's own wind reach decides how
         // much of its ground beyond the crop the regional map's climate needs
@@ -40,7 +42,7 @@ export class RegionalExtractor {
 
         // 1. Size, zoom and grid. From here on the crop is the one the regional map actually
         // shows, fitted round the drawn one so its grid lines up with the parent's (see planCrop)
-        const plan = this.planCrop(drawnCropBox, requestedWidth ?? state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight);
+        const plan = this.planCrop(drawnCropBox, requestedWidth ?? state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight, { align });
         const { cropBox, zoomScale, targetWidth, targetHeight, gridSize } = plan;
 
         // 2. Mutate Map State Properties
@@ -253,7 +255,10 @@ export class RegionalExtractor {
      * The zoom is the same across and down, so the latitude range matches the terrain.
      *
      * A gridless parent has nothing to line up with: the zoom is the requested width divided by
-     * the crop's, and the crop keeps its corner (its height moves by under a pixel).
+     * the crop's, and the crop keeps its corner (its height moves by under a pixel). A crop cut
+     * without lining up with the grid (`align` false; Ken, 2026-11-20: on a hex grid the pattern
+     * repeats only every two rows or columns, so a small crop could land far from where it was
+     * drawn) is fitted the same way, and its grid does not line up with its parent's.
      *
      * Regional maps used to scale the grid with the zoom instead, so each parent cell stayed one
      * cell: a regional map of a regional map at x4 each time had a grid of 800 pixels on a 50 pixel
@@ -264,12 +269,14 @@ export class RegionalExtractor {
      * @param {{type: string, size: number}} grid - The parent's grid type ("none", "square", "hexR" or "hexC") and size.
      * @param {number} mapWidth - The parent's width.
      * @param {number} mapHeight - The parent's height.
+     * @param {{align?: boolean}} [options] - align false: keep the crop where it was drawn, the grid
+     *     not lined up (see above). True by default.
      * @returns {{cropBox: {x: number, y: number, width: number, height: number}, zoomScale: number, targetWidth: number, targetHeight: number, gridSize: number}}
      *   The crop the regional map shows, the zoom, the regional map's size and its grid size.
      */
-    static planCrop(cropBox, baseTargetWidth, grid, mapWidth, mapHeight) {
+    static planCrop(cropBox, baseTargetWidth, grid, mapWidth, mapHeight, { align = true } = {}) {
         const gridSize = Math.max(this.#MIN_GRID, Number(grid.size) || this.#MIN_GRID);
-        const period = this.#gridPeriod(grid.type, gridSize);
+        const period = align ? this.#gridPeriod(grid.type, gridSize) : null;
         const requestedWidth = Math.max(1, Math.round(baseTargetWidth));
         const drawnWidth = Math.max(1, cropBox.width);
 

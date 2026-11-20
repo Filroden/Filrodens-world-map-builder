@@ -29,12 +29,13 @@ export class CropFingerprint {
     /**
      * The fingerprint of a crop on the open map.
      * @param {object} app - The studio, with the parent map open and drawn.
-     * @param {{crop: {x: number, y: number, width: number, height: number}, width: number}} cut -
-     *     The crop in the parent's pixels (as the cut fitted it) and the regional map's width.
+     * @param {{crop: {x: number, y: number, width: number, height: number}, width: number, align?: boolean}} cut -
+     *     The crop in the parent's pixels (as the cut fitted it), the regional map's width, and
+     *     whether the cut fitted it to the grid (true unless said).
      * @returns {string} 8 hex digits.
      */
-    static of(app, { crop, width }) {
-        const { payload, plan } = RegionalExtractor.createPayload(app, crop, { targetWidth: width, mesh: false });
+    static of(app, { crop, width, align = true }) {
+        const { payload, plan } = RegionalExtractor.createPayload(app, crop, { targetWidth: width, mesh: false, align });
         const hash = new Hasher();
         hash.value(this.#content(payload));
         this.#regions(hash, app, plan.cropBox);

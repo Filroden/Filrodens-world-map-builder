@@ -292,6 +292,8 @@ export class MapStateManager {
             regionalTargetWidth: 1000,
             regionalTargetHeight: 1000,
             regionalInfill: false,
+            // Cut regional world…'s crop fitted to the map's grid, so the two grids line up (see RegionalExtractor.planCrop)
+            regionalAlignGrid: true,
         };
     }
 

@@ -1,9 +1,9 @@
 {{!--
     The context bar while a regional world's crop is drawn (Cut regional world…, S0 step 5): what
-    is being cut from, that the crop snaps to the grid, and Cancel (as Escape does).
+    is being cut from, whether the crop snaps to the grid, and Cancel (as Escape does).
 --}}
 <div class="fwmb-contents fwmb-bar-world">
     <span class="fwmb-bar-world-map"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{cut.bar}}</span>
-    <span class="fwmb-bar-world-hint">{{localize "FILRODENSWMB.UI.CutBarHint"}}</span>
+    <span class="fwmb-bar-world-hint">{{cut.barHint}}</span>
     <button type="button" class="fwmb-btn fwmb-bar-world-done" data-action="cancelCut">{{localize "FILRODENSWMB.UI.Cancel"}}</button>
 </div>

@@ -21,6 +21,7 @@
  *         cropFingerprint,        // FNV-1a hash (8 hex) of the parent's content reaching the crop, or null
  *         inheritedStrokes,       // how many strokes at the head of the map's history are the parent's
  *         cutBase,                // the hash (32 hex) of what the cut delivered, kept with the map, or null
+ *         gridAligned,            // whether the crop was fitted to the parent's grid (false: kept where drawn)
  *       }],
  *     }
  *
@@ -67,8 +68,8 @@ export class RegionalRecord {
     }
 
     /** One map's part of the record, every field present. */
-    static mapEntry({ mapId, sourceMapId = null, crop = null, zoom = null, rootZoom = null, size = null, parentRevision = null, parentSavedAt = null, cropFingerprint = null, inheritedStrokes = 0, cutBase = null }) {
-        return { mapId, sourceMapId, crop, zoom, rootZoom, size, parentRevision, parentSavedAt, cropFingerprint, inheritedStrokes, cutBase };
+    static mapEntry({ mapId, sourceMapId = null, crop = null, zoom = null, rootZoom = null, size = null, parentRevision = null, parentSavedAt = null, cropFingerprint = null, inheritedStrokes = 0, cutBase = null, gridAligned = true }) {
+        return { mapId, sourceMapId, crop, zoom, rootZoom, size, parentRevision, parentSavedAt, cropFingerprint, inheritedStrokes, cutBase, gridAligned: gridAligned !== false };
     }
 
     /** Whether a record is v5's (2a wrote a placeholder without a version). */
@@ -191,6 +192,8 @@ function checkEntry(entry) {
         cropFingerprint: typeof entry.cropFingerprint === "string" && FINGERPRINT.test(entry.cropFingerprint) ? entry.cropFingerprint : null,
         inheritedStrokes: Number.isInteger(entry.inheritedStrokes) && entry.inheritedStrokes >= 0 && entry.inheritedStrokes <= MAX_STROKES ? entry.inheritedStrokes : 0,
         cutBase: typeof entry.cutBase === "string" && BLOB_HASH.test(entry.cutBase) ? entry.cutBase : null,
+        // Every crop before this field was fitted to the grid
+        gridAligned: entry.gridAligned !== false,
     });
 }
 

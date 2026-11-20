@@ -19,6 +19,7 @@ const entry = {
     cropFingerprint: "deadbeef",
     inheritedStrokes: 12,
     cutBase: HASH,
+    gridAligned: true,
 };
 const record = () => RegionalRecord.create({ parentSettingsRevision: 2, cutAt: "2026-11-18T10:00:00.000Z", cutWith: { module: "5.0.0", terrainVersion: 3, generatorRevision: 4 }, maps: [entry] });
 
@@ -163,6 +164,14 @@ test("a chain that loops back on itself is read without end", () => {
     const { middle, top, byId } = chain({ printTop: "cccccccc" });
     Object.assign(top, { held: true, parentWorldId: "middle", regional: middle.regional });
     assert.ok(Array.isArray(RegionalRecord.staleness(middle, byId)));
+});
+
+test("a crop kept where it was drawn says so; a record from before the field was fitted to the grid", () => {
+    const free = RegionalRecord.check(RegionalRecord.create({ maps: [{ ...entry, gridAligned: false }] }));
+    assert.equal(free.maps[0].gridAligned, false);
+    const { gridAligned: _gone, ...older } = entry;
+    assert.equal(RegionalRecord.check({ ...record(), maps: [older] }).maps[0].gridAligned, true);
+    assert.equal(RegionalRecord.check({ ...record(), maps: [{ ...entry, gridAligned: "no" }] }).maps[0].gridAligned, true, "anything but false is the grid's");
 });
 
 test("the parent's fingerprints read safely", () => {

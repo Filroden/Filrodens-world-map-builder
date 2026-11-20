@@ -2120,7 +2120,7 @@ export class MapStudio {
 
     /** The regional map the crop makes (see RegionalExtractor.planCrop). */
     #planCrop(cropBox) {
-        return RegionalExtractor.planCrop(cropBox, this.uiState.regionalTargetWidth, { type: this.uiState.gridType, size: this.uiState.gridSize }, this.mapWidth, this.mapHeight);
+        return RegionalExtractor.planCrop(cropBox, this.uiState.regionalTargetWidth, { type: this.uiState.gridType, size: this.uiState.gridSize }, this.mapWidth, this.mapHeight, { align: this.uiState.regionalAlignGrid !== false });
     }
 
     /**
@@ -2441,6 +2441,13 @@ export class MapStudio {
         // Filling in a regional map when first opened is an option for the cut, not part of this map
         if (name === "regionalInfill") {
             this.uiState.regionalInfill = target.checked;
+            return;
+        }
+        // Lining the crop up with the grid is the cut's too: the crop is fitted again, and the panel says what it snaps to
+        if (name === "regionalAlignGrid") {
+            this.uiState.regionalAlignGrid = target.checked;
+            this.#syncCropLiveEdits("regionalTargetWidth");
+            this.view?.render(["context", "editToolbar"]);
             return;
         }
 
@@ -6716,10 +6723,14 @@ export class MapStudio {
         return {
             world: name,
             bar: i18n.format("FILRODENSWMB.UI.CutBar", { name }),
+            barHint: i18n.localize(grid && this.uiState.regionalAlignGrid !== false ? "FILRODENSWMB.UI.CutBarHint" : "FILRODENSWMB.UI.CutBarHintFree"),
             height: plan?.targetHeight ?? this.uiState.regionalTargetHeight,
             scale: plan ? this.#cropScaleText(plan) : "--",
             gridGo: i18n.format("FILRODENSWMB.UI.GoTo", { name: i18n.localize("FILRODENSWMB.UI.ToolCartography") }),
-            grid: grid ? i18n.format("FILRODENSWMB.UI.CutGridLine", { grid: i18n.localize(grid), size: this.uiState.gridSize }) : i18n.localize("FILRODENSWMB.UI.CutGridNone"),
+            // A map with a grid offers to keep the crop where it is drawn instead (Ken, 2026-11-20)
+            hasGrid: !!grid,
+            align: this.uiState.regionalAlignGrid !== false,
+            grid: !grid ? i18n.localize("FILRODENSWMB.UI.CutGridNone") : this.uiState.regionalAlignGrid === false ? i18n.format("FILRODENSWMB.UI.CutGridFree", { name }) : i18n.format("FILRODENSWMB.UI.CutGridLine", { grid: i18n.localize(grid), size: this.uiState.gridSize }),
             limit: this.#cropLimitText(),
             tooFine,
             infillOffered: this.#regionalInfillOffered(box, plan),
@@ -6755,7 +6766,7 @@ export class MapStudio {
         const name = (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.CutRegionalWorldName"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: parentName })))?.trim();
         if (!name) return;
         this.#cutReturn = null;
-        const cut = await this.#cutWorld({ crop: plan.cropBox, width: plan.targetWidth, name, infill: this.uiState.regionalInfill === true });
+        const cut = await this.#cutWorld({ crop: plan.cropBox, width: plan.targetWidth, name, infill: this.uiState.regionalInfill === true, align: this.uiState.regionalAlignGrid !== false });
         if (cut) await this.#openCutWorld(cut);
     }
 
@@ -6771,9 +6782,10 @@ export class MapStudio {
      * @param {number} options.width - The regional world's width in pixels.
      * @param {string} options.name
      * @param {boolean} options.infill - Fill it in when it first opens (where it is offered).
+     * @param {boolean} [options.align] - Fit the crop to this map's grid (see RegionalExtractor.planCrop).
      * @returns {Promise<{worldId: string, mapId: string, name: string}|null>}
      */
-    async #cutWorld({ crop, width, name, infill }) {
+    async #cutWorld({ crop, width, name, infill, align = true }) {
         const parent = this.world;
         const sourceMapId = this.currentSaveId;
         if (!parent || !sourceMapId) return null;
@@ -6783,12 +6795,12 @@ export class MapStudio {
             this.uiState.regionalInfill = infill;
             let cut;
             try {
-                cut = RegionalExtractor.createPayload(this, crop, { targetWidth: width });
+                cut = RegionalExtractor.createPayload(this, crop, { targetWidth: width, align });
             } finally {
                 this.uiState.regionalInfill = askedInfill;
             }
             const { payload, owners, plan } = cut;
-            const fingerprint = CropFingerprint.of(this, { crop: plan.cropBox, width: plan.targetWidth });
+            const fingerprint = CropFingerprint.of(this, { crop: plan.cropBox, width: plan.targetWidth, align });
             const base = await Blobs.pack(RegionalExtractor.cutBase(payload, owners));
 
             const { settings, mapData } = WorldSettings.split(payload);
@@ -6826,6 +6838,7 @@ export class MapStudio {
                             cropFingerprint: fingerprint,
                             inheritedStrokes: (payload.history ?? []).length,
                             cutBase: base.hash,
+                            gridAligned: align,
                         },
                     ],
                 }),
@@ -6878,7 +6891,7 @@ export class MapStudio {
         for (const child of children) {
             for (const entry of child.regional.maps) {
                 if (entry.sourceMapId !== mapId || !entry.cropFingerprint || !entry.crop?.parent || !entry.size) continue;
-                prints[child.id] = { ...prints[child.id], [entry.mapId]: CropFingerprint.of(this, { crop: entry.crop.parent, width: entry.size.width }) };
+                prints[child.id] = { ...prints[child.id], [entry.mapId]: CropFingerprint.of(this, { crop: entry.crop.parent, width: entry.size.width, align: entry.gridAligned !== false }) };
             }
         }
         world.childFingerprints = prints;
@@ -6936,7 +6949,7 @@ export class MapStudio {
             }
         }
         await Worlds.rename(old.id, oldName);
-        const cut = await this.#cutWorld({ crop: entry.crop.parent, width: entry.size.width, name, infill: this.uiState.regionalInfill === true });
+        const cut = await this.#cutWorld({ crop: entry.crop.parent, width: entry.size.width, name, infill: this.uiState.regionalInfill === true, align: entry.gridAligned !== false });
         if (cut) await this.#openCutWorld(cut);
         else await Worlds.rename(old.id, name);
     }

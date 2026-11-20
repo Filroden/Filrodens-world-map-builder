@@ -101,3 +101,21 @@ test("a scene's scale is a whole number from 1", () => {
     assert.equal(SceneExporter.sceneScale(undefined), 1);
     assert.equal(SceneExporter.sceneScale(Number.NaN), 1);
 });
+
+test("a crop kept where it is drawn (not lined up with the grid) keeps its corner and the zoom it gives, on any grid", () => {
+    for (const type of ["square", "hexR", "hexC"]) {
+        const grid = { type, size: 50 };
+        const drawn = { x: 1113, y: 507, width: 30, height: 24 };
+        const free = RegionalExtractor.planCrop(drawn, 1600, grid, PARENT.width, PARENT.height, { align: false });
+        assert.equal(free.cropBox.x, drawn.x, `${type}: the corner stays`);
+        assert.ok(Math.abs(free.cropBox.y - drawn.y) < 1, `${type}: within a pixel down`);
+        assert.ok(Math.abs(free.zoomScale - 1600 / 30) < 1e-9, `${type}: the zoom the crop gives`);
+        assert.equal(free.gridSize, 50, `${type}: the grid keeps its size`);
+        // Planned again from the crop it gave, it stays put (the fingerprint and Cut again… re-plan it)
+        const again = RegionalExtractor.planCrop(free.cropBox, free.targetWidth, grid, PARENT.width, PARENT.height, { align: false });
+        assert.ok(Math.abs(again.cropBox.x - free.cropBox.x) < 1e-9 && Math.abs(again.cropBox.y - free.cropBox.y) < 1e-6 && again.targetHeight === free.targetHeight, `${type}: re-planned the same`);
+        // Lined up, the same crop moves to the pattern's start
+        const lined = RegionalExtractor.planCrop(drawn, 1600, grid, PARENT.width, PARENT.height);
+        assert.ok(isWhole(lined.zoomScale, 1), `${type}: lined up, a whole zoom`);
+    }
+});

@@ -3,7 +3,7 @@
     the Surface map's canvas, beside the world's rail. Crop: the regional world's width, its height
     from the crop, the zoom, the ground a pixel (refused finer than REGIONAL_CROP.MIN_KM_PER_PX,
     which settlement maps will cover), the latitudes, and the grid the crop snaps to with a Go to
-    Cartography. What is cut: S0's one row, the Surface map. The new regional world: Fill in when
+    Cartography, and the tick to line the crop up with the grid or keep it where it is drawn. What is cut: S0's one row, the Surface map. The new regional world: Fill in when
     it first opens, and that it is held. Cancel and Cut regional world… are at the foot
     (tools-worldCut-foot.hbs). The readouts follow the crop as it is dragged (MapStudio's
     #showCropReadouts).
@@ -34,6 +34,12 @@
             <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
         </div>
     </div>
+    {{#if cut.hasGrid}}
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalAlignGridHint'}}">
+        <input type="checkbox" name="regionalAlignGrid" class="fwmb-checkbox" {{#if cut.align}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.RegionalAlignGrid"}}
+    </label>
+    {{/if}}
     <div class="fwmb-goto">
         <p>{{cut.grid}}</p>
         <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="goToMapTool" data-tool="cartography" data-section="grid" aria-label="{{cut.gridGo}}">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
