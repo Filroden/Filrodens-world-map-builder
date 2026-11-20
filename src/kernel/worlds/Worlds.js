@@ -66,10 +66,12 @@ export class Worlds {
      */
     static async tree() {
         const worlds = await Worlds.all();
+        const byId = (id) => worlds.get(id) ?? null;
         const nodes = new Map(
             [...worlds.values()].map((world) => {
                 const surface = (world.maps ?? []).find((map) => map.type === MAP_TYPES.SURFACE) ?? null;
                 const setup = world.settings?.setup ?? {};
+                const entry = RegionalRecord.forMap(world.regional, Worlds.mapOf(world));
                 return [
                     world.id,
                     {
@@ -80,7 +82,13 @@ export class Worlds {
                         held: world.held === true,
                         maps: (world.maps ?? []).map((map) => ({ ...map })),
                         thumbnail: surface?.thumbnail ?? null,
-                        marks: WorldRecord.marks(world),
+                        marks: WorldRecord.marks(world, byId),
+                        // Why it is Out of date (RegionalRecord.staleness), and its zoom from its parent
+                        stale: RegionalRecord.staleness(world, byId),
+                        zoom: entry?.zoom ?? null,
+                        // What Cut again… needs: the crop it was cut with, and whether v5 cut it
+                        cropKnown: !!(entry?.crop?.parent && entry?.size),
+                        migrated: world.regional?.migrated === true,
                         // World setup in brief, and when anything of the world was last saved changed
                         setup: { engine: typeof setup.engine === "string" ? setup.engine : null, seed: setup.seed ?? null, frame: setup.frame ?? null },
                         settingsSavedAt: world.settingsSavedAt ?? null,

@@ -21,11 +21,18 @@ export class RegionalExtractor {
     /**
      * Orchestrates the mathematical scaling and data translation for a regional crop.
      *
-     * @returns {{payload: object, owners: Object<string, string>|null}} The regional map's data, ready
-     *     to save, and the encoded owner arrays to save beside it (null for a map whose regions are
-     *     polygons; see platform.store.saveMapData).
+     * @param {object} app - The studio, with the parent map open.
+     * @param {{x: number, y: number, width: number, height: number}} drawnCropBox - The crop, in the parent's pixels.
+     * @param {object} [options]
+     * @param {number} [options.targetWidth] - The regional map's width (the panel's by default).
+     * @param {boolean} [options.mesh] - False to leave out the regions and routes, which need the
+     *     regional map's own mesh built: the crop fingerprint reads those from the parent instead
+     *     (see CropFingerprint).
+     * @returns {{payload: object, owners: Object<string, string>|null, plan: object}} The regional map's
+     *     data, ready to save, the encoded owner arrays to save beside it (null for a map whose
+     *     regions are polygons; see platform.store.saveMapData), and the crop as planCrop fitted it.
      */
-    static createPayload(app, drawnCropBox) {
+    static createPayload(app, drawnCropBox, { targetWidth: requestedWidth, mesh = true } = {}) {
         const state = platform.utils.deepClone(app.uiState);
         // Read before the state is scaled to the crop: the parent's own wind reach decides how
         // much of its ground beyond the crop the regional map's climate needs
@@ -33,7 +40,8 @@ export class RegionalExtractor {
 
         // 1. Size, zoom and grid. From here on the crop is the one the regional map actually
         // shows, fitted round the drawn one so its grid lines up with the parent's (see planCrop)
-        const { cropBox, zoomScale, targetWidth, targetHeight, gridSize } = this.planCrop(drawnCropBox, state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight);
+        const plan = this.planCrop(drawnCropBox, requestedWidth ?? state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight);
+        const { cropBox, zoomScale, targetWidth, targetHeight, gridSize } = plan;
 
         // 2. Mutate Map State Properties
         // A legacy regional parent does not record the size of the map at the top of its chain;
@@ -111,13 +119,41 @@ export class RegionalExtractor {
         // the regional map at for its scale (see DetailLevel.forScale), so its places and their
         // names appear as the zoom gives them room
         payload.detailLevel = Math.max(DetailLevel.current(app), DetailLevel.forScale(effectiveKmPerPx(payload)));
-        const owners = this.#meshVectors(app, payload, cropBox, zoomScale);
+        const owners = mesh ? this.#meshVectors(app, payload, cropBox, zoomScale) : null;
         // A regional map's own Fill in replaces only what it added itself: what the map it was cut
         // from filled in is inherited content on it, like that map's own run's
         for (const item of [...payload.mapPins, ...payload.mapRoutes]) if (item.generated) delete item.generated.infill;
         // Filled in once opened, when asked for and the regional map is close enough in (see Infilling)
         if (app.uiState.regionalInfill === true && payload.parentRun?.spacingPx >= FILRODENSWMB.INFILL.MIN_PARENT_PX) payload.infillPending = true;
-        return { payload, owners };
+        return { payload, owners, plan };
+    }
+
+    /**
+     * What a cut delivered, kept with the regional world's map as its `cutBase` blob (see
+     * RegionalRecord and Blobs): the land inputs (the strokes, faults, rivers and masks), the
+     * pins, routes, labels and decorations, the region levels with their owners, and the
+     * influences, as the cut gave them. A later release compares the map with it to tell the
+     * regional world's own edits from what it inherited (`claude/v5-r-regional-diff.md` §6).
+     * @param {object} payload - From createPayload.
+     * @param {Object<string, string>|null} owners - Its encoded owner arrays.
+     * @returns {object}
+     */
+    static cutBase(payload, owners) {
+        const pick = (key) => (payload[key] === undefined ? null : payload[key]);
+        return {
+            version: 1,
+            history: pick("history"),
+            tectonicFaults: pick("tectonicFaults"),
+            manualRivers: pick("manualRivers"),
+            landMasks: pick("landMasks"),
+            mapPins: pick("mapPins"),
+            mapRoutes: pick("mapRoutes"),
+            mapLabels: pick("mapLabels"),
+            mapDecorations: pick("mapDecorations"),
+            layerSets: pick("layerSets"),
+            owners: owners ?? null,
+            influences: pick("influences"),
+        };
     }
 
     /**
@@ -169,7 +205,6 @@ export class RegionalExtractor {
             childMapData: { mapWidth: payload.mapWidth, mapHeight: payload.mapHeight, seed: payload.seed, params: payload.params, world: payload.world },
             crop: { x: cropBox.x, y: cropBox.y },
             zoom: zoomScale,
-            idFactory: () => platform.utils.randomID(),
         });
         Object.assign(payload, fields);
         // The influences painted on the parent come too, on the regional map's own cells
@@ -489,7 +524,8 @@ export class RegionalExtractor {
 
             const point = river.path[entry];
             pins.push({
-                id: platform.utils.randomID(),
+                // From the river's id, so two cuts of the same crop give the same spring
+                id: `${river.id}-inflow`,
                 name: platform.i18n.localize("FILRODENSWMB.UI.RiverInflow"),
                 x: this.#clampInside((point.x - cropBox.x) * zoomScale, targetWidth),
                 y: this.#clampInside((point.y - cropBox.y) * zoomScale, targetHeight),

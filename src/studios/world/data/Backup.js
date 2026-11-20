@@ -248,8 +248,9 @@ function readManifest(bytes) {
 
 /**
  * The manifest's world records, checked as the store would hold them: each world's own fields,
- * its maps only those the backup holds (a map in one world only), its settings' known groups, and
- * its regional record through RegionalRecord.check. The settings reach the store only through the
+ * its maps only those the backup holds (a map in one world only), its settings' known groups, its
+ * regional record through RegionalRecord.check, and the fingerprints of the regional worlds it
+ * holds through RegionalRecord.checkChildFingerprints. The settings reach the store only through the
  * maps they are merged into, which MapImport checks as any map file.
  */
 function readWorlds(list, mapIds) {
@@ -268,6 +269,9 @@ function readWorlds(list, mapIds) {
         const record = WorldRecord.create({ id: world.id, name: Sanitize.typedText(world.name, "name"), settings, maps, parentWorldId: Sanitize.id(world.parentWorldId), held: world.held === true });
         if (Number.isInteger(world.settingsRevision) && world.settingsRevision >= 1) record.settingsRevision = world.settingsRevision;
         record.regional = RegionalRecord.check(world.regional);
+        // The fingerprints of the regional worlds it holds, so Out of date reads the same restored
+        const prints = RegionalRecord.checkChildFingerprints(world.childFingerprints);
+        if (Object.keys(prints).length) record.childFingerprints = prints;
         worlds.push(record);
     }
     // A world cannot be its own parent. (A parent the backup does not hold may still be saved where

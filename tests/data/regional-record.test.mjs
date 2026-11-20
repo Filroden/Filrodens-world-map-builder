@@ -108,3 +108,64 @@ test("a blob claiming to unpack past the limit is refused before it is inflated"
     bytes.set([size & 0xff, (size >> 8) & 0xff, (size >> 16) & 0xff, (size >>> 24) & 0xff], bytes.length - 4);
     assert.equal(await Blobs.unpack(bytes), null);
 });
+
+// ------------------------------------------------------------------ Out of date (S0 step 5)
+
+/** A chain: Aethoria, Westmarch cut from it (x4), Westmarch coast cut from Westmarch (x2), all held. */
+function chain({ printTop = "aaaaaaaa", printMiddle = "bbbbbbbb", migrated = false } = {}) {
+    const cut = (mapId, sourceMapId, fingerprint) => RegionalRecord.create({ parentSettingsRevision: 2, cutAt: "2026-11-18T10:00:00.000Z", migrated, maps: [{ ...entry, mapId, sourceMapId, cropFingerprint: fingerprint }] });
+    const top = { id: "top", name: "Aethoria", held: false, settingsRevision: 2, settingsSavedAt: "2026-11-19T09:00:00.000Z", maps: [{ id: "mTop", type: "surface", savedAt: "2026-11-20T09:00:00.000Z" }], childFingerprints: { middle: { mMiddle: printTop } } };
+    const middle = { id: "middle", name: "Westmarch", held: true, parentWorldId: "top", settingsRevision: 2, maps: [{ id: "mMiddle", type: "surface", savedAt: null }], regional: cut("mMiddle", "mTop", "aaaaaaaa"), childFingerprints: { coast: { mCoast: printMiddle } } };
+    const coast = { id: "coast", name: "Westmarch coast", held: true, parentWorldId: "middle", settingsRevision: 1, maps: [{ id: "mCoast", type: "surface" }], regional: cut("mCoast", "mMiddle", "bbbbbbbb") };
+    const worlds = new Map([top, middle, coast].map((world) => [world.id, world]));
+    return { top, middle, coast, byId: (id) => worlds.get(id) ?? null };
+}
+
+test("a regional world cut and unchanged since is not Out of date", () => {
+    const { top, middle, coast, byId } = chain();
+    for (const world of [top, middle, coast]) assert.deepEqual(RegionalRecord.staleness(world, byId), [], world.name);
+});
+
+test("rule 1: the parent saved with changes inside the crop marks it, and every world below (rule 3)", () => {
+    const { middle, coast, byId } = chain({ printTop: "cccccccc" });
+    assert.deepEqual(RegionalRecord.staleness(middle, byId), [{ rule: "crop", parentId: "top", parentName: "Aethoria", at: "2026-11-20T09:00:00.000Z" }]);
+    assert.deepEqual(RegionalRecord.staleness(coast, byId), [{ rule: "above", parentId: "middle", parentName: "Westmarch", at: null }]);
+});
+
+test("rule 1 on the middle world marks only the world cut from it", () => {
+    const { middle, coast, byId } = chain({ printMiddle: "cccccccc" });
+    assert.deepEqual(RegionalRecord.staleness(middle, byId), []);
+    assert.deepEqual(RegionalRecord.staleness(coast, byId).map((reason) => reason.rule), ["crop"]);
+});
+
+test("rule 2: the parent's settings saved changed since the cut", () => {
+    const { top, middle, byId } = chain();
+    top.settingsRevision = 3;
+    assert.deepEqual(RegionalRecord.staleness(middle, byId), [{ rule: "settings", parentId: "top", parentName: "Aethoria", at: "2026-11-19T09:00:00.000Z" }]);
+});
+
+test("a world cut before v5 is never Out of date, nor makes one below it so", () => {
+    const { middle, coast, top, byId } = chain({ printTop: "cccccccc", migrated: true });
+    top.settingsRevision = 9;
+    assert.deepEqual(RegionalRecord.staleness(middle, byId), []);
+    assert.deepEqual(RegionalRecord.staleness(coast, byId), []);
+});
+
+test("a parent with no fingerprint for the world (none worked out yet) does not mark it; a lost parent ends the climb", () => {
+    const { middle, coast, top, byId } = chain();
+    delete top.childFingerprints;
+    assert.deepEqual(RegionalRecord.staleness(middle, byId), []);
+    assert.deepEqual(RegionalRecord.staleness({ ...coast, parentWorldId: "gone" }, byId), []);
+    assert.deepEqual(RegionalRecord.staleness({ ...middle, held: false }, byId), [], "only a held world");
+});
+
+test("a chain that loops back on itself is read without end", () => {
+    const { middle, top, byId } = chain({ printTop: "cccccccc" });
+    Object.assign(top, { held: true, parentWorldId: "middle", regional: middle.regional });
+    assert.ok(Array.isArray(RegionalRecord.staleness(middle, byId)));
+});
+
+test("the parent's fingerprints read safely", () => {
+    assert.deepEqual(RegionalRecord.checkChildFingerprints({ w1: { m1: "deadbeef", m2: "nothex!!", "bad id!": "deadbeef" }, "bad id!": { m1: "deadbeef" }, w2: "x", w3: {} }), { w1: { m1: "deadbeef" } });
+    assert.deepEqual(RegionalRecord.checkChildFingerprints(null), {});
+});

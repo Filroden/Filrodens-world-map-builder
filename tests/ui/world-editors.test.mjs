@@ -71,7 +71,7 @@ test("the world's rail: World settings (the overview first) and All maps, none o
     const rail = WORLD_DEFINITION.worldRail("surface").map((stage) => `${stage.id}:${stage.tools.map((tool) => tool.id + (tool.later ? "(later)" : "")).join(",")}`);
     assert.deepEqual(rail, [
         "worldSettings:worldOverview,worldSetup,worldCultures,worldAges,library,worldBiomes",
-        "worldWhole:worldGenerateAll,worldCut(later)",
+        "worldWhole:worldGenerateAll,worldCut",
     ]);
     assert.equal(WORLD_DEFINITION.tool("worldNameStyle"), null, "the default naming style is Cultures'");
     assert.equal(WORLD_DEFINITION.tool("worldClimate"), null, "Climate base is the Surface map's Climate tool");
@@ -102,17 +102,20 @@ test("the world's rail: World settings (the overview first) and All maps, none o
     assert.ok(WorldEditors.isAside("manage") && !WorldEditors.isAside("worldBiomes"), "only Worlds closes back to the tool left");
 });
 
-test("the world's rail drawn: its tools open as the world's, Generate all acts, the part to come disabled with its tooltip", async () => {
-    const railStages = WORLD_DEFINITION.worldRail("surface").map((stage) => ({ ...stage, tools: stage.tools.map((tool) => ({ ...tool, action: tool.act ?? "openWorldTool", disabled: !!tool.later, tooltip: tool.later ? "later" : null })) }));
+test("the world's rail drawn: its tools open as the world's, Generate all acts, Cut regional world… off with why when it cannot cut", async () => {
+    const railStages = WORLD_DEFINITION.worldRail("surface").map((stage) => ({ ...stage, tools: stage.tools.map((tool) => ({ ...tool, action: tool.act ?? "openWorldTool", disabled: false, tooltip: null })) }));
     const box = await render("shell/toolbar.hbs", { railWorld: true, railStages, railOccasional: [], activeTool: "worldBiomes" });
     assert.ok(box.querySelector("nav.fwmb-rail--world"));
     assert.deepEqual([...box.querySelectorAll(".fwmb-rail-stage")].map((stage) => stage.textContent), ["StageWorldSettings", "StageWorldWhole"]);
     assert.equal(box.querySelector('[aria-current="page"]').dataset.tool, "worldBiomes");
-    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldCultures", "worldAges", "library", "worldBiomes"]);
+    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldCultures", "worldAges", "library", "worldBiomes", "worldCut"]);
     assert.equal(box.querySelector('[data-action="generateAll"]').dataset.tool, "worldGenerateAll");
-    const off = [...box.querySelectorAll('.fwmb-rail-btn[aria-disabled="true"]')];
-    assert.deepEqual(off.map((button) => button.getAttribute("aria-label")), ["CutRegionalWorld"]);
-    assert.ok(off.every((button) => !button.dataset.action && button.dataset.tooltip === "later"));
+    assert.deepEqual([...box.querySelectorAll('.fwmb-rail-btn[aria-disabled="true"]')], [], "nothing drawn for later");
+    // With no Surface map it can cut from, Cut regional world… is off with why (MapStudio's cutOff)
+    const cutOff = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldCut" ? { ...tool, disabled: true, tooltip: "NeedsSurfaceMap" } : tool)) }));
+    const offBox = await render("shell/toolbar.hbs", { railWorld: true, railStages: cutOff, railOccasional: [], activeTool: "worldOverview" });
+    const off = [...offBox.querySelectorAll('.fwmb-rail-btn[aria-disabled="true"]')];
+    assert.deepEqual(off.map((button) => [button.getAttribute("aria-label"), button.dataset.tooltip, button.dataset.action ?? null]), [["CutRegionalWorld", "NeedsSurfaceMap", null]]);
 });
 
 test("a group captured and put back: each editor's state, the biome colours included", () => {
@@ -175,7 +178,7 @@ test("a page's head: what this sitting changed, Revert changes or Undo, Read by 
     box = await page(held);
     assert.ok(box.querySelector("fieldset.fwmb-world-editor").disabled, "read only on a held world");
     assert.match(box.querySelector(".fwmb-held").textContent, /WorldHeldBanner Aethoria/);
-    assert.equal(box.querySelector('.fwmb-held [aria-disabled="true"]').textContent.trim(), "OpenParentSettings", "Open parent world settings waits for step 5");
+    assert.equal(box.querySelector('.fwmb-held [data-action="openParentSettings"]').textContent.trim(), "OpenParentSettings", "Open parent world settings opens the parent (S0 step 5)");
     assert.equal(box.querySelector('[data-action="revertWorldGroup"]'), null, "nothing to revert on a held world");
 
     box = await render("shell/parts/page-head.hbs", { panel: { title: "ToolLibrary", crumb: "Aethoria", worldEditor: styles } });
@@ -253,7 +256,12 @@ test("the overview's two groups: what is in the world, and the regional worlds c
     assert.equal(box.querySelector('[data-action="selectMapCard"]').getAttribute("aria-current"), "false");
     const regional = box.querySelector('[data-action="selectWorld"]');
     assert.deepEqual([regional.dataset.worldId, regional.getAttribute("aria-current")], ["w2", "true"]);
-    assert.equal(box.querySelectorAll('.fwmb-overview [aria-disabled="true"]').length, 2, "Add a map and Cut regional world… wait for their steps");
+    assert.equal(box.querySelectorAll('.fwmb-overview [aria-disabled="true"]').length, 1, "Add a map waits for its step");
+    assert.equal(box.querySelector('.fwmb-overview [data-action="openWorldTool"][data-tool="worldCut"]').querySelector(".fwmb-card-title").textContent, "CutRegionalWorld", "Cut regional world… opens the crop");
+    // Off, with why, when the Surface map cannot be cut from
+    const off = await render("world/tools-worldOverview.hbs", { overview: { ...overview, cutOff: "NeedsSurfaceMap" } });
+    const cut = [...off.querySelectorAll(".fwmb-world-group--related .fwmb-card--add")][0];
+    assert.deepEqual([cut.getAttribute("aria-disabled"), cut.dataset.tooltip, cut.dataset.action ?? null], ["true", "NeedsSurfaceMap", null]);
     assert.match(box.textContent, /OverviewSettlementsLater/);
     assert.equal(box.querySelector(".fwmb-overview-side"), null, "the world's tools are its rail's");
 });

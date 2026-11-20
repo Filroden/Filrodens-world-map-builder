@@ -258,3 +258,25 @@ test("Duplicate takes each map's card to the copy", async () => {
     assert.equal(copy.maps[0].run, true);
     assert.notEqual(copy.maps[0].id, world.maps[0].id);
 });
+
+test("Out of date (S0 step 5): the mark given every world, and the tree's reasons and zoom", async () => {
+    const parent = await Worlds.save({ world: null, name: "Aethoria", settings: SETTINGS, maps: [surface()] });
+    const mapId = parent.maps[0].id;
+    const child = await Worlds.save({ world: { parentWorldId: parent.world.id, held: true, regional: null }, asNew: true, name: "Westmarch", settings: { setup: {} }, maps: [surface()] });
+    const childMap = child.maps[0].id;
+    const record = RegionalRecord.create({ parentSettingsRevision: parent.world.settingsRevision, maps: [{ mapId: childMap, sourceMapId: mapId, crop: { parent: { x: 0, y: 0, width: 5, height: 5 }, root: null }, zoom: 4, size: { width: 20, height: 20 }, cropFingerprint: "aaaaaaaa" }] });
+    assert.equal(child.world.parentWorldId, parent.world.id, "a cut world saved as new under its parent");
+    assert.equal(child.world.held, true);
+    await platform.store.saveWorld({ ...child.world, regional: record });
+    await platform.store.saveWorld({ ...(await Worlds.get(parent.world.id)), childFingerprints: { [child.world.id]: { [childMap]: "aaaaaaaa" } } });
+    const node = async () => (await Worlds.tree())[0].children[0];
+    let westmarch = await node();
+    assert.deepEqual([westmarch.marks, westmarch.stale, westmarch.zoom, westmarch.cropKnown, westmarch.migrated], [["held"], [], 4, true, false]);
+
+    // The parent saved changed inside the crop: its fingerprint for the child moves
+    await platform.store.saveWorld({ ...(await Worlds.get(parent.world.id)), childFingerprints: { [child.world.id]: { [childMap]: "bbbbbbbb" } } });
+    westmarch = await node();
+    assert.deepEqual(westmarch.marks, ["held", "stale"]);
+    assert.deepEqual(westmarch.stale.map((reason) => [reason.rule, reason.parentName]), [["crop", "Aethoria"]]);
+    assert.deepEqual(WorldRecord.marks(await Worlds.get(child.world.id)), ["held"], "no stale mark without every world to read");
+});

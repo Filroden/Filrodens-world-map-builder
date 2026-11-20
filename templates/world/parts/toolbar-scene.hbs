@@ -1,19 +1,16 @@
-{{!-- New map's bar: a guided map's land mask modes (Select, which only picks masks, opening them
-     in the inspector; Land, Ocean), with random masks and maps and
-     the pause on regeneration; and Crop, which marks the area of a regional map (its size and the
-     Generate button are in the panel's Regional map section). --}}
+{{!-- Map setup's bar: a guided map's land mask modes (Select, which only picks masks, opening them
+     in the inspector; Land, Ocean), with random masks and maps and the pause on regeneration. The
+     crop of a regional world is Cut regional world…'s (S0 step 5). --}}
 {{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/shell/parts/bar-modes.hbs" group=this}}{{/each}}
 
 {{#if (eq uiState.generationEngine "guided")}}
-    {{#unless (eq uiState.sceneMode "crop")}}
-        <span class="fwmb-sep"></span>
-        <button type="button" class="fwmb-btn" data-action="generateRandomLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMaskHint'}}">
-            <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMask"}}
-        </button>
-        <button type="button" class="fwmb-btn" data-action="generateRandomLandMap" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMapHint'}}">
-            <i class="fwmb-icon fwmb-icon--travel-explore" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMap"}}
-        </button>
-        <span class="fwmb-sep"></span>
-        {{> "modules/filrodens-world-map-builder/templates/shell/parts/bar-pause.hbs"}}
-    {{/unless}}
+    <span class="fwmb-sep"></span>
+    <button type="button" class="fwmb-btn" data-action="generateRandomLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMaskHint'}}">
+        <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMask"}}
+    </button>
+    <button type="button" class="fwmb-btn" data-action="generateRandomLandMap" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMapHint'}}">
+        <i class="fwmb-icon fwmb-icon--travel-explore" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMap"}}
+    </button>
+    <span class="fwmb-sep"></span>
+    {{> "modules/filrodens-world-map-builder/templates/shell/parts/bar-pause.hbs"}}
 {{/if}}

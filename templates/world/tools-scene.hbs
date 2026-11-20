@@ -4,9 +4,9 @@
     as a world has one Surface map; Ken, 2026-11-20), which a made map takes only by being made again
     (Make the Surface map again…, which asks first: what is drawn on the map is lost, the world's
     settings are kept). Before the map is made, the same fields and Make Surface map at the panel's
-    foot. Then updating it to the latest engine; a guided map's land masks (drawn with the bar's
-    Land and Ocean modes); and a regional map cut from this one (the crop is the bar's Crop mode,
-    until step 5). The world's frame (size, latitudes, area factor and unit) is World setup's.
+    foot. Then updating it to the latest engine; and a guided map's land masks (drawn with the bar's
+    Land and Ocean modes). A regional world is cut from the world's rail (Cut regional world…, S0
+    step 5). The world's frame (size, latitudes, area factor and unit) is World setup's.
 --}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="terrainChoice" title="FILRODENSWMB.UI.SectionTerrain" badge=terrainChoice.badge}}
 <fieldset class="fwmb-held-fieldset"{{#if terrainChoice.held}} disabled{{/if}}>
@@ -95,45 +95,6 @@
             <i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
         </button>
     {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
-{{/if}}
-
-{{#if terrainChoice.made}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="regionalMap" title="FILRODENSWMB.UI.SectionRegionalMap" badge="FILRODENSWMB.UI.BadgeCreatesNewMap" closed=true}}
-    {{#if canCreateRegionalMap}}
-        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionalMapCropHint"}}</p>
-        <div class="fwmb-form-group">
-            <label>{{localize "FILRODENSWMB.UI.RegionalResolution"}}</label>
-            <div class="fwmb-form-fields">
-                <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" step="100" min="500" aria-label="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" />
-                <span class="fwmb-times">×</span>
-                <input type="number" name="regionalTargetHeight" value="{{lookup uiState 'regionalTargetHeight'}}" disabled aria-label="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
-                <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
-            </div>
-        </div>
-        <div class="fwmb-form-group" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalZoomHint'}}">
-            <label>{{localize "FILRODENSWMB.UI.RegionalZoom"}}</label>
-            <div class="fwmb-form-fields fwmb-setting-row--readout">
-                <strong id="fwmb-readout-regional-zoom">--</strong>
-            </div>
-        </div>
-        <div class="fwmb-form-group">
-            <label>{{localize "FILRODENSWMB.UI.RegionalLatitude"}}</label>
-            <div class="fwmb-form-fields fwmb-setting-row--readout">
-                <span>{{localize "FILRODENSWMB.UI.LatTop"}}: <strong id="fwmb-readout-lat-top">--&deg;</strong></span>
-                <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
-            </div>
-        </div>
-        <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalInfillHint'}}">
-            <input type="checkbox" name="regionalInfill" class="fwmb-checkbox" {{#if uiState.regionalInfill}}checked{{/if}} {{#unless regionalInfillOffered}}disabled{{/unless}} data-regional-infill />
-            {{localize "FILRODENSWMB.UI.RegionalInfill"}}
-        </label>
-        <button type="button" data-action="generateRegionalMap" class="fwmb-btn fwmb-btn--wide">
-            <i class="fwmb-icon fwmb-icon--map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
-        </button>
-    {{else}}
-        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionalMapNeedsUpdate"}}</p>
-    {{/if}}
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{/if}}
 
 {{!-- The world's frame, which every map shares --}}

@@ -169,7 +169,9 @@ test("a world in the inspector: its family's tree, what it is, Open and its acti
     assert.deepEqual(tree(coastBox), ["1:Aethoria", "2:Westmarch", "3:Westmarch coast*"], "the whole family, from the top");
     assert.deepEqual([...coastBox.querySelectorAll(".fwmb-worlds-family [data-inspector-action=showWorld]")].map((row) => row.dataset.worldId), [top.id, region.id], "every other row chooses its world");
     assert.deepEqual(actions(coastBox), ["open", "cloneAsNew", "duplicate", "exportWorld", "delete"]);
-    assert.ok(coastBox.querySelector(".fwmb-action-row[disabled]").textContent.includes("WorldCutAgain"), "Cut again is shown, off");
+    // Cut again… on a held regional world: off here, its crop unknown (no v5 record)
+    const again = [...coastBox.querySelectorAll(".fwmb-action-row")].find((row) => row.textContent.includes("WorldCutAgain"));
+    assert.ok(again && again.getAttribute("aria-disabled") === "true" && again.dataset.tooltip === "CutAgainNoCrop" && !again.dataset.inspectorAction, "Cut again is shown, off, with why");
     assert.match(coastBox.textContent, /WorldAboutHeld Westmarch/);
     assert.equal(WorldEditor.header(app, WorldsPanel.find(app, region.id)).subtitle, "WorldKindRegional");
 

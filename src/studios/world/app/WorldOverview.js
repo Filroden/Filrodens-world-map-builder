@@ -3,7 +3,7 @@ import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { platform } from "../../../platform/index.js";
 import { Inspector } from "./Inspector.js";
 import { RunInputs } from "./RunInputs.js";
-import { WorldsPanel } from "./WorldsPanel.js";
+import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
 
 /** The engines' short names, as World setup and Worlds name them. */
 const ENGINES = Object.freeze({
@@ -57,6 +57,10 @@ export class WorldOverview {
             // A world with no maps yet offers to make its Surface map (board N3)
             maps: app.surfaceMade === false ? [] : [surfaceCard],
             regional,
+            // Cut regional world… (S0 step 5), off with why when the Surface map cannot be cut from
+            cutOff: app.cutOff?.() ?? null,
+            // A held regional world: what it was cut from, at what zoom, why it is Out of date, Cut again…
+            cutFrom: node?.held && node.parentId ? WorldOverview.#cutFrom(app, node) : null,
         };
     }
 
@@ -84,6 +88,19 @@ export class WorldOverview {
                 ...(stale ? [{ kind: "stale", icon: "warning-mark", label: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate") }] : []),
                 ...(older ? [{ kind: "older", icon: "history", label: i18n.localize("FILRODENSWMB.UI.MarkOlderGenerator") }] : []),
             ],
+        };
+    }
+
+    /** A held regional world's "Cut from" note (see context). */
+    static #cutFrom(app, node) {
+        const { i18n } = platform;
+        const parentName = node.parentName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const zoom = Number.isFinite(node.zoom) ? i18n.format("FILRODENSWMB.UI.RegionalZoomValue", { zoom: new Intl.NumberFormat(i18n.lang, { maximumFractionDigits: 1 }).format(node.zoom) }) : null;
+        return {
+            id: node.id,
+            line: zoom ? i18n.format("FILRODENSWMB.UI.OverviewCutFromZoom", { name: parentName, zoom }) : i18n.format("FILRODENSWMB.UI.OverviewCutFromLine", { name: parentName }),
+            stale: WorldsPanel.staleLines(node),
+            again: WorldEditor.cutAgain(app, node),
         };
     }
 

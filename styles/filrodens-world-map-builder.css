@@ -3401,11 +3401,16 @@
 /* Map setup's foot while the Surface map is not made (board N4): Make Surface map, full width */
 .fwmb .fwmb-make-foot {
     display: flex;
+    gap: 0.5rem;
     padding-inline: 0.75rem;
 }
 .fwmb .fwmb-make-foot .fwmb-btn {
     flex: 1;
     justify-content: center;
+}
+/* Cut regional world…'s foot: Cut over Cancel, each the panel's width, so neither wraps in Foundry's narrower panel */
+.fwmb .fwmb-make-foot--stack {
+    flex-direction: column-reverse;
 }
 .fwmb .fwmb-worlds-foot {
     display: grid;
@@ -9577,4 +9582,74 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 .fwmb .fwmb-shortcuts-table tr:nth-child(even) {
     background: none;
+}
+
+/* v5, S0 step 5: regional worlds. Cut regional world…'s "What is cut" row; a regional world's zoom
+   in the family tree; why a world is Out of date on its held banner and in the inspector; and, in
+   the world bar, Out of date beside the name and, while a regional world's parent is open for its
+   settings, whose they are with Back to. */
+.fwmb .fwmb-cut-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.375rem 0;
+}
+.fwmb .fwmb-cut-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-cut-row-text b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb .fwmb-tree-zoom {
+    margin-inline-start: auto;
+    font: 400 0.6875rem/1 var(--fwmb-font-ui);
+    color: var(--fwmb-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb .fwmb-held-stale {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375rem;
+    color: var(--fwmb-text-primary);
+}
+.fwmb .fwmb-held-stale .fwmb-icon {
+    flex: none;
+    color: var(--fwmb-color-warning);
+}
+.fwmb .fwmb-held > .fwmb-btn,
+.fwmb .fwmb-notice > .fwmb-btn {
+    align-self: flex-start;
+}
+.fwmb .fwmb-inspector-notice {
+    margin: 0 0 0.5rem;
+}
+.fwmb .fwmb-overview-cut {
+    margin: 0;
+    max-width: 36rem;
+}
+.fwmb-worldbar .fwmb-worldbar-stale {
+    flex: none;
+    margin-inline-start: 0.25rem;
+}
+.fwmb-worldbar .fwmb-worldbar-back {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: none;
+    margin-inline-start: 0.5rem;
+    padding-inline-start: 0.5rem;
+    border-inline-start: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-worldbar .fwmb-worldbar-for {
+    font-size: 0.75rem;
+    color: var(--fwmb-text-secondary);
+    white-space: nowrap;
+}
+.fwmb-worldbar:is([data-fold="3"], [data-fold="4"], [data-fold="5"]) .fwmb-worldbar-for {
+    display: none;
 }

@@ -119,6 +119,63 @@ export class MapDialogManager {
     }
 
     /**
+     * Cut again… (S0 step 5; Ken, 2026-11-20): a new regional world is cut afresh from the same
+     * crop of its parent and takes this one's name; this one is kept, renamed, with its edits and
+     * the regional worlds cut from it.
+     * @param {string} name - The regional world's name.
+     * @param {string} parentName - The world it was cut from.
+     * @param {string} oldName - The name it is kept under.
+     * @returns {Promise<boolean>} Whether to cut again.
+     */
+    static async promptCutAgain(name, parentName, oldName) {
+        const { i18n } = platform;
+        const escape = (text) => Sanitize.escapeHtml(text);
+        const choice = await platform.dialogs.choose({
+            title: i18n.format("FILRODENSWMB.UI.CutAgainTitle", { name }),
+            icon: "fwmb-icon fwmb-icon--crop",
+            content: `<p>${escape(i18n.format("FILRODENSWMB.UI.CutAgainBody", { name, parent: parentName }))}</p><p>${escape(i18n.format("FILRODENSWMB.UI.CutAgainKept", { old: oldName }))}</p>`,
+            buttons: [
+                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                { action: "cut", label: i18n.localize("FILRODENSWMB.UI.CutAgainConfirm"), tone: "positive" },
+            ],
+            dismissed: "cancel",
+        });
+        return choice === "cut";
+    }
+
+    /**
+     * Open parent world settings, from a held regional world (S0 step 5; Ken, 2026-11-20): what
+     * happens, said before it does, with the regional world's unsaved changes asked about in the
+     * same dialogue.
+     * @param {string} name - The regional world.
+     * @param {string} parentName - The world its settings come from.
+     * @param {boolean} dirty - Whether the regional world has unsaved changes.
+     * @returns {Promise<"save"|"open"|"cancel">}
+     */
+    static async promptOpenParentSettings(name, parentName, dirty) {
+        const { i18n } = platform;
+        const escape = (text) => Sanitize.escapeHtml(text);
+        const lines = [i18n.format("FILRODENSWMB.UI.OpenParentBody", { name, parent: parentName }), i18n.format("FILRODENSWMB.UI.OpenParentBack", { name })];
+        if (dirty) lines.push(i18n.format("FILRODENSWMB.UI.OpenParentUnsaved", { name }));
+        return platform.dialogs.choose({
+            title: i18n.format("FILRODENSWMB.UI.OpenParentTitle", { parent: parentName }),
+            icon: "fwmb-icon fwmb-icon--open-in-new",
+            content: lines.map((line) => `<p>${escape(line)}</p>`).join(""),
+            buttons: dirty
+                ? [
+                      { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                      { action: "open", label: i18n.localize("FILRODENSWMB.UI.OpenParentDiscard"), tone: "negative" },
+                      { action: "save", label: i18n.localize("FILRODENSWMB.UI.OpenParentSave"), tone: "positive" },
+                  ]
+                : [
+                      { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                      { action: "open", label: i18n.format("FILRODENSWMB.UI.OpenParentConfirm", { parent: parentName }), tone: "positive" },
+                  ],
+            dismissed: "cancel",
+        });
+    }
+
+    /**
      * Asks to save the open map before a regional map is cut from it, because it has never been
      * saved or has unsaved changes. A regional map is listed under the saved map it was cut from,
      * and is built from the map as it is now, so without a save it would have no parent in the

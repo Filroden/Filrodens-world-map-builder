@@ -280,6 +280,13 @@ test("a format 2 backup holds the worlds and blobs, and hands each map back with
     assert.equal(backup.blobBytes("../manifest"), null);
 });
 
+test("a format 2 backup keeps the fingerprints a world holds for its regional worlds (S0 step 5)", () => {
+    const { bytes } = worldsBackup({ worlds: (list) => [{ ...list[0], childFingerprints: { worldRegionAAAAA: { mapRegionAAAAAAA: "deadbeef", bad: "zz" } } }, list[1]] });
+    const [top, region] = Backup.read(bytes).worlds;
+    assert.deepEqual(top.childFingerprints, { worldRegionAAAAA: { mapRegionAAAAAAA: "deadbeef" } });
+    assert.equal(region.childFingerprints, undefined);
+});
+
 test("a format 2 backup keeps each map's card", () => {
     const thumbnail = "data:image/jpeg;base64,/9j/4A==";
     const { bytes } = worldsBackup({ worlds: (list) => [{ ...list[0], maps: [{ ...list[0].maps[0], thumbnail, run: true, older: false }] }, list[1]] });

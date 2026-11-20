@@ -3,9 +3,10 @@
     what is in the world (its maps and settlement maps, a solid group) apart from the regional
     worlds cut from it (separate worlds reading its settings while held, a dashed group), as cards,
     beside the world's rail and the inspector. A card is chosen as in Worlds: one click shows it in the inspector, a second
-    goes to the map or opens the regional world. Parts a later track builds are drawn in their
-    places, disabled: Add a map (Layers 1), the settlement maps (L-surface) and Cut regional
-    world… (step 5). See WorldOverview.
+    goes to the map or opens the regional world. Cut regional world… opens the crop (S0 step 5),
+    off with why when the Surface map cannot be cut from; a held regional world says what it was
+    cut from, why it is Out of date, and offers Cut again…. Parts a later track builds are drawn in
+    their places, disabled: Add a map (Layers 1) and the settlement maps (L-surface). See WorldOverview.
 --}}
 <div class="fwmb-overview">
     <section class="fwmb-world-group" aria-labelledby="fwmb-overview-in">
@@ -19,7 +20,7 @@
                     <span class="fwmb-card-body">
                         <span class="fwmb-card-title"><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span>{{this.name}}</span>
                         <span class="fwmb-card-meta fwmb-card-line">{{this.meta}}</span>
-                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
+                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
                     </span>
                 </button>
                 {{else}}
@@ -29,6 +30,24 @@
                 <button type="button" class="fwmb-card fwmb-card--add" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.OverviewAddMapLater'}}"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.AddMap"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.OverviewAddMapKinds"}}</span></button>
             </div>
         </div>
+
+        {{#if overview.cutFrom}}
+        <div class="fwmb-overview-group">
+            <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.OverviewCutFromTitle"}}</div>
+            {{#if overview.cutFrom.stale.length}}
+            <div class="fwmb-notice fwmb-overview-cut" role="note">
+                <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span>{{overview.cutFrom.line}}</span>
+            {{else}}
+            <div class="fwmb-held fwmb-overview-cut" role="note">
+                <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{overview.cutFrom.line}}</span>
+            {{/if}}
+                {{#each overview.cutFrom.stale}}<span>{{this}}</span>{{/each}}
+                {{#if overview.cutFrom.again}}
+                <button type="button" class="fwmb-btn"{{#if overview.cutFrom.again.off}} aria-disabled="true" data-tooltip="{{overview.cutFrom.again.off}}"{{else}} data-action="cutAgain" data-world-id="{{overview.cutFrom.id}}" data-tooltip="{{overview.cutFrom.again.note}}"{{/if}}><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldCutAgain"}}</button>
+                {{/if}}
+            </div>
+        </div>
+        {{/if}}
 
         <div class="fwmb-overview-group">
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMaps"}}</div>
@@ -48,12 +67,12 @@
                     <span class="fwmb-card-body">
                         <span class="fwmb-card-title"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{this.name}}</span>
                         {{#if this.meta}}<span class="fwmb-card-meta fwmb-card-line">{{this.meta}}</span>{{/if}}
-                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
+                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
                         <span class="fwmb-card-meta fwmb-card-opens"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OverviewOpensOwn"}}</span>
                     </span>
                 </button>
                 {{/each}}
-                <button type="button" class="fwmb-card fwmb-card--add" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.OverviewCutLater'}}"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.CutRegionalWorld"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.OverviewCutKinds"}}</span></button>
+                <button type="button" class="fwmb-card fwmb-card--add"{{#if overview.cutOff}} aria-disabled="true" data-tooltip="{{overview.cutOff}}"{{else}} data-action="openWorldTool" data-tool="worldCut"{{/if}}><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.CutRegionalWorld"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.OverviewCutKinds"}}</span></button>
             </div>
         </div>
     </section>

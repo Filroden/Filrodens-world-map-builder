@@ -1,7 +1,8 @@
 {{!--
     The top of a world page's body (S0 step 4c-1; the design system's WorldPage), above its
-    sections: the held banner on a held regional world (its page read only, Open parent world
-    settings drawn until step 5 builds it), then Read by: a chip for each map tool that reads the
+    sections: the held banner on a held regional world (its page read only; Open parent world
+    settings opens the world its settings come from, with Back to; and why it is Out of date,
+    S0 step 5), then Read by: a chip for each map tool that reads the
     page, its map and a Go there (the mirror of Peoples and realms' Read from the world), and the
     regional worlds a change reaches too. See WorldEditors.head and MapStudio's #readByChips.
 --}}
@@ -9,7 +10,8 @@
 <div class="fwmb-held" role="note">
     <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldHeldTitle"}}</span>
     <span>{{worldEditor.heldBanner}}</span>
-    <button type="button" class="fwmb-btn" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.OpenParentSettingsLater'}}"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenParentSettings"}}</button>
+    {{#each worldEditor.stale}}<span class="fwmb-held-stale"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span>{{this}}</span>{{/each}}
+    <button type="button" class="fwmb-btn" data-action="openParentSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.OpenParentSettingsHint'}}"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenParentSettings"}}</button>
 </div>
 {{/if}}
 {{#if worldEditor.readBy.length}}

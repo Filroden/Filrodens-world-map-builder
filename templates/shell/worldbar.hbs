@@ -11,6 +11,9 @@
       the bar for the layer menu; 4: the layer switcher becomes one menu button naming the map;
       5: the world name ellipsises.
 
+    Beside the name: Out of date on a held regional world whose parent changed what it shows, and
+    Back to while a regional world's parent is open for its settings (S0 step 5).
+
     Save world and the mode switch never fold. Parts later tracks fill (Geology, Add a map,
     Settlement maps) are drawn in their places and disabled, with a tooltip saying they are not
     built yet (aria-disabled, so the tooltip still shows).
@@ -43,6 +46,17 @@
             <button type="button" role="menuitem" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
         </div>
     </div>
+    {{!-- A held regional world Out of date (S0 step 5), and, while a regional world's parent is
+         open for its settings, whose they are with Back to --}}
+    {{#if worldBar.stale}}
+    <span class="fwmb-state-mark fwmb-state-mark--stale fwmb-worldbar-stale" role="img" aria-label="{{localize 'FILRODENSWMB.UI.MarkOutOfDate'}}" data-tooltip="{{worldBar.stale}}"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span><span class="fwmb-fold-full">{{localize "FILRODENSWMB.UI.MarkOutOfDate"}}</span></span>
+    {{/if}}
+    {{#if worldBar.backTo}}
+    <div class="fwmb-worldbar-back">
+        <span class="fwmb-worldbar-for">{{worldBar.backTo.line}}</span>
+        <button type="button" class="fwmb-barbtn" data-action="backToRegional"><span class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></span>{{worldBar.backTo.label}}</button>
+    </div>
+    {{/if}}
 
     {{#if worldBar.savesOff}}
     <button type="button" class="fwmb-barbtn fwmb-barbtn--icon fwmb-save" aria-disabled="true" aria-label="{{localize 'FILRODENSWMB.UI.SaveWorld'}}" data-tooltip="{{worldBar.savesOff}}">

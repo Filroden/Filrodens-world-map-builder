@@ -3,8 +3,9 @@
     renamed as the field is committed; Open; what it is (below Open, so its varying length moves
     nothing above it); its family as a tree (the world it belongs to at the top, each regional
     world under the one it was cut from), each row choosing that world, this one lit, the search's
-    matches marked; the action list (Cut again… is off until regional worlds can be cut again,
-    Clone as new… only for a regional world); Delete… apart.
+    matches marked, each regional world with its zoom against the world it was cut from and Out of
+    date where it is (S0 step 5); why this one is Out of date; the action list (Cut again… and
+    Clone as new… only for a held regional world); Delete… apart.
     A label ending in "…" asks something first; one without acts at once.
 --}}
 <div class="fwmb-group">
@@ -29,6 +30,8 @@
         <button type="button" class="fwmb-list-item{{#if this.match}} fwmb-is-match{{/if}}" role="treeitem" aria-level="{{this.level}}" style="--depth: {{this.depth}}" aria-selected="{{#if this.current}}true{{else}}false{{/if}}"{{#unless this.current}} data-inspector-action="showWorld" data-world-id="{{this.id}}"{{/unless}}>
             <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
             <span class="fwmb-name">{{this.name}}</span>
+            {{#if this.zoom}}<span class="fwmb-tree-zoom">{{this.zoom}}</span>{{/if}}
+            {{#if this.stale}}<span class="fwmb-state-mark fwmb-state-mark--stale" data-tooltip="{{this.stale}}" aria-label="{{localize 'FILRODENSWMB.UI.MarkOutOfDate'}}"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span></span>{{/if}}
             {{#if this.held}}<span class="fwmb-state-mark fwmb-state-mark--held" data-tooltip="{{localize 'FILRODENSWMB.UI.MarkRegionalWorld'}}" aria-label="{{localize 'FILRODENSWMB.UI.MarkRegionalWorld'}}"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span></span>{{/if}}
         </button>
         {{/each}}
@@ -36,11 +39,18 @@
 </div>
 {{/if}}
 
+{{#if stale.length}}
+<div class="fwmb-notice fwmb-inspector-notice" role="note">
+    <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MarkOutOfDate"}}</span>
+    {{#each stale}}<span>{{this}}</span>{{/each}}
+</div>
+{{/if}}
+
 <div class="fwmb-action-list">
-    {{#if world.parentId}}
-    <button type="button" class="fwmb-action-row" disabled>
+    {{#if cutAgain}}
+    <button type="button" class="fwmb-action-row"{{#if cutAgain.off}} aria-disabled="true" data-tooltip="{{cutAgain.off}}"{{else}} data-inspector-action="cutAgain"{{/if}}>
         <span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>
-        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.WorldCutAgain"}}</b><span>{{localize "FILRODENSWMB.UI.WorldCutAgainSoon"}}</span></span>
+        <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.WorldCutAgain"}}</b><span>{{#if cutAgain.off}}{{cutAgain.off}}{{else}}{{cutAgain.note}}{{/if}}</span></span>
     </button>
     {{/if}}
     {{#if held}}

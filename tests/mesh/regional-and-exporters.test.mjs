@@ -7,6 +7,7 @@ import { MeshSession } from "../../src/studios/world/mesh/MeshSession.js";
 import { decodeOwners } from "../../src/studios/world/mesh/OwnerLayer.js";
 import { extractRegionalVectors } from "../../src/studios/world/mesh/RegionalMesh.js";
 import { UNCLAIMED } from "../../src/studios/world/mesh/Schema.js";
+import { cellsAlongPolyline } from "../../src/studios/world/mesh/RoutePath.js";
 import { FIXTURES, P0_SKIP, isContiguous, loadP0, readJson } from "./helpers.mjs";
 
 const CROP = { x: 500, y: 300, width: 400, height: 300 };
@@ -152,4 +153,16 @@ test("grid data: region coverage from the cell raster matches the polygon test w
     assert.ok(gap / total <= MAX_COVERAGE_GAP, `coverage differs by ${((100 * gap) / total).toFixed(2)}%`);
     assert.equal(mesh.schemaVersion, polygons.schemaVersion, "same schema");
     assert.ok(Object.values(mesh.cells).some((cell) => cell.infrastructure.routes.length > 0), "routes on the mesh still mark the cells they cross");
+});
+
+test("a route the crop splits keeps its id on its first stretch and <id>-<n> on the rest, the same for every cut", { skip: P0_SKIP }, async () => {
+    const { session, mapData } = await openV3();
+    // In from the west, out through the south edge, back in, and out again east: two stretches inside
+    const line = [400, 450, 600, 450, 600, 700, 800, 700, 800, 450, 1000, 450];
+    const cells = Array.from(cellsAlongPolyline(session.mesh, line));
+    const route = { ...structuredClone(mapData.mapRoutes[0]), id: "road1", name: "Old road", waypoints: [cells[0], cells.at(-1)], legs: [cells] };
+    const cut = () => extractRegionalVectors({ session, layerSets: [], routes: [route], pins: [], childMapData: { mapWidth: CROP.width * ZOOM, mapHeight: CROP.height * ZOOM, seed: "P0JBVA-child", params: { latTop: 40, latBottom: 20 }, world: { zoom: ZOOM, areaFactor: 15 } }, crop: CROP, zoom: ZOOM }).fields.mapRoutes.map((piece) => piece.id);
+    const ids = cut();
+    assert.deepEqual(ids, ["road1", "road1-2"]);
+    assert.deepEqual(cut(), ids, "two cuts of the same crop give the same ids");
 });

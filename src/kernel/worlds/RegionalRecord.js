@@ -24,6 +24,15 @@
  *       }],
  *     }
  *
+ * The parent world keeps, for each regional world held by it, the fingerprint each of its maps'
+ * crops has now (worked out again whenever the parent is saved changed):
+ *
+ *     childFingerprints: { [childWorldId]: { [childMapId]: "8 hex" } }
+ *
+ * A held regional world is **Out of date** (§4's three rules, see staleness) when the parent's
+ * fingerprint for one of its maps differs from that map's `cropFingerprint`, when the parent's
+ * settings were saved changed since the cut, or when a world above it is Out of date.
+ *
  * Every function here is pure. `check` reads a record from anywhere (a saved world, an imported
  * file, a backup) and never throws: a field it cannot trust is set to null, or to 0 for the
  * inherited strokes (Undo then goes as far as it always has), and a record it cannot read at all
@@ -120,6 +129,51 @@ export class RegionalRecord {
             maps: maps.filter((entry) => !seen.has(entry.mapId) && seen.add(entry.mapId)),
         };
     }
+
+    /** The parent's fingerprints for the worlds it holds (see the class comment), read safely: {} when none. */
+    static checkChildFingerprints(value) {
+        const out = {}
+        if (!isObject(value)) return out;
+        for (const [worldId, maps] of Object.entries(value)) {
+            if (!isId(worldId) || !isObject(maps)) continue;
+            const kept = {}
+            for (const [mapId, hash] of Object.entries(maps)) if (isId(mapId) && typeof hash === "string" && FINGERPRINT.test(hash)) kept[mapId] = hash;
+            if (Object.keys(kept).length) out[worldId] = kept;
+        }
+        return out;
+    }
+
+    /**
+     * Why a held regional world is Out of date (§4's three rules), most direct first, or an empty
+     * list when it is not. A record made by the migration is never Out of date (v5 cannot tell what
+     * its parent changed), and a world above that is migrated never makes one below it so.
+     *
+     *     { rule: "crop", parentId, parentName, at }      // the parent was saved with changes inside its crop
+     *     { rule: "settings", parentId, parentName, at }  // the parent's settings were saved changed
+     *     { rule: "above", parentId, parentName, at }     // the world it was cut from is Out of date
+     *
+     * @param {object} world - The world record.
+     * @param {function(string): (object|null)} byId - Any world record by id.
+     * @returns {Array<{rule: string, parentId: string, parentName: string, at: string|null}>}
+     */
+    static staleness(world, byId, seen = new Set()) {
+        const record = world?.regional;
+        if (!world?.held || !RegionalRecord.isCurrent(record) || record.migrated || seen.has(world.id)) return [];
+        seen.add(world.id);
+        const parent = world.parentWorldId ? byId(world.parentWorldId) : null;
+        if (!parent) return [];
+        const about = { parentId: parent.id, parentName: parent.name ?? "" }
+        const reasons = [];
+        const prints = parent.childFingerprints?.[world.id] ?? {}
+        const moved = record.maps.find((entry) => entry.cropFingerprint && typeof prints[entry.mapId] === "string" && prints[entry.mapId] !== entry.cropFingerprint);
+        if (moved) reasons.push({ rule: "crop", ...about, at: (parent.maps ?? []).find((map) => map.id === moved.sourceMapId)?.savedAt ?? null });
+        if (Number.isInteger(record.parentSettingsRevision) && Number.isInteger(parent.settingsRevision) && parent.settingsRevision > record.parentSettingsRevision) {
+            reasons.push({ rule: "settings", ...about, at: parent.settingsSavedAt ?? null });
+        }
+        if (RegionalRecord.staleness(parent, byId, seen).length) reasons.push({ rule: "above", ...about, at: null });
+        return reasons;
+    }
+
 }
 
 function checkEntry(entry) {

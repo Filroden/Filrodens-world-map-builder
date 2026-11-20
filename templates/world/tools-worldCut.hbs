@@ -1,0 +1,56 @@
+{{!--
+    Cut regional world… (tool id "worldCut"; S0 step 5, board W7 redrawn for round 4c): the crop on
+    the Surface map's canvas, beside the world's rail. Crop: the regional world's width, its height
+    from the crop, the zoom, the ground a pixel (refused finer than REGIONAL_CROP.MIN_KM_PER_PX,
+    which settlement maps will cover), the latitudes, and the grid the crop snaps to with a Go to
+    Cartography. What is cut: S0's one row, the Surface map. The new regional world: Fill in when
+    it first opens, and that it is held. Cancel and Cut regional world… are at the foot
+    (tools-worldCut-foot.hbs). The readouts follow the crop as it is dragged (MapStudio's
+    #showCropReadouts).
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="cutCrop" title="FILRODENSWMB.UI.CutSectionCrop"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CutCropHint"}}</p>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.RegionalResolution"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" step="100" min="500" aria-label="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" />
+            <span class="fwmb-times">×</span>
+            <input type="number" name="regionalTargetHeight" value="{{cut.height}}" disabled aria-label="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
+            <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
+        </div>
+    </div>
+    <div class="fwmb-form-group" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalZoomHint'}}">
+        <label>{{localize "FILRODENSWMB.UI.RegionalZoom"}}</label>
+        <div class="fwmb-form-fields fwmb-setting-row--readout">
+            <strong id="fwmb-readout-regional-zoom">--</strong>
+            <span id="fwmb-readout-regional-scale">{{cut.scale}}</span>
+        </div>
+    </div>
+    <p class="fwmb-hint fwmb-hint--warning" data-crop-limit{{#unless cut.tooFine}} hidden{{/unless}}>{{cut.limit}}</p>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.RegionalLatitude"}}</label>
+        <div class="fwmb-form-fields fwmb-setting-row--readout">
+            <span>{{localize "FILRODENSWMB.UI.LatTop"}}: <strong id="fwmb-readout-lat-top">--&deg;</strong></span>
+            <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
+        </div>
+    </div>
+    <div class="fwmb-goto">
+        <p>{{cut.grid}}</p>
+        <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="goToMapTool" data-tool="cartography" data-section="grid" aria-label="{{cut.gridGo}}">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="cutWhat" title="FILRODENSWMB.UI.CutSectionWhat"}}
+    <div class="fwmb-cut-row">
+        <span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span>
+        <span class="fwmb-cut-row-text"><b>{{localize "FILRODENSWMB.UI.LayerSurfaceFull"}}</b><span>{{localize "FILRODENSWMB.UI.CutWhatSurface"}}</span></span>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="cutNew" title="FILRODENSWMB.UI.CutSectionNew"}}
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalInfillHint'}}">
+        <input type="checkbox" name="regionalInfill" class="fwmb-checkbox" {{#if uiState.regionalInfill}}checked{{/if}} {{#unless cut.infillOffered}}disabled{{/unless}} data-regional-infill />
+        {{localize "FILRODENSWMB.UI.RegionalInfill"}}
+    </label>
+    <p class="fwmb-hint"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span> {{cut.held}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

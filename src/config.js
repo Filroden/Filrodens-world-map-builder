@@ -662,9 +662,9 @@ export const FILRODENSWMB = {
                     tables: [
                         { caption: "FILRODENSWMB.UI.ShortcutsLandMaskSelect", context: "maskSelect" },
                         { caption: "FILRODENSWMB.UI.ShortcutsLandMasks", context: "mask" },
-                        { caption: "FILRODENSWMB.UI.ShortcutsRegionalCrop", context: "crop" },
                     ],
                 },
+                { title: "FILRODENSWMB.UI.CutRegionalWorld", tables: [{ caption: null, context: "crop" }] },
                 { title: "FILRODENSWMB.UI.ToolTerrain", tables: [{ caption: null, context: "terrain" }] },
                 { title: "FILRODENSWMB.UI.ToolBiomes", tables: [{ caption: null, context: "biomes" }] },
                 {
@@ -752,6 +752,11 @@ export const FILRODENSWMB = {
         },
         REGIONAL_CROP: {
             PADDING: 50,
+            // The finest a regional world may be cut, in effective km a pixel (roadmap §7; Ken,
+            // 2026-11-20: 0.1 to start, so the smallest crop of a 1000 x 1000 map is 100 km across,
+            // perhaps raised to 0.2 or more once tried). Finer than this is a settlement map's
+            // ground, which reads no terrain.
+            MIN_KM_PER_PX: 0.1,
         },
         CANVAS_BUFFER: 200,
         DEBOUNCE_MS: {
@@ -780,7 +785,6 @@ export const FILRODENSWMB = {
             painting: "Painting",
             drawing: "Drawing",
             placing: "Placing",
-            cropping: "Cropping",
         },
         // The bar's modes that fold into More when the bar runs short (see BarFold), per tool and
         // group, least used first. Modes not listed stay on the bar at every width, as does the

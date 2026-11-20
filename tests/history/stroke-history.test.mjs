@@ -91,3 +91,19 @@ test("a rewrite on a map that is not held leaves it without a count", () => {
     StrokeHistory.rewrite(plain, () => plain.brushEngine.history.reverse());
     assert.equal(plain.inheritedStrokes, undefined);
 });
+
+test("Undo stops at a held regional world's inherited strokes (S0 step 5), Redo brings back what it took", async () => {
+    const { BrushEngine } = await import("../../src/studios/world/tools/BrushEngine.js");
+    const engine = new BrushEngine(8, 8);
+    const stroke = (id) => ({ id, type: "terrain", tool: "raise", points: [{ x: 1, y: 1 }], size: 2, strength: 0.1, feather: 0.5 });
+    engine.history = [stroke("p1"), stroke("p2"), stroke("own1")];
+    engine.undoFloor = 2;
+    assert.ok(engine.canUndo());
+    assert.equal(engine.undo(), true, "the map's own stroke goes");
+    assert.equal(engine.canUndo(), false);
+    assert.equal(engine.undo(), false, "the parent's are kept");
+    assert.deepEqual(engine.history.map((each) => each.id), ["p1", "p2"]);
+    assert.equal(engine.redo(), true);
+    engine.undoFloor = 0;
+    assert.equal(engine.undo(), true, "with no floor (a world of its own) every stroke can go");
+});

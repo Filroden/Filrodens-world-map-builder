@@ -28,7 +28,7 @@
                     <span class="fwmb-card-body">
                         <span class="fwmb-card-title">{{this.name}}</span>
                         {{#if this.meta}}<span class="fwmb-card-meta fwmb-card-line">{{this.meta}}</span>{{/if}}
-                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
+                        {{#if this.marks.length}}<span class="fwmb-card-meta">{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</span>{{/if}}
                         {{#if this.regional}}<span class="fwmb-card-meta"><span class="fwmb-chip"><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{this.regional}}</span></span>{{/if}}
                     </span>
                 </button>

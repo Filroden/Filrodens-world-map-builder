@@ -278,8 +278,20 @@ export class BrushEngine {
         }
     }
 
+    /**
+     * How many strokes at the head of the history Undo may not take back: on a held regional
+     * world, the strokes it inherited from its parent (its record's inheritedStrokes), which are
+     * the parent's to change. 0 elsewhere.
+     */
+    undoFloor = 0;
+
+    /** Whether Undo has a stroke of the map's own to take back (none below undoFloor). */
+    canUndo() {
+        return this.#history.length > Math.max(0, this.undoFloor);
+    }
+
     undo() {
-        if (this.#history.length === 0) return false;
+        if (!this.canUndo()) return false;
 
         const layerWasInLine = this.#layerCacheInLineWithHistory();
         const stroke = this.#history.pop();

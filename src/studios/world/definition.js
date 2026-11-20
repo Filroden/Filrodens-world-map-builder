@@ -19,8 +19,6 @@ const SURFACE = ["surface"];
 /** A tool on the Surface map, in Create unless said. */
 const tool = (id, stage, icon, label, { mode = "create", next = null, stateWord = null } = {}) => ({ id, stage, mode, icon, label, mapTypes: SURFACE, next, stateWord });
 const next = (toolId, reason) => ({ tool: toolId, reason });
-/** A part of the world's rail a later step builds: drawn in its place, disabled ("…: not built yet" unless said). */
-const later = (id, stage, icon, label, tooltip = null) => ({ ...tool(id, stage, icon, label), later: tooltip ?? label });
 
 export const WORLD_DEFINITION = defineStudio({
     id: "world",
@@ -44,7 +42,7 @@ export const WORLD_DEFINITION = defineStudio({
     // word's strings). Cartography has no edit toggle (its decorations can always be moved), so its
     // word stands for the tool. Tools with none have no editing at all.
     tools: [
-        tool("scene", "shape", "grid-on", "FILRODENSWMB.UI.ToolCreateMap", { next: next("terrain", "FILRODENSWMB.UI.NextReasonScene"), stateWord: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing", crop: "cropping" } }),
+        tool("scene", "shape", "grid-on", "FILRODENSWMB.UI.ToolCreateMap", { next: next("terrain", "FILRODENSWMB.UI.NextReasonScene"), stateWord: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing" } }),
         tool("terrain", "shape", "landscape", "FILRODENSWMB.UI.ToolTerrain", { next: next("climate", "FILRODENSWMB.UI.NextReasonTerrain"), stateWord: "terraforming" }),
         // The climate the world record keeps, shown on its Surface map (S0 step 4c-2; Ken,
         // 2026-11-20): a world has one Surface map, so it is stored with the world
@@ -75,7 +73,9 @@ export const WORLD_DEFINITION = defineStudio({
         tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
         // Generate all acts at once (its dialogue), with no panel of its own
         { ...tool("worldGenerateAll", "worldWhole", "run", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
-        later("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
+        // Cut regional world… (S0 step 5; board W7): the crop on the Surface map's canvas, beside
+        // the world's rail, with its panel
+        tool("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)
     // sits among them, and on the web the full-screen toggle (shown only where the host can go

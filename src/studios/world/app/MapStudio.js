@@ -110,6 +110,8 @@ import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
 import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { WorldSettings } from "../data/WorldSettings.js";
+import { CropFingerprint } from "./CropFingerprint.js";
+import { Blobs } from "../../../kernel/data/Blobs.js";
 import { WorldMaps } from "../data/WorldMaps.js";
 import { WorldMigration } from "../data/WorldMigration.js";
 
@@ -286,7 +288,13 @@ export class MapStudio {
         exportSettings(e, t)            { this._onExportSettings(e, t); },
         generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
         generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
-        generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
+        // Cut regional world… (S0 step 5): its foot's Cut and Cancel, Cut again…, and a held
+        // regional world's Open parent world settings with the world bar's Back to
+        cutRegionalWorld()              { this._onCutRegionalWorld(); },
+        cancelCut()                     { this.#cancelCut(); },
+        cutAgain(_e, t)                 { this.cutAgain(t.dataset.worldId ?? this.world?.id); },
+        openParentSettings()            { this.openParentSettings(); },
+        backToRegional()                { this.backToRegional(); },
         importMapJson(e, t)             { this._onImportMapJson(e, t); },
         backUpMaps(e, t)                { this._onBackUpMaps(e, t); },
         restoreBackup(e, t)             { this._onRestoreBackup(e, t); },
@@ -936,6 +944,9 @@ export class MapStudio {
         if (this.#creatingWorld) railStages = only((id) => id === "worldSetup");
         else if (!this.surfaceMade && !inWorld) railStages = only((id) => id === "scene");
         else if (!this.surfaceMade && inWorld) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldGenerateAll" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap") } : tool)) }));
+        // Cut regional world… needs a Surface map the cut can read
+        const cutOff = this.cutOff();
+        if (inWorld && cutOff) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldCut" ? { ...tool, disabled: true, tooltip: cutOff } : tool)) }));
         const unmade = !this.surfaceMade || this.#creatingWorld;
         return {
             railWorld: inWorld,
@@ -995,6 +1006,10 @@ export class MapStudio {
             // Save world and Save as have nothing to save with no world open or while one is made
             savesOff: noWorld || creating ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint") : null,
             fold: this.root?.querySelector(":scope > .fwmb-worldbar")?.dataset.fold ?? "1",
+            // A held regional world Out of date (S0 step 5): the mark beside its name, saying why
+            stale: !noWorld && this.#staleLines.length ? this.#staleLines.join(" ") : null,
+            // Open parent world settings from a regional world: whose settings these are, and the way back
+            backTo: this.#backTo ? { label: i18n.format("FILRODENSWMB.UI.WorldsBackTo", { name: this.#backTo.name }), line: i18n.format("FILRODENSWMB.UI.ChangingSettingsLine", { name: this.#backTo.name }) } : null,
         };
     }
 
@@ -1048,12 +1063,12 @@ export class MapStudio {
     }
 
     /**
-     * What New map's editing does: a guided map's mask drawing or crop (its scene mode), or the
-     * crop alone for any other map that can make regional maps; null when there is nothing to do.
+     * What Map setup's editing does: a guided map's mask drawing (its scene mode); null for any
+     * other map, which has nothing to edit there (the crop is Cut regional world…'s, S0 step 5).
      */
     #sceneModeKey() {
-        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
-        return TerrainVersion.canCreateRegionalMap(this.uiState) ? "crop" : null;
+        if (this.uiState.generationEngine !== "guided") return null;
+        return ["addMask", "subtractMask", "coastMask"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
     }
 
     /**
@@ -1202,23 +1217,17 @@ export class MapStudio {
                 return [group(ui("ModesFeatures"), "features", [feature("select", "ModeSelect", "FeatureModeSelect", "select"), feature("spring", "ModeSource", "ToolAddSpring", "water-drop"), feature("river", "ModeRiver", "ToolDrawRiver", "water"), feature("fault", "ModeFault", "ToolDrawFault", "timeline")])];
             }
             case "scene": {
-                const canCrop = TerrainVersion.canCreateRegionalMap(this.uiState);
-                const cropTip = canCrop ? ui("ToolRegionalMap") : ui("RegionalMapNeedsUpdate");
-                if (s.generationEngine === "guided") {
-                    const current = s.sceneMode;
-                    return [
-                        group(ui("ModesMask"), "scene", [
-                            mode("setSceneMode", "mode", "select", ui("ModeSelect"), ui("MaskModeSelect"), "select", current === "select"),
-                            mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
-                            mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
-                            // Coast only masks exist only where masks have coast settings (see MaskSettings)
-                            ...(TerrainVersion.usesCurrentCoastline(s) ? [mode("setSceneMode", "mode", "coastMask", ui("ModeCoast"), ui("DrawCoastMaskHint"), "tune", current === "coastMask")] : []),
-                            mode("setSceneMode", "mode", "crop", ui("ModeCrop"), cropTip, "crop", current === "crop", { disabled: !canCrop }),
-                        ]),
-                    ];
-                }
-                if (!canCrop) return [];
-                return [group(ui("ModesMask"), "scene", [mode("setBrushTool", "tool", "crop", ui("ModeCrop"), cropTip, "crop", true)])];
+                if (s.generationEngine !== "guided") return [];
+                const current = s.sceneMode;
+                return [
+                    group(ui("ModesMask"), "scene", [
+                        mode("setSceneMode", "mode", "select", ui("ModeSelect"), ui("MaskModeSelect"), "select", current === "select"),
+                        mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
+                        mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
+                        // Coast only masks exist only where masks have coast settings (see MaskSettings)
+                        ...(TerrainVersion.usesCurrentCoastline(s) ? [mode("setSceneMode", "mode", "coastMask", ui("ModeCoast"), ui("DrawCoastMaskHint"), "tune", current === "coastMask")] : []),
+                    ]),
+                ];
             }
             case "influences":
                 return [group(ui("ModesInfluence"), "influences", InfluencePainter.toolbarContext(this).modes.map((entry) => mode("setInfluenceMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
@@ -1417,6 +1426,11 @@ export class MapStudio {
                 // The Surface map before it is made (board N4): the bar says so, and has no modes
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-unmade.hbs`;
                 context.bar.state = null;
+            } else if (this.activeTool === "worldCut") {
+                // The crop of a regional world being cut (board W7)
+                context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-cut.hbs`;
+                context.bar.state = null;
+                context.cut = this.#cutContext();
             } else if (editableTools.includes(this.activeTool)) {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-${this.activeTool}.hbs`;
             } else if (this.activeTool === "generate" && CultureMarkers.picking(this)) {
@@ -1492,8 +1506,6 @@ export class MapStudio {
         context.scaleBarValue = scaleBarTick(this.uiState, this.mapHeight).value;
         context.currentSaveName = this.currentSaveName;
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
-        context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
-        context.regionalInfillOffered = this.#regionalInfillOffered(this.canvasEngine?.cropBox);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
         if (this.activeTool === "scene") context.terrainChoice = this.#terrainChoiceContext();
@@ -1558,6 +1570,11 @@ export class MapStudio {
             context.panelFootPartial = this.activeTool === "manage" ? `${TEMPLATE_ROOT}world/tools-manage-foot.hbs` : null;
             // Make Surface map at Map setup's foot while the map is not made (board N4)
             if (this.activeTool === "scene" && !this.surfaceMade) context.panelFootPartial = `${TEMPLATE_ROOT}world/tools-scene-foot.hbs`;
+            // Cut regional world…'s Cancel and Cut at its foot (board W7)
+            if (this.activeTool === "worldCut") {
+                context.cut = this.#cutContext();
+                context.panelFootPartial = `${TEMPLATE_ROOT}world/tools-worldCut-foot.hbs`;
+            }
 
             context.massEditMode = { ...this.massEditMode };
             context.massEditCount = {
@@ -1968,6 +1985,12 @@ export class MapStudio {
             event.preventDefault();
             return;
         }
+        // Escape leaves Cut regional world… for where it was opened from
+        if (event.key === "Escape" && this.activeTool === "worldCut") {
+            event.preventDefault();
+            this.#cancelCut();
+            return;
+        }
         // A homeland or event place pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
         // inspector on what it picked
         if (CultureMarkers.handleKey(this, event) || AgeEventRows.handleKey(this, event) || PickTool.handleKey(this, event)) {
@@ -2131,6 +2154,23 @@ export class MapStudio {
 
         const infillBox = this.root.querySelector("[data-regional-infill]");
         if (infillBox) infillBox.disabled = !this.#regionalInfillOffered(cropBox, plan);
+
+        // The ground a pixel on the regional world, and the limit finer than which it is refused
+        const scaleEl = this.root.querySelector("#fwmb-readout-regional-scale");
+        if (scaleEl) scaleEl.textContent = this.#cropScaleText(plan);
+        const tooFine = this.#cropTooFine(plan);
+        const limit = this.root.querySelector("[data-crop-limit]");
+        if (limit) limit.hidden = !tooFine;
+        const cut = this.root.querySelector('.fwmb-panel-foot [data-action="cutRegionalWorld"]');
+        if (cut) {
+            if (tooFine) {
+                cut.setAttribute("aria-disabled", "true");
+                cut.dataset.tooltip = this.#cropLimitText();
+            } else {
+                cut.removeAttribute("aria-disabled");
+                delete cut.dataset.tooltip;
+            }
+        }
     }
 
     /**
@@ -2394,8 +2434,8 @@ export class MapStudio {
         // The resolution fields describe the frame a world with no maps will make its Surface map
         // in, not the open map, so changing them neither marks the map unsaved nor regenerates
         if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
-        // The regional map's size is in New map's Regional map section; the crop on the map follows
-        // it. Like the resolution fields, it describes the next map (the cut), not the open one,
+        // The regional world's width is Cut regional world…'s; the crop on the map follows it.
+        // Like the resolution fields, it describes the next map (the cut), not the open one,
         // so it doesn't mark the map unsaved: cutting would otherwise ask to save the map first
         if (name === "regionalTargetWidth") return this.#recordRegionalWidth(event, target);
         // Filling in a regional map when first opened is an option for the cut, not part of this map
@@ -5050,7 +5090,11 @@ export class MapStudio {
             regional,
         });
         if (!result) return null;
+        // The regional worlds it holds learn whether it changed inside their crops (rule 1)
+        const mapId = result.maps[0]?.id ?? null;
+        if (mapId && (this.isDirty || createsNewMap) && !asNew && (await this.#updateChildFingerprints(result.world, mapId))) await platform.store.saveWorld(result.world);
         this.world = result.world;
+        await this.#refreshStale();
         this.worldSettingsOpened = settings;
         this.#captureEditorBaseline();
         this.view?.render(["worldbar"]);
@@ -5442,6 +5486,11 @@ export class MapStudio {
         let action = sourceLedger?.pop();
         while (action) {
             const stepped = await this.#stepHistoryAction(action, isUndo, targetLedger);
+            // Undo has reached a held regional world's inherited strokes: it stops there
+            if (stepped === null) {
+                sourceLedger.push(action);
+                break;
+            }
             if (stepped) break;
             action = sourceLedger?.pop();
         }
@@ -5453,7 +5502,8 @@ export class MapStudio {
     /**
      * Steps one ledger entry, recording it on `targetLedger` when it changed something.
      *
-     * @returns {Promise<boolean>} Whether anything was stepped through.
+     * @returns {Promise<boolean|null>} Whether anything was stepped through; null when Undo stops
+     *     at a held regional world's inherited strokes (see #stepRasterHistory).
      */
     async #stepHistoryAction(action, isUndo, targetLedger) {
         if (action === "vector") return this.#stepVectorHistory(isUndo, targetLedger);
@@ -5532,6 +5582,12 @@ export class MapStudio {
      * @returns {Promise<boolean>} Whether a stroke was stepped through onto existing terrain.
      */
     async #stepRasterHistory(isUndo, targetLedger) {
+        // A held regional world's inherited strokes are its parent's: Undo stops above them
+        if (this.brushEngine) this.brushEngine.undoFloor = this.inheritedStrokes ?? 0;
+        if (isUndo && this.brushEngine && !this.brushEngine.canUndo() && this.brushEngine.history.length > 0) {
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.UndoInheritedStrokes"));
+            return null;
+        }
         const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
         if (!this.baseElevationData || !brushAction) return false;
 
@@ -5683,6 +5739,7 @@ export class MapStudio {
      * @param {object|null} [world]
      */
     #clearMap(world = null) {
+        this.#forgetPanel();
         MapStateManager.allocateBuffers(this);
         // A new map opens with every terrain layer on (see #terrainLayers)
         this.#setTerrainLayers(MapStudio.#allTerrainLayers(true));
@@ -5889,10 +5946,13 @@ export class MapStudio {
      */
     async openWorldTool(tool, section) {
         if (!tool || !this.definition.tool(tool) || this.definition.tool(tool).later) return;
+        // Cut regional world… goes back to where it was opened from, not to the tool Create opens on
+        const from = this.activeTool;
         if (tool !== "worldOverview" && this.mode !== "create") {
             await this.enterMode("create");
         }
         await this.switchTool(tool);
+        if (tool === "worldCut" && this.activeTool === "worldCut" && from !== "worldCut") this.#cutReturn = from;
         if (!section) return;
         await this.view?.render(["context"]);
         const details = this.root?.querySelector(`.fwmb-context-panel details[data-section="${section}"]`);
@@ -5916,6 +5976,8 @@ export class MapStudio {
             heldBy: this.world?.held ? WorldsPanel.named(parent ?? { name: "" }) : null,
             readBy: this.#readByChips(editor.readBy),
         });
+        // Why a held regional world is Out of date, on its held banner (S0 step 5)
+        context.worldEditor.stale = this.world?.held ? this.#staleLines : [];
         if (context.panel?.page) {
             context.panel.crumb = (this.#creatingWorld ? this.#newWorldName : null) || this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
             context.panel.worldEditor = context.worldEditor;
@@ -6220,10 +6282,14 @@ export class MapStudio {
         // setup is all its rail holds (board N4)
         if (!this.worldOpen && newTool !== "manage") return;
         if (this.worldOpen && !this.surfaceMade && this.#isMapTool(newTool) && newTool !== "scene") return;
+        // Cut regional world… needs a Surface map it can cut from; Cancel goes back where it was opened
+        if (newTool === "worldCut" && this.cutOff()) return;
+        if (newTool === "worldCut" && this.activeTool !== "worldCut") this.#cutReturn = this.activeTool;
         // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
         const toolMode = this.definition.tool(newTool)?.mode;
-        if (this.definition.isWorldTool(newTool)) this.#worldTool = newTool;
+        // The World segment goes back to the world's page last open, not to the cut
+        if (this.definition.isWorldTool(newTool)) this.#worldTool = newTool === "worldCut" ? this.#worldTool : newTool;
         else if (toolMode && this.#isMapTool(newTool) && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
         this.#rememberWorldMode();
 
@@ -6355,19 +6421,6 @@ export class MapStudio {
 
         this.canvasEngine.setReferenceMode(newTool === "reference");
         this.#applyCanvasInteractivity();
-    }
-
-    /**
-     * Whether the Scene tool's edit mode is currently set to the regional map crop, as opposed
-     * to something else that takes clicks on the canvas. Standard, flat and tectonic maps have
-     * nothing else, so it is always the crop for them. Guided maps share the edit mode with land mask drawing,
-     * so it is the crop only once the crop button has been chosen (and only if a regional map
-     * can be made from this map at all; see TerrainVersion.canCreateRegionalMap).
-     */
-    #isCropToolSelected() {
-        if (!TerrainVersion.canCreateRegionalMap(this.uiState)) return false;
-        if (this.uiState.generationEngine !== "guided") return true;
-        return this.uiState.sceneMode === "crop";
     }
 
     /**
@@ -6606,57 +6659,351 @@ export class MapStudio {
     }
 
     /**
-     * Executes the regional map extraction pipeline.
-     *
-     * The open map must be saved, with no unsaved changes, before a regional map is cut from it
-     * (see MapDialogManager.promptSaveBeforeRegionalMap): the regional map is listed under the
-     * saved map it came from, and is built from the map as it is now, which must be what was saved.
-     * Each prompt on the way is titled for what it saves (the unsaved or changed map, then the
-     * regional map), so the two name prompts of a never-saved map don't read as the same question.
+     * Why Cut regional world… is off, or null when a regional world can be cut from the open world
+     * (S0 step 5): it needs the world's Surface map made, with terrain the cut can read
+     * (TerrainVersion.canCreateRegionalMap).
+     * @returns {string|null}
      */
-    async _onGenerateRegionalMap(_event, _target) {
-        if (!this.canvasEngine) return;
+    cutOff() {
+        const { i18n } = platform;
+        if (!this.worldOpen || this.#creatingWorld) return i18n.localize("FILRODENSWMB.UI.NoWorldOpenHint");
+        if (!this.surfaceMade) return i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap");
+        if (!TerrainVersion.canCreateRegionalMap(this.uiState)) return i18n.localize("FILRODENSWMB.UI.RegionalMapNeedsUpdate");
+        return null;
+    }
 
-        // 1. Validate Crop Box
-        const cropBox = this.canvasEngine.getCropData();
-        if (!cropBox || cropBox.width <= 0 || cropBox.height <= 0) {
+    /** The tool Cut regional world… was opened from, which Cancel and Escape go back to. */
+    #cutReturn = null;
+
+    /** Cancel (the panel's foot, the bar, Escape): back to the world page or map tool the cut was opened from. */
+    async #cancelCut() {
+        if (this.activeTool !== "worldCut") return;
+        const back = this.#cutReturn && this.#cutReturn !== "worldCut" ? this.#cutReturn : "worldOverview";
+        this.#cutReturn = null;
+        if (this.#isMapTool(back)) return this.goToMapTool(back);
+        return this.switchTool(back);
+    }
+
+    /**
+     * Whether a crop would cut a regional world finer than a world map can show (FILRODENSWMB.UI.
+     * REGIONAL_CROP.MIN_KM_PER_PX): its effective km a pixel is this map's divided by the zoom.
+     * @param {{zoomScale: number}|null} plan - From #planCrop.
+     */
+    #cropTooFine(plan) {
+        if (!plan || !(plan.zoomScale > 0)) return false;
+        return kmPerPxOf(this.uiState, this.mapHeight) / plan.zoomScale < FILRODENSWMB.UI.REGIONAL_CROP.MIN_KM_PER_PX;
+    }
+
+    /** Why a crop finer than the limit is refused, the limit in the map's unit. */
+    #cropLimitText() {
+        return platform.i18n.format("FILRODENSWMB.UI.CropTooFine", { distance: formatDistance(FILRODENSWMB.UI.REGIONAL_CROP.MIN_KM_PER_PX), unit: cleanUnit(this.uiState.mapUnit) });
+    }
+
+    /** The crop's ground a pixel on the regional world, as its readout shows it ("1 pixel is about 0.4 km"). */
+    #cropScaleText(plan) {
+        const km = kmPerPxOf(this.uiState, this.mapHeight) / plan.zoomScale;
+        return platform.i18n.format("FILRODENSWMB.UI.PixelScale", { distance: formatDistance(km), unit: cleanUnit(this.uiState.mapUnit) });
+    }
+
+    /** What Cut regional world…'s panel, foot and bar read (board W7). */
+    #cutContext() {
+        const { i18n } = platform;
+        const box = this.canvasEngine?.cropBox ?? null;
+        const plan = box && box.width > 0 && box.height > 0 ? this.#planCrop(box) : null;
+        const tooFine = this.#cropTooFine(plan);
+        const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const grid = { square: "FILRODENSWMB.UI.GridSquare", hexR: "FILRODENSWMB.UI.GridHexRows", hexC: "FILRODENSWMB.UI.GridHexCols" }[this.uiState.gridType];
+        return {
+            world: name,
+            bar: i18n.format("FILRODENSWMB.UI.CutBar", { name }),
+            height: plan?.targetHeight ?? this.uiState.regionalTargetHeight,
+            scale: plan ? this.#cropScaleText(plan) : "--",
+            gridGo: i18n.format("FILRODENSWMB.UI.GoTo", { name: i18n.localize("FILRODENSWMB.UI.ToolCartography") }),
+            grid: grid ? i18n.format("FILRODENSWMB.UI.CutGridLine", { grid: i18n.localize(grid), size: this.uiState.gridSize }) : i18n.localize("FILRODENSWMB.UI.CutGridNone"),
+            limit: this.#cropLimitText(),
+            tooFine,
+            infillOffered: this.#regionalInfillOffered(box, plan),
+            held: i18n.format("FILRODENSWMB.UI.CutHeldLine", { name }),
+            off: !plan ? i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") : tooFine ? this.#cropLimitText() : null,
+        };
+    }
+
+    /**
+     * Cut regional world… at the panel's foot (board W7): the world is saved first if it has never
+     * been or has unsaved changes (the regional world is cut from the world as it is now, which
+     * must be what was saved); then the regional world's name; then the cut (#cutWorld), and the
+     * new regional world opens.
+     */
+    async _onCutRegionalWorld() {
+        if (!this.canvasEngine || this.activeTool !== "worldCut") return;
+        const box = this.canvasEngine.getCropData();
+        if (!box || !(box.width > 0) || !(box.height > 0)) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop"));
             return;
         }
-
-        // 1a. Make sure there is a saved parent that matches the map as it is now
+        const plan = this.#planCrop(box);
+        if (this.#cropTooFine(plan)) {
+            platform.notify.warn(this.#cropLimitText());
+            return;
+        }
         const neverSaved = !this.currentSaveId;
         if (neverSaved || this.isDirty) {
             if (!(await MapDialogManager.promptSaveBeforeRegionalMap(neverSaved))) return;
             if (!(await this.saveCurrentMap({ promptTitle: platform.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
         }
+        const parentName = this.world?.name || this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.MapNameFallback");
+        const name = (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.CutRegionalWorldName"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: parentName })))?.trim();
+        if (!name) return;
+        this.#cutReturn = null;
+        const cut = await this.#cutWorld({ crop: plan.cropBox, width: plan.targetWidth, name, infill: this.uiState.regionalInfill === true });
+        if (cut) await this.#openCutWorld(cut);
+    }
 
-        // 2. Prompt for save name
-        const mapName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.MapNameFallback") }));
-
-        if (!mapName) return;
-
-        // 3. Lock UI
+    /**
+     * Cuts a regional world from the open world (saved, with no unsaved changes): a new world, held
+     * by the open one, with its Surface map cut from the crop (RegionalExtractor.createPayload) and
+     * its full record (RegionalRecord: the crop, the zoom, the inherited strokes, the crop
+     * fingerprint and the cut's base, kept as the map's blob). The open world records the new
+     * world's fingerprint (its childFingerprints), so a later save can tell when it changes.
+     *
+     * @param {object} options
+     * @param {{x: number, y: number, width: number, height: number}} options.crop - In this map's pixels.
+     * @param {number} options.width - The regional world's width in pixels.
+     * @param {string} options.name
+     * @param {boolean} options.infill - Fill it in when it first opens (where it is offered).
+     * @returns {Promise<{worldId: string, mapId: string, name: string}|null>}
+     */
+    async #cutWorld({ crop, width, name, infill }) {
+        const parent = this.world;
+        const sourceMapId = this.currentSaveId;
+        if (!parent || !sourceMapId) return null;
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingRegion"));
-
         try {
-            // 4. Delegate heavy mathematical payload extraction
-            const { payload, owners } = RegionalExtractor.createPayload(this, cropBox);
+            const askedInfill = this.uiState.regionalInfill;
+            this.uiState.regionalInfill = infill;
+            let cut;
+            try {
+                cut = RegionalExtractor.createPayload(this, crop, { targetWidth: width });
+            } finally {
+                this.uiState.regionalInfill = askedInfill;
+            }
+            const { payload, owners, plan } = cut;
+            const fingerprint = CropFingerprint.of(this, { crop: plan.cropBox, width: plan.targetWidth });
+            const base = await Blobs.pack(RegionalExtractor.cutBase(payload, owners));
 
-            // 5. Save to database
-            const journal = await platform.store.saveMapData(mapName, payload, null, { owners });
-            // Made a regional world under the open world (see WorldMigration); written by the cut
-            // itself, with its full record, from S0 step 5
-            if (journal) await WorldMigration.run();
-            if (journal) platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.RegionalMapCreated", { name: journal.name }));
+            const { settings, mapData } = WorldSettings.split(payload);
+            const result = await Worlds.save({
+                world: { parentWorldId: parent.id, held: true, regional: null },
+                asNew: true,
+                name,
+                settings: { setup: settings.setup },
+                maps: [{ id: null, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun: null, summary: payload, changed: true, card: { run: !!payload.parentRun, older: GeneratorRevision.isOlder(payload) } }],
+            });
+            const mapId = result?.maps[0]?.id;
+            if (!mapId) throw new Error("the regional world could not be saved");
+
+            // The parent map's revision and save time as its store holds them
+            const source = (await platform.store.loadMapMeta(sourceMapId)) ?? (parent.maps ?? []).find((map) => map.id === sourceMapId) ?? null;
+            const place = TerrainVersion.resolveWorld(payload);
+            const rootZoom = Number.isFinite(place.zoom) && place.zoom > 0 ? place.zoom : null;
+            const size = { width: plan.targetWidth, height: plan.targetHeight };
+            const world = result.world;
+            world.regional = RegionalRecord.check(
+                RegionalRecord.create({
+                    parentSettingsRevision: parent.settingsRevision ?? null,
+                    cutAt: Worlds.now(),
+                    cutWith: { module: platform.module?.version, terrainVersion: payload.terrainVersion, generatorRevision: payload.generatorRevision },
+                    maps: [
+                        {
+                            mapId,
+                            sourceMapId,
+                            crop: { parent: plan.cropBox, root: rootZoom && Number.isFinite(place.originX) ? { x: place.originX, y: place.originY, width: size.width / rootZoom, height: size.height / rootZoom } : null },
+                            zoom: plan.zoomScale,
+                            rootZoom,
+                            size,
+                            parentRevision: source?.revision ?? null,
+                            parentSavedAt: source?.savedAt ?? null,
+                            cropFingerprint: fingerprint,
+                            inheritedStrokes: (payload.history ?? []).length,
+                            cutBase: base.hash,
+                        },
+                    ],
+                }),
+            );
+            await platform.store.saveMapBlob?.(mapId, base.hash, base.bytes);
+            await platform.store.saveWorld(world);
+
+            // The world it was cut from keeps the fingerprint, to tell when it changes there
+            const saved = (await Worlds.get(parent.id)) ?? parent;
+            saved.childFingerprints = { ...RegionalRecord.checkChildFingerprints(saved.childFingerprints), [world.id]: { [mapId]: fingerprint } };
+            await platform.store.saveWorld(saved);
+            this.world = saved;
+            platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.RegionalWorldCut", { name }));
+            return { worldId: world.id, mapId, name };
         } catch (err) {
-            console.error("FWMB | Regional Map Generation Failed:", err);
+            console.error("FWMB | Cutting the regional world failed:", err);
             platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError"));
+            return null;
         } finally {
-            // 6. Cleanup
             this.#endProcessing();
-            this.#deactivateEditMode();
         }
+    }
+
+    /** Opens a regional world just cut, on its Surface map (it fills in then, when asked). */
+    async #openCutWorld({ mapId, name }) {
+        this.isDirty = false;
+        await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name }));
+        try {
+            await this.#loadMap(mapId, name);
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    /**
+     * Each held regional world's crop fingerprint as the open world now gives it (see
+     * CropFingerprint), kept on the world's record as childFingerprints: worked out when the world
+     * is saved with its map changed, so a regional world can tell its parent changed inside its
+     * crop (RegionalRecord.staleness, rule 1). A world cut before v5 has no fingerprint to compare.
+     * @param {object} world - The world just saved (changed in place).
+     * @param {string} mapId - Its map just saved.
+     * @returns {Promise<boolean>} Whether any fingerprint was worked out.
+     */
+    async #updateChildFingerprints(world, mapId) {
+        const children = [...(await Worlds.all()).values()].filter((child) => child.parentWorldId === world.id && child.held && RegionalRecord.isCurrent(child.regional) && !child.regional.migrated);
+        if (!children.length) return false;
+        // Only the worlds it holds now: one deleted or released has no crop to compare
+        const kept = RegionalRecord.checkChildFingerprints(world.childFingerprints);
+        const prints = Object.fromEntries(children.filter((child) => kept[child.id]).map((child) => [child.id, kept[child.id]]));
+        for (const child of children) {
+            for (const entry of child.regional.maps) {
+                if (entry.sourceMapId !== mapId || !entry.cropFingerprint || !entry.crop?.parent || !entry.size) continue;
+                prints[child.id] = { ...prints[child.id], [entry.mapId]: CropFingerprint.of(this, { crop: entry.crop.parent, width: entry.size.width }) };
+            }
+        }
+        world.childFingerprints = prints;
+        return true;
+    }
+
+    /**
+     * Why the open world is Out of date, a sentence a rule (see WorldsPanel.staleLines), as last
+     * read from the store: refreshed as a world opens and after each save.
+     */
+    #staleLines = [];
+
+    async #refreshStale() {
+        if (!this.world?.held) {
+            this.#staleLines = [];
+            return;
+        }
+        const worlds = await Worlds.all();
+        const world = worlds.get(this.world.id) ?? this.world;
+        this.#staleLines = WorldsPanel.staleLines({ stale: RegionalRecord.staleness(world, (id) => worlds.get(id) ?? null) });
+    }
+
+    /**
+     * Cut again… (Worlds' inspector, a held world's overview; Ken, 2026-11-20): the regional
+     * world is cut afresh from the same crop of the world it was cut from, as a new world with its
+     * name; the old one is kept, renamed "<name> (old, <date>)", with its edits and the regional
+     * worlds cut from it (their crops came from it). Asks first; the open world's unsaved changes
+     * are asked about as any close does.
+     * @param {string} worldId
+     */
+    async cutAgain(worldId) {
+        const worlds = await Worlds.all();
+        const old = worlds.get(worldId);
+        const parent = old?.parentWorldId ? worlds.get(old.parentWorldId) : null;
+        const entry = RegionalRecord.forMap(old?.regional, Worlds.mapOf(old));
+        if (!old?.held || !parent || !entry?.crop?.parent || !entry.size) return;
+        const name = old.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const oldName = MapStudio.#oldWorldName(name, new Set([...worlds.values()].map((world) => world.name)));
+        if (!(await MapDialogManager.promptCutAgain(name, parent.name || "", oldName))) return;
+        // Changes discarded here are still in the studio, so the world is opened again from its save
+        const wasDirty = this.isDirty;
+        if (!(await this.#closeWorldFirst())) return;
+        const parentMapId = entry.sourceMapId && (parent.maps ?? []).some((map) => map.id === entry.sourceMapId) ? entry.sourceMapId : Worlds.mapOf(parent);
+        if (!parentMapId) return;
+
+        Inspector.close(this);
+        // The world it was cut from, open as it was saved
+        if (this.world?.id !== parent.id || wasDirty) {
+            this.isDirty = false;
+            await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: parent.name || "" }));
+            try {
+                if (!(await this.#loadMap(parentMapId, parent.name))) return;
+            } finally {
+                this.#endProcessing();
+            }
+        }
+        await Worlds.rename(old.id, oldName);
+        const cut = await this.#cutWorld({ crop: entry.crop.parent, width: entry.size.width, name, infill: this.uiState.regionalInfill === true });
+        if (cut) await this.#openCutWorld(cut);
+        else await Worlds.rename(old.id, name);
+    }
+
+    /** "<name> (old, <date>)", numbered when that name is taken ("… (old, 20/11/2026) 2"). */
+    static #oldWorldName(name, taken) {
+        const date = new Intl.DateTimeFormat(platform.i18n.lang, { dateStyle: "short" }).format(new Date());
+        const base = platform.i18n.format("FILRODENSWMB.UI.CutAgainOldName", { name, date });
+        let candidate = base;
+        for (let n = 2; taken.has(candidate); n++) candidate = `${base} ${n}`;
+        return candidate;
+    }
+
+    /**
+     * A held regional world's way to its parent's settings (Open parent world settings, on its
+     * world pages' held banner and Climate; Ken, 2026-11-20), signposted at each stage: a dialogue
+     * says the regional world closes and the world its settings come from (the top of its held
+     * chain) opens, asking about unsaved changes too; that world opens on the same page, the world
+     * bar showing whose settings are being changed with Back to; Back to returns.
+     */
+    async openParentSettings() {
+        if (!this.world?.held) return;
+        const worlds = await Worlds.all();
+        const source = WorldRecord.settingsSource(this.world, (id) => worlds.get(id) ?? null);
+        const sourceMapId = Worlds.mapOf(source);
+        if (!source || source.id === this.world.id || !sourceMapId) return;
+        const regionalName = this.world.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const choice = await MapDialogManager.promptOpenParentSettings(regionalName, source.name || "", this.isDirty);
+        if (choice === "cancel") return;
+        if (choice === "save" && !(await this.saveCurrentMap())) return;
+        const back = { worldId: this.world.id, mapId: this.currentSaveId, name: regionalName, tool: this.activeTool, mode: this.mode };
+        // The same page or map tool (Climate) on the parent; the overview from anywhere else
+        const tool = this.activeTool;
+        const onPage = this.inWorld && tool !== "worldCut";
+        const onMapTool = !this.inWorld && this.#isMapTool(tool);
+        this.isDirty = false;
+        Inspector.close(this);
+        await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: source.name || "" }));
+        try {
+            if (!(await this.#loadMap(sourceMapId, source.name))) return;
+        } finally {
+            this.#endProcessing();
+        }
+        this.#backTo = back;
+        if (onMapTool) await this.goToMapTool(tool);
+        else await this.openWorldTool(onPage ? tool : "worldOverview");
+        this.view?.render(["worldbar"]);
+        platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ChangingSettingsFor", { name: regionalName, parent: source.name || "" }));
+    }
+
+    /** Where Back to returns (see openParentSettings), until another world is opened. */
+    #backTo = null;
+
+    /** Back to <regional world> in the world bar: the open world's changes asked about, then the regional world, on the tool left there. */
+    async backToRegional() {
+        const back = this.#backTo;
+        if (!back) return;
+        if (!(await this.#closeWorldFirst())) return;
+        this.isDirty = false;
+        await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: back.name }));
+        try {
+            if (!(await this.#loadMap(back.mapId, back.name))) return;
+        } finally {
+            this.#endProcessing();
+        }
+        if (this.definition.isWorldTool(back.tool)) await this.openWorldTool(back.tool);
+        else if (this.#isMapTool(back.tool)) await this.goToMapTool(back.tool);
     }
 
     /**
@@ -6984,6 +7331,9 @@ export class MapStudio {
             await this._onCloseWorlds();
         }
 
+        this.#forgetPanel();
+        // Back to (a held regional world's Open parent world settings) goes once another world opens
+        this.#backTo = null;
         // The map's data with its world's settings merged in (see WorldMaps)
         const loaded = await WorldMaps.load(mapId);
         if (loaded) {
@@ -6999,6 +7349,7 @@ export class MapStudio {
             this.worldSettingsOpened = this.#worldSettingsNow();
             this.#captureEditorBaseline();
             this.inheritedStrokes = world?.held && RegionalRecord.isCurrent(world.regional) ? (RegionalRecord.forMap(world.regional, mapId)?.inheritedStrokes ?? 0) : undefined;
+            await this.#refreshStale();
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.view?.render(["toolbar", "context"]);
@@ -7066,6 +7417,16 @@ export class MapStudio {
     #newWorldName = "";
 
     /**
+     * Empties the panel as a world is left. It still shows the world being left (a world page's
+     * fields, from Open parent world settings, Back to or New world), and nothing of it may be read
+     * into the world opening: each tool switch and save reads the panel's fields into the state
+     * (MapStateManager.getMapParameters). The next draw fills it for the world opened.
+     */
+    #forgetPanel() {
+        this.root?.querySelector(".fwmb-context-panel")?.replaceChildren();
+    }
+
+    /**
      * Closes the open world's state: no world record, no map, no save (the map's state is
      * #clearMap's). Nothing is open after it until a world is opened or made.
      */
@@ -7085,6 +7446,8 @@ export class MapStudio {
         this.#modeTools = { create: "scene", explore: null };
         this.#worldTool = "worldOverview";
         this.#toolBeforeAside = null;
+        this.#backTo = null;
+        this.#staleLines = [];
         this.#showUnmade();
     }
 
@@ -7595,9 +7958,7 @@ export class MapStudio {
             if (needsTerrain) this.requestTerrainUpdate();
         }
 
-        // The crop takes over canvas clicks while it is showing, so it is shown only in its own
-        // mode, never while land masks are being drawn (see #applyCanvasInteractivity). Select
-        // only picks land masks, so it does not edit.
+        // Select only picks land masks, so it does not edit
         this.#modeChosen(target.dataset.mode !== "select");
     }
 
@@ -7697,8 +8058,8 @@ export class MapStudio {
         this.uiState.isEditMode = on;
 
         if (on) {
-            // A guided map's New map tool draws land masks unless its Crop mode was chosen
-            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode)) {
+            // A guided map's Map setup draws land masks (a crop mode left from 4.3 included)
+            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "coastMask"].includes(this.uiState.sceneMode)) {
                 this.uiState.sceneMode = "addMask";
             }
 
@@ -7769,6 +8130,8 @@ export class MapStudio {
      */
     #canvasInteractive() {
         if (this.uiState.isEditMode) return true;
+        // Cut regional world…'s crop takes the map's drags
+        if (this.activeTool === "worldCut") return true;
         if (this.activeTool === "cartography") return true;
         if (this.activeTool === "regions") return RegionPainter.mode(this) === "select";
         if (this.#isRouteMode()) return RouteTool.mode(this) === "select";
@@ -7780,7 +8143,7 @@ export class MapStudio {
         if (!this.canvasEngine) return;
         this.canvasEngine.setEditMode(this.#canvasInteractive());
         // The crop takes over canvas clicks while it is showing, so only in its own mode while editing
-        this.canvasEngine.setCropMode?.(!!this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
+        this.canvasEngine.setCropMode?.(this.activeTool === "worldCut");
     }
 
     _onToggleGrid(_event, _target) {

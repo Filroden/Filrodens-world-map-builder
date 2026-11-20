@@ -8,6 +8,15 @@ const MARKS = Object.freeze({
     held: Object.freeze({ kind: "held", icon: "lock", label: "FILRODENSWMB.UI.MarkRegionalWorld" }),
     older: Object.freeze({ kind: "older", icon: "history", label: "FILRODENSWMB.UI.MarkOlderGenerator" }),
     noRun: Object.freeze({ kind: "older", icon: "generate", label: "FILRODENSWMB.UI.MarkNoRun" }),
+    // A held regional world whose parent changed what it shows (RegionalRecord.staleness, S0 step 5)
+    stale: Object.freeze({ kind: "stale", icon: "sync", label: "FILRODENSWMB.UI.MarkOutOfDate" }),
+});
+
+/** Out of date's reasons (RegionalRecord.staleness), by rule. */
+const STALE_REASONS = Object.freeze({
+    crop: "FILRODENSWMB.UI.StaleCrop",
+    settings: "FILRODENSWMB.UI.StaleSettings",
+    above: "FILRODENSWMB.UI.StaleAbove",
 });
 
 /** The terrain engines' short names (World setup). */
@@ -130,7 +139,25 @@ export class WorldsPanel {
 
     /** A world's marks, as they show (MARKS). */
     static marks(node) {
-        return (node.marks ?? []).map((mark) => MARKS[mark]).filter(Boolean).map((mark) => ({ ...mark, label: platform.i18n.localize(mark.label) }));
+        return (node.marks ?? [])
+            .map((mark) => MARKS[mark])
+            .filter(Boolean)
+            .map((mark) => ({ ...mark, label: platform.i18n.localize(mark.label), ...(mark.kind === "stale" ? { tooltip: WorldsPanel.staleLines(node).join(" ") } : {}) }));
+    }
+
+    /**
+     * Why a world is Out of date, a sentence a rule (RegionalRecord.staleness), with when where it
+     * is known: "Aethoria was saved with changes inside this crop (saved today)." Empty when it is not.
+     * @param {{stale?: object[]}} node
+     * @returns {string[]}
+     */
+    static staleLines(node) {
+        const { i18n } = platform;
+        return (node?.stale ?? []).map((reason) => {
+            const time = Date.parse(reason.at ?? "");
+            const line = i18n.format(STALE_REASONS[reason.rule], { name: reason.parentName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld") });
+            return Number.isFinite(time) ? i18n.format("FILRODENSWMB.UI.StaleWhen", { line, when: WorldsPanel.savedLabel(time) }) : i18n.format("FILRODENSWMB.UI.StaleLine", { line });
+        });
     }
 
     /** A card's line: its engine, its maps, when it was last saved changed (board W9). */
@@ -229,6 +256,8 @@ export const WorldEditor = Object.freeze({
         isOpen: app.world?.id === world.id,
         held: world.held,
         hasMap: !!world.mapId,
+        stale: WorldsPanel.staleLines(world),
+        cutAgain: WorldEditor.cutAgain(app, world),
     }),
     apply: (app, world, _ref, form) => {
         const name = String(form.elements.worldName?.value ?? "").trim();
@@ -239,6 +268,7 @@ export const WorldEditor = Object.freeze({
     actions: {
         open: (app, world) => app.openWorld(world.mapId, world.name, world.id),
         showWorld: (app, _world, _ref, button) => WorldsPanel.select(app, button.dataset.worldId),
+        cutAgain: (app, world) => app.cutAgain(world.id),
         cloneAsNew: (app, world) => app.worldAction("promote", world.mapId, world.name, undefined, world.id),
         duplicate: (app, world) => app.worldAction("duplicate", world.mapId, world.name, undefined, world.id),
         exportWorld: (app, world) => app.worldAction("export", world.mapId, world.name, undefined, world.id),
@@ -256,11 +286,36 @@ export const WorldEditor = Object.freeze({
         const needle = WorldsPanel.needle(app);
         const rows = [];
         const walk = (node, depth) => {
-            rows.push({ id: node.id, name: WorldsPanel.named(node), depth, level: depth + 1, icon: node.parentId ? "crop" : "public", held: node.held, current: node.id === world.id, match: !!needle && WorldsPanel.matches(node, needle) });
+            rows.push({
+                id: node.id,
+                name: WorldsPanel.named(node),
+                depth,
+                level: depth + 1,
+                icon: node.parentId ? "crop" : "public",
+                held: node.held,
+                // Its zoom against the world it was cut from ("×4"), and whether it is Out of date
+                zoom: node.parentId && Number.isFinite(node.zoom) ? platform.i18n.format("FILRODENSWMB.UI.RegionalZoomValue", { zoom: new Intl.NumberFormat(platform.i18n.lang, { maximumFractionDigits: 1 }).format(node.zoom) }) : null,
+                stale: (node.stale ?? []).length > 0 ? WorldsPanel.staleLines(node).join(" ") : null,
+                current: node.id === world.id,
+                match: !!needle && WorldsPanel.matches(node, needle),
+            });
             for (const child of node.children) walk(child, depth + 1);
         };
         walk(root, 0);
         return rows;
+    },
+
+    /**
+     * Cut again… for a held regional world (null for any other): off, with why, while the world it
+     * was cut from is not saved or the crop is not known (a world cut before v5 whose crop could
+     * not be recovered); for a world cut before v5, its note says v5 cannot tell what changed.
+     */
+    cutAgain(app, world) {
+        if (!world.held || !world.parentId) return null;
+        const { i18n } = platform;
+        if (!WorldsPanel.find(app, world.parentId)) return { off: i18n.localize("FILRODENSWMB.UI.CutAgainNoParent") };
+        if (!world.cropKnown) return { off: i18n.localize("FILRODENSWMB.UI.CutAgainNoCrop") };
+        return { note: i18n.localize(world.migrated ? "FILRODENSWMB.UI.CutAgainMigrated" : "FILRODENSWMB.UI.CutAgainNote") };
     },
 
     /** What the world is, in a sentence: a world, a regional world held by its parent, or one only cut from it. */

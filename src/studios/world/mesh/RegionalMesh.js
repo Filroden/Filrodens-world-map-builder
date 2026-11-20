@@ -1,6 +1,6 @@
 import { MeshBuilder } from "./MeshBuilder.js";
 import { pinsToCells } from "./Migration.js";
-import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, randomId } from "./Schema.js";
+import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock } from "./Schema.js";
 import { encodeOwners } from "./OwnerLayer.js";
 import { resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
 
@@ -33,10 +33,9 @@ import { resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
  *     seed, params.latTop/latBottom and world.
  * @param {{x: number, y: number}} options.crop - The crop's top-left corner in parent pixels.
  * @param {number} options.zoom
- * @param {Function} [options.idFactory]
  * @returns {{fields: {vectorSchemaVersion: number, mesh: object, layerSets: Array, mapRoutes: Array, mapPins: Array, influences: object|null}, owners: Object<string, string>, mesh: import("./MeshBuilder.js").Mesh}}
  */
-export function extractRegionalVectors({ session, layerSets, routes, pins, childMapData, crop, zoom, influences = null, idFactory = randomId }) {
+export function extractRegionalVectors({ session, layerSets, routes, pins, childMapData, crop, zoom, influences = null }) {
     const block = createMeshBlock(childMapData);
     const mesh = MeshBuilder.fromMapData({ ...childMapData, mesh: block });
     block.cells = mesh.cellCount;
@@ -52,7 +51,7 @@ export function extractRegionalVectors({ session, layerSets, routes, pins, child
     }
     dropMissingParents(sets);
 
-    const mapRoutes = (routes ?? []).flatMap((route) => carryRoute(route, session.mesh, mesh, toChild, idFactory));
+    const mapRoutes = (routes ?? []).flatMap((route) => carryRoute(route, session.mesh, mesh, toChild));
     return {
         fields: {
             vectorSchemaVersion: VECTOR_SCHEMA_VERSION,
@@ -89,11 +88,16 @@ function dropMissingParents(sets) {
     for (const set of sets) for (const level of set.levels) if (level.parentLevelId && !ids.has(level.parentLevelId)) level.parentLevelId = null;
 }
 
-function carryRoute(route, parentMesh, mesh, toChild, idFactory) {
+/**
+ * A route's stretches inside the crop. The first keeps the route's id; the later ones are
+ * `<id>-<n>` from the second on, so two cuts of the same crop give the same ids (a regional
+ * world cut again matches the one before, and its record's base matches its routes).
+ */
+function carryRoute(route, parentMesh, mesh, toChild) {
     const pieces = retraceLine(routeMarkedLine(route, parentMesh), mesh, toChild);
     return pieces.map((piece, i) => {
         const carried = moveLabel(structuredClone(route), toChild);
-        if (i > 0) carried.id = idFactory();
+        if (i > 0) carried.id = `${route.id}-${i + 1}`;
         carried.waypoints = piece.waypoints;
         carried.legs = piece.legs;
         return carried;

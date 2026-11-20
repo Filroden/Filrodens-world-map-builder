@@ -1,3 +1,5 @@
+import { RegionalRecord } from "./RegionalRecord.js";
+
 /**
  * The world record (v5's family records; `claude/v5-s0-shell-handoff.md` §4) and the version gate
  * that tells a store written before it.
@@ -69,17 +71,20 @@ export class WorldRecord {
     /**
      * A world's state marks, as Worlds shows them (one set everywhere, S0 step 6 brings the rest):
      * `held` (a regional world reading its parent's settings), `older` (its Surface map made with
-     * an older generator), `noRun` (its Surface map has no run yet). Out of date comes with step 5.
+     * an older generator), `noRun` (its Surface map has no run yet), and, given every world,
+     * `stale` (a held regional world Out of date, see RegionalRecord.staleness).
      * @param {object} world
+     * @param {function(string): (object|null)} [byId] - Any world record by id (no `stale` without it).
      * @returns {string[]}
      */
-    static marks(world) {
+    static marks(world, byId = null) {
         const surface = (world?.maps ?? []).find((map) => map.type === MAP_TYPES.SURFACE);
         const marks = [];
         if (world?.held) marks.push("held");
         // An older generator matters to a map it has run on
         if (surface?.older && surface.run !== false) marks.push("older");
         if (surface && surface.run === false && !world?.held) marks.push("noRun");
+        if (byId && RegionalRecord.staleness(world, byId).length) marks.push("stale");
         return marks;
     }
 

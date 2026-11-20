@@ -1,0 +1,10 @@
+{{!--
+    Cut regional world…'s foot (S0 step 5, board W7), stacked so neither button wraps in Foundry's
+    narrower panel: Cut regional world…, which asks for the new world's name (and to save first, if
+    the world has unsaved changes), over Cancel, which goes back to where the cut was opened from.
+    Cut is off, with why, with no crop or one finer than a world map can show.
+--}}
+<div class="fwmb-make-foot fwmb-make-foot--stack">
+    <button type="button" class="fwmb-btn" data-action="cancelCut">{{localize "FILRODENSWMB.UI.Cancel"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="cutRegionalWorld"{{#if cut.off}} aria-disabled="true" data-tooltip="{{cut.off}}"{{/if}}><span class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.CutRegionalWorld"}}</button>
+</div>
