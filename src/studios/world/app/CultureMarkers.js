@@ -8,8 +8,8 @@ import { platform } from "../../../platform/index.js";
  * - **Markers** (see HomelandMarkers): while the Generate tool is open, each culture's homelands
  *   show in its colour, filled where the reader put them and hollow where the last run placed one
  *   for a culture given none (its Auto homeland), so the reader sees where each people starts.
- * - **Pick on map** (the culture inspector's Add homeland): the next click on the map's land adds a
- *   homeland to the culture, as one undo step, and ends the pick. A click on water is refused with
+ * - **Pick on map** (Peoples and realms' Homelands, Place; S0 step 4c-2): each click on the map's
+ *   land adds a homeland to the culture, until Done, Escape or the culture's limit ends the pick. A click on water is refused with
  *   a notice (the run would leave it out). Escape, Add homeland again, or the inspector closing
  *   ends it with nothing added. The pick takes the click whether or not the map is being edited
  *   (StudioCanvas.pickPointerTool).
@@ -19,10 +19,11 @@ export class CultureMarkers {
     static #picking = new WeakMap();
 
     /**
-     * The tools that mark the homelands and the events' places on the map: Peoples and realms, and
-     * the world's Cultures and Ages and events (S0 step 4b), where they are picked.
+     * The tools that mark the homelands and the events' places on the map: Peoples and realms,
+     * where homelands are placed (S0 step 4c-2), and the world's Ages and events, whose events'
+     * places are picked on the map.
      */
-    static TOOLS = Object.freeze(new Set(["generate", "worldCultures", "worldAges"]));
+    static TOOLS = Object.freeze(new Set(["generate", "worldAges"]));
 
     /**
      * Shows the markers those tools show, or none in any other tool, with `extra` markers beside
@@ -127,7 +128,60 @@ export class CultureMarkers {
         }
         if (WorldEditors.readOnly(app)) return false;
         culture.homelands = [...(culture.homelands ?? []), { x: Math.round(x), y: Math.round(y) }];
-        this.stopPick(app);
+        // Placed from Peoples and realms, each click adds one until Done, Escape or the limit (Ken,
+        // 2026-11-20: a culture may start in several places); elsewhere one click places one
+        const full = culture.homelands.length >= FILRODENSWMB.GENERATOR.CULTURES.MAX_HOMELANDS;
+        if (app.activeTool !== "generate" || full) this.stopPick(app);
+        app.markGeneratorStale?.();
+        app.markDirty();
+        app.view?.render(["context", "editToolbar"]);
+    }
+
+    /**
+     * Peoples and realms' Homelands (S0 step 4c-2, board C10): a row for each culture, with its
+     * homelands on this map (each removable), or Auto when it has none, and Place. The homelands are
+     * each map's own (see WorldSettings), so they are placed here, on the map, not on the Cultures
+     * page. Read only on a held regional world.
+     * @param {object} app
+     * @returns {{readOnly: boolean, rows: object[]}}
+     */
+    static rows(app) {
+        const { i18n } = platform;
+        const max = FILRODENSWMB.GENERATOR.CULTURES.MAX_HOMELANDS;
+        const readOnly = WorldEditors.readOnly(app);
+        const rows = (app.uiState?.cultures ?? []).map((culture) => {
+            const points = culture.homelands ?? [];
+            return {
+                id: culture.id,
+                name: culture.name,
+                color: culture.color ?? FILRODENSWMB.GENERATOR.CULTURES.DEFAULT.color,
+                count: points.length ? i18n.format(points.length === 1 ? "FILRODENSWMB.UI.HomelandsOnMapOne" : "FILRODENSWMB.UI.HomelandsOnMap", { count: points.length }) : i18n.localize("FILRODENSWMB.UI.HomelandsAuto"),
+                points: points.map((point, index) => ({ index, label: i18n.format("FILRODENSWMB.UI.CultureHomelandAt", { number: index + 1, x: Math.round(point.x), y: Math.round(point.y) }) })),
+                picking: this.picking(app, culture.id),
+                canPlace: !readOnly && points.length < max,
+                canAuto: !readOnly && points.length > 0,
+            };
+        });
+        return { readOnly, rows };
+    }
+
+    /** One homeland taken away from a culture on this map. */
+    static remove(app, cultureId, index) {
+        if (WorldEditors.readOnly(app)) return;
+        const culture = (app.uiState.cultures ?? []).find((each) => each.id === cultureId);
+        if (!culture || !Number.isInteger(index) || !culture.homelands?.[index]) return;
+        culture.homelands = culture.homelands.filter((_, at) => at !== index);
+        app.markGeneratorStale?.();
+        app.markDirty();
+        app.view?.render(["context"]);
+    }
+
+    /** Auto: a culture's homelands on this map go, and a run places one. */
+    static clear(app, cultureId) {
+        if (WorldEditors.readOnly(app)) return;
+        const culture = (app.uiState.cultures ?? []).find((each) => each.id === cultureId);
+        if (!culture || !(culture.homelands ?? []).length) return;
+        culture.homelands = [];
         app.markGeneratorStale?.();
         app.markDirty();
         app.view?.render(["context"]);

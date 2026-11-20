@@ -14,11 +14,10 @@
             <input type="text" id="fwmb-inspector-world-name" name="worldName" maxlength="{{fwmbTextLimit 'name'}}" value="{{world.name}}" />
         </div>
     </div>
-    {{#if hasMap}}
+    {{!-- A world with no maps yet opens too, on its overview (S0 step 4c-2) --}}
     <div class="fwmb-btn-row">
         <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="open"{{#if isOpen}} disabled{{/if}}><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{#if isOpen}}{{localize "FILRODENSWMB.UI.WorldIsOpen"}}{{else}}{{localize "FILRODENSWMB.UI.WorldOpen"}}{{/if}}</button>
     </div>
-    {{/if}}
     <p class="fwmb-hint">{{about}}</p>
 </div>
 
@@ -37,7 +36,6 @@
 </div>
 {{/if}}
 
-{{#if hasMap}}
 <div class="fwmb-action-list">
     {{#if world.parentId}}
     <button type="button" class="fwmb-action-row" disabled>
@@ -55,12 +53,12 @@
         <span class="fwmb-icon fwmb-icon--content-copy" aria-hidden="true"></span>
         <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.Duplicate"}}</b><span>{{#if held}}{{localize "FILRODENSWMB.UI.WorldDuplicateHeldNote"}}{{else}}{{localize "FILRODENSWMB.UI.WorldDuplicateNote"}}{{/if}}</span></span>
     </button>
-    <button type="button" class="fwmb-action-row" data-inspector-action="exportWorld">
+    {{!-- A world file holds a world's maps: a world with none yet has nothing to export --}}
+    <button type="button" class="fwmb-action-row"{{#if hasMap}} data-inspector-action="exportWorld"{{else}} aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.WorldExportNoMaps'}}"{{/if}}>
         <span class="fwmb-icon fwmb-icon--file-export" aria-hidden="true"></span>
         <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.MenuExportWorld"}}</b><span>{{localize "FILRODENSWMB.UI.WorldExportNote"}}</span></span>
     </button>
 </div>
-{{/if}}
 
 <div class="fwmb-foot-danger">
     <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-inspector-action="delete"><span class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DeleteEllipsis"}}</button>

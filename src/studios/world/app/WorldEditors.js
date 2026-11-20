@@ -20,9 +20,9 @@ import { platform } from "../../../platform/index.js";
  * group (MapStudio.revertWorldGroup), since that needs its private redraws.
  */
 export const WORLD_EDITORS = Object.freeze({
-    // The frame's latitudes reach the climate, and through it the biomes (the Surface map's Climate
-    // tool from step 4c-2); its area factor and unit the scale bar, travel and the run's areas
-    worldSetup: Object.freeze({ groups: ["setup"], icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede", readBy: ["biomes", "cartography", "travel", "generate"] }),
+    // The frame's latitudes reach the Surface map's Climate tool, and through it the biomes; its
+    // area factor and unit the scale bar, travel and the run's areas
+    worldSetup: Object.freeze({ groups: ["setup"], icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede", readBy: ["climate", "cartography", "travel", "generate"] }),
     // The cultures and the default naming style, one page (round 4c): every random name reads them
     worldCultures: Object.freeze({ groups: ["cultures", "nameStyle"], icon: "groups", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede", readBy: ["generate", "history", "infrastructure", "regions", "labels", "features"] }),
     worldAges: Object.freeze({ groups: ["ages"], icon: "history", label: "FILRODENSWMB.UI.WorldAges", lede: "FILRODENSWMB.UI.WorldAgesLede", readBy: ["generate", "history"] }),
@@ -30,8 +30,6 @@ export const WORLD_EDITORS = Object.freeze({
     // keeps the map's undo rather than Revert changes (Ken, 2026-11-19)
     library: Object.freeze({ groups: ["styles", "icons"], icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary", lede: "FILRODENSWMB.UI.WorldStylesLede", undo: true, readBy: ["infrastructure", "regions", "labels", "generate"] }),
     worldBiomes: Object.freeze({ groups: ["biomes"], icon: "forest", label: "FILRODENSWMB.UI.WorldBiomes", lede: "FILRODENSWMB.UI.WorldBiomesLede", readBy: ["biomes", "generate", "travel"] }),
-    // Until step 4c-2 makes it the Surface map's Climate tool
-    worldClimate: Object.freeze({ groups: ["climate"], icon: "water-drop", label: "FILRODENSWMB.UI.WorldClimate", lede: "FILRODENSWMB.UI.WorldClimateLede", readBy: ["biomes", "generate"] }),
 });
 
 /** The tools off every rail, with a Close back to the tool left: Worlds. */
@@ -39,9 +37,10 @@ const ASIDES = Object.freeze(new Set(["manage"]));
 
 /**
  * The state each group's editor writes, as uiState keys (and the biome colours, kept beside it),
- * so a group can be put back as it was. World setup's engine, seed and frame make a new world
- * (Create new world), so only its in-place fields are kept: the latitudes, the area factor and the
- * unit.
+ * so a group can be put back as it was. World setup's engine and seed make the Surface map again
+ * (Map setup), so only its in-place fields are kept: the latitudes, the area factor and the unit.
+ * The climate has no Revert changes: it is edited on the Surface map's Climate tool, whose sliders,
+ * as Terrain's, go back to their defaults when double-clicked (Ken, 2026-11-20).
  */
 const STATE = Object.freeze({
     setup: Object.freeze(["latTop", "latBottom", "mapUnit", "world.areaFactor"]),
@@ -49,8 +48,14 @@ const STATE = Object.freeze({
     ages: Object.freeze(["generatorSettings.ages"]),
     nameStyle: Object.freeze(["generatorSettings.nameBase"]),
     biomes: Object.freeze(["customBiomes", "nextCustomBiomeId", "@customBiomeColors"]),
-    climate: Object.freeze(["globalTemp", "seasonOffset", "altCooling", "freezingThreshold", "globalMoisture", "noise.moisture.scale"]),
 });
+
+/**
+ * The rest of the world's settings in the studio's state, which no world page puts back: the
+ * climate (the Surface map's Climate tool, with no Revert changes) and the four style lists
+ * (Styles and icons, which keeps the map's undo).
+ */
+const WORLD_ONLY = Object.freeze(["globalTemp", "seasonOffset", "altCooling", "freezingThreshold", "globalMoisture", "noise.moisture.scale", "customRouteStyles", "customLabelStyles", "customRegionStyles", "customPinStyles"]);
 
 /** Reads a key of the studio's state: a dotted path into uiState, or "@name" for one of the studio's own fields. */
 function read(app, key) {
@@ -79,6 +84,35 @@ function write(app, key, value) {
         node = node[part];
     }
     node[rest.at(-1)] = value;
+}
+
+/** The cultures put back keep each culture's homelands as they are now (see WorldEditors.restore). */
+function keepHomelands(restored, now) {
+    if (!Array.isArray(restored)) return;
+    const current = new Map((Array.isArray(now) ? now : []).filter((culture) => culture?.id).map((culture) => [culture.id, culture]));
+    for (const culture of restored) {
+        const live = culture?.id ? current.get(culture.id) : null;
+        if (!live) continue;
+        if (Object.hasOwn(live, "homelands")) culture.homelands = structuredClone(live.homelands);
+        else delete culture.homelands;
+    }
+}
+
+/** The ages put back keep each event's place as it is now, by age id and the event's kind. */
+function keepPlaces(restored, now) {
+    if (!Array.isArray(restored)) return;
+    const current = new Map((Array.isArray(now) ? now : []).filter((age) => age?.id).map((age) => [age.id, age]));
+    for (const age of restored) {
+        const live = age?.id ? current.get(age.id) : null;
+        if (!live || !Array.isArray(age.events)) continue;
+        const byKind = new Map((live.events ?? []).filter((event) => event?.kind).map((event) => [event.kind, event]));
+        for (const event of age.events) {
+            const match = event?.kind ? byKind.get(event.kind) : null;
+            if (!match) continue;
+            if (Object.hasOwn(match, "place")) event.place = structuredClone(match.place);
+            else delete event.place;
+        }
+    }
 }
 
 export class WorldEditors {
@@ -110,12 +144,46 @@ export class WorldEditors {
         return Object.fromEntries(Object.entries(STATE).map(([group, keys]) => [group, Object.fromEntries(keys.map((key) => [key, structuredClone(read(app, key))]))]));
     }
 
-    /** Writes a captured group back into the studio's state (the studio then redraws what it reaches). */
+    /**
+     * Writes a captured group back into the studio's state (the studio then redraws what it reaches).
+     * A culture's homelands and an event's place are the map's, not the world's (S0 step 4c-2), so
+     * putting the cultures or ages back keeps them as they are now: a culture or event that is
+     * back keeps its points from before only when it has none now (it was deleted since).
+     */
     static restore(app, captured, group) {
         const values = captured?.[group];
         if (!values) return false;
-        for (const [key, value] of Object.entries(values)) write(app, key, structuredClone(value));
+        for (const [key, value] of Object.entries(values)) {
+            const restored = structuredClone(value);
+            if (group === "cultures" && key === "cultures") keepHomelands(restored, read(app, key));
+            if (group === "ages" && key === "generatorSettings.ages") keepPlaces(restored, read(app, key));
+            write(app, key, restored);
+        }
         return true;
+    }
+
+    /**
+     * The world's settings as the studio's state holds them: every group's editor state (see
+     * STATE), the climate and the style lists, so the Surface map can be made again while the
+     * world stays as it is (Map setup's Make the Surface map again…, S0 step 4c-2).
+     */
+    static captureWorld(app) {
+        const keys = [...Object.values(STATE).flat(), ...WORLD_ONLY];
+        return Object.fromEntries(keys.map((key) => [key, structuredClone(read(app, key))]));
+    }
+
+    /**
+     * Writes back what captureWorld kept, the cultures without their homelands and the events
+     * without their places: those are the map's, drawn on it, and go with what else was drawn.
+     */
+    static restoreWorld(app, captured) {
+        for (const [key, value] of Object.entries(captured ?? {})) {
+            if (value === undefined) continue;
+            const restored = structuredClone(value);
+            if (key === "cultures" && Array.isArray(restored)) for (const culture of restored) delete culture?.homelands;
+            if (key === "generatorSettings.ages" && Array.isArray(restored)) for (const age of restored) for (const event of age?.events ?? []) delete event?.place;
+            write(app, key, restored);
+        }
     }
 
     /**

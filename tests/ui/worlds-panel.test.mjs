@@ -199,7 +199,8 @@ test("the inspector's actions and Name field go to the studio's world actions", 
     form.elements.worldName.value = "  ";
     WorldEditor.apply(app, world, { id: region.id }, form);
     const mapId = region.maps[0].id;
-    assert.deepEqual(app.calls, [["open", mapId, "Westmarch"], ["promote", mapId, "Westmarch"], ["rename", mapId, "Westmarch", "Eastmarch"]]);
+    // The world's id goes with each, so a world with no maps yet can be acted on (S0 step 4c-2)
+    assert.deepEqual(app.calls, [["open", mapId, "Westmarch", region.id], ["promote", mapId, "Westmarch", undefined, region.id], ["rename", mapId, "Westmarch", "Eastmarch", region.id]]);
 });
 
 test("choosing a regional world shows it in the inspector and lights its family's card", async () => {

@@ -96,6 +96,29 @@ export class MapDialogManager {
     }
 
     /**
+     * Close <world> first? (New world, board N1): the open world has unsaved changes, named where
+     * they are world settings. Save and close, Discard changes, or Cancel (the default).
+     * @param {string} name - The open world's name.
+     * @param {string[]} groups - The world settings groups changed, by name.
+     * @returns {Promise<"save"|"discard"|"cancel">}
+     */
+    static async promptCloseWorld(name, groups = []) {
+        const { i18n } = platform;
+        const list = groups.length ? i18n.format("FILRODENSWMB.UI.CloseWorldGroups", { groups: new Intl.ListFormat(i18n.lang, { type: "conjunction" }).format(groups) }) : i18n.localize("FILRODENSWMB.UI.CloseWorldChanges");
+        return platform.dialogs.choose({
+            title: i18n.format("FILRODENSWMB.UI.CloseWorldTitle", { name }),
+            icon: "fwmb-icon fwmb-icon--save",
+            content: `<p>${Sanitize.escapeHtml(list)}</p><p>${Sanitize.escapeHtml(i18n.localize("FILRODENSWMB.UI.CloseWorldHint"))}</p>`,
+            buttons: [
+                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                { action: "discard", label: i18n.localize("FILRODENSWMB.UI.DiscardChanges"), tone: "negative" },
+                { action: "save", label: i18n.localize("FILRODENSWMB.UI.SaveAndClose"), tone: "positive" },
+            ],
+            dismissed: "cancel",
+        });
+    }
+
+    /**
      * Asks to save the open map before a regional map is cut from it, because it has never been
      * saved or has unsaved changes. A regional map is listed under the saved map it was cut from,
      * and is built from the map as it is now, so without a save it would have no parent in the

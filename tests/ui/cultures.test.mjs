@@ -57,7 +57,6 @@ const { CultureEditor } = await import("../../src/studios/world/app/CultureEdito
 const { CultureLists } = await import("../../src/studios/world/app/CultureLists.js");
 const { RangeTrack } = await import("../../src/shell/RangeTrack.js");
 const { CultureMarkers } = await import("../../src/studios/world/app/CultureMarkers.js");
-const { Inspector } = await import("../../src/studios/world/app/Inspector.js");
 const { GeneratedDetails } = await import("../../src/studios/world/app/GeneratedDetails.js");
 const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
 
@@ -393,15 +392,20 @@ test("the rule editor marks a run out of date when its rules change while a cult
     assert.equal(app.stale, 1);
 });
 
-test("Use auto takes the culture's homelands away, no undo step", async () => {
+test("Homelands are placed in Peoples and realms (S0 step 4c-2): Auto takes a culture's away, no undo step", async () => {
     const app = studio();
     const id = await addCulture(app, "Hillfolk");
     culture(app).homelands = [{ x: 4, y: 5 }, { x: 9, y: 9 }];
-    await CultureEditor.open(app, id);
-    form(app).querySelector('[data-inspector-action="autoHomelands"]').click();
-    await settle();
+    const row = CultureMarkers.rows(app).rows.find((each) => each.id === id);
+    assert.deepEqual([row.points.length, row.canAuto, row.canPlace, row.count], [2, true, true, 'FILRODENSWMB.UI.HomelandsOnMap {"count":2}']);
+    CultureMarkers.clear(app, id);
     assert.deepEqual(culture(app).homelands, []);
+    assert.equal(CultureMarkers.rows(app).rows.find((each) => each.id === id).count, "FILRODENSWMB.UI.HomelandsAuto");
     noUndo(app);
+    // The culture inspector says where they are placed now, with a Go there
+    await CultureEditor.open(app, id);
+    assert.ok(form(app).querySelector('[data-inspector-action="goHomelands"]'));
+    assert.equal(form(app).querySelector('[data-inspector-action="addHomeland"]'), null);
 });
 
 test("a handle's keys: a step, ten steps, the ends; never past the other end", () => {
@@ -421,14 +425,12 @@ test("a handle's keys: a step, ten steps, the ends; never past the other end", (
     assert.equal(holder.querySelector("input").value, "0.4,0.4", "the low end stops at the high one");
 });
 
-test("Add homeland: the next click on land adds one as an undo step; water is refused; Escape and closing end it", async () => {
+test("Place: each click on land adds a homeland until Escape or Done; water is refused; one click places one from a world page", async () => {
     const app = studio();
     const id = await addCulture(app, "Hillfolk");
-    const button = () => form(app).querySelector('[data-inspector-action="addHomeland"]');
-    button().click();
-    await settle();
+    CultureMarkers.togglePick(app, id);
     assert.ok(app.canvasEngine.pickPointerTool, "the click goes to the pick, editing or not");
-    assert.equal(button().getAttribute("aria-pressed"), "true");
+    assert.equal(CultureMarkers.rows(app).rows.find((each) => each.id === id).picking, true);
     warnings.length = 0;
     app.canvasEngine.pickPointerTool.down(2, 3);
     assert.equal(warnings.length, 1, "water is refused");
@@ -436,30 +438,35 @@ test("Add homeland: the next click on land adds one as an undo step; water is re
     app.canvasEngine.pickPointerTool.down(7.4, 3.6);
     await settle();
     assert.deepEqual(culture(app).homelands, [{ x: 7, y: 4 }]);
-    assert.equal(app.canvasEngine.pickPointerTool, null, "one click, one homeland");
-    // The studio redraws the inspector after the panel (see MapStudio's afterRegionsDrawn)
-    await Inspector.refresh(app);
-    assert.match(form(app).querySelector(".fwmb-homeland-row").textContent, /CultureHomelandAt/);
-    noUndo(app);
-    // Escape ends a pick; so does the inspector closing
-    CultureMarkers.togglePick(app, id);
-    assert.equal(CultureMarkers.handleKey(app, { key: "Escape" }), true);
-    assert.equal(app.canvasEngine.pickPointerTool, null);
-    CultureMarkers.togglePick(app, id);
-    Inspector.close(app);
+    assert.ok(app.canvasEngine.pickPointerTool, "Peoples and realms keeps placing (Ken, 2026-11-20)");
+    app.canvasEngine.pickPointerTool.down(8, 4);
     await settle();
-    assert.equal(app.canvasEngine.pickPointerTool, null);
+    assert.equal(culture(app).homelands.length, 2);
+    assert.match(CultureMarkers.rows(app).rows.find((each) => each.id === id).points[0].label, /CultureHomelandAt/);
+    noUndo(app);
+    assert.equal(CultureMarkers.handleKey(app, { key: "Escape" }), true);
+    assert.equal(app.canvasEngine.pickPointerTool, null, "Escape ends it");
+    // Anywhere else, one click places one
+    app.activeTool = "worldAges";
+    CultureMarkers.togglePick(app, id);
+    app.canvasEngine.pickPointerTool.down(7, 3);
+    await settle();
+    assert.equal(app.canvasEngine.pickPointerTool, null, "one click, one homeland");
 });
 
-test("Remove takes one homeland away, no undo step", async () => {
+test("Remove takes one homeland away, no undo step; nothing changes on a held regional world", async () => {
     const app = studio();
     await addCulture(app, "Hillfolk");
     culture(app).homelands = [{ x: 6, y: 1 }, { x: 8, y: 8 }];
-    await CultureEditor.open(app, culture(app).id);
-    form(app).querySelector('[data-inspector-action="removeHomeland"][data-index="0"]').click();
-    await settle();
+    CultureMarkers.remove(app, culture(app).id, 0);
     assert.deepEqual(culture(app).homelands, [{ x: 8, y: 8 }]);
     noUndo(app);
+    app.world = { held: true };
+    CultureMarkers.remove(app, culture(app).id, 0);
+    CultureMarkers.clear(app, culture(app).id);
+    assert.deepEqual(culture(app).homelands, [{ x: 8, y: 8 }]);
+    const held = CultureMarkers.rows(app);
+    assert.deepEqual([held.readOnly, held.rows[0].canPlace, held.rows[0].canAuto], [true, false, false]);
 });
 
 test("the markers: given homelands filled, a run's placed homeland hollow, only in the Generate tool", async () => {

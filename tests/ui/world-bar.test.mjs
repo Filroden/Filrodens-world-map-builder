@@ -61,7 +61,7 @@ test("a held regional world is told where its settings come from, and what was t
     const held = FirstOpening.context({ held: true, migration: { from: "4.3", changed: ["climate", "styles", "icons"], addedStyles: 2, addedBiomes: 1 } }, { explore: false, source: "Aethoria", link: "" }, i18n);
     assert.equal(held.items.length, 4);
     assert.match(held.items[1], /held by Aethoria/);
-    assert.match(held.items[2], /Aethoria's are used now: Styles and icons and Climate base|Aethoria's are used now: Climate base and Styles and icons/);
+    assert.match(held.items[2], /Aethoria's are used now: Styles and icons and Climate|Aethoria's are used now: Climate and Styles and icons/);
     assert.match(held.items[3], /2 styles and 1 custom biomes it had of its own were added to Aethoria/);
     const unchanged = FirstOpening.context({ held: true, migration: { from: "4.3", changed: [] } }, { explore: false, source: "Aethoria", link: "" }, i18n);
     assert.equal(unchanged.items.length, 2);

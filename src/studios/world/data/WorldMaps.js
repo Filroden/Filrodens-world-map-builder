@@ -21,7 +21,8 @@ export class WorldMaps {
         const world = await Worlds.ofMap(mapId);
         if (!world) return { payload: structuredClone(mapData), world: null, settings: null };
         const settings = await Worlds.settingsOf(world);
-        return { payload: WorldSettings.merge(settings, mapData), world, settings };
+        // A held world's cultures and ages are its parent's, so their inline points are in the parent's pixels
+        return { payload: WorldSettings.merge(settings, mapData, { inline: !world.held }), world, settings };
     }
 
     /** A saved map's payload with its world's settings merged in (see load), or null. */

@@ -27,6 +27,15 @@ import { LINKED_GROUPS, WORLD_GROUPS, WorldRecord } from "../../../kernel/worlds
  * A held regional world keeps its own `setup` (its frame comes from its crop) and reads every other
  * group from the world its settings come from (see Worlds.settingsSource).
  *
+ * **What stays the map's inside those groups (S0 step 4c-2):** a culture's homelands and an event's
+ * place are points in one map's pixels, so they are each map's own, though the cultures and ages
+ * they belong to are the world's. `split` takes them out of the cultures and ages into the map's
+ * data, `homelands` (by culture id) and `eventPlaces` (by age id, then by the event's kind, which
+ * an age holds at most once; see resolveEvents), and `merge` puts them back where the studio has
+ * always read them. A world saved before this step still holds them inline: `merge` keeps those
+ * until the map's next save moves them (Ken, 2026-11-20), except on a held regional world, whose
+ * cultures and ages are its parent's and so in its parent's pixels.
+ *
  * Pure and free of host calls: values are copied, never shared with the payload they came from.
  */
 
@@ -118,6 +127,61 @@ function dropEmpty(data, path) {
     }
 }
 
+const isPlainObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+
+/** The map's homelands and event places taken out of the world's cultures and ages (see the class comment). */
+function takePoints(settings, mapData) {
+    const homelands = {};
+    for (const culture of Array.isArray(settings.cultures?.list) ? settings.cultures.list : []) {
+        if (!isPlainObject(culture) || typeof culture.id !== "string" || !Object.hasOwn(culture, "homelands")) continue;
+        homelands[culture.id] = culture.homelands;
+        delete culture.homelands;
+    }
+    const eventPlaces = {};
+    for (const age of Array.isArray(settings.ages?.list) ? settings.ages.list : []) {
+        if (!isPlainObject(age) || typeof age.id !== "string" || !Array.isArray(age.events)) continue;
+        for (const event of age.events) {
+            if (!isPlainObject(event) || typeof event.kind !== "string" || !Object.hasOwn(event, "place")) continue;
+            (eventPlaces[age.id] ??= {})[event.kind] = event.place;
+            delete event.place;
+        }
+    }
+    if (Object.keys(homelands).length || settings.cultures?.list) mapData.homelands = homelands;
+    if (Object.keys(eventPlaces).length || settings.ages?.list) mapData.eventPlaces = eventPlaces;
+}
+
+/**
+ * The map's homelands and event places put back on the merged cultures and ages: the map's own
+ * where its data has them, else (a world saved before step 4c-2) the inline ones, unless `inline`
+ * is false (a held regional world).
+ */
+function putPoints(payload, { inline = true } = {}) {
+    const homelands = payload.homelands;
+    const eventPlaces = payload.eventPlaces;
+    delete payload.homelands;
+    delete payload.eventPlaces;
+    const ownHomelands = isPlainObject(homelands);
+    const ownPlaces = isPlainObject(eventPlaces);
+    for (const culture of Array.isArray(payload.cultures) ? payload.cultures : []) {
+        if (!isPlainObject(culture)) continue;
+        if (ownHomelands) {
+            if (typeof culture.id === "string" && Object.hasOwn(homelands, culture.id) && Array.isArray(homelands[culture.id])) culture.homelands = copy(homelands[culture.id]);
+            else delete culture.homelands;
+        } else if (!inline) delete culture.homelands;
+    }
+    for (const age of Array.isArray(payload.generatorSettings?.ages) ? payload.generatorSettings.ages : []) {
+        if (!isPlainObject(age) || !Array.isArray(age.events)) continue;
+        const places = ownPlaces && typeof age.id === "string" && isPlainObject(eventPlaces[age.id]) ? eventPlaces[age.id] : null;
+        for (const event of age.events) {
+            if (!isPlainObject(event)) continue;
+            if (ownPlaces) {
+                if (places && typeof event.kind === "string" && Object.hasOwn(places, event.kind)) event.place = copy(places[event.kind]);
+                else delete event.place;
+            } else if (!inline) delete event.place;
+        }
+    }
+}
+
 export class WorldSettings {
     /**
      * A map's saved data split into its world's settings and the map's own data.
@@ -143,6 +207,7 @@ export class WorldSettings {
                 if (remove(mapData, path)) dropEmpty(mapData, path);
             }
         }
+        takePoints(settings, mapData);
         return { settings, mapData };
     }
 
@@ -152,9 +217,13 @@ export class WorldSettings {
      * the map's data (a map migrated from 4.3) is never read.
      * @param {object} settings - The world's settings (see split).
      * @param {object} mapData - The map's own data.
+     * @param {object} [options]
+     * @param {boolean} [options.inline=true] - Whether a map with no homelands or event places of
+     *     its own reads those its world's cultures and ages still hold inline (false on a held
+     *     regional world, whose cultures and ages are its parent's).
      * @returns {object} A new object.
      */
-    static merge(settings, mapData) {
+    static merge(settings, mapData, { inline = true } = {}) {
         const payload = structuredClone(mapData ?? {});
         for (const group of MAP_GROUPS) {
             for (const [field, path] of Object.entries(FIELDS[group])) {
@@ -164,6 +233,7 @@ export class WorldSettings {
                 else if (removed) dropEmpty(payload, path);
             }
         }
+        putPoints(payload, { inline });
         return payload;
     }
 

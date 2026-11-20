@@ -74,6 +74,35 @@
     {{/each}}
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
+{{!-- Where each culture starts on this map (S0 step 4c-2, board C10): each map's own, placed on it --}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generateHomelands" title="FILRODENSWMB.UI.SectionHomelands" badge="FILRODENSWMB.UI.BadgeThisMap" instant=true}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HomelandsHint"}}</p>
+    {{#each generate.homelands.rows}}
+    <div class="fwmb-homeland-culture">
+        <div class="fwmb-go-row">
+            <span class="fwmb-chip-swatch" style="background-color: {{this.color}};" aria-hidden="true"></span>
+            <span class="fwmb-go-row-text"><span class="fwmb-name">{{this.name}}</span><span class="fwmb-meta">{{this.count}}</span></span>
+            {{#if this.canAuto}}<button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="autoHomelands" data-culture-id="{{this.id}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureHomelandsUseAutoHint'}}">{{localize "FILRODENSWMB.UI.CultureHomelandsUseAuto"}}</button>{{/if}}
+            <button type="button" class="fwmb-btn{{#if this.picking}} fwmb-btn--primary{{/if}}" data-action="placeHomeland" data-culture-id="{{this.id}}" aria-pressed="{{#if this.picking}}true{{else}}false{{/if}}"{{#unless this.canPlace}} aria-disabled="true"{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.CultureHomelandAddHint'}}"><span class="fwmb-icon fwmb-icon--place" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.HomelandPlace"}}</button>
+        </div>
+        {{#if this.points.length}}
+        <ul class="fwmb-homeland-list">
+            {{#each this.points}}
+            <li class="fwmb-homeland-row">
+                <span class="fwmb-flex-1">{{this.label}}</span>
+                {{#unless @root.generate.homelands.readOnly}}
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeHomeland" data-culture-id="{{../id}}" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.CultureHomelandRemove'}} {{this.label}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureHomelandRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
+                {{/unless}}
+            </li>
+            {{/each}}
+        </ul>
+        {{/if}}
+    </div>
+    {{else}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HomelandsNoCultures"}}</p>
+    {{/each}}
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
 {{#if generate.infill}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generateInfill" title="FILRODENSWMB.UI.SectionGenerateInfill" badge=generate.infill.badge}}
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InfillHint"}}</p>

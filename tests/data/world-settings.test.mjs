@@ -88,3 +88,52 @@ test("changedGroups names the groups that differ", () => {
     assert.deepEqual(WorldSettings.changedGroups(a, b), ["climate", "icons"]);
     assert.equal(WORLD_GROUPS.length, 8);
 });
+
+/** A map with homelands on its cultures and places on its events, as the studio builds them. */
+const withPoints = () => {
+    const map = structuredClone(MAPS.p0jbva);
+    map.cultures = [
+        { id: "hill", name: "Hillfolk", homelands: [{ x: 4, y: 5 }] },
+        { id: "sea", name: "Sea folk", homelands: [] },
+        { id: "plain", name: "Plainsfolk" },
+    ];
+    map.generatorSettings = { ...map.generatorSettings, ages: [{ id: "age-1", era: "early", strife: "calm", events: [{ kind: "realmEvent", place: { x: 7, y: 8 } }, { kind: "migration", culture: "hill" }] }] };
+    return map;
+};
+
+test("homelands and events' places are the map's (S0 step 4c-2): out of the world's cultures and ages, back on load", () => {
+    const map = withPoints();
+    const { settings, mapData } = WorldSettings.split(map);
+    assert.deepEqual(settings.cultures.list.map((culture) => "homelands" in culture), [false, false, false], "the world holds no homelands");
+    assert.equal("place" in settings.ages.list[0].events[0], false, "nor events' places");
+    assert.deepEqual(mapData.homelands, { hill: [{ x: 4, y: 5 }], sea: [] }, "kept by culture id; a culture with none given has no entry");
+    assert.deepEqual(mapData.eventPlaces, { "age-1": { realmEvent: { x: 7, y: 8 } } }, "by age id, then by the event's kind");
+    assert.deepEqual(WorldSettings.merge(settings, mapData), map, "merged back where the studio reads them");
+    // Two maps of one world, each with its own homelands for the same cultures
+    const other = { ...mapData, homelands: { hill: [{ x: 1, y: 1 }] }, eventPlaces: {} };
+    const merged = WorldSettings.merge(settings, other);
+    assert.deepEqual(merged.cultures.map((culture) => culture.homelands), [[{ x: 1, y: 1 }], undefined, undefined]);
+    assert.equal("place" in merged.generatorSettings.ages[0].events[0], false);
+    assert.equal("homelands" in merged || "eventPlaces" in merged, false, "the map's entries are not left in the payload");
+});
+
+test("a world saved before step 4c-2 keeps its inline homelands until its map's next save, but a held world reads none of its parent's", () => {
+    const map = withPoints();
+    // The world as it was saved before: its cultures and ages with their points inline
+    const old = WorldSettings.split(MAPS.p0jbva).settings;
+    old.cultures = { list: structuredClone(map.cultures) };
+    old.ages = { list: structuredClone(map.generatorSettings.ages) };
+    const mapData = WorldSettings.split(MAPS.p0jbva).mapData;
+    delete mapData.homelands;
+    delete mapData.eventPlaces;
+    const merged = WorldSettings.merge(old, mapData);
+    assert.deepEqual(merged.cultures[0].homelands, [{ x: 4, y: 5 }], "read through");
+    assert.deepEqual(merged.generatorSettings.ages[0].events[0].place, { x: 7, y: 8 });
+    // Its next save moves them to the map
+    const again = WorldSettings.split(merged);
+    assert.deepEqual(again.mapData.homelands.hill, [{ x: 4, y: 5 }]);
+    assert.equal("homelands" in again.settings.cultures.list[0], false);
+    const held = WorldSettings.merge(old, mapData, { inline: false });
+    assert.equal("homelands" in held.cultures[0], false, "a held world's cultures are its parent's, in the parent's pixels");
+    assert.equal("place" in held.generatorSettings.ages[0].events[0], false);
+});

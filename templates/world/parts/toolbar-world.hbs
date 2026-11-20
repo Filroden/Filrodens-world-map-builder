@@ -1,11 +1,11 @@
 {{!--
-    The context bar while a world page has given way to the map (S0 step 4c-1): a homeland or an
-    event's place is being picked on the Surface map, from the Cultures or Ages and events page's
-    inspector (until step 4c-2 moves both to each map's Peoples and realms; board C10's state).
-    Done, Escape or the click that places it brings the page back.
+    The context bar while something is placed on the Surface map from a list: a homeland, from
+    Peoples and realms' Homelands (S0 step 4c-2, board C10), or an event's place, from the Ages and
+    events page's inspector, which gives way to the map meanwhile (step 4c-1). Done, Escape or the
+    click that places it ends it (and brings the page back).
 --}}
 <div class="fwmb-contents fwmb-bar-world">
     <span class="fwmb-bar-world-map"><span class="fwmb-icon fwmb-icon--place" aria-hidden="true"></span>{{worldPick.label}} <b>{{worldPick.name}}</b></span>
-    <span class="fwmb-bar-world-hint">{{localize "FILRODENSWMB.UI.PickingHint"}}</span>
+    <span class="fwmb-bar-world-hint">{{worldPick.hint}}</span>
     <button type="button" class="fwmb-btn fwmb-bar-world-done" data-action="stopWorldPick">{{localize "FILRODENSWMB.UI.Done"}}</button>
 </div>

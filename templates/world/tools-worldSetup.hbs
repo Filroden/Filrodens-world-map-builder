@@ -1,14 +1,23 @@
 {{!--
-    World setup (S0 step 4; a page from step 4c-1, boards C4 and C9): the world's frame, which every
-    map in it shares: its size (fixed once a map is made), latitudes, area factor and unit, the last
-    three changed in place, marking the runs out of date. Then, until step 4c-2 moves the terrain
-    engine and the seed to the Surface map's Map setup, what makes a new world: its engine, seed and
-    size (Create new world, which asks about the open world first; New world opens here with Create
-    world). On a held regional world all of it is its own, fixed by its crop, and read only.
+    World setup (S0 step 4; a page from step 4c-1; the frame only from step 4c-2, boards C4, C9 and
+    N2): the world's frame, which every map in it shares: its size (set while the world has no maps,
+    fixed once a map is made), latitudes, area factor and unit, the last three changed in place,
+    marking the runs out of date. The terrain engine and the seed are the Surface map's Map setup.
+    While a world is being made (New world), its name too, with Cancel and Create world. On a held
+    regional world all of it is its own, fixed by its crop, and read only.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
 <fieldset class="fwmb-world-editor fwmb-page-form"{{#if worldEditor.held}} disabled{{/if}}>
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldScale" title="FILRODENSWMB.UI.WorldSetupFrame" badge="FILRODENSWMB.UI.BadgeRebuildsClimate" rebuilds=true}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldScale" title="FILRODENSWMB.UI.WorldSetupFrame" badge=worldSetup.badge rebuilds=worldSetup.sizeFixed}}
+    {{#if worldSetup.creating}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-world-name">{{localize "FILRODENSWMB.UI.WorldName"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-world-name" name="newWorldName" value="{{worldSetup.name}}" maxlength="{{fwmbTextLimit 'name'}}" />
+        </div>
+    </div>
+    {{/if}}
+    {{#if worldSetup.sizeFixed}}
     <div class="fwmb-form-group">
         <span class="fwmb-label">{{localize "FILRODENSWMB.UI.MapSize"}}</span>
         <div class="fwmb-form-fields">
@@ -16,6 +25,18 @@
             <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.WorldSizeFixed"}}</span>
         </div>
     </div>
+    {{else}}
+    {{!-- The frame's size while the world has no maps: the Surface map is made at it --}}
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.MapSize"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="number" name="mapWidth" value="{{worldSetup.width}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapWidth'}}" />
+            <span class="fwmb-times">×</span>
+            <input type="number" name="mapHeight" value="{{worldSetup.height}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapHeight'}}" />
+            <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
+        </div>
+    </div>
+    {{/if}}
 
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
@@ -48,59 +69,11 @@
     <p class="fwmb-hint" id="fwmb-pixel-scale" data-pixel-scale>{{pixelScale}}</p>
 
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generation" title="FILRODENSWMB.UI.WorldSetupNew" badge="FILRODENSWMB.UI.BadgeCreatesWorld"}}
-    <div class="fwmb-form-group">
-        <label for="fwmb-generation-engine">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
-        <div class="fwmb-form-fields">
-            <select id="fwmb-generation-engine" name="generationEngine">
-                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}}</option>
-                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}}</option>
-                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{engineLabels.flat}}</option>
-                {{!-- Legacy terrain is offered only on a map made with it: new maps use the other engines --}}
-                {{#if (eq uiState.generationEngine "standard")}}
-                    <option value="standard" selected>{{engineLabels.standard}}</option>
-                {{/if}}
-            </select>
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{#if (eq uiState.generationEngine 'flat')}}{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}{{else if (eq uiState.generationEngine 'advanced')}}{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}{{else if (eq uiState.generationEngine 'guided')}}{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}{{/if}}"></i>
-        </div>
-    </div>
-
-    {{#unless (eq uiState.generationEngine "flat")}}
-        <div class="fwmb-form-group">
-            <label for="fwmb-map-seed">{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
-            <div class="fwmb-form-fields">
-                <input type="text" id="fwmb-map-seed" name="mapSeed" maxlength="{{fwmbTextLimit 'name'}}" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SeedHint'}}" />
-                <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeSeed" aria-label="{{localize 'FILRODENSWMB.UI.Randomize'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
-                    <i class="fwmb-icon fwmb-icon--shuffle"></i>
-                </button>
-            </div>
-        </div>
-    {{/unless}}
-
-    <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.MapSize"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="number" name="mapWidth" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapWidth'}}" />
-            <span class="fwmb-times">×</span>
-            <input type="number" name="mapHeight" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapHeight'}}" />
-            <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
-        </div>
-    </div>
-
-    {{#if (eq uiState.generationEngine "flat")}}
-        <!-- Read when the map is created (Create new map), not when it is ticked -->
-        <div class="fwmb-form-group">
-            <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
-                <input type="checkbox" name="flatTexture" class="fwmb-checkbox" {{#if uiState.flatTexture}}checked{{/if}} />
-                {{localize "FILRODENSWMB.UI.FlatTexture"}}
-            </label>
-        </div>
-    {{/if}}
-
-    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.WorldSetupNewHint"}}</p>
-    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="applyResolution">
-        {{#if worldSetup.isNew}}{{localize "FILRODENSWMB.UI.CreateWorld"}}{{else}}{{localize "FILRODENSWMB.UI.CreateNewWorld"}}{{/if}}
-    </button>
-{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{#if worldSetup.creating}}
+<div class="fwmb-page-bar">
+    <button type="button" class="fwmb-btn" data-action="cancelNewWorld">{{localize "FILRODENSWMB.UI.Cancel"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="createWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.CreateWorld"}}</button>
+</div>
+{{/if}}
 
 </fieldset>

@@ -45,7 +45,7 @@ test("every tool the World studio registers has a stage or is occasional, a mode
 test("the rail is the registration's: one mode's stages (every mode's when none is named)", () => {
     const ids = (stages) => stages.map((stage) => [stage.id, stage.tools.map((tool) => tool.id)]);
     assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface")), [
-        ["shape", ["scene", "terrain", "biomes", "features"]],
+        ["shape", ["scene", "terrain", "climate", "biomes", "features"]],
         ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
         ["finish", ["cartography", "export"]],
         ["explore", ["history", "travel", "threeD"]],

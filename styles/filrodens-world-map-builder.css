@@ -587,6 +587,11 @@
     cursor: default;
     pointer-events: none;
 }
+/* A button drawn off with its reason in a tooltip (aria-disabled, so the tooltip still shows) */
+.fwmb-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: default;
+}
 /* The accent fill takes text-on-accent (white, or dark on gold light's bright gold) and an edge */
 .fwmb-btn--primary {
     background: var(--fwmb-fill-accent);
@@ -3022,6 +3027,12 @@
     padding: 0 0.5rem;
     color: var(--fwmb-accent-main);
 }
+/* A Surface map not made yet (S0 step 4c-2, board N3): + Surface map, dashed */
+.fwmb-layer--unmade:not([aria-checked="true"]) {
+    outline: 1px dashed var(--fwmb-border-strong);
+    outline-offset: -4px;
+    color: var(--fwmb-text-secondary);
+}
 .fwmb-layer--menu {
     gap: 0.5rem;
 }
@@ -3075,12 +3086,16 @@
     flex: 1 1 0;
     min-width: 0;
 }
-.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"] {
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button, .fwmb-mode-switch button)[aria-disabled="true"] {
     opacity: 0.45;
     cursor: default;
 }
-.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"]:hover {
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button, .fwmb-mode-switch button)[aria-disabled="true"]:hover {
     background: transparent;
+}
+/* The mode chosen stays lit when the other is off (Explore, with no Surface map made) */
+.fwmb-worldbar .fwmb-mode-switch button[aria-checked="true"][aria-disabled="true"] {
+    opacity: 1;
 }
 .fwmb-worldbar .fwmb-layer[aria-checked="true"][aria-disabled="true"] {
     opacity: 1;
@@ -3383,6 +3398,15 @@
     border-top: 1px solid var(--fwmb-border-main);
     background: var(--fwmb-bg-panel);
 }
+/* Map setup's foot while the Surface map is not made (board N4): Make Surface map, full width */
+.fwmb .fwmb-make-foot {
+    display: flex;
+    padding-inline: 0.75rem;
+}
+.fwmb .fwmb-make-foot .fwmb-btn {
+    flex: 1;
+    justify-content: center;
+}
 .fwmb .fwmb-worlds-foot {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3521,8 +3545,10 @@
     text-align: center;
 }
 /* A world settings editor's sections sit in a fieldset, so a held regional world's are read only
-   at once (disabled); it draws nothing of its own */
-.fwmb .fwmb-world-editor {
+   at once (disabled); it draws nothing of its own. A map tool showing what a held regional world
+   reads from its parent (Climate, Map setup's Terrain) does the same with fwmb-held-fieldset,
+   which, unlike a world page's, does not redraw the panel at each change */
+.fwmb :is(.fwmb-world-editor, .fwmb-held-fieldset) {
     display: contents;
     margin: 0;
     padding: 0;
@@ -6308,6 +6334,55 @@
     min-width: 0;
     min-height: 0;
     background: var(--fwmb-canvas-surround);
+}
+
+/* The Surface map before it is made (board N4): the canvas and its overlays give way to a dashed
+   frame in the world's aspect (#showUnmade writes the aspect and the size) */
+.fwmb-map-preview > .fwmb-unmade {
+    display: none;
+}
+.fwmb-studio.fwmb-is-unmade .fwmb-map-preview > .fwmb-unmade {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--fwmb-canvas-surround);
+    container-type: size;
+}
+.fwmb-studio.fwmb-is-unmade .fwmb-map-preview > :not(.fwmb-unmade) {
+    visibility: hidden;
+}
+.fwmb-unmade-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    /* As large as the map area allows, in the world's aspect (--fwmb-unmade-ratio, width over height) */
+    width: min(100cqw, 100cqh * var(--fwmb-unmade-ratio, 1));
+    aspect-ratio: var(--fwmb-unmade-ratio, 1);
+    padding: 1rem;
+    overflow: hidden;
+    border: 2px dashed var(--fwmb-border-strong);
+    border-radius: 8px;
+    color: var(--fwmb-text-secondary);
+    text-align: center;
+    font-size: 0.8125rem;
+}
+.fwmb-unmade-frame > .fwmb-icon {
+    width: 2rem;
+    height: 2rem;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-unmade-frame > b {
+    color: var(--fwmb-text-primary);
+    font-size: 0.9375rem;
+}
+.fwmb-unmade-size {
+    opacity: 0.8;
 }
 
 .fwmb-map-preview canvas {

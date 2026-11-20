@@ -14,7 +14,7 @@ export class FirstOpening {
         nameStyle: "FILRODENSWMB.UI.WorldNameStyle",
         styles: "FILRODENSWMB.UI.ToolLibrary",
         biomes: "FILRODENSWMB.UI.WorldBiomes",
-        climate: "FILRODENSWMB.UI.WorldClimate",
+        climate: "FILRODENSWMB.UI.ToolClimate",
         icons: "FILRODENSWMB.UI.ToolLibrary",
     });
 

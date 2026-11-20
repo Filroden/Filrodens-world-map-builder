@@ -23,12 +23,12 @@ const read = (path) => readFileSync(join(ROOT, path), "utf8");
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => read(join("templates", path)) });
-await templates.load(["shell/parts/section.hbs", "world/parts/world-editor-head.hbs", "world/tools-worldSetup.hbs"]);
+await templates.load(["shell/parts/section.hbs", "world/tools-scene.hbs"]);
 
-/** The engine list's options, value and label, as World setup draws it for a world on this engine. */
+/** The engine list's options, value and label, as Map setup draws it for a map on this engine (S0 step 4c-2). */
 const engineOptions = async (generationEngine) => {
     const engineLabels = Object.fromEntries(Object.keys(TerrainVersion.ENGINE_NAMES).map((engine) => [engine, `label-${engine}`]));
-    const html = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-worldSetup.hbs", { uiState: { generationEngine }, engineLabels, worldEditor: {} });
+    const html = await templates.render("modules/filrodens-world-map-builder/templates/world/tools-scene.hbs", { uiState: { generationEngine }, engineLabels, landMasks: [], terrainChoice: { engine: generationEngine, seed: "", made: true } });
     const select = html.match(/<select id="fwmb-generation-engine"[\s\S]*?<\/select>/)[0];
     return [...select.matchAll(/<option value="(\w+)"([^>]*)>([^<]*)<\/option>/g)].map(([, value, attrs, label]) => ({ value, selected: /selected/.test(attrs), label: label.trim() }));
 };

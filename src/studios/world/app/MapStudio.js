@@ -250,7 +250,7 @@ export class MapStudio {
         clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message)); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
-        generateAll()               { GenerateAll.open(this); },
+        generateAll()               { if (this.surfaceMade) GenerateAll.open(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
         addAge()                    { GeneratePanel.editAges(this, "add"); },
@@ -271,7 +271,9 @@ export class MapStudio {
         adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
         adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
         applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
-        applyResolution(e, t)           { this._onApplyResolution(e, t); },
+        makeSurfaceMap(e, t)            { this._onMakeSurfaceMap(e, t); },
+        createWorld(e, t)               { this._onCreateWorld(e, t); },
+        cancelNewWorld(e, t)            { this._onCancelNewWorld(e, t); },
         cancelProcessing()              { this.#cancelRunning?.abort(); },
         keepProcessing()                { this.#keepRunning?.(); },
         changeTool(e, t)                { this._onChangeTool(e, t); },
@@ -296,7 +298,10 @@ export class MapStudio {
         selectMapCard(e)                { this.#selectMapCard(e); },
         openWorldTool(_e, t)            { this.openWorldTool(t.dataset.tool, t.dataset.section); },
         revertWorldGroup(_e, t)         { this.revertWorldGroup(t.dataset.tool); },
-        goToMapTool(_e, t)              { this.goToMapTool(t.dataset.tool); },
+        goToMapTool(_e, t)              { this.goToMapTool(t.dataset.tool, t.dataset.section); },
+        placeHomeland(_e, t)            { this.#placeHomeland(t.dataset.cultureId); },
+        removeHomeland(_e, t)           { CultureMarkers.remove(this, t.dataset.cultureId, Number(t.dataset.index)); },
+        autoHomelands(_e, t)            { CultureMarkers.clear(this, t.dataset.cultureId); },
         stopWorldPick()                 { this.#stopWorldPick(); },
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
         nudgeReference(e, t)            { this._onNudgeReference(e, t); },
@@ -513,6 +518,12 @@ export class MapStudio {
         // The studio opens on Worlds (Ken, 2026-11-19): its Back to goes to the new world it made,
         // on Map setup (see #modeTools), as the studio opened before
         this.activeTool = "manage";
+        // Whether a world is open (S0 step 4c-2, board N5: the studio opens with none, on Worlds),
+        // and whether its Surface map is made (a world can have no maps, board N3). The canvas and
+        // its buffers are made either way, at the default frame, so its code never meets a missing
+        // engine; only what is shown depends on these.
+        this.worldOpen = false;
+        this.surfaceMade = false;
         this.viewFilters = { all: true, gm: true, none: false };
 
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
@@ -858,10 +869,19 @@ export class MapStudio {
     #changedGroupNames() {
         if (!this.worldSettingsOpened) return [];
         try {
-            const changed = new Set(WorldRecord.changedGroups(this.worldSettingsOpened, this.#worldSettingsNow()));
+            const now = this.#worldSettingsNow();
+            const changed = new Set(WorldRecord.changedGroups(this.worldSettingsOpened, now));
             // Pin icons are edited with the styles, so they are named as Styles and icons
             if (changed.delete("icons")) changed.add("styles");
-            const order = ["setup", "cultures", "ages", "nameStyle", "styles", "biomes", "climate"];
+            // The terrain engine and seed are kept with World setup's but edited in the Surface
+            // map's Map setup (S0 step 4c-2), so they are named as that
+            if (changed.has("setup")) {
+                const { engine: e1, seed: s1, ...rest1 } = this.worldSettingsOpened.setup ?? {};
+                const { engine: e2, seed: s2, ...rest2 } = now.setup ?? {};
+                if (e1 !== e2 || s1 !== s2) changed.add("terrain");
+                if (WorldRecord.changedGroups({ setup: rest1 }, { setup: rest2 }).length === 0) changed.delete("setup");
+            }
+            const order = ["terrain", "setup", "cultures", "ages", "nameStyle", "styles", "biomes", "climate"];
             return order.filter((group) => changed.has(group)).map((group) => platform.i18n.localize(MapStudio.#GROUP_NAMES[group]));
         } catch (error) {
             console.warn("FWMB | The world's settings could not be compared:", error);
@@ -871,13 +891,14 @@ export class MapStudio {
 
     /** The world settings groups' names, as the World menu names their editors. */
     static #GROUP_NAMES = Object.freeze({
+        terrain: "FILRODENSWMB.UI.ToolCreateMap",
         setup: "FILRODENSWMB.UI.WorldSetup",
         cultures: "FILRODENSWMB.UI.WorldCultures",
         ages: "FILRODENSWMB.UI.WorldAges",
         nameStyle: "FILRODENSWMB.UI.WorldNameStyle",
         styles: "FILRODENSWMB.UI.ToolLibrary",
         biomes: "FILRODENSWMB.UI.WorldBiomes",
-        climate: "FILRODENSWMB.UI.WorldClimate",
+        climate: "FILRODENSWMB.UI.ToolClimate",
     });
 
     /** The rail's groups and buttons, for toolbar.hbs (see the studio's definition). */
@@ -908,11 +929,19 @@ export class MapStudio {
             })),
         }));
         const inWorld = this.inWorld;
+        let railStages = inWorld ? worldRail() : definition.railStages(this.mapType, this.mode);
+        // A world being made has its World setup alone (board N2); a Surface map not made yet its
+        // Map setup alone (board N4); a world with no maps has nothing yet for All maps to act on
+        const only = (keep) => railStages.map((stage) => ({ ...stage, tools: stage.tools.filter((tool) => keep(tool.id)) })).filter((stage) => stage.tools.length);
+        if (this.#creatingWorld) railStages = only((id) => id === "worldSetup");
+        else if (!this.surfaceMade && !inWorld) railStages = only((id) => id === "scene");
+        else if (!this.surfaceMade && inWorld) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldGenerateAll" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap") } : tool)) }));
+        const unmade = !this.surfaceMade || this.#creatingWorld;
         return {
             railWorld: inWorld,
-            railStages: inWorld ? worldRail() : definition.railStages(this.mapType, this.mode),
+            railStages,
             // A map's occasional tools are its own; the menus and toggles are on both rails
-            railOccasional: inWorld ? occasional.filter((entry) => !entry.tool) : occasional,
+            railOccasional: inWorld || unmade ? occasional.filter((entry) => !entry.tool) : occasional,
             railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
             helpOpen: HelpPanel.shows(this),
         };
@@ -926,15 +955,25 @@ export class MapStudio {
     #worldBarContext() {
         const { i18n } = platform;
         const notBuilt = (name) => i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name });
-        const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        // No world open (board N5); a world being made (N2); a world whose Surface map is not made (N3, N4)
+        const noWorld = !this.worldOpen;
+        const creating = this.#creatingWorld;
+        const unmade = !noWorld && !this.surfaceMade;
+        const name = noWorld ? i18n.localize("FILRODENSWMB.UI.NoWorldOpen") : (creating ? this.#newWorldName : null) || this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
         // World, then the world's maps: the switcher says what is being worked on (S0 step 4)
         // In Worlds no world is being worked on yet, so neither is lit
         const inWorld = this.inWorld;
         const inWorlds = this.activeTool === "manage";
         const worldName = i18n.localize("FILRODENSWMB.UI.LayerWorld");
         const world = { id: "world", icon: "public", full: worldName, short: worldName, tooltip: i18n.localize("FILRODENSWMB.UI.LayerWorldHint"), current: inWorld, action: inWorld ? null : "showWorld" };
-        const surface = { id: "surface", icon: "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: !inWorld && !inWorlds, action: inWorld || inWorlds ? "showMap" : null };
-        surface.tooltip = surface.full;
+        const surface = { id: "surface", icon: unmade ? "add" : "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: !inWorld && !inWorlds, action: inWorld || inWorlds ? "showMap" : null, unmade };
+        surface.tooltip = unmade ? i18n.localize("FILRODENSWMB.UI.LayerSurfaceUnmade") : surface.full;
+        // Nothing to switch to with no world open, nor while one is being made
+        if (noWorld || creating) {
+            const off = i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint");
+            Object.assign(world, { action: null, disabled: !world.current, tooltip: world.current ? world.tooltip : off });
+            Object.assign(surface, { action: null, disabled: true, tooltip: off });
+        }
         const geologyName = i18n.localize("FILRODENSWMB.UI.LayerGeologyFull");
         const geology = { id: "geology", icon: "strata", full: geologyName, short: i18n.localize("FILRODENSWMB.UI.LayerGeology"), disabled: true, tooltip: notBuilt(geologyName) };
         const current = inWorld ? world : surface;
@@ -950,6 +989,11 @@ export class MapStudio {
             addMap: notBuilt(i18n.localize("FILRODENSWMB.UI.AddMap")),
             settlementMaps: notBuilt(i18n.localize("FILRODENSWMB.UI.SettlementMaps")),
             mode: this.mode,
+            // Explore needs a map to explore
+            exploreOff: noWorld || creating || unmade ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.NeedsSurfaceMap") : null,
+            noWorld,
+            // Save world and Save as have nothing to save with no world open or while one is made
+            savesOff: noWorld || creating ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint") : null,
             fold: this.root?.querySelector(":scope > .fwmb-worldbar")?.dataset.fold ?? "1",
         };
     }
@@ -1079,8 +1123,10 @@ export class MapStudio {
             // Worlds is off every rail and closes from its own header; the world's tools are left by
             // choosing a map in the layer switcher
             closes: WorldEditors.isAside(tool) ? "closeWorlds" : null,
-            state: this.#stateBlockContext(),
-            next: next ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
+            // Nothing to edit on a Surface map not made yet
+            state: this.surfaceMade ? this.#stateBlockContext() : null,
+            // No Next while the Surface map is not made: Map setup is all its rail holds
+            next: next && this.surfaceMade ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
         };
     }
 
@@ -1367,8 +1413,17 @@ export class MapStudio {
         if (regionId === "editToolbar") {
             const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
 
-            if (editableTools.includes(this.activeTool)) {
+            if (!this.surfaceMade && this.#isMapTool(this.activeTool)) {
+                // The Surface map before it is made (board N4): the bar says so, and has no modes
+                context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-unmade.hbs`;
+                context.bar.state = null;
+            } else if (editableTools.includes(this.activeTool)) {
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-${this.activeTool}.hbs`;
+            } else if (this.activeTool === "generate" && CultureMarkers.picking(this)) {
+                // A homeland being placed from Peoples and realms (board C10)
+                context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-world.hbs`;
+                context.bar.state = null;
+                context.worldPick = this.#worldPickContext();
             } else if (WorldEditors.isEditor(this.activeTool) && this.#worldPicking()) {
                 // A world page giving way to the map while a homeland or an event's place is picked
                 context.toolbarPartial = `${TEMPLATE_ROOT}world/parts/toolbar-world.hbs`;
@@ -1441,6 +1496,7 @@ export class MapStudio {
         context.regionalInfillOffered = this.#regionalInfillOffered(this.canvasEngine?.cropBox);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
+        if (this.activeTool === "scene") context.terrainChoice = this.#terrainChoiceContext();
         // The Coastline Fracture slider's position on its power curve (see RangeCurve)
         context.fractureCurve = FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE;
         context.fracturePosition = RangeCurve.positionOf(this.uiState.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE, context.fractureCurve);
@@ -1500,6 +1556,8 @@ export class MapStudio {
             // its New world, Import world and backups
             context.panelHeadPartial = this.activeTool === "manage" ? `${TEMPLATE_ROOT}world/tools-manage-head.hbs` : null;
             context.panelFootPartial = this.activeTool === "manage" ? `${TEMPLATE_ROOT}world/tools-manage-foot.hbs` : null;
+            // Make Surface map at Map setup's foot while the map is not made (board N4)
+            if (this.activeTool === "scene" && !this.surfaceMade) context.panelFootPartial = `${TEMPLATE_ROOT}world/tools-scene-foot.hbs`;
 
             context.massEditMode = { ...this.massEditMode };
             context.massEditCount = {
@@ -1537,8 +1595,10 @@ export class MapStudio {
             if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
             if (this.activeTool === "influences") context.influences = InfluenceView.context(this);
+            // The climate is the world's: a held regional world reads its parent's, read only
+            if (this.activeTool === "climate" && this.world?.held) context.climateHeld = platform.i18n.format("FILRODENSWMB.UI.ClimateHeld", { name: (await this.#heldSourceName()) ?? "" });
             if (this.activeTool === "generate") {
-                context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this), fromWorld: this.#readFromWorld(), generateAllLabel: GenerateAll.buttonLabel(this) };
+                context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this), fromWorld: this.#readFromWorld(), generateAllLabel: GenerateAll.buttonLabel(this), homelands: CultureMarkers.rows(this) };
             }
             // The world's cultures and ages (S0 step 4b), as Peoples and realms drew them before
             if (this.activeTool === "worldCultures") context.cultureList = CultureLists.context(this);
@@ -1566,7 +1626,9 @@ export class MapStudio {
                 // Worlds fills the studio's body beside the inspector (board W9)
                 context.panel.board = true;
                 context.panel.meta = context.worlds.summary;
-                context.panel.back = this.world?.name ? platform.i18n.format("FILRODENSWMB.UI.WorldsBackTo", { name: this.world.name }) : platform.i18n.localize("FILRODENSWMB.UI.WorldsBackToMap");
+                // With no world open (board N5) there is nothing to go back to
+                if (!this.worldOpen) context.panel.closes = null;
+                context.panel.back = !this.worldOpen ? null : this.world?.name ? platform.i18n.format("FILRODENSWMB.UI.WorldsBackTo", { name: this.world.name }) : platform.i18n.localize("FILRODENSWMB.UI.WorldsBackToMap");
             }
         }
 
@@ -1781,6 +1843,11 @@ export class MapStudio {
      * Undo/Redo buttons' preview of what they would change.
      */
     #onMapDrawn() {
+        // The processing overlay covers the whole studio, not only the map (S0 step 4c-2): opening
+        // a world from Worlds shows it from the first step, while the map is hidden behind Worlds'
+        // board. The map region is drawn once, so the overlay is moved out of it once.
+        const overlay = this.root.querySelector(".fwmb-map .fwmb-processing-overlay");
+        if (overlay) this.root.append(overlay);
         this.#initCanvasAndEngines();
         this.#syncMapControls();
         this.#layout = new StudioLayout(this.root);
@@ -2317,8 +2384,15 @@ export class MapStudio {
 
         const name = target.name || "";
 
-        // The resolution fields describe the next map Create New Map will build, not the open
-        // map, so changing them neither marks the map unsaved nor regenerates anything
+        // Map setup's terrain engine and seed are held until the map is made (again) from them
+        if (MapStudio.#TERRAIN_CHOICE_INPUTS.has(name)) return this.#recordTerrainChoice(target, name, event);
+        // A new world's name, kept until Create world
+        if (name === "newWorldName") {
+            this.#newWorldName = target.value;
+            return;
+        }
+        // The resolution fields describe the frame a world with no maps will make its Surface map
+        // in, not the open map, so changing them neither marks the map unsaved nor regenerates
         if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
         // The regional map's size is in New map's Regional map section; the crop on the map follows
         // it. Like the resolution fields, it describes the next map (the cut), not the open one,
@@ -2332,13 +2406,6 @@ export class MapStudio {
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
-
-        if (name === "generationEngine") {
-            if (event.type === "input") return;
-
-            this._onApplyResolution(event, target);
-            return;
-        }
 
         // 1. Route specific single-action updates
         if (name === "mapUnitName") return this.#updateMapUnit(target);
@@ -2479,20 +2546,6 @@ export class MapStudio {
         }
     }
 
-    /**
-     * Carries the panel's latitude, area factor and unit into a new map's state, which was rebuilt
-     * from the defaults. A top map's world is taken afresh (a regional map's zoom and origin are
-     * not the new map's), with the area factor that was set.
-     */
-    #keepNewMapPlace({ latTop, latBottom, areaFactor, unit }) {
-        this.uiState.mapUnit = cleanUnit(unit);
-        if (Number.isFinite(latTop) && Number.isFinite(latBottom)) {
-            this.uiState.latTop = latTop;
-            this.uiState.latBottom = latBottom;
-        }
-        if (areaFactor !== undefined) this.uiState.world = { ...TerrainVersion.resolveWorld({ ...this.uiState, world: null, mapWidth: this.mapWidth, mapHeight: this.mapHeight }), areaFactor: clampAreaFactor(areaFactor) };
-    }
-
     #updateBiomeAlphas() {
         MapStateManager.getMapParameters(this);
         this.#updateBiomeOpacity();
@@ -2513,7 +2566,16 @@ export class MapStudio {
      */
     #recordNewMapSize(target, name) {
         const size = Number.parseInt(target.value, 10);
-        if (!Number.isNaN(size)) this.uiState[name] = size;
+        if (Number.isNaN(size)) return;
+        this.uiState[name] = size;
+        // The frame of a world with no maps yet (World setup, board N2): its Surface map is made at it
+        if (!this.surfaceMade) {
+            const clamped = Math.min(4000, Math.max(500, size));
+            if (name === "mapWidth") this.mapWidth = clamped;
+            else this.mapHeight = clamped;
+            if (this.world) this.markDirty();
+            this.#showUnmade();
+        }
     }
 
     /** The regional map's width, once the field is left (not per keystroke), and the crop fitted to it. */
@@ -2680,6 +2742,11 @@ export class MapStudio {
 
         const activeWindow = this.root.ownerDocument.defaultView || window;
         activeWindow.setTimeout(async () => {
+            // The studio opens with no world (board N5): nothing is made behind Worlds
+            if (!this.surfaceMade) {
+                this.#showUnmade();
+                return;
+            }
             await this.generateTerrain();
             this.isDirty = false;
             // Unless a map was loaded meanwhile, the new map gets its (empty) display mesh
@@ -4266,9 +4333,15 @@ export class MapStudio {
      * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see platform.store.loadMapOwners).
      * @param {object|null} [modelRun] - The generator's saved outputs (see platform.store.loadMapModelRun).
      */
-    async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null) {
+    async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null, { generate = true } = {}) {
         // Deep clone to sever the connection to Foundry's memory cache
         const payload = platform.utils.deepClone(rawPayload);
+        // A map loaded is its world's Surface map, made; a world with no maps reads its settings
+        // through here without one (see #openMaplessWorld)
+        this.worldOpen = true;
+        this.surfaceMade = generate;
+        this.#creatingWorld = false;
+        this.#terrainChoice = null;
         // Pin and label sizes saved before the current size unit are scaled to it (see SymbolSizes).
         // The map is not marked as changed: until it is saved, the same scaling runs on every load.
         rebaseMap(payload);
@@ -4556,6 +4629,8 @@ export class MapStudio {
         this.defaultUiState = platform.utils.deepClone(this.uiState);
 
         this.view?.render(["toolbar", "context"]);
+        this.#showUnmade();
+        if (!generate) return;
         await this.generateTerrain();
         await MeshIntegration.finishLoad(this, this.#processingOverlay());
         this.#updateGrid();
@@ -4891,13 +4966,15 @@ export class MapStudio {
      * @param {string|null} [promptTitle] - Title for the name prompt, or null for "Save As...".
      */
     async #performSave(asNew, promptTitle = null) {
+        if (!this.worldOpen || this.#creatingWorld) return false;
         let mapName = this.currentSaveName;
         const createsNewMap = asNew || !this.currentSaveId;
 
         // 1. Ask for the name BEFORE locking the UI. This sits outside the try block below: its
         // finally releases the processing overlay, and a cancelled prompt has not claimed it, so
-        // releasing it here would hide the overlay of a refresh that is still running.
-        if (createsNewMap) {
+        // releasing it here would hide the overlay of a refresh that is still running. A world
+        // saved already keeps its name when its Surface map is first saved with it.
+        if (asNew || (createsNewMap && !this.world)) {
             mapName = (await MapDialogManager._promptTextValue(promptTitle ?? platform.i18n.localize("FILRODENSWMB.UI.SaveAs"), platform.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
 
             if (!mapName) return false; // User cancelled the save prompt (or left the name blank)
@@ -4965,7 +5042,8 @@ export class MapStudio {
             world: this.world,
             name: this.currentSaveName,
             settings,
-            maps: [{ id: createsNewMap ? null : this.currentSaveId, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun, summary: payload, changed: this.isDirty || createsNewMap, card: this.#mapCard(payload, modelRun, this.isDirty || createsNewMap) }],
+            // A world with no maps saves its settings alone (board N3)
+            maps: this.surfaceMade ? [{ id: createsNewMap ? null : this.currentSaveId, type: MAP_TYPES.SURFACE, data: mapData, owners, modelRun, summary: payload, changed: this.isDirty || createsNewMap, card: this.#mapCard(payload, modelRun, this.isDirty || createsNewMap) }] : [],
             asNew: asNew && !!this.world,
             // A held world writes only its own World setup, so only that can change its revision
             settingsChanged: opened ? WorldRecord.changedGroups(this.world?.held ? { setup: opened.setup } : opened, this.world?.held ? { setup: settings.setup } : settings).length > 0 : undefined,
@@ -4976,7 +5054,7 @@ export class MapStudio {
         this.worldSettingsOpened = settings;
         this.#captureEditorBaseline();
         this.view?.render(["worldbar"]);
-        return { mapId: result.maps[0].id, name: this.currentSaveName };
+        return { mapId: result.maps[0]?.id ?? null, name: this.currentSaveName };
     }
 
     /**
@@ -5533,64 +5611,94 @@ export class MapStudio {
         await this.generateTerrain();
     }
 
+    /** Map setup's terrain fields, which are held until the map is made (again) from them. */
+    static #TERRAIN_CHOICE_INPUTS = new Set(["terrainEngine", "terrainSeed", "terrainFlatTexture"]);
+
     /**
-     * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
+     * The terrain engine, seed and Flat's textured ground Map setup will make the Surface map from
+     * (S0 step 4c-2): null while they are the open map's. A made map takes a new engine or seed only
+     * by being made again (Make the Surface map again…), so a change waits here.
      */
-    async _onApplyResolution(event, target) {
-        const formData = platform.utils.readForm(target.form);
+    #terrainChoice = null;
 
-        const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
-        const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
-        let newSeed = formData.mapSeed?.trim();
+    /** The open map's terrain engine, seed and textured ground, as Map setup's fields start. */
+    #currentTerrainChoice() {
+        return { engine: this.uiState.generationEngine ?? FILRODENSWMB.DEFAULTS.ENGINE, seed: String(this.uiState.mapSeed ?? ""), flatTexture: this.uiState.flatTexture === true };
+    }
 
-        // Extract the dropdown choice
-        const newEngine = formData.generationEngine || FILRODENSWMB.DEFAULTS.ENGINE;
+    #recordTerrainChoice(target, name, event) {
+        const choice = { ...(this.#terrainChoice ?? this.#currentTerrainChoice()) };
+        if (name === "terrainEngine") choice.engine = target.value;
+        else if (name === "terrainSeed") choice.seed = target.value;
+        else choice.flatTexture = target.checked === true;
+        this.#terrainChoice = choice;
+        // The engine decides which fields show; any change decides whether Make the Surface map again is on
+        if (name !== "terrainSeed" || event?.type === "change") this.view?.render(["context"]);
+    }
 
-        // If the user left the seed blank, generate a random one automatically
-        if (!newSeed) {
-            newSeed = this.#generateRandomSeed();
-        }
+    /** Map setup's Terrain section: the fields, whether the map is made, and whether they differ from it. */
+    #terrainChoiceContext() {
+        const now = this.#currentTerrainChoice();
+        const choice = this.#terrainChoice ?? now;
+        const made = this.surfaceMade !== false;
+        const changed = choice.engine !== now.engine || (choice.engine !== "flat" && choice.seed.trim() !== now.seed) || (choice.engine === "flat" && choice.flatTexture !== now.flatTexture);
+        return { ...choice, made, changed, held: !!this.world?.held, badge: made ? "FILRODENSWMB.UI.BadgeMakesMapAgain" : null };
+    }
 
-        const canProceed = await this.#gateUnsavedChanges();
+    /**
+     * Make Surface map, or Make the Surface map again… (Map setup, S0 step 4c-2). Again asks first,
+     * naming what is lost; both make the map from Map setup's terrain fields in the world's frame.
+     */
+    async _onMakeSurfaceMap(_event, target) {
+        if (target?.getAttribute?.("aria-disabled") === "true" || this.world?.held) return false;
+        const choice = this.#terrainChoice ?? this.#currentTerrainChoice();
+        const again = this.surfaceMade !== false;
+        if (again && !(await this.#confirmMakeAgain())) return false;
+        const made = await this.#makeSurfaceMap({ ...choice, again });
+        // The world is saved with its new map, so it is in Worlds whatever happens next
+        if (made && !again && this.world) await this.saveCurrentMap();
+        return made;
+    }
 
-        if (!canProceed) {
-            // The user cancelled the action
-            if (target.name === "generationEngine") {
-                target.value = this.uiState.generationEngine;
-            }
-            this.view?.render(["context"]);
-            return false;
-        }
+    /** Asks before Make the Surface map again…: what is drawn on the map is lost; the world's settings are kept. */
+    async #confirmMakeAgain() {
+        const { i18n } = platform;
+        const choice = await platform.dialogs.choose({
+            title: i18n.localize("FILRODENSWMB.UI.MakeMapAgainTitle"),
+            icon: "fwmb-icon fwmb-icon--sync",
+            content: `<p>${Sanitize.escapeHtml(i18n.localize("FILRODENSWMB.UI.MakeMapAgainLost"))}</p><p>${Sanitize.escapeHtml(i18n.localize("FILRODENSWMB.UI.MakeMapAgainKept"))}</p>`,
+            buttons: [
+                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
+                { action: "again", label: i18n.localize("FILRODENSWMB.UI.MakeMapAgainButton"), tone: "negative" },
+            ],
+        });
+        return choice === "again";
+    }
 
-        // The latitude, area factor and unit in the panel are the new map's too: they apply to the
-        // open map as they are typed, so they are read before the state is rebuilt from the defaults
-        const kept = { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom, areaFactor: this.uiState.world?.areaFactor, unit: this.uiState.mapUnit };
-
-        // Calculate the centre-anchor offset
-        const dx = (newWidth - this.mapWidth) / 2;
-        const dy = (newHeight - this.mapHeight) / 2;
-
-        this.mapWidth = newWidth;
-        this.mapHeight = newHeight;
-
+    /**
+     * The studio's map state made empty, in the frame it has (mapWidth, mapHeight): the defaults,
+     * with `world` (a captureWorld) written back if given, and nothing drawn: no strokes, masks,
+     * rivers, faults, pins, routes, regions, labels, decorations or run, and no undo. Shared by
+     * making the Surface map, New world and opening a world with no maps.
+     * @param {object|null} [world]
+     */
+    #clearMap(world = null) {
         MapStateManager.allocateBuffers(this);
         // A new map opens with every terrain layer on (see #terrainLayers)
         this.#setTerrainLayers(MapStudio.#allTerrainLayers(true));
-
-        this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
+        this.defaultUiState = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
         this.uiState = platform.utils.deepClone(this.defaultUiState);
+        // The built-in biomes' colours at their defaults, so the panel's fields read them (a world's
+        // changed colours come back with its settings below)
+        this.customBiomeColors = {};
+        Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
+            this.customBiomeColors[key] = rgb;
+        });
+        if (world) WorldEditors.restoreWorld(this, world);
         PinStyles.ensure(this);
-        // The new map's grid starts hidden
         this.#syncMapControls();
         this.#syncReliefEmphasisSlider();
-        this.uiState.mapSeed = newSeed;
-
-        // Inject the engine choice into the wiped state
-        this.uiState.generationEngine = newEngine;
-        this.#keepNewMapPlace(kept);
-        // Textured ground is chosen when a Flat map is created (the checkbox only shows while the
-        // open map is Flat, so a map switched to Flat from another engine starts smooth)
-        this.uiState.flatTexture = newEngine === "flat" && formData.flatTexture === true;
+        this.#terrainChoice = null;
 
         // A new map is built with the current terrain rules, so there is nothing to update
         this.terrainUpgrade = null;
@@ -5604,16 +5712,6 @@ export class MapStudio {
         this.riverRoutesLaid = false;
         this.shoresPlaced = false;
 
-        // Reset biome colours to defaults so the DOM sync catches them
-        this.customBiomeColors = {};
-        Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
-            this.customBiomeColors[key] = rgb;
-        });
-
-        this.view?.render(["toolbar", "context"]);
-
-        // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
-        this.markDirty();
         this.brushEngine = this.#createBrushEngine();
         this.manualRivers = [];
         this.tectonicFaults = [];
@@ -5622,16 +5720,7 @@ export class MapStudio {
         this.mapRoutes = [];
         this.layerSets = [];
         this.modelRun = null;
-
-        // Apply the centre offset to keep masks perfectly framed
-        this.landMasks =
-            newEngine === "guided"
-                ? this.landMasks.map((mask) => ({
-                      ...mask,
-                      points: mask.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-                  }))
-                : [];
-
+        this.landMasks = [];
         this.mapLabels = [];
         this.mapDecorations = [];
         FeatureNames.forget(this);
@@ -5640,7 +5729,6 @@ export class MapStudio {
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
 
-        // 2. Drop all active drawing states
         this.activeRouteId = null;
         this.activeLayerSetId = null;
         this.activeLevelId = null;
@@ -5648,46 +5736,61 @@ export class MapStudio {
         this.activeFaultId = null;
         this.activeRiverId = null;
         this.activeLandMaskId = null;
+    }
 
-        // 3. Wipe the save memory so the next save forces a "Save As" prompt: a new world, with
-        // the built-in pin icons only
-        this.currentSaveId = null;
-        this.currentSaveName = null;
-        this.world = null;
-        this.worldSettingsOpened = null;
-        this.inheritedStrokes = undefined;
-        this.#useWorldIcons(WorldRecord.emptyIcons());
-        // A new world opens in Create, on Map setup (S0 step 3)
+    /**
+     * Makes the world's Surface map from a terrain engine and seed, in the world's frame (S0 step
+     * 4c-2). Everything drawn on the map goes: strokes, masks (kept only when the map stays Guided),
+     * rivers, faults, pins, routes, regions, labels, decorations, its homelands and events' places,
+     * and the run. The world's settings stay as they are (Ken, 2026-11-20: a new map, not a new
+     * world), and so do the world, its save and the mode; the engine's own settings start at its
+     * defaults. It has no undo.
+     *
+     * @param {object} options
+     * @param {string} options.engine
+     * @param {string} [options.seed] - Blank for a random one.
+     * @param {boolean} [options.flatTexture]
+     * @param {boolean} [options.again] - Whether the map was made before (its masks are kept when
+     *     it stays Guided).
+     * @returns {Promise<boolean>}
+     */
+    async #makeSurfaceMap({ engine, seed = "", flatTexture = false, again = true }) {
+        const newEngine = engine || FILRODENSWMB.DEFAULTS.ENGINE;
+        const newSeed = String(seed ?? "").trim() || this.#generateRandomSeed();
+        // Made in the world's frame (mapWidth, mapHeight): a world with no maps yet sets it in World setup
+        const keptMasks = again && newEngine === "guided" && this.uiState.generationEngine === "guided" ? this.landMasks : [];
+        // The world's settings, and the climate shown on the map, are kept as they are
+        const world = WorldEditors.captureWorld(this);
+
+        this.#clearMap(world);
+        this.landMasks = keptMasks;
+        this.uiState.mapSeed = newSeed;
+        this.uiState.generationEngine = newEngine;
+        // Textured ground is chosen when a Flat map is made
+        this.uiState.flatTexture = newEngine === "flat" && flatTexture === true;
+        this.surfaceMade = true;
+        this.worldOpen = true;
+        this.#showUnmade();
+        this.markDirty();
+
+        // Made from Map setup, which stays open; a Guided map starts drawing its masks
         this.mode = "create";
-        this.#modeTools = { create: "scene", explore: null };
-
-        // 4. If switching to Guided Mode, auto-activate the drawing tools
-        if (newEngine === "guided") {
-            this.activeTool = "scene";
+        this.#modeTools = { ...this.#modeTools, create: "scene" };
+        this.activeTool = "scene";
+        if (newEngine === "guided" && !keptMasks.length) {
             this.uiState.sceneMode = "addMask";
             this.uiState.isEditMode = true;
         } else {
             this.uiState.isEditMode = false;
         }
-
         this.#updateCanvasModes(this.activeTool);
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
 
         await this.generateTerrain();
         MeshIntegration.startNewMap(this);
         this.#updateGrid();
         this.canvasEngine.resetCamera();
-        this.#captureEditorBaseline();
-        // Made from World setup: the new world's Surface map, on Map setup, is next
-        // (the world bar is drawn again with the rest below, so its switcher shows the map)
-        if (this.definition.isWorldTool(this.activeTool)) {
-            this.activeTool = "scene";
-            this.#toolBeforeAside = null;
-            this.#newWorldSetup = false;
-            this.view?.render(["worldbar"]);
-        }
-
-        // 5. Force UI to update
-        this.view?.render(["toolbar", "context", "editToolbar"]);
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
         return true;
     }
 
@@ -5707,8 +5810,6 @@ export class MapStudio {
      */
     #toolBeforeAside = null;
 
-    /** New world opened World setup for a world still to be made (its button is Create world). */
-    #newWorldSetup = false;
 
     /**
      * The world's settings as they were when the world was opened, made or last saved, for each
@@ -5816,12 +5917,30 @@ export class MapStudio {
             readBy: this.#readByChips(editor.readBy),
         });
         if (context.panel?.page) {
-            context.panel.crumb = this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+            context.panel.crumb = (this.#creatingWorld ? this.#newWorldName : null) || this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
             context.panel.worldEditor = context.worldEditor;
         }
         if (this.activeTool === "worldCultures") context.generate = { nameBases: GeneratePanel.nameBaseChoices(GeneratePanel.settings(this).nameBase) };
-        // The world's frame as it is (its fields below are a new world's until step 4c-2)
-        if (this.activeTool === "worldSetup") context.worldSetup = { isNew: this.#newWorldSetup, width: this.mapWidth, height: this.mapHeight };
+        // The world's frame: its size set while the world has no maps, fixed once one is made; its
+        // name too while it is being made (board N2)
+        if (this.activeTool === "worldSetup") {
+            context.worldSetup = {
+                creating: this.#creatingWorld,
+                name: this.#newWorldName,
+                sizeFixed: this.surfaceMade || !!this.world?.held,
+                width: this.mapWidth,
+                height: this.mapHeight,
+                badge: this.surfaceMade ? "FILRODENSWMB.UI.BadgeRebuildsClimate" : null,
+            };
+            // Nothing is made until Create world: its page says so, and has nothing to revert yet
+            if (this.#creatingWorld && context.worldEditor) {
+                context.worldEditor.lede = platform.i18n.localize("FILRODENSWMB.UI.WorldSetupNewLede");
+                context.worldEditor.changes = "";
+                context.worldEditor.canRevert = false;
+                context.worldEditor.creating = true;
+                context.worldEditor.readBy = [];
+            }
+        }
     }
 
     /**
@@ -5846,8 +5965,9 @@ export class MapStudio {
                     name,
                     map: explore ? i18n.format("FILRODENSWMB.UI.ReadByExplore", { map }) : map,
                     goLabel: i18n.format("FILRODENSWMB.UI.GoToOn", { name, map }),
-                    disabled: explore && !hasRun,
-                    tooltip: explore && !hasRun ? i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") : null,
+                    // With no Surface map made yet there is no map tool to go to
+                    disabled: !this.surfaceMade || (explore && !hasRun),
+                    tooltip: !this.surfaceMade ? i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap") : explore && !hasRun ? i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") : null,
                 };
             });
     }
@@ -5857,15 +5977,29 @@ export class MapStudio {
      * the tool open. The World segment returns to the page left.
      * @param {string} tool
      */
-    async goToMapTool(tool) {
+    async goToMapTool(tool, section = null) {
         const entry = this.definition.tool(tool);
         if (!entry || !this.#isMapTool(tool) || !this.definition.offers(tool, this.mapType, entry.mode)) return;
         if (entry.mode === "explore" && !(this.modelRun || this.parentRun)) return;
+        // A Surface map not made yet has its Map setup alone
+        if (!this.surfaceMade && tool !== "scene") return;
         Inspector.close(this);
         this.mode = entry.mode;
         await this.switchTool(tool, { force: true });
         this.#rememberWorldMode();
-        this.view?.render(["worldbar", "toolbar"]);
+        await this.view?.render(["worldbar", "toolbar", "context"]);
+        if (!section) return;
+        const details = this.root?.querySelector(`.fwmb-context-panel details[data-section="${section}"]`);
+        if (!details) return;
+        details.open = true;
+        details.scrollIntoView({ block: "start" });
+    }
+
+    /** Place in Peoples and realms' Homelands (board C10): the next click on the map's land adds one. */
+    #placeHomeland(cultureId) {
+        if (!cultureId || WorldEditors.readOnly(this)) return;
+        CultureMarkers.togglePick(this, cultureId);
+        this.view?.render(["context", "editToolbar"]);
     }
 
     /**
@@ -5880,9 +6014,11 @@ export class MapStudio {
     /** What the picking bar names: what is being placed, and for which culture or event. */
     #worldPickContext() {
         const { i18n } = platform;
+        // From a world page, the page comes back once the pick ends; from a map tool, nothing does
+        const hint = i18n.localize(WorldEditors.isEditor(this.activeTool) ? "FILRODENSWMB.UI.PickingHint" : "FILRODENSWMB.UI.PickingHintMap");
         const culture = CultureMarkers.pickingName(this);
-        if (culture) return { label: i18n.localize("FILRODENSWMB.UI.PickingHomeland"), name: culture };
-        return { label: i18n.localize("FILRODENSWMB.UI.PickingEventPlace"), name: AgeEventRows.pickingName(this) ?? "" };
+        if (culture) return { label: i18n.localize("FILRODENSWMB.UI.PickingHomeland"), name: culture, hint };
+        return { label: i18n.localize("FILRODENSWMB.UI.PickingEventPlace"), name: AgeEventRows.pickingName(this) ?? "", hint };
     }
 
     /** The picking bar's Done: the pick ends with nothing placed, and the page comes back. */
@@ -5913,7 +6049,7 @@ export class MapStudio {
     #unsavedGroupNames() {
         const opened = this.worldSettingsOpened;
         if (!opened) return [];
-        const names = { setup: "WorldSetup", cultures: "WorldCultures", ages: "WorldAges", nameStyle: "WorldNameStyle", styles: "ToolLibrary", biomes: "WorldBiomes", climate: "WorldClimate", icons: "ToolLibrary" };
+        const names = { setup: "WorldSetup", cultures: "WorldCultures", ages: "WorldAges", nameStyle: "WorldNameStyle", styles: "ToolLibrary", biomes: "WorldBiomes", climate: "ToolClimate", icons: "ToolLibrary" };
         return [...new Set(WorldRecord.changedGroups(opened, this.#worldSettingsNow()).map((group) => names[group]).filter(Boolean))].map((key) => platform.i18n.localize(`FILRODENSWMB.UI.${key}`));
     }
 
@@ -5948,10 +6084,6 @@ export class MapStudio {
                 case "setup":
                     this.#applyWorldScale();
                     this._repaintVectors();
-                    this.debouncedGenerateClimate();
-                    this.#markGeneratorStale();
-                    break;
-                case "climate":
                     this.debouncedGenerateClimate();
                     this.#markGeneratorStale();
                     break;
@@ -6010,8 +6142,8 @@ export class MapStudio {
      * @param {string} mapId
      * @param {string} name
      */
-    async openWorld(mapId, name) {
-        await this.worldAction("load", mapId, name);
+    async openWorld(mapId, name, worldId = null) {
+        await this.worldAction("load", mapId, name, undefined, worldId);
     }
 
     /** The tool each mode opens on when none of its tools has been open yet. */
@@ -6025,6 +6157,8 @@ export class MapStudio {
     async enterMode(mode) {
         // From the world's rail, either mode goes to the map (in that mode)
         if (!["create", "explore"].includes(mode) || (mode === this.mode && !this.inWorld)) return;
+        // Explore needs a map; with no world open, or one being made, there is no map to go to
+        if (!this.worldOpen || this.#creatingWorld || (mode === "explore" && !this.surfaceMade)) return;
         this.mode = mode;
         const kept = this.#modeTools[mode];
         const tool = kept && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode];
@@ -6051,7 +6185,13 @@ export class MapStudio {
         if (kept) this.#modeTools = { ...kept.tools };
         else this.#modeTools = { create: this.mode === "create" && this.#isMapTool(this.activeTool) ? this.activeTool : this.#modeTools.create, explore: null };
         if (mode === this.mode) {
-            if (mode === "explore" && !this.definition.offers(this.activeTool, this.mapType, "explore")) await this.switchTool(this.#modeTools.explore ?? MapStudio.#MODE_FIRST_TOOL.explore);
+            // A world opens on its map (S0 step 4c-2): leaving Worlds may have shown the world tool
+            // left, which the opening's overlay hid
+            const onMap = this.#isMapTool(this.activeTool) && this.definition.offers(this.activeTool, this.mapType, mode);
+            if (!onMap) {
+                const kept = this.#modeTools[mode];
+                await this.switchTool(this.#isMapTool(kept) && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode], { force: true });
+            }
         } else {
             this.mode = mode;
             const tool = this.#isMapTool(this.#modeTools[mode]) && this.definition.offers(this.#modeTools[mode], this.mapType, mode) ? this.#modeTools[mode] : MapStudio.#MODE_FIRST_TOOL[mode];
@@ -6072,7 +6212,14 @@ export class MapStudio {
         const wasOn = this.#workingOn();
         // Worlds' Close goes back to the tool it was opened from
         if (WorldEditors.isAside(newTool) && !WorldEditors.isAside(this.activeTool)) this.#toolBeforeAside = this.activeTool;
-        if (newTool !== "worldSetup") this.#newWorldSetup = false;
+        // While a world is being made, only its World setup is open (board N2); Open world (Worlds)
+        // gives it up, as Cancel does
+        if (this.#creatingWorld && newTool === "manage") this.#closeWorld();
+        else if (this.#creatingWorld && newTool !== "worldSetup") return;
+        // With no world open there is only Worlds (board N5); with no Surface map made, its Map
+        // setup is all its rail holds (board N4)
+        if (!this.worldOpen && newTool !== "manage") return;
+        if (this.worldOpen && !this.surfaceMade && this.#isMapTool(newTool) && newTool !== "scene") return;
         // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
         const toolMode = this.definition.tool(newTool)?.mode;
@@ -6792,17 +6939,19 @@ export class MapStudio {
      */
     /**
      * A world's action, from Worlds' rows and cards or the world inspector (WorldEditor): on the
-     * world whose Surface map is `mapId`, named `name`.
+     * world whose Surface map is `mapId`, named `name`; or, for a world with no maps yet (board
+     * N3), the world `worldId` (a map's world is found from it when not given).
      * @param {"load"|"rename"|"duplicate"|"promote"|"export"|"delete"} action
      */
-    async worldAction(action, mapId, name, value) {
+    async worldAction(action, mapId, name, value, worldId = null) {
         const handlers = {
-            load: () => this.#handleMapLoad(mapId, name),
-            delete: () => this.#handleMapDelete(mapId),
-            rename: () => this.#handleMapRename(mapId, name, value),
-            duplicate: () => this.#handleMapDuplicate(mapId, name),
-            promote: () => this.#handleMapPromote(mapId, name),
-            export: () => this.#handleMapExport(mapId, name),
+            load: () => (mapId ? this.#handleMapLoad(mapId, name) : this.#handleMaplessLoad(worldId)),
+            delete: () => this.#handleMapDelete(mapId, worldId),
+            rename: () => this.#handleMapRename(mapId, name, value, worldId),
+            duplicate: () => this.#handleMapDuplicate(mapId, name, worldId),
+            promote: () => this.#handleMapPromote(mapId, name, worldId),
+            // A world with no maps has nothing a world file could hold yet
+            export: () => (mapId ? this.#handleMapExport(mapId, name) : null),
         };
         await handlers[action]?.();
     }
@@ -6810,6 +6959,24 @@ export class MapStudio {
     async #handleMapLoad(mapId, name) {
         const canLoad = await this.#gateUnsavedChanges();
         if (!canLoad) return;
+        // One processing overlay over the whole opening, the world and its map (Ken, 2026-11-20):
+        // the steps between (leaving Worlds, the map's tool, its generation) are not shown
+        await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: name || "" }));
+        let opened;
+        try {
+            opened = await this.#loadMap(mapId, name);
+        } finally {
+            this.#endProcessing();
+        }
+        // What asks the user comes once the world is open and shown
+        if (opened) {
+            await this.#offerFirstOpeningNotice();
+            await this.#offerTerrainUpgrade();
+        }
+    }
+
+    /** Loads a saved map and its world (see #handleMapLoad); true once it is open. */
+    async #loadMap(mapId, name) {
         // Opened from Worlds: leave it first, so the load draws on the map in view and not on Worlds
         // and its inspector redrawn at every step (which slowed a load to tens of seconds)
         if (this.activeTool === "manage") {
@@ -6865,21 +7032,184 @@ export class MapStudio {
             // Its mode (Explore when it has a run, S0 step 3), then, for a world made from a 4.3 map,
             // the notice saying what that means, once
             await this.#openWorldMode();
-            await this.#offerFirstOpeningNotice();
-            await this.#offerTerrainUpgrade();
+            return true;
         }
+        return false;
     }
 
     /**
-     * New world (the world bar's name menu, Worlds): World setup for a world still to be made, in
-     * Create, its button Create world, which asks about unsaved changes before it makes the world
-     * (S0 step 4; Ken, 2026-11-19).
+     * New world… (the world name menu, Worlds, the empty state; S0 step 4c-2, boards N1 and N2):
+     * the open world is closed first, asking about its unsaved changes (Close <world> first?);
+     * then World setup alone on the world's rail makes the new world's frame, with Create world.
      */
     async _onNewWorld() {
-        await this.openWorldTool("worldSetup");
-        this.#newWorldSetup = true;
-        await this.view?.render(["context"]);
-        this.root?.querySelector('.fwmb-context-panel details[data-section="generation"] select, .fwmb-context-panel details[data-section="generation"] input')?.focus({ preventScroll: true });
+        if (this.#creatingWorld) return;
+        if (!(await this.#closeWorldFirst())) return;
+        Inspector.close(this);
+        this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+        this.#clearMap();
+        this.#closeWorld();
+        this.worldOpen = true;
+        this.#creatingWorld = true;
+        this.#newWorldName = platform.i18n.localize("FILRODENSWMB.UI.NewWorldName");
+        this.#worldTool = "worldSetup";
+        await this.switchTool("worldSetup", { force: true });
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
+        this.root?.querySelector('.fwmb-context-panel input[name="newWorldName"]')?.focus({ preventScroll: true });
+    }
+
+    /** The world being made by New world (board N2): World setup alone, until Create world or Cancel. */
+    #creatingWorld = false;
+
+    /** The name a world being made is given at Create world. */
+    #newWorldName = "";
+
+    /**
+     * Closes the open world's state: no world record, no map, no save (the map's state is
+     * #clearMap's). Nothing is open after it until a world is opened or made.
+     */
+    #closeWorld() {
+        this.currentSaveId = null;
+        this.currentSaveName = null;
+        this.currentParentId = null;
+        this.world = null;
+        this.worldSettingsOpened = null;
+        this.inheritedStrokes = undefined;
+        this.#useWorldIcons(WorldRecord.emptyIcons());
+        this.worldOpen = false;
+        this.surfaceMade = false;
+        this.#creatingWorld = false;
+        this.isDirty = false;
+        this.mode = "create";
+        this.#modeTools = { create: "scene", explore: null };
+        this.#worldTool = "worldOverview";
+        this.#toolBeforeAside = null;
+        this.#showUnmade();
+    }
+
+    /**
+     * Asks before the open world is closed for a new one (board N1), when it has unsaved changes:
+     * Save and close, Discard changes, or Cancel.
+     * @returns {Promise<boolean>} Whether to go on.
+     */
+    async #closeWorldFirst() {
+        if (!this.worldOpen || !this.isDirty) return true;
+        const name = this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const choice = await MapDialogManager.promptCloseWorld(name, this.#changedGroupNames());
+        if (choice === "save") return await this.saveCurrentMap();
+        if (choice === "discard") {
+            this.isDirty = false;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Create world (World setup while a world is being made, board N2): the world is made with its
+     * name and frame and no maps, and saved at once, so it is in Worlds whatever happens next; its
+     * overview follows, offering to make its Surface map (board N3).
+     */
+    async _onCreateWorld() {
+        if (!this.#creatingWorld) return;
+        const { i18n } = platform;
+        const name = String(this.root?.querySelector('.fwmb-context-panel input[name="newWorldName"]')?.value ?? this.#newWorldName).trim() || i18n.localize("FILRODENSWMB.UI.NewWorldName");
+        const settings = this.#worldSettingsNow();
+        await this.#startProcessing(i18n.localize("FILRODENSWMB.UI.SavingMap"));
+        let result;
+        try {
+            result = await Worlds.save({ world: null, name, settings, maps: [] });
+        } finally {
+            this.#endProcessing();
+        }
+        if (!result) {
+            platform.notify.error(i18n.localize("FILRODENSWMB.UI.SaveError"));
+            return;
+        }
+        this.world = result.world;
+        this.currentSaveName = name;
+        this.worldSettingsOpened = settings;
+        this.#creatingWorld = false;
+        this.isDirty = false;
+        this.#modeWorldId = this.world.id;
+        this.#captureEditorBaseline();
+        platform.notify.info(i18n.format("FILRODENSWMB.UI.SaveSuccess", { name }));
+        await this.switchTool("worldOverview", { force: true });
+        this.view?.render(["worldbar", "toolbar", "context"]);
+    }
+
+    /** Cancel while a world is being made: nothing was made, and Worlds opens again. */
+    async _onCancelNewWorld() {
+        if (!this.#creatingWorld) return;
+        this.#closeWorld();
+        await this.switchTool("manage", { force: true });
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
+    }
+
+    /**
+     * Opens a world with no maps yet (Worlds' Open, board N3): its settings in the studio's state,
+     * in its frame, with no map made, on its overview.
+     * @param {string|null} worldId
+     */
+    async #handleMaplessLoad(worldId) {
+        const world = worldId ? await Worlds.get(worldId) : null;
+        if (!world) return;
+        if (!(await this.#gateUnsavedChanges())) return;
+        await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: world.name || "" }));
+        try {
+            await this.#openMapless(world);
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    async #openMapless(world) {
+        Inspector.close(this);
+        const settings = await Worlds.settingsOf(world);
+        const frame = settings?.setup?.frame;
+        this.mapWidth = Number.isInteger(frame?.width) ? frame.width : FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        this.mapHeight = Number.isInteger(frame?.height) ? frame.height : FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+        this.#closeWorld();
+        this.#clearMap();
+        // The world's settings read in as a map's load reads them, from an empty map in its frame
+        const base = WorldSettings.split(this._buildSavePayload().payload).mapData;
+        const payload = WorldSettings.merge(settings, base, { inline: false });
+        this.world = world;
+        this.currentSaveName = world.name;
+        this.worldSettingsOpened = settings;
+        this.#useWorldIcons(settings?.icons ?? WorldRecord.emptyIcons());
+        await this.#ingestMapPayload(payload, {}, null, { generate: false });
+        this.worldSettingsOpened = this.#worldSettingsNow();
+        this.#captureEditorBaseline();
+        this.isDirty = false;
+        this.#modeWorldId = world.id;
+        await this.switchTool("worldOverview", { force: true });
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
+        platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+    }
+
+    /**
+     * Shows whether the Surface map is made (board N4): with no map, the canvas gives way to a
+     * dashed frame in the world's aspect, its size in pixels and km (fwmb-is-unmade on the studio).
+     */
+    #showUnmade() {
+        const root = this.root;
+        if (!root) return;
+        const unmade = !this.surfaceMade;
+        root.classList.toggle("fwmb-is-unmade", unmade);
+        const frame = root.querySelector(".fwmb-unmade-frame");
+        if (!frame || !unmade) return;
+        const width = this.mapWidth;
+        const height = this.mapHeight;
+        // As large as the map area allows, in the frame's aspect
+        frame.style.setProperty("--fwmb-unmade-ratio", String(width / height));
+        const size = frame.querySelector("[data-unmade-size]");
+        if (size) {
+            const { i18n } = platform;
+            const km = Math.round(width * kmPerPxOf(this.uiState, height));
+            const number = (value) => Number(value).toLocaleString(i18n.lang);
+            size.textContent = i18n.format("FILRODENSWMB.UI.UnmadeFrameSize", { width: number(width), height: number(height), distance: Number.isFinite(km) ? number(km) : "?", unit: cleanUnit(this.uiState.mapUnit) });
+        }
     }
 
     /** Export world (the world bar's name menu): the open world as last saved, in a world file (see MapTransfer). */
@@ -7003,8 +7333,8 @@ export class MapStudio {
      * move up to its parent when it is held itself, and are otherwise released as worlds of their
      * own with a copy of the settings they read (see Worlds.delete). The confirmation names them.
      */
-    async #handleMapDelete(mapId) {
-        const worldId = await MapStudio.#worldIdOf(mapId);
+    async #handleMapDelete(mapId, knownWorldId = null) {
+        const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
         const plan = worldId ? await Worlds.deletePlan(worldId) : { movedUp: [], released: [], unlinked: [] };
         const names = (worlds) => worlds.map((world) => world.name).join(", ");
         const notes = [];
@@ -7017,9 +7347,13 @@ export class MapStudio {
 
         if (worldId) await Worlds.delete(worldId);
         else await platform.store.deleteSavedMap(mapId);
-        if (this.currentSaveId === mapId) {
+        if ((mapId && this.currentSaveId === mapId) || (worldId && this.world?.id === worldId)) {
             this.currentSaveId = null;
             this.world = null;
+            // The open world is gone: nothing is open, and Worlds has nothing to go back to
+            this.worldOpen = false;
+            this.isDirty = false;
+            this.view?.render(["worldbar"]);
         } else if (this.world) {
             // The open world may be one of those moved up or released
             this.world = (await Worlds.get(this.world.id)) ?? this.world;
@@ -7028,17 +7362,17 @@ export class MapStudio {
     }
 
     /** Renames a world: to the name given (Worlds' inspector), else to one asked for. */
-    async #handleMapRename(mapId, name, given) {
+    async #handleMapRename(mapId, name, given, knownWorldId = null) {
         const currentName = name;
         const newName = given ?? (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName));
 
         if (newName && newName !== currentName) {
             // The world and its maps (see Worlds.rename)
-            const worldId = await MapStudio.#worldIdOf(mapId);
+            const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
             if (worldId) await Worlds.rename(worldId, newName);
             else await platform.store.renameSavedMap(mapId, newName);
 
-            const isOpen = this.currentSaveId === mapId;
+            const isOpen = (!!mapId && this.currentSaveId === mapId) || (!!worldId && this.world?.id === worldId);
             if (isOpen) {
                 this.currentSaveName = newName;
                 if (this.world) this.world = { ...this.world, name: newName };
@@ -7047,10 +7381,10 @@ export class MapStudio {
         }
     }
 
-    async #handleMapDuplicate(mapId, name) {
+    async #handleMapDuplicate(mapId, name, knownWorldId = null) {
         const copyName = platform.i18n.format("FILRODENSWMB.UI.CopyMapName", { name });
         // The world and its maps, not its regional worlds (see Worlds.copy)
-        const worldId = await MapStudio.#worldIdOf(mapId);
+        const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
         const copy = worldId ? await Worlds.copy(worldId, copyName) : await platform.store.duplicateSavedMap(mapId, copyName);
         if (!copy) return;
         // Nothing on screen says it was done, so say so, and show the copy where Worlds is open
@@ -7064,7 +7398,7 @@ export class MapStudio {
         if (worldId && this.activeTool === "manage") WorldsPanel.select(this, worldId);
     }
 
-    async #handleMapPromote(mapId, name) {
+    async #handleMapPromote(mapId, name, knownWorldId = null) {
         const confirmed = await MapDialogManager._confirmDialog(
             platform.i18n.localize("FILRODENSWMB.UI.Promote"),
             platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm"),
@@ -7073,7 +7407,7 @@ export class MapStudio {
 
         // Clone as new: a world of its own, with a copy of the settings it read, no longer held or
         // cut from its parent (see Worlds.cloneAsNew); its map no longer names the parent's map
-        const worldId = await MapStudio.#worldIdOf(mapId);
+        const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
         if (!worldId) return;
         const originalName = name;
         const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
@@ -7105,7 +7439,8 @@ export class MapStudio {
     }
 
     async _onRandomizeSeed(_event, _target) {
-        this.uiState.mapSeed = this.#generateRandomSeed();
+        // A seed for the map Map setup makes next, not the open map's (see #terrainChoice)
+        this.#terrainChoice = { ...(this.#terrainChoice ?? this.#currentTerrainChoice()), seed: this.#generateRandomSeed() };
         this.view?.render(["context"]);
     }
 

@@ -54,7 +54,8 @@ export class WorldOverview {
             relatedTitle: i18n.format("FILRODENSWMB.UI.OverviewCutFrom", { name }),
             relatedHint: i18n.format("FILRODENSWMB.UI.OverviewCutFromHint", { name }),
             line: WorldOverview.line(app, dirtyGroups),
-            maps: [surfaceCard],
+            // A world with no maps yet offers to make its Surface map (board N3)
+            maps: app.surfaceMade === false ? [] : [surfaceCard],
             regional,
         };
     }
@@ -104,9 +105,11 @@ export class WorldOverview {
         const { i18n } = platform;
         const state = app.uiState ?? {};
         const latitude = (value) => `${Math.abs(Math.round(value))}° ${value >= 0 ? i18n.localize("FILRODENSWMB.UI.North") : i18n.localize("FILRODENSWMB.UI.South")}`;
+        // The engine and seed are its Surface map's, once made
+        const made = app.surfaceMade !== false;
         const parts = [
-            ENGINES[state.generationEngine] ? i18n.localize(ENGINES[state.generationEngine]) : null,
-            state.mapSeed ? i18n.format("FILRODENSWMB.UI.OverviewSeed", { seed: state.mapSeed }) : null,
+            made && ENGINES[state.generationEngine] ? i18n.localize(ENGINES[state.generationEngine]) : null,
+            made && state.mapSeed ? i18n.format("FILRODENSWMB.UI.OverviewSeed", { seed: state.mapSeed }) : null,
             app.mapWidth && app.mapHeight ? `${app.mapWidth} × ${app.mapHeight}` : null,
             Number.isFinite(state.world?.areaFactor) ? i18n.format("FILRODENSWMB.UI.OverviewAreaFactor", { factor: state.world.areaFactor }) : null,
             Number.isFinite(state.latTop) && Number.isFinite(state.latBottom) ? i18n.format("FILRODENSWMB.UI.OverviewLatitudes", { from: latitude(state.latTop), to: latitude(state.latBottom) }) : null,

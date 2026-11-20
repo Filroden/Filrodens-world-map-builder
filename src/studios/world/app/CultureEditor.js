@@ -120,9 +120,6 @@ export class CultureEditor {
             climate: this.#climateContext(app, climate),
             // A held regional world reads its cultures from the world above it
             readOnly: WorldEditors.readOnly(app),
-            homelands: (culture.homelands ?? []).map((point, index) => ({ index, label: platform.i18n.format("FILRODENSWMB.UI.CultureHomelandAt", { number: index + 1, x: Math.round(point.x), y: Math.round(point.y) }) })),
-            picking: CultureMarkers.picking(app, culture.id),
-            canAddHomeland: (culture.homelands ?? []).length < FILRODENSWMB.GENERATOR.CULTURES.MAX_HOMELANDS,
         };
     }
 
@@ -306,27 +303,8 @@ export class CultureEditor {
         actions: {
             // Edit zones: the rule editor on its climate zones
             editZones: (app, culture) => CultureEditor.#editZones(app, culture),
-            // Add homeland: the next click on the map's land adds one (see CultureMarkers)
-            addHomeland: (app, culture) => CultureMarkers.togglePick(app, culture.id),
-            // One homeland taken away
-            removeHomeland: (app, culture, _ref, button) => {
-                const index = Number(button.dataset.index);
-                if (!Number.isInteger(index) || !culture.homelands?.[index]) return;
-                if (WorldEditors.readOnly(app)) return false;
-                culture.homelands = culture.homelands.filter((_, at) => at !== index);
-                app.markGeneratorStale?.();
-                app.view?.render(["context"]);
-                app.markDirty();
-            },
-            // Auto: the culture's homelands go, and a run places one
-            autoHomelands: (app, culture) => {
-                if (!(culture.homelands ?? []).length) return;
-                if (WorldEditors.readOnly(app)) return false;
-                culture.homelands = [];
-                app.markGeneratorStale?.();
-                app.view?.render(["context"]);
-                app.markDirty();
-            },
+            // Homelands are each map's (S0 step 4c-2): placed in the map's Peoples and realms
+            goHomelands: (app) => app.goToMapTool("generate", "generateHomelands"),
         },
     });
 }

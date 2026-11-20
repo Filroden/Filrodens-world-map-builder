@@ -26,7 +26,7 @@ const i18n = { localize: (key) => key.replace("FILRODENSWMB.UI.", ""), format: (
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/page-head.hbs", "world/parts/world-editor-head.hbs", "world/tools-worldOverview.hbs", "world/tools-worldSetup.hbs", "world/tools-worldClimate.hbs", "world/tools-worldBiomes.hbs", "world/parts/inspector-biome-builtin.hbs", "world/parts/inspector-world-map.hbs", "shell/toolbar.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "shell/parts/page-head.hbs", "world/parts/world-editor-head.hbs", "world/tools-worldOverview.hbs", "world/tools-worldSetup.hbs", "world/tools-climate.hbs", "world/tools-scene.hbs", "world/tools-scene-foot.hbs", "world/parts/toolbar-unmade.hbs", "world/tools-worldBiomes.hbs", "world/parts/inspector-biome-builtin.hbs", "world/parts/inspector-world-map.hbs", "shell/toolbar.hbs"]);
 let next = 0;
 installPlatform({ i18n, templates, module: { version: "5.0.0", host: "web", hostVersion: null }, store: createWebStore(new MemoryRecords(), { newId: () => `id${++next}` }), utils: { ...platform.utils } });
 
@@ -67,13 +67,17 @@ const studio = () => ({
     mapHeight: 1120,
 });
 
-test("the world's rail: World settings (the overview first, Climate base until step 4c-2) and All maps, none on a map's rail", () => {
+test("the world's rail: World settings (the overview first) and All maps, none on a map's rail; Climate a Surface map tool", () => {
     const rail = WORLD_DEFINITION.worldRail("surface").map((stage) => `${stage.id}:${stage.tools.map((tool) => tool.id + (tool.later ? "(later)" : "")).join(",")}`);
     assert.deepEqual(rail, [
-        "worldSettings:worldOverview,worldSetup,worldCultures,worldAges,library,worldBiomes,worldClimate",
+        "worldSettings:worldOverview,worldSetup,worldCultures,worldAges,library,worldBiomes",
         "worldWhole:worldGenerateAll,worldCut(later)",
     ]);
     assert.equal(WORLD_DEFINITION.tool("worldNameStyle"), null, "the default naming style is Cultures'");
+    assert.equal(WORLD_DEFINITION.tool("worldClimate"), null, "Climate base is the Surface map's Climate tool");
+    // Climate: Shape, between Terrain and Biomes, with the Nexts on both sides
+    assert.deepEqual(WORLD_DEFINITION.railStages("surface", "create")[0].tools.map((tool) => tool.id), ["scene", "terrain", "climate", "biomes", "features"]);
+    assert.deepEqual([WORLD_DEFINITION.tool("terrain").next.tool, WORLD_DEFINITION.tool("climate").next.tool, WORLD_DEFINITION.tool("climate").icon], ["climate", "biomes", "temperature"]);
     assert.deepEqual([WORLD_DEFINITION.tool("worldCultures").icon, WORLD_DEFINITION.tool("worldGenerateAll").icon], ["groups", "run"]);
     for (const tool of ["worldOverview", ...Object.keys(WORLD_EDITORS)]) {
         assert.ok(WORLD_DEFINITION.isWorldTool(tool), `${tool} is the world's`);
@@ -84,7 +88,8 @@ test("the world's rail: World settings (the overview first, Climate base until s
         assert.ok(!map.some((tool) => WORLD_DEFINITION.isWorldTool(tool)), `none on the map's ${mode} rail`);
     }
     assert.ok(!WORLD_DEFINITION.isWorldTool("terrain") && !WORLD_DEFINITION.isWorldTool("manage"));
-    assert.deepEqual(Object.values(WORLD_EDITORS).map((editor) => editor.groups.join("+")), ["setup", "cultures+nameStyle", "ages", "styles+icons", "biomes", "climate"]);
+    assert.deepEqual(Object.values(WORLD_EDITORS).map((editor) => editor.groups.join("+")), ["setup", "cultures+nameStyle", "ages", "styles+icons", "biomes"]);
+    assert.ok(WORLD_EDITORS.worldSetup.readBy.includes("climate"), "World setup's latitudes are read by Climate");
     // Every page's Read by names map tools that exist on the Surface map
     for (const [tool, editor] of Object.entries(WORLD_EDITORS)) {
         assert.ok(editor.readBy.length, `${tool} is read by a map tool`);
@@ -94,16 +99,16 @@ test("the world's rail: World settings (the overview first, Climate base until s
         }
     }
     assert.equal(WORLD_DEFINITION.tool("worldGenerateAll").act, "generateAll", "Generate all acts at once");
-    assert.ok(WorldEditors.isAside("manage") && !WorldEditors.isAside("worldClimate"), "only Worlds closes back to the tool left");
+    assert.ok(WorldEditors.isAside("manage") && !WorldEditors.isAside("worldBiomes"), "only Worlds closes back to the tool left");
 });
 
 test("the world's rail drawn: its tools open as the world's, Generate all acts, the part to come disabled with its tooltip", async () => {
     const railStages = WORLD_DEFINITION.worldRail("surface").map((stage) => ({ ...stage, tools: stage.tools.map((tool) => ({ ...tool, action: tool.act ?? "openWorldTool", disabled: !!tool.later, tooltip: tool.later ? "later" : null })) }));
-    const box = await render("shell/toolbar.hbs", { railWorld: true, railStages, railOccasional: [], activeTool: "worldClimate" });
+    const box = await render("shell/toolbar.hbs", { railWorld: true, railStages, railOccasional: [], activeTool: "worldBiomes" });
     assert.ok(box.querySelector("nav.fwmb-rail--world"));
     assert.deepEqual([...box.querySelectorAll(".fwmb-rail-stage")].map((stage) => stage.textContent), ["StageWorldSettings", "StageWorldWhole"]);
-    assert.equal(box.querySelector('[aria-current="page"]').dataset.tool, "worldClimate");
-    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldCultures", "worldAges", "library", "worldBiomes", "worldClimate"]);
+    assert.equal(box.querySelector('[aria-current="page"]').dataset.tool, "worldBiomes");
+    assert.deepEqual([...box.querySelectorAll('[data-action="openWorldTool"]')].map((button) => button.dataset.tool), ["worldOverview", "worldSetup", "worldCultures", "worldAges", "library", "worldBiomes"]);
     assert.equal(box.querySelector('[data-action="generateAll"]').dataset.tool, "worldGenerateAll");
     const off = [...box.querySelectorAll('.fwmb-rail-btn[aria-disabled="true"]')];
     assert.deepEqual(off.map((button) => button.getAttribute("aria-label")), ["CutRegionalWorld"]);
@@ -120,8 +125,8 @@ test("a group captured and put back: each editor's state, the biome colours incl
     assert.equal(WorldEditors.restore(app, captured, "setup"), true);
     assert.deepEqual([app.uiState.latTop, app.uiState.mapUnit, app.uiState.world.areaFactor], [60, "km", 15]);
     assert.equal(app.uiState.globalTemp, 0.9, "only the group asked for");
-    WorldEditors.restore(app, captured, "climate");
-    assert.deepEqual([app.uiState.globalTemp, app.uiState["noise.moisture.scale"]], [0.5, 1200]);
+    assert.equal(WorldEditors.restore(app, captured, "climate"), false, "the climate has no Revert changes (Climate's sliders reset on a double-click)");
+    assert.equal(app.uiState.globalTemp, 0.9);
     WorldEditors.restore(app, captured, "nameStyle");
     assert.equal(app.uiState.generatorSettings.nameBase, "English");
     assert.deepEqual(app.uiState.generatorSettings.ages.length, 3, "the rest of the generator's settings kept");
@@ -139,7 +144,7 @@ test("a group captured and put back: each editor's state, the biome colours incl
 
 test("a page's head: what this sitting changed, Revert changes or Undo, Read by and the held banner", async () => {
     const readBy = [{ tool: "biomes", icon: "forest", name: "Biomes", map: "Surface map", goLabel: "Go to Biomes", disabled: false, tooltip: null }];
-    const head = (options) => WorldEditors.head({}, { tool: "worldClimate", changed: false, heldCount: 0, heldBy: null, readBy, ...options });
+    const head = (options) => WorldEditors.head({}, { tool: "worldAges", changed: false, heldCount: 0, heldBy: null, readBy, ...options });
     assert.deepEqual([head().changes, head({ changed: true }).changes], ["WorldNoChanges", "WorldChangedRuns"]);
     assert.deepEqual([head().canRevert, head({ changed: true }).canRevert], [false, true]);
     assert.deepEqual([head().heldReach, head({ heldCount: 1 }).heldReach, head({ heldCount: 2 }).heldReach], [null, "ReadByHeldOne 1", "ReadByHeld 2"]);
@@ -150,22 +155,22 @@ test("a page's head: what this sitting changed, Revert changes or Undo, Read by 
     assert.equal(WorldEditors.head({}, { tool: "worldSetup", changed: false, heldCount: 0, heldBy: "Aethoria" }).heldBanner, "WorldHeldSetup Aethoria");
 
     const page = async (worldEditor) => {
-        const box = await render("shell/parts/page-head.hbs", { panel: { title: "WorldClimate", crumb: "Aethoria", worldEditor } });
-        box.insertAdjacentHTML("beforeend", await platform.templates.render("modules/filrodens-world-map-builder/templates/world/tools-worldClimate.hbs", { worldEditor, uiState: studio().uiState }));
+        const box = await render("shell/parts/page-head.hbs", { panel: { title: "WorldSetup", crumb: "Aethoria", worldEditor } });
+        box.insertAdjacentHTML("beforeend", await platform.templates.render("modules/filrodens-world-map-builder/templates/world/tools-worldSetup.hbs", { worldEditor, uiState: studio().uiState, worldSetup: { width: 1400, height: 1120, sizeFixed: true } }));
         return box;
     };
     let box = await page(head());
     assert.match(box.querySelector(".fwmb-page-crumb").textContent, /Aethoria/);
-    assert.equal(box.querySelector(".fwmb-page-title").textContent, "WorldClimate");
+    assert.equal(box.querySelector(".fwmb-page-title").textContent, "WorldSetup");
     assert.ok(box.querySelector(".fwmb-tag"), "the World tag");
     const revert = box.querySelector('[data-action="revertWorldGroup"]');
-    assert.equal(revert.dataset.tool, "worldClimate");
+    assert.equal(revert.dataset.tool, "worldAges");
     assert.ok(revert.disabled, "nothing to revert yet");
     assert.equal(box.querySelector(".fwmb-page-changes").textContent, "WorldNoChanges");
     const go = box.querySelector('.fwmb-readby [data-action="goToMapTool"]');
     assert.deepEqual([go.dataset.tool, go.getAttribute("aria-label")], ["biomes", "Go to Biomes"]);
     assert.ok(!box.querySelector("fieldset.fwmb-world-editor").disabled);
-    assert.ok(box.querySelector('input[name="globalTemp"]') && box.querySelector('input[name="noise.moisture.scale"]'), "Climate and Moisture's sliders");
+    assert.ok(box.querySelector('input[name="latTop"]') && box.querySelector('input[name="worldAreaFactor"]'), "the frame's fields");
 
     box = await page(held);
     assert.ok(box.querySelector("fieldset.fwmb-world-editor").disabled, "read only on a held world");
@@ -179,25 +184,61 @@ test("a page's head: what this sitting changed, Revert changes or Undo, Read by 
     assert.deepEqual([box.querySelector(".fwmb-tag"), box.querySelector(".fwmb-page-lede").textContent], [null, "line"], "the overview: its line, no tag");
 });
 
-test("World setup: the world's frame first (its size read only), then the new world's fields with their button", async () => {
-    const context = { worldEditor: WorldEditors.head({}, { tool: "worldSetup", changed: false, heldCount: 0, heldBy: null }), uiState: studio().uiState, engineLabels: {}, worldSetup: { isNew: false, width: 1400, height: 1120 } };
+test("World setup: the world's frame only, its size set while the world has no maps and fixed once one is made", async () => {
+    const context = { worldEditor: WorldEditors.head({}, { tool: "worldSetup", changed: false, heldCount: 0, heldBy: null }), uiState: studio().uiState, engineLabels: {}, worldSetup: { width: 1400, height: 1120, sizeFixed: true } };
     let box = await render("world/tools-worldSetup.hbs", context);
-    const generation = box.querySelector('[data-section="generation"]');
-    assert.ok(generation.querySelector('[name="generationEngine"]') && generation.querySelector('[name="mapSeed"]') && generation.querySelector('[name="mapWidth"]'));
-    assert.equal(generation.querySelector('[data-action="applyResolution"]').textContent.trim(), "CreateNewWorld");
+    assert.deepEqual([...box.querySelectorAll("[data-section]")].map((section) => section.dataset.section), ["worldScale"], "the frame alone: the engine and seed are Map setup's");
+    assert.equal(box.querySelector('[name="generationEngine"], [name="terrainEngine"], [name="mapSeed"]'), null);
     const scale = box.querySelector('[data-section="worldScale"]');
     assert.ok(scale.querySelector('[name="latTop"]') && scale.querySelector('[name="worldAreaFactor"]') && scale.querySelector('[name="mapUnitName"]'));
-    assert.deepEqual([...box.querySelectorAll("[data-section]")].map((section) => section.dataset.section), ["worldScale", "generation"], "the frame first");
     assert.match(scale.textContent, /1400 × 1120[\s\S]*WorldSizeFixed/, "the size, fixed once a map is made");
-    box = await render("world/tools-worldSetup.hbs", { ...context, worldSetup: { isNew: true, width: 1400, height: 1120 } });
-    assert.equal(box.querySelector('[data-action="applyResolution"]').textContent.trim(), "CreateWorld", "New world's button");
+    assert.equal(box.querySelector('[name="mapWidth"]'), null);
+    // A world being made (board N2): its name, its size, Cancel and Create world
+    box = await render("world/tools-worldSetup.hbs", { ...context, worldSetup: { creating: true, name: "Northreach", width: 1000, height: 800, sizeFixed: false } });
+    assert.equal(box.querySelector('[name="newWorldName"]').value, "Northreach");
+    assert.deepEqual([box.querySelector('[name="mapWidth"]').value, box.querySelector('[name="mapHeight"]').value], ["1000", "800"]);
+    assert.deepEqual([...box.querySelectorAll(".fwmb-page-bar [data-action]")].map((button) => button.dataset.action), ["cancelNewWorld", "createWorld"]);
+});
+
+test("Map setup: the Surface map's terrain engine and seed, made again only from Make the Surface map again…, or made at its foot before it exists", async () => {
+    const terrain = (choice) => ({ uiState: studio().uiState, engineLabels: { advanced: "A", guided: "G", flat: "F" }, landMasks: [], terrainChoice: { engine: "advanced", seed: "P0JBVA", flatTexture: false, made: true, changed: false, held: false, badge: "BadgeMakesMapAgain", ...choice } });
+    let box = await render("world/tools-scene.hbs", terrain());
+    const section = box.querySelector('[data-section="terrainChoice"]');
+    assert.equal(box.querySelector("[data-section]"), section, "Terrain first");
+    assert.deepEqual([section.querySelector('[name="terrainEngine"]').value, section.querySelector('[name="terrainSeed"]').value], ["advanced", "P0JBVA"]);
+    const again = section.querySelector('[data-action="makeSurfaceMap"]');
+    assert.equal(again.textContent.trim(), "MakeMapAgain");
+    assert.equal(again.getAttribute("aria-disabled"), "true", "off until the engine or seed differs");
+    box = await render("world/tools-scene.hbs", terrain({ changed: true }));
+    assert.equal(box.querySelector('[data-action="makeSurfaceMap"]').getAttribute("aria-disabled"), null);
+    box = await render("world/tools-scene.hbs", terrain({ engine: "flat" }));
+    assert.ok(!box.querySelector('[name="terrainSeed"]') && box.querySelector('[name="terrainFlatTexture"]'), "Flat: no seed, its textured ground");
+    // Before the map exists (board N4): the fields, no Make again, nor the regional map; Make Surface map at the foot
+    box = await render("world/tools-scene.hbs", terrain({ made: false, badge: null }));
+    assert.equal(box.querySelector('[data-action="makeSurfaceMap"]'), null);
+    assert.equal(box.querySelector('[data-section="regionalMap"]'), null);
+    box = await render("world/tools-scene-foot.hbs", terrain({ made: false }));
+    assert.equal(box.querySelector('[data-action="makeSurfaceMap"]').textContent.trim(), "MakeSurfaceMap");
+    box = await render("world/tools-scene.hbs", terrain({ held: true }));
+    assert.ok(box.querySelector('[data-section="terrainChoice"] fieldset').disabled, "read only on a held regional world");
+});
+
+test("Climate, a Surface map tool: Temperature and Moisture, a Go to World setup, read only on a held regional world", async () => {
+    let box = await render("world/tools-climate.hbs", { uiState: studio().uiState });
+    assert.deepEqual([...box.querySelectorAll("[data-section]")].map((section) => section.dataset.section), ["climate", "moisture"]);
+    assert.ok(box.querySelector('input[name="globalTemp"]') && box.querySelector('input[name="noise.moisture.scale"]'));
+    assert.equal(box.querySelector('[data-action="openWorldTool"]').dataset.tool, "worldSetup");
+    assert.ok(!box.querySelector("fieldset").disabled);
+    box = await render("world/tools-climate.hbs", { uiState: studio().uiState, climateHeld: "ClimateHeld Aethoria" });
+    assert.ok(box.querySelector("fieldset").disabled);
+    assert.match(box.querySelector(".fwmb-held").textContent, /ClimateHeld Aethoria/);
 });
 
 test("the overview's line", () => {
     const app = studio();
     assert.equal(WorldOverview.line(app), "EngineShortAdvanced · OverviewSeed P0JBVA · 1400 × 1120 · OverviewAreaFactor 15 · OverviewLatitudes 60° North,20° North · OverviewNotSaved");
     app.isDirty = true;
-    assert.match(WorldOverview.line(app, ["WorldClimate"]), /OverviewUnsavedGroups WorldClimate$/);
+    assert.match(WorldOverview.line(app, ["ToolClimate"]), /OverviewUnsavedGroups ToolClimate$/);
 });
 
 test("the overview's two groups: what is in the world, and the regional worlds cut from it; cards chosen as Worlds' are", async () => {
@@ -279,4 +320,27 @@ test("the map side's Go blocks to the world's pages: the scale bar, Natural feat
     assert.deepEqual(goes(box, '[data-section="featureNames"]'), ["worldCultures"], "the default naming style");
     box = await render("world/parts/style-picker.hbs", { name: "pinStyle", choices: [], type: "Pin" });
     assert.deepEqual(goes(box, ""), ["library"], "Styles and icons");
+});
+
+test("Revert changes on Cultures and Ages keeps the map's homelands and events' places; making the map again keeps the world's settings but not its points", () => {
+    const app = studio();
+    app.uiState.cultures = [{ id: "hill", name: "Hillfolk", homelands: [{ x: 1, y: 1 }] }];
+    app.uiState.generatorSettings.ages = [{ id: "age-1", events: [{ kind: "realmEvent", place: { x: 2, y: 2 } }] }];
+    const captured = WorldEditors.capture(app);
+    app.uiState.cultures[0].name = "Highlanders";
+    app.uiState.cultures[0].homelands = [{ x: 9, y: 9 }];
+    app.uiState.generatorSettings.ages[0].events[0].place = { x: 5, y: 5 };
+    WorldEditors.restore(app, captured, "cultures");
+    WorldEditors.restore(app, captured, "ages");
+    assert.equal(app.uiState.cultures[0].name, "Hillfolk", "the culture put back");
+    assert.deepEqual(app.uiState.cultures[0].homelands, [{ x: 9, y: 9 }], "its homelands on this map as they are now");
+    assert.deepEqual(app.uiState.generatorSettings.ages[0].events[0].place, { x: 5, y: 5 });
+
+    const world = WorldEditors.captureWorld(app);
+    Object.assign(app.uiState, { cultures: [], globalTemp: 0.1, customPinStyles: [] });
+    app.uiState.generatorSettings.ages = [{}];
+    WorldEditors.restoreWorld(app, world);
+    assert.deepEqual([app.uiState.cultures[0].name, app.uiState.globalTemp, app.uiState.customPinStyles.length, app.uiState.latTop], ["Hillfolk", 0.5, 2, 60], "the world's settings, the climate and styles with them");
+    assert.equal("homelands" in app.uiState.cultures[0], false, "what was drawn on the map goes with it");
+    assert.equal("place" in app.uiState.generatorSettings.ages[0].events[0], false);
 });

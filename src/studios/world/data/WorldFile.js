@@ -101,7 +101,7 @@ export class WorldFile {
             .map((map, index) => {
                 const { owners, modelRun, ...data } = map.file;
                 delete data.parentId;
-                const file = WorldSettings.merge(settings, data);
+                const file = WorldSettings.merge(settings, data, { inline: world.held !== true });
                 // The map it was cut from, for the import to look for
                 if (cutFrom?.mapId) file.parentId = cutFrom.mapId;
                 if (owners) file.owners = owners;

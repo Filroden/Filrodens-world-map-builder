@@ -17,7 +17,7 @@
         <button type="button" class="fwmb-btn" data-action="undoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Undo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}"><span class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.Undo"}}</button>
         <button type="button" class="fwmb-btn fwmb-btn--square" data-action="redoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Redo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}"><span class="fwmb-icon fwmb-icon--redo" aria-hidden="true"></span></button>
     </span>
-    {{else}}
+    {{else unless panel.worldEditor.creating}}
     <button type="button" class="fwmb-btn" data-action="revertWorldGroup" data-tool="{{panel.worldEditor.tool}}"{{#unless panel.worldEditor.canRevert}} disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.WorldRevertHint'}}"><span class="fwmb-icon fwmb-icon--history" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldRevert"}}</button>
     {{/if}}
     {{/unless}}

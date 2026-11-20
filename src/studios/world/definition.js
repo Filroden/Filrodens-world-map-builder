@@ -45,7 +45,10 @@ export const WORLD_DEFINITION = defineStudio({
     // word stands for the tool. Tools with none have no editing at all.
     tools: [
         tool("scene", "shape", "grid-on", "FILRODENSWMB.UI.ToolCreateMap", { next: next("terrain", "FILRODENSWMB.UI.NextReasonScene"), stateWord: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing", crop: "cropping" } }),
-        tool("terrain", "shape", "landscape", "FILRODENSWMB.UI.ToolTerrain", { next: next("biomes", "FILRODENSWMB.UI.NextReasonTerrain"), stateWord: "terraforming" }),
+        tool("terrain", "shape", "landscape", "FILRODENSWMB.UI.ToolTerrain", { next: next("climate", "FILRODENSWMB.UI.NextReasonTerrain"), stateWord: "terraforming" }),
+        // The climate the world record keeps, shown on its Surface map (S0 step 4c-2; Ken,
+        // 2026-11-20): a world has one Surface map, so it is stored with the world
+        tool("climate", "shape", "temperature", "FILRODENSWMB.UI.ToolClimate", { next: next("biomes", "FILRODENSWMB.UI.NextReasonClimate") }),
         tool("biomes", "shape", "forest", "FILRODENSWMB.UI.ToolBiomes", { next: next("features", "FILRODENSWMB.UI.NextReasonBiomes"), stateWord: "painting" }),
         // Select starts editing in River (see PickTool.settleForEditing)
         tool("features", "shape", "ssid-chart", "FILRODENSWMB.UI.ToolFeatures", { next: next("influences", "FILRODENSWMB.UI.NextReasonFeatures"), stateWord: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" } }),
@@ -70,8 +73,6 @@ export const WORLD_DEFINITION = defineStudio({
         // Styles and icons keeps its v4.3 id (library): it left the map's rail for the world's
         tool("library", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
         tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
-        // Until S0 step 4c-2 makes it the Surface map's Climate tool (round 4c)
-        tool("worldClimate", "worldSettings", "water-drop", "FILRODENSWMB.UI.WorldClimate"),
         // Generate all acts at once (its dialogue), with no panel of its own
         { ...tool("worldGenerateAll", "worldWhole", "run", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
         later("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),

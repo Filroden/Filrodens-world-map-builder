@@ -1,12 +1,19 @@
 {{!--
-    Climate base (S0 step 4; a page from step 4c-1, until step 4c-2 makes it the Surface map's
-    Climate tool): the world's temperature, seasons, altitude cooling, freezing and
-    moisture, for the Surface map (and the Aerial map, with Layers 4; never underground). Each
-    change makes the climate again. Read only on a held regional world.
+    Climate (S0 step 4c-2, board C2): a Surface map tool between Terrain and Biomes, holding the
+    climate the world record keeps (Ken, 2026-11-20: a world has one Surface map, so the climate is
+    stored with the world and shown here): temperature, seasons, altitude cooling, freezing and
+    moisture. Each change makes the climate again. No undo and no Revert changes: a slider goes back
+    to its default when double-clicked, as Terrain's do. The latitudes are the world's frame (Go to
+    World setup). Read only on a held regional world, which reads its parent's.
 --}}
-{{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor fwmb-page-form"{{#if worldEditor.held}} disabled{{/if}}>
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="climate" title="FILRODENSWMB.UI.SettingsClimate" badge="FILRODENSWMB.UI.BadgeRebuildsClimate" rebuilds=true}}
+{{#if climateHeld}}
+<div class="fwmb-held" role="note">
+    <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldHeldTitle"}}</span>
+    <span>{{climateHeld}}</span>
+</div>
+{{/if}}
+<fieldset class="fwmb-held-fieldset"{{#if climateHeld}} disabled{{/if}}>
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="climate" title="FILRODENSWMB.UI.SectionTemperature" badge="FILRODENSWMB.UI.BadgeRebuildsClimate" rebuilds=true}}
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="globalTemp" label="FILRODENSWMB.UI.GlobalTemp" value=(lookup uiState 'globalTemp') min=0 max=1 step=0.01}}
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="seasonOffset" label="FILRODENSWMB.UI.SeasonOffset" value=(lookup uiState 'seasonOffset') min=-1 max=1 step=0.05}}
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="altCooling" label="FILRODENSWMB.UI.AltitudeCooling" value=(lookup uiState 'altCooling') min=0 max=1 step=0.05}}
@@ -18,3 +25,9 @@
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="noise.moisture.scale" label="FILRODENSWMB.UI.MoistureScale" value=(lookup uiState 'noise.moisture.scale') min=100 max=8000 step=10 display=(numberFormat (lookup uiState "noise.moisture.scale") decimals=0)}}
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 </fieldset>
+
+{{!-- The latitudes the climate is drawn across are the world's frame --}}
+<div class="fwmb-goto">
+    <p>{{localize "FILRODENSWMB.UI.ClimateSetupGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuSetupPath"}}</b></p>
+    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldSetup">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+</div>

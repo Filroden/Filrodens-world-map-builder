@@ -139,6 +139,8 @@ export class WorldsPanel {
         const engine = ENGINES[node.setup?.engine];
         const count = node.maps.length;
         const saved = WorldsPanel.lastSaved(node);
+        // A world with no maps yet (board N3) has no engine to name: its Surface map is not made
+        if (!count) return [i18n.localize("FILRODENSWMB.UI.WorldNoMapsYet"), saved ? WorldsPanel.savedLabel(saved) : null].filter(Boolean).join(" · ");
         return [
             engine ? i18n.localize(engine) : null,
             count === 1 ? i18n.localize("FILRODENSWMB.UI.WorldMapsOne") : i18n.format("FILRODENSWMB.UI.WorldMapsCount", { count }),
@@ -195,7 +197,7 @@ export class WorldsPanel {
         renaming.set(world.id, name);
         app.view?.render(["context"]);
         try {
-            await app.worldAction("rename", world.mapId, world.name, name);
+            await app.worldAction("rename", world.mapId, world.name, name, world.id);
         } finally {
             if (renaming.get(world.id) === name) renaming.delete(world.id);
         }
@@ -230,17 +232,17 @@ export const WorldEditor = Object.freeze({
     }),
     apply: (app, world, _ref, form) => {
         const name = String(form.elements.worldName?.value ?? "").trim();
-        if (!name || name === world.name || !world.mapId) return false;
+        if (!name || name === world.name) return false;
         WorldsPanel.rename(app, world, name);
         return false;
     },
     actions: {
-        open: (app, world) => app.openWorld(world.mapId, world.name),
+        open: (app, world) => app.openWorld(world.mapId, world.name, world.id),
         showWorld: (app, _world, _ref, button) => WorldsPanel.select(app, button.dataset.worldId),
-        cloneAsNew: (app, world) => app.worldAction("promote", world.mapId, world.name),
-        duplicate: (app, world) => app.worldAction("duplicate", world.mapId, world.name),
-        exportWorld: (app, world) => app.worldAction("export", world.mapId, world.name),
-        delete: (app, world) => app.worldAction("delete", world.mapId, world.name),
+        cloneAsNew: (app, world) => app.worldAction("promote", world.mapId, world.name, undefined, world.id),
+        duplicate: (app, world) => app.worldAction("duplicate", world.mapId, world.name, undefined, world.id),
+        exportWorld: (app, world) => app.worldAction("export", world.mapId, world.name, undefined, world.id),
+        delete: (app, world) => app.worldAction("delete", world.mapId, world.name, undefined, world.id),
     },
 
     /**

@@ -288,7 +288,8 @@ function settingsMerger(worlds) {
         const world = worldOf.get(id);
         if (!world || !file || typeof file !== "object" || Array.isArray(file)) return file;
         const { pinIcons, name, owners, modelRun, ...data } = file;
-        const merged = WorldSettings.merge(WorldRecord.effectiveSettings(world, (key) => byId.get(key) ?? null), data);
+        // A held world's cultures and ages are its parent's, in its parent's pixels: none of their inline points
+        const merged = WorldSettings.merge(WorldRecord.effectiveSettings(world, (key) => byId.get(key) ?? null), data, { inline: !world.held });
         return { ...merged, ...(name !== undefined ? { name } : {}), ...(owners ? { owners } : {}), ...(modelRun ? { modelRun } : {}), ...(pinIcons ? { pinIcons } : {}) };
     };
 }

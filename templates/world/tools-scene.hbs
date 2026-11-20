@@ -1,10 +1,64 @@
 {{!--
-    Map setup (tool id "scene"): the Surface map's own settings. Updating it to the latest engine;
-    a guided map's land masks (drawn with the bar's Land and Ocean modes); and a regional map cut
-    from this one (the crop is the bar's Crop mode). What a world is made with (its engine, seed,
-    size, latitudes, area factor and unit) is the world's, in World setup (S0 step 4). The grid is
-    in Cartography.
+    Map setup (tool id "scene"): the Surface map's own settings (S0 step 4c-2, boards C11 and N4).
+    First its Terrain: the terrain engine and the seed it is made from (kept in the world record,
+    as a world has one Surface map; Ken, 2026-11-20), which a made map takes only by being made again
+    (Make the Surface map again…, which asks first: what is drawn on the map is lost, the world's
+    settings are kept). Before the map is made, the same fields and Make Surface map at the panel's
+    foot. Then updating it to the latest engine; a guided map's land masks (drawn with the bar's
+    Land and Ocean modes); and a regional map cut from this one (the crop is the bar's Crop mode,
+    until step 5). The world's frame (size, latitudes, area factor and unit) is World setup's.
 --}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="terrainChoice" title="FILRODENSWMB.UI.SectionTerrain" badge=terrainChoice.badge}}
+<fieldset class="fwmb-held-fieldset"{{#if terrainChoice.held}} disabled{{/if}}>
+    <div class="fwmb-form-group">
+        <label for="fwmb-generation-engine">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-generation-engine" name="terrainEngine">
+                <option value="advanced" {{#if (eq terrainChoice.engine "advanced")}}selected{{/if}}>{{engineLabels.advanced}}</option>
+                <option value="guided" {{#if (eq terrainChoice.engine "guided")}}selected{{/if}}>{{engineLabels.guided}}</option>
+                <option value="flat" {{#if (eq terrainChoice.engine "flat")}}selected{{/if}}>{{engineLabels.flat}}</option>
+                {{!-- Legacy terrain is offered only on a map made with it: new maps use the other engines --}}
+                {{#if (eq terrainChoice.engine "standard")}}
+                    <option value="standard" selected>{{engineLabels.standard}}</option>
+                {{/if}}
+            </select>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{#if (eq terrainChoice.engine 'flat')}}{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}{{else if (eq terrainChoice.engine 'advanced')}}{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}{{else if (eq terrainChoice.engine 'guided')}}{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}{{/if}}"></i>
+        </div>
+    </div>
+
+    {{#unless (eq terrainChoice.engine "flat")}}
+        <div class="fwmb-form-group">
+            <label for="fwmb-map-seed">{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
+            <div class="fwmb-form-fields">
+                <input type="text" id="fwmb-map-seed" name="terrainSeed" maxlength="{{fwmbTextLimit 'name'}}" value="{{terrainChoice.seed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SeedHint'}}" />
+                <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeSeed" aria-label="{{localize 'FILRODENSWMB.UI.Randomize'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
+                    <i class="fwmb-icon fwmb-icon--shuffle"></i>
+                </button>
+            </div>
+        </div>
+    {{/unless}}
+
+    {{#if (eq terrainChoice.engine "flat")}}
+        {{!-- Read when the map is made, not when it is ticked --}}
+        <div class="fwmb-form-group">
+            <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
+                <input type="checkbox" name="terrainFlatTexture" class="fwmb-checkbox" {{#if terrainChoice.flatTexture}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.FlatTexture"}}
+            </label>
+        </div>
+    {{/if}}
+
+    {{#if terrainChoice.made}}
+        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.MakeMapAgainHint"}}</p>
+        <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="makeSurfaceMap"{{#unless terrainChoice.changed}} aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.MakeMapAgainUnchanged'}}"{{/unless}}>
+            <i class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.MakeMapAgain"}}
+        </button>
+    {{else}}
+        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.MakeMapHint"}}</p>
+    {{/if}}
+</fieldset>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
 {{#if terrainUpgradeAvailable}}
 <div class="fwmb-tool-content">
     <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
@@ -12,10 +66,6 @@
     </button>
 </div>
 {{/if}}
-<div class="fwmb-goto">
-    <p>{{localize "FILRODENSWMB.UI.MapSetupWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuSetupPath"}}</b></p>
-    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldSetup">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
-</div>
 
 {{#if (eq uiState.generationEngine "guided")}}
     {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="landMasks" title="FILRODENSWMB.UI.LandMasks" badge="FILRODENSWMB.UI.BadgeRebuildsMap"}}
@@ -47,6 +97,7 @@
     {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{/if}}
 
+{{#if terrainChoice.made}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="regionalMap" title="FILRODENSWMB.UI.SectionRegionalMap" badge="FILRODENSWMB.UI.BadgeCreatesNewMap" closed=true}}
     {{#if canCreateRegionalMap}}
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionalMapCropHint"}}</p>
@@ -83,3 +134,10 @@
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionalMapNeedsUpdate"}}</p>
     {{/if}}
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+
+{{!-- The world's frame, which every map shares --}}
+<div class="fwmb-goto">
+    <p>{{localize "FILRODENSWMB.UI.MapSetupWorldGo"}} <b>{{localize "FILRODENSWMB.UI.WorldMenuSetupPath"}}</b></p>
+    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openWorldTool" data-tool="worldSetup">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+</div>

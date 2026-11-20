@@ -18,6 +18,17 @@
     <div class="fwmb-map-preview">
         <!-- The PIXI canvas is drawn in here -->
 
+        {{!-- The Surface map before it is made (board N4): a dashed frame in the world's aspect in the
+             canvas's place, its size written by #showUnmade (shown while the studio has fwmb-is-unmade) --}}
+        <div class="fwmb-unmade" aria-hidden="true">
+            <div class="fwmb-unmade-frame">
+                <span class="fwmb-icon fwmb-icon--landscape"></span>
+                <b>{{localize "FILRODENSWMB.UI.UnmadeFrameTitle"}}</b>
+                <span>{{localize "FILRODENSWMB.UI.UnmadeFrameHint"}}</span>
+                <span class="fwmb-unmade-size" data-unmade-size></span>
+            </div>
+        </div>
+
         <div class="fwmb-map-overlay fwmb-canvas-readout" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ReadoutLabel'}}">
             <div class="fwmb-values">
                 <span><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ReadoutElevation"}}</span><span id="fwmb-readout-elev">–</span></span>
