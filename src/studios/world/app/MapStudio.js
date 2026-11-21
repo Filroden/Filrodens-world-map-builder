@@ -253,7 +253,7 @@ export class MapStudio {
         moveLevelToPolitical(_e, t) { RegionPanel.moveToPolitical(this, RegionPanel.levelIdOf(t), null); },
         // --- INFLUENCES (see InfluenceView, InfluencePainter) ---
         chooseInfluenceKind(_e, t)  { InfluenceView.chooseKind(this, t.dataset.kind); },
-        clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message)); },
+        clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message, { confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionClear") })); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
         generateAll()               { if (this.surfaceMade) GenerateAll.open(this); },
@@ -6866,7 +6866,7 @@ export class MapStudio {
             if (!(await this.saveCurrentMap({ promptTitle: platform.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
         }
         const parentName = this.world?.name || this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.MapNameFallback");
-        const name = (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.CutRegionalWorldName"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: parentName })))?.trim();
+        const name = (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.CutRegionalWorldName"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: parentName }), "name", platform.i18n.localize("FILRODENSWMB.UI.ActionCut")))?.trim();
         if (!name) return;
         this.#cutReturn = null;
         const cut = await this.#cutWorld({ crop: plan.cropBox, width: plan.targetWidth, name, infill: this.uiState.regionalInfill === true, align: this.uiState.regionalAlignGrid !== false });
@@ -7232,6 +7232,8 @@ export class MapStudio {
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportSettings"),
             content: content,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionExport"),
+            confirmIcon: "fwmb-icon fwmb-icon--file-export",
             onSubmit: (form) => MapStudio.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => form.elements[key]?.checked),
         });
 
@@ -7740,7 +7742,7 @@ export class MapStudio {
             title: i18n.format("FILRODENSWMB.UI.FirstOpeningTitle", { name: noticed.name || this.#saveName || "" }),
             icon: "fwmb-icon fwmb-icon--public",
             content,
-            buttons: [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), tone: "positive", default: true }],
+            buttons: [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), default: true }],
             dismissed: "close",
         });
     }
@@ -7837,7 +7839,7 @@ export class MapStudio {
         if (plan.movedUp.length) notes.push(platform.i18n.format("FILRODENSWMB.UI.DeleteWorldMovesUp", { names: names(plan.movedUp) }));
         // Plain text: the dialogue escapes it (see MapDialogManager._confirmDialog)
         const content = notes.length ? [platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm"), ...notes].join(" ") : undefined;
-        const confirmed = await MapDialogManager._confirmDialog(undefined, content);
+        const confirmed = await MapDialogManager._confirmDialog(undefined, content, { confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionDeleteWorld") });
         if (!confirmed) return;
 
         // Deleting the world the inspector shows (Ken, 2026-11-20): the inspector stays open, on
@@ -7865,7 +7867,7 @@ export class MapStudio {
     /** Renames a world: to the name given (Worlds' inspector), else to one asked for. */
     async #handleMapRename(mapId, name, given, knownWorldId = null) {
         const currentName = name;
-        const newName = given ?? (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName));
+        const newName = given ?? (await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName, "name", platform.i18n.localize("FILRODENSWMB.UI.Rename")));
 
         if (newName && newName !== currentName) {
             // The world and its maps (see Worlds.rename)
@@ -7903,6 +7905,7 @@ export class MapStudio {
         const confirmed = await MapDialogManager._confirmDialog(
             platform.i18n.localize("FILRODENSWMB.UI.Promote"),
             platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm"),
+            { confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.Promote"), destructive: false },
         );
         if (!confirmed) return;
 

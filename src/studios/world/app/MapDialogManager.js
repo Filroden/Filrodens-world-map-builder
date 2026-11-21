@@ -23,15 +23,19 @@ const OVER_LIMIT_SHOWN = 20;
 
 export class MapDialogManager {
     /**
-     * Shows a standard Yes/No confirmation dialogue. The message is plain text: it often names
+     * Shows a confirmation: Cancel, and the action it names (Delete unless `confirmLabel` says
+     * otherwise; see dialogs.confirm). The message is plain text: it often names
      * something the user typed or a file brought in (a layer, a set, a custom icon), so it is
      * escaped before it becomes the dialogue's markup, and no message carries markup of its own.
      */
-    static async _confirmDialog(title, content) {
+    static async _confirmDialog(title, content, { confirmLabel, destructive = true } = {}) {
         const message = Sanitize.escapeHtml(content || platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm"));
         return platform.dialogs.confirm({
             title: title || platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${message}</p>`,
+            // A confirmation names its action (S0 step 8a): Delete unless the caller says otherwise
+            confirmLabel: confirmLabel ?? platform.i18n.localize("FILRODENSWMB.UI.Delete"),
+            destructive,
         });
     }
 
@@ -64,8 +68,9 @@ export class MapDialogManager {
      * @param {string} label - Plain text.
      * @param {string} defaultValue
      * @param {"name"|"description"|"label"} [kind]
+     * @param {string} [confirmLabel] - The action's name (Save unless the caller names it: Rename, Cut).
      */
-    static async _promptTextValue(title, label, defaultValue, kind = "name") {
+    static async _promptTextValue(title, label, defaultValue, kind = "name", confirmLabel = platform.i18n.localize("FILRODENSWMB.UI.Save")) {
         // The value is escaped because it is often an existing name (a map or layer name) that
         // may contain quotes, which would otherwise end the attribute early and cut the name short
         const safeValue = platform.utils.escapeHtml(defaultValue ?? "");
@@ -74,6 +79,7 @@ export class MapDialogManager {
             title,
             content: `<label>${Sanitize.escapeHtml(label)}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}" maxlength="${limit}">`,
             onSubmit: (form) => form.elements["fwmb-prompt-input"].value,
+            confirmLabel,
         });
         return typeof answer === "string" ? answer.slice(0, limit) : answer;
     }
@@ -87,9 +93,9 @@ export class MapDialogManager {
             title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${platform.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
             buttons: [
-                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon fwmb-icon--delete", tone: "negative" },
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "caution" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel") },
+                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.DiscardChanges") },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", default: true },
             ],
             dismissed: "cancel",
         });
@@ -110,9 +116,10 @@ export class MapDialogManager {
             icon: "fwmb-icon fwmb-icon--save",
             content: `<p>${Sanitize.escapeHtml(list)}</p><p>${Sanitize.escapeHtml(i18n.localize("FILRODENSWMB.UI.CloseWorldHint"))}</p>`,
             buttons: [
+                // Board N1: Save and close the primary; Cancel the default, so Enter never closes
                 { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
-                { action: "discard", label: i18n.localize("FILRODENSWMB.UI.DiscardChanges"), tone: "negative" },
-                { action: "save", label: i18n.localize("FILRODENSWMB.UI.SaveAndClose"), tone: "positive" },
+                { action: "discard", label: i18n.localize("FILRODENSWMB.UI.DiscardChanges") },
+                { action: "save", label: i18n.localize("FILRODENSWMB.UI.SaveAndClose"), icon: "fwmb-icon fwmb-icon--save", primary: true },
             ],
             dismissed: "cancel",
         });
@@ -136,7 +143,7 @@ export class MapDialogManager {
             content: `<p>${escape(i18n.format("FILRODENSWMB.UI.CutAgainBody", { name, parent: parentName }))}</p><p>${escape(i18n.format("FILRODENSWMB.UI.CutAgainKept", { old: oldName }))}</p>`,
             buttons: [
                 { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
-                { action: "cut", label: i18n.localize("FILRODENSWMB.UI.CutAgainConfirm"), tone: "positive" },
+                { action: "cut", label: i18n.localize("FILRODENSWMB.UI.CutAgainConfirm"), icon: "fwmb-icon fwmb-icon--crop", primary: true },
             ],
             dismissed: "cancel",
         });
@@ -164,12 +171,12 @@ export class MapDialogManager {
             buttons: dirty
                 ? [
                       { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
-                      { action: "open", label: i18n.localize("FILRODENSWMB.UI.OpenParentDiscard"), tone: "negative" },
-                      { action: "save", label: i18n.localize("FILRODENSWMB.UI.OpenParentSave"), tone: "positive" },
+                      { action: "open", label: i18n.localize("FILRODENSWMB.UI.OpenParentDiscard") },
+                      { action: "save", label: i18n.localize("FILRODENSWMB.UI.OpenParentSave"), icon: "fwmb-icon fwmb-icon--save", primary: true },
                   ]
                 : [
                       { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },
-                      { action: "open", label: i18n.format("FILRODENSWMB.UI.OpenParentConfirm", { parent: parentName }), tone: "positive" },
+                      { action: "open", label: i18n.format("FILRODENSWMB.UI.OpenParentConfirm", { parent: parentName }), icon: "fwmb-icon fwmb-icon--open-in-new", primary: true },
                   ],
             dismissed: "cancel",
         });
@@ -193,8 +200,8 @@ export class MapDialogManager {
             title: platform.i18n.localize(title),
             content: `<p>${platform.i18n.localize(message)}</p>`,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel") },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", default: true },
             ],
             dismissed: "cancel",
         });
@@ -246,15 +253,14 @@ export class MapDialogManager {
                 {
                     action: "keep",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
-                    icon: "fwmb-icon fwmb-icon--cancel",
-                    tone: "negative",
+                    // The way out: keeps the map as it is
+                    start: true,
                     callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
                 },
                 {
                     action: "apply",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
                     icon: "fwmb-icon fwmb-icon--sync",
-                    tone: "positive",
                     default: true,
                     callback: () => ({ apply: true, dismiss: false }),
                 },
@@ -412,6 +418,7 @@ export class MapDialogManager {
             classes: ["fwmb"],
             title: platform.i18n.localize(titleKey),
             content,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionApply"),
             onRender: (html) => {
                 const pathInput = html.querySelector('[name="iconPath"]');
                 const previewImg = html.querySelector("#fwmb-pin-icon-preview-img");
@@ -453,6 +460,7 @@ export class MapDialogManager {
             content: content,
             onRender,
             onSubmit: (form) => (onExtract ? onExtract(form, entity.name) : null),
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionApply"),
         });
 
         if (result) {
@@ -650,6 +658,8 @@ export class MapDialogManager {
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.AddDecoration"),
             content: content,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionAdd"),
+            confirmIcon: "fwmb-icon fwmb-icon--add",
             onSubmit: (form) => ({
                 name: Sanitize.typedText(form.elements["fwmb-dec-name"].value.trim() || defaultName, "name"),
                 src: form.elements["fwmb-dec-src"].value.trim(),
@@ -704,7 +714,7 @@ export class MapDialogManager {
                 ? platform.i18n.format("FILRODENSWMB.UI.RemovePinIconInUseWarning", { name: icon.name, count: usage.totalCount })
                 : platform.i18n.format("FILRODENSWMB.UI.RemovePinIconConfirm", { name: icon.name });
 
-        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.RemovePinIcon"), content);
+        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.RemovePinIcon"), content, { confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionRemove") });
         if (!confirmed) return;
 
         if (usage.totalCount > 0) {
@@ -855,18 +865,6 @@ export class MapDialogManager {
     }
 
     // --- MASS EDIT ---
-
-    /**
-     * Moves a dialogue's footer start item (the content's `.fwmb-start`: a setting such as Ask
-     * each time, or Save world when it finishes) onto the footer's line, before the buttons, as
-     * the design system draws it.
-     * @param {HTMLElement} element - The dialogue, as onRender gives it.
-     */
-    static footerStart(element) {
-        const start = element.querySelector(".fwmb-overlay-body .fwmb-start, form .fwmb-start");
-        const footer = element.querySelector(".fwmb-overlay-footer");
-        if (start && footer) footer.prepend(start);
-    }
 
     /** Mass edit of the chosen items of a kind (see MassEdit). */
     static onMassEdit(app, _event, target) {

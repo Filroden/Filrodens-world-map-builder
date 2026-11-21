@@ -1,6 +1,5 @@
 import { platform } from "../../../platform/index.js";
 import { Generation } from "./Generation.js";
-import { MapDialogManager } from "./MapDialogManager.js";
 import { RunInputs } from "./RunInputs.js";
 import { WorldsPanel } from "./WorldsPanel.js";
 
@@ -100,15 +99,14 @@ export class GenerateAll {
         const plan = this.plan({ maps: this.mapsOf(app), held: this.heldOf(app) });
         const context = this.context(plan);
         const content = await platform.templates.render(DIALOG_TEMPLATE, context);
-        const buttons = [{ action: "cancel", label: i18n.localize(context.nothing ? "FILRODENSWMB.UI.Close" : "FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null }];
+        const buttons = [{ action: "cancel", label: i18n.localize(context.nothing ? "FILRODENSWMB.UI.Close" : "FILRODENSWMB.UI.Cancel"), callback: () => null }];
         if (!context.nothing) {
-            buttons.push({ action: "run", label: i18n.format(plan.run.length === 1 ? "FILRODENSWMB.UI.GenerateAllRunOne" : "FILRODENSWMB.UI.GenerateAllRun", { count: plan.run.length }), icon: "fwmb-icon fwmb-icon--run", tone: "positive", default: true, callback: (form) => ({ save: !!(form.closest("dialog") ?? form).querySelector('input[name="saveWhenDone"]')?.checked }) });
+            buttons.push({ action: "run", label: i18n.format(plan.run.length === 1 ? "FILRODENSWMB.UI.GenerateAllRunOne" : "FILRODENSWMB.UI.GenerateAllRun", { count: plan.run.length }), icon: "fwmb-icon fwmb-icon--run", default: true, callback: (form) => ({ save: !!(form.closest("dialog") ?? form).querySelector('input[name="saveWhenDone"]')?.checked }) });
         }
         const answer = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-generate-all-dialog"],
             title: i18n.localize("FILRODENSWMB.UI.GenerateAllTitle"),
             content,
-            onRender: (element) => MapDialogManager.footerStart(element),
             buttons,
             dismissed: null,
         });

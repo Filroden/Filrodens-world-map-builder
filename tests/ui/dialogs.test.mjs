@@ -37,45 +37,95 @@ const key = (target, name, options = {}) => {
     return event;
 };
 
-test("confirm resolves true for Yes and false for No, with No first and the default", async () => {
-    const yes = dialogs.confirm({ title: "Delete?", content: "<p>Sure?</p>" });
+const labels = () => [...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.textContent);
+const parts = () => [...dialog().querySelector(".fwmb-overlay-footer").children].map((child) => child.dataset.overlayAction ?? child.className);
+
+test("confirm names its action: Cancel first and the default, the action at the end, resolving true", async () => {
+    const yes = dialogs.confirm({ title: "Delete?", content: "<p>Sure?</p>", confirmLabel: "Delete" });
     assert.equal(dialog().querySelector("h2").textContent, "Delete?");
-    assert.deepEqual([...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.textContent), ["No", "Yes"]);
-    assert.ok(button("no").classList.contains("fwmb-btn--primary"));
-    assert.equal(document.activeElement, button("no"), "with no fields, focus starts on the default button");
-    button("yes").click();
+    assert.deepEqual(labels(), ["Cancel", "Delete"]);
+    assert.deepEqual(parts(), ["cancel", "fwmb-start fwmb-hint", "fwmb-overlay-gap", "confirm"], "board N1: the way out at the start");
+    assert.equal(document.activeElement, button("cancel"), "with no fields, focus starts on Cancel, so Enter never confirms");
+    assert.ok(!button("cancel").classList.contains("fwmb-btn--primary"), "the way out is never the primary");
+    button("confirm").click();
     assert.equal(await yes, true);
     assert.equal(dialog(), null, "the dialogue is removed once answered");
 
     const no = dialogs.confirm({ title: "Delete?", content: "" });
-    button("no").click();
+    assert.deepEqual(labels(), ["Cancel", "Confirm"], "Confirm when no action is named");
+    button("cancel").click();
     assert.equal(await no, false);
 });
 
-test("buttons carry their tone: confirm and prompt's are negative then positive, choose's as given", async () => {
+test("a destructive confirmation's action is negative; any other is the primary", async () => {
     const tones = () => [...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.dataset.tone ?? null);
-    const confirmed = dialogs.confirm({ title: "A", content: "" });
-    assert.deepEqual(tones(), ["negative", "positive"]);
+    const deleting = dialogs.confirm({ title: "A", content: "", confirmLabel: "Delete" });
+    assert.deepEqual(tones(), [null, "negative"]);
+    assert.equal(dialog().querySelector(".fwmb-btn--primary"), null);
     key(dialog(), "Escape");
-    await confirmed;
+    await deleting;
 
-    const prompted = dialogs.prompt({ title: "B", content: "" });
-    assert.deepEqual(tones(), ["negative", "positive"]);
+    const promoting = dialogs.confirm({ title: "B", content: "", confirmLabel: "Clone as new", destructive: false });
+    assert.deepEqual(tones(), [null, null]);
+    assert.ok(button("confirm").classList.contains("fwmb-btn--primary"));
+    assert.equal(document.activeElement, button("cancel"), "focus still opens on Cancel");
+    key(dialog(), "Escape");
+    await promoting;
+
+    const prompted = dialogs.prompt({ title: "C", content: "", confirmLabel: "Rename" });
+    assert.deepEqual(tones(), [null, null], "a prompt's buttons have no tone");
+    assert.deepEqual(labels(), ["Cancel", "Rename"]);
+    assert.ok(button("ok").classList.contains("fwmb-btn--primary"));
+    assert.equal(button("cancel").querySelector("i"), null, "the way out has no icon");
     key(dialog(), "Escape");
     await prompted;
+});
 
-    const chosen = dialogs.choose({
-        title: "C",
+test("choose's footer is board N1's: tones only on a lone destructive action, one primary, a lone Close at the end", async () => {
+    const tones = () => [...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.dataset.tone ?? null);
+    const three = dialogs.choose({
+        title: "Close the world first",
         content: "",
         buttons: [
-            { action: "discard", label: "Discard", tone: "negative" },
-            { action: "cancel", label: "Cancel", tone: "caution" },
-            { action: "plain", label: "Plain" },
+            { action: "cancel", label: "Cancel", default: true },
+            { action: "discard", label: "Discard changes", tone: "negative" },
+            { action: "save", label: "Save and close", tone: "positive", primary: true },
         ],
+        dismissed: "cancel",
     });
-    assert.deepEqual(tones(), ["negative", "caution", null], "a button without a tone keeps the accent colour");
+    assert.deepEqual(parts(), ["cancel", "fwmb-start fwmb-hint", "fwmb-overlay-gap", "discard", "save"]);
+    assert.deepEqual(tones(), [null, null, null], "beside another action, Discard changes is plain");
+    assert.deepEqual([...dialog().querySelectorAll(".fwmb-btn--primary")].map((b) => b.dataset.overlayAction), ["save"]);
+    assert.equal(document.activeElement, button("cancel"), "the default has the focus");
     key(dialog(), "Escape");
-    await chosen;
+    assert.equal(await three, "cancel");
+
+    const revert = dialogs.choose({ title: "Revert", content: "", buttons: [{ action: "cancel", label: "Cancel", default: true }, { action: "revert", label: "Revert", tone: "negative" }], dismissed: "cancel" });
+    assert.deepEqual(tones(), [null, "negative"], "a lone destructive action keeps its tone");
+    key(dialog(), "Escape");
+    await revert;
+
+    const closing = dialogs.choose({ title: "Shortcuts", content: "", buttons: [{ action: "close", label: "Close", default: true }], dismissed: "closed" });
+    assert.deepEqual(parts(), ["fwmb-start fwmb-hint", "fwmb-overlay-gap", "close"], "a lone Close sits at the end");
+    assert.ok(button("close").classList.contains("fwmb-btn--primary"));
+    button("close").click();
+    assert.equal(await closing, "closed", "Close dismisses, as the header's close does");
+});
+
+test("a dialogue's own start item (a setting such as Ask each time) goes to the footer after Cancel", async () => {
+    const answer = dialogs.choose({
+        title: "Generate",
+        content: '<p>Body</p><label class="fwmb-start"><input type="checkbox" name="askEachTime" checked> Ask each time</label>',
+        buttons: [
+            { action: "cancel", label: "Cancel", callback: () => null },
+            { action: "generate", label: "Generate", default: true, callback: (form) => (form.closest("dialog") ?? form).querySelector('input[name="askEachTime"]').checked },
+        ],
+        dismissed: null,
+    });
+    assert.deepEqual(parts(), ["cancel", "fwmb-start", "fwmb-overlay-gap", "generate"]);
+    assert.equal(dialog().querySelector(".fwmb-overlay-body .fwmb-start"), null);
+    button("generate").click();
+    assert.equal(await answer, true, "the setting is still read from the dialogue");
 });
 
 test("a modal dialogue has a scrim, removed with it; a docked one has none", async () => {
@@ -107,7 +157,7 @@ test("prompt reads its result from the form, runs onRender with the element and 
     assert.equal(rendered, dialog());
     assert.ok(dialog().classList.contains("fwmb-test-dialog"));
     assert.ok(dialog().querySelector(".fwmb-overlay-header i.fwmb-icon.fwmb-icon--tune"));
-    assert.deepEqual([...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.textContent), ["Cancel", "Confirm"]);
+    assert.deepEqual(labels(), ["Cancel", "Confirm"]);
     const input = dialog().querySelector('input[name="name"]');
     assert.equal(document.activeElement, input);
     input.value = "Port";
@@ -175,7 +225,7 @@ test("focus returns to where it was when the dialogue closes", async () => {
     before.focus();
     const result = dialogs.confirm({ title: "T", content: "" });
     assert.notEqual(document.activeElement, before);
-    button("yes").click();
+    button("confirm").click();
     await result;
     assert.equal(document.activeElement, before);
 });

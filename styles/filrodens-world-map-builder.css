@@ -1616,6 +1616,12 @@
     background: var(--fwmb-bg-panel);
 }
 /* The texts an export refuses on (MapDialogManager.showOverLimit): one per line, scrolling when long */
+/* The terrain update's lists of what changes: their indent the module's own, so Foundry's never
+   reaches it (S0 step 8a, the dark theme's scan) */
+.fwmb .fwmb-terrain-update-list {
+    margin-block: 1em;
+    padding-inline-start: 1.25rem;
+}
 .fwmb-overlay-body .fwmb-limit-list {
     margin: 0;
     padding-inline-start: 1.25rem;
@@ -8578,6 +8584,13 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     gap: var(--fwmb-size-8);
 }
 
+/* A dialogue's paragraphs are spaced by its body's gap, not margins of their own (S0 step 8a): set
+   here, so neither the browser's margin (the web host) nor Foundry's (0.5rem) reaches them. Of the
+   lowest weight, so a paragraph's own class (.fwmb-hint) still sets its margin */
+:where(.fwmb .fwmb-overlay-body) p {
+    margin-block: 0;
+}
+
 /* A dialogue's form rows are the module's own (see .fwmb-form-group above), on both hosts: a label is
    bold and as tall as the field beside it, and a stacked row's field takes the row's width */
 .fwmb .fwmb-overlay-body .fwmb-form-group > label {
@@ -8594,6 +8607,94 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
+}
+
+/* A file field (S0 step 8a): Foundry's <file-picker> and the web host's stand-in (FilePickerElement)
+   take the studio's field look, the same on both hosts: one bordered field (as .fwmb-input), its
+   text without a border of its own, and the browse button square and subtle at its end. Foundry's
+   button draws a Font Awesome glyph in ::before; the studio's folder icon is drawn there instead,
+   as the web host's button has it in an <i> */
+.fwmb file-picker {
+    --fwmb-mask: url("../assets/icons/folder_open.svg");
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 7.5rem;
+    height: 1.75rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    box-shadow: none;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    overflow: hidden;
+}
+.fwmb file-picker:hover {
+    border-color: var(--fwmb-accent-main);
+}
+.fwmb file-picker:focus-within {
+    outline-color: var(--fwmb-border-focus);
+}
+.fwmb .fwmb-overlay-body file-picker > input[type="text"],
+.fwmb file-picker > input[type="text"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0 0.5rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    color: inherit;
+    font: inherit;
+}
+.fwmb file-picker > button,
+.fwmb file-picker > button.fwmb-btn {
+    flex: none;
+    width: 1.625rem;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--fwmb-accent-main);
+    font-size: 0;
+    line-height: 0;
+}
+.fwmb file-picker > button:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-accent-hover);
+}
+.fwmb file-picker > button:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: -2px;
+}
+.fwmb file-picker > button > .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+}
+.fwmb file-picker > button:not(:has(> .fwmb-icon))::before {
+    content: "";
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    background-color: currentColor;
+    font: 0/0 a;
+    -webkit-mask: var(--fwmb-mask) center / contain no-repeat;
+    mask: var(--fwmb-mask) center / contain no-repeat;
 }
 
 .fwmb .fwmb-overlay-footer {

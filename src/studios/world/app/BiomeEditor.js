@@ -248,6 +248,7 @@ export class BiomeEditor {
         const confirmed = await platform.dialogs.confirm({
             title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${Sanitize.escapeHtml(platform.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"))}</p>`,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.Delete"),
         });
         if (!confirmed) return false;
         // Its land now behaves as the biome beneath, so a run made while it behaved as another, or

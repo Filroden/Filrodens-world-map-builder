@@ -86,8 +86,8 @@ export class RuleEditorDialog {
             resizable: true,
             content,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
-                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel") },
+                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", default: true },
             ],
             dismissed: "cancel",
             onRender: (element) => RuleEditorDialog.#renderContent(element, customBiomes, defaultBiomes, seaLevel),
@@ -135,8 +135,8 @@ export class RuleEditorDialog {
             resizable: true,
             content,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
-                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel") },
+                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", default: true },
             ],
             dismissed: "cancel",
             onRender: (element) => RuleEditorDialog.#renderZones(element, working, defaultBiomes, seaLevel),

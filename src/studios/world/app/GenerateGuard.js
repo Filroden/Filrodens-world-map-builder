@@ -1,6 +1,5 @@
 import { platform } from "../../../platform/index.js";
 import { GenerateAll } from "./GenerateAll.js";
-import { MapDialogManager } from "./MapDialogManager.js";
 
 /** The client setting keeping the reader's answer once Ask each time is unticked. */
 export const GUARD_SETTING = "generateGuard";
@@ -84,17 +83,14 @@ export class GenerateGuard {
             classes: ["fwmb", "fwmb-guard-dialog"],
             title: i18n.localize("FILRODENSWMB.UI.GuardTitle"),
             content,
-            onRender: (element) => {
-                MapDialogManager.footerStart(element);
-                GenerateGuard.bindChoices(element);
-            },
+            // Ask each time (the content's .fwmb-start) goes to the footer after Cancel (see Overlay)
+            onRender: (element) => GenerateGuard.bindChoices(element),
             buttons: [
-                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
+                { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), callback: () => null },
                 {
                     action: "generate",
                     label: i18n.localize("FILRODENSWMB.UI.GenerateRun"),
                     icon: "fwmb-icon fwmb-icon--run",
-                    tone: "positive",
                     default: true,
                     callback: (form) => {
                         const root = form.closest("dialog") ?? form;

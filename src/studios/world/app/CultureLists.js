@@ -137,7 +137,7 @@ export class CultureLists {
         const culture = CultureEditor.find(app, id);
         if (!culture) return false;
         const message = platform.i18n.format("FILRODENSWMB.UI.CultureDeleteConfirm", { name: culture.name });
-        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.CultureDeleteTitle", { name: culture.name }), content: `<p>${Sanitize.escapeHtml(message)}</p>` });
+        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.CultureDeleteTitle", { name: culture.name }), content: `<p>${Sanitize.escapeHtml(message)}</p>`, confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.Delete") });
         if (!confirmed) return false;
         if (WorldEditors.readOnly(app)) return false;
         app.uiState.cultures = (app.uiState.cultures ?? []).filter((candidate) => candidate.id !== id);

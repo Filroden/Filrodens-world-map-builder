@@ -63,6 +63,7 @@ export class MassEdit {
             content,
             onRender: (element) => this.bind(app, type, element),
             onSubmit: (form) => this.read(form),
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionApply"),
         });
         if (!changes) return false;
         const changed = this.apply(app, type, items, changes);

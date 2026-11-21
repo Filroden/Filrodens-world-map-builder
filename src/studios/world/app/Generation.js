@@ -126,15 +126,15 @@ export class Generation {
      * be replaced).
      */
     static async #confirmAgain(app) {
-        return this.#confirmReplacing(app, "FILRODENSWMB.UI.GenerateAgainTitle", "FILRODENSWMB.UI.GenerateAgainMessage");
+        return this.#confirmReplacing(app, "FILRODENSWMB.UI.GenerateAgainTitle", "FILRODENSWMB.UI.GenerateAgainMessage", "FILRODENSWMB.UI.GenerateAgain");
     }
 
-    static async #confirmReplacing(app, titleKey, messageKey) {
+    static async #confirmReplacing(app, titleKey, messageKey, actionKey) {
         const { removed, kept } = Regeneration.plan(app);
         if (!removed.realms && !removed.places && !removed.routes) return true;
         const format = (value) => value.toLocaleString(platform.i18n.lang);
         const shown = { ...Object.fromEntries(Object.entries(removed).map(([key, value]) => [key, format(value)])), kept: format(kept) };
-        return MapDialogManager._confirmDialog(platform.i18n.localize(titleKey), platform.i18n.format(messageKey, shown));
+        return MapDialogManager._confirmDialog(platform.i18n.localize(titleKey), platform.i18n.format(messageKey, shown), { confirmLabel: platform.i18n.localize(actionKey) });
     }
 
     /**
@@ -149,7 +149,7 @@ export class Generation {
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.RemoveGeneratedNothing"));
             return false;
         }
-        if (!(await this.#confirmReplacing(app, "FILRODENSWMB.UI.RemoveGeneratedTitle", "FILRODENSWMB.UI.RemoveGeneratedMessage"))) return false;
+        if (!(await this.#confirmReplacing(app, "FILRODENSWMB.UI.RemoveGeneratedTitle", "FILRODENSWMB.UI.RemoveGeneratedMessage", "FILRODENSWMB.UI.ActionRemove"))) return false;
         const before = VectorHistory.snapshot(app);
         const removal = Regeneration.remove(app);
         // What the run gave hand-placed settlement pins goes with it; the pins stay

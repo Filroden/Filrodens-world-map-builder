@@ -223,6 +223,7 @@ export class RandomNames {
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.NameAllTitle"),
             content,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionName"),
             onRender: (element) => {
                 const update = () => {
                     const count = this.nameAllCount(app, read(element));

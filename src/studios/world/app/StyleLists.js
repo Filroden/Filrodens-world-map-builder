@@ -230,7 +230,7 @@ export class StyleLists {
         const key = count === 0 ? "FILRODENSWMB.UI.StyleDeleteUnused" : count === 1 ? "FILRODENSWMB.UI.StyleDeleteUsedOne" : "FILRODENSWMB.UI.StyleDeleteUsed";
         const message = platform.i18n.format(key, { count, name, one: platform.i18n.localize(`${users}One`), many: platform.i18n.localize(users) });
         // The title is set as text; the message is escaped as a whole, the style's name with it
-        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.StyleDeleteTitle", { name }), content: `<p>${Sanitize.escapeHtml(message)}</p>` });
+        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.StyleDeleteTitle", { name }), content: `<p>${Sanitize.escapeHtml(message)}</p>`, confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.Delete") });
         if (!confirmed) return false;
         MapStateManager.pushVectorState(app);
         app.uiState[config.registryKey] = (app.uiState[config.registryKey] ?? []).filter((candidate) => candidate.id !== id);

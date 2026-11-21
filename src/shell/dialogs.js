@@ -49,6 +49,17 @@ function rememberOpeningValues(element) {
  *     buttons' labels and the close control's name).
  * @returns {{confirm: Function, prompt: Function, choose: Function, dismiss: Function, attach: (element: HTMLElement) => () => void}}
  */
+/**
+ * Board N1's footer for every dialogue (S0 step 8a): the way out (an action named cancel, or a
+ * button marked `start`) at the start when there is anything else to press; a lone Close stays at
+ * the end as the dialogue's one button.
+ * @param {object[]} buttons
+ */
+function splitButtons(buttons = []) {
+    if (buttons.length < 2) return buttons;
+    return buttons.map((button) => (button.start === undefined && button.action === "cancel" ? { ...button, start: true } : button));
+}
+
 export function createOverlayDialogs({ localize }) {
     /** Attached elements, most recent last; dialogues open in the last one. */
     const hosts = [];
@@ -77,7 +88,8 @@ export function createOverlayDialogs({ localize }) {
             title,
             icon,
             content,
-            buttons: typeof buttons === "function" ? buttons() : buttons,
+            footer: "split",
+            buttons: splitButtons(typeof buttons === "function" ? buttons() : buttons),
             classes,
             resizable,
             dismissed,
@@ -91,18 +103,34 @@ export function createOverlayDialogs({ localize }) {
         });
     }
 
-    async function confirm(options) {
+    /**
+     * A confirmation names its action (Ken, 2026-11-21): Cancel at the start, the action at the end.
+     * A destructive action (the default: Delete, Discard, Revert) takes the negative tone; any other
+     * is the primary. Cancel is the default either way, so focus opens on it and Enter (or a stray
+     * key press) never confirms.
+     * @param {object} options
+     * @param {string} [options.confirmLabel] - The action's name (Confirm when none is given).
+     * @param {string} [options.confirmIcon] - An icon class for the action.
+     * @param {boolean} [options.destructive=true]
+     */
+    async function confirm({ confirmLabel, confirmIcon, destructive = true, ...options }) {
         return open(options, () => [
-            // No is the default, so Enter (or a stray key press) never confirms a deletion
-            { action: "no", label: localize("FILRODENSWMB.UI.No"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", default: true, callback: () => false },
-            { action: "yes", label: localize("FILRODENSWMB.UI.Yes"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", callback: () => true },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), start: true, default: true, callback: () => false },
+            { action: "confirm", label: confirmLabel ?? localize("FILRODENSWMB.UI.Confirm"), icon: confirmIcon, tone: destructive ? "negative" : undefined, primary: !destructive, callback: () => true },
         ], false);
     }
 
-    async function prompt({ onSubmit, ...options }) {
+    /**
+     * A dialogue with fields: Cancel at the start, the action (the primary, which Enter in a lone
+     * field presses) at the end, named for what it does.
+     * @param {object} options
+     * @param {string} [options.confirmLabel] - The action's name (Confirm when none is given).
+     * @param {string} [options.confirmIcon] - An icon class for the action.
+     */
+    async function prompt({ onSubmit, confirmLabel, confirmIcon, ...options }) {
         return open(options, () => [
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
-            { action: "ok", label: localize("FILRODENSWMB.UI.Confirm"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true, callback: onSubmit },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), start: true, callback: () => null },
+            { action: "ok", label: confirmLabel ?? localize("FILRODENSWMB.UI.Confirm"), icon: confirmIcon, default: true, callback: onSubmit },
         ], null);
     }
 

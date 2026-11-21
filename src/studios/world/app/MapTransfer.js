@@ -268,9 +268,9 @@ export class MapTransfer {
             title: platform.i18n.localize("FILRODENSWMB.UI.BackupLargeTitle"),
             content: `<p>${Sanitize.escapeHtml(platform.i18n.format("FILRODENSWMB.UI.BackupLargeContent", { size: Math.round(bytes / BYTES_PER_MEGABYTE) }))}</p>`,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel") },
                 { action: "mapsOnly", label: platform.i18n.localize("FILRODENSWMB.UI.BackupMapsOnly") },
-                { action: "everything", label: platform.i18n.localize("FILRODENSWMB.UI.BackupEverything"), tone: "positive", default: true },
+                { action: "everything", label: platform.i18n.localize("FILRODENSWMB.UI.BackupEverything"), default: true },
             ],
             dismissed: "cancel",
         });
@@ -293,8 +293,8 @@ export class MapTransfer {
             content,
             onRender: (element) => bindParentTicks(element),
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
-                { action: "restore", label: platform.i18n.localize("FILRODENSWMB.UI.RestoreButton"), icon: "fwmb-icon fwmb-icon--upload-file", tone: "positive", default: true, callback: (form) => [...form.querySelectorAll('input[name="restoreMap"]:checked')].map((input) => input.value) },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), callback: () => null },
+                { action: "restore", label: platform.i18n.localize("FILRODENSWMB.UI.RestoreButton"), icon: "fwmb-icon fwmb-icon--upload-file", default: true, callback: (form) => [...form.querySelectorAll('input[name="restoreMap"]:checked')].map((input) => input.value) },
             ],
             dismissed: null,
         });

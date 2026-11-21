@@ -147,7 +147,7 @@ export class Infilling {
     static async #confirmAgain(app) {
         const replaced = [...(app.mapPins ?? []), ...(app.mapRoutes ?? [])].filter((item) => this.isInfill(item) && !isKept(item)).length;
         if (!replaced) return true;
-        return MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.InfillAgainTitle"), platform.i18n.format("FILRODENSWMB.UI.InfillAgainMessage", { count: replaced.toLocaleString(platform.i18n.lang) }));
+        return MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.InfillAgainTitle"), platform.i18n.format("FILRODENSWMB.UI.InfillAgainMessage", { count: replaced.toLocaleString(platform.i18n.lang) }), { confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.InfillAgain") });
     }
 
     static async #work(app, signal) {

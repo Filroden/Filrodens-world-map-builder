@@ -68,6 +68,8 @@ let titleCount = 0;
  * @property {boolean} [stays] - Pressing the button runs its callback and leaves the dialogue open
  *     (the export's Export image, which draws in the dialogue and closes it when done).
  * @property {boolean} [start] - In a split footer, the button sits at the start (Cancel).
+ * @property {boolean} [primary] - In a split footer, the primary without being the default (a
+ *     confirmation's non-destructive action, whose default stays Cancel).
  */
 
 export class Overlay {
@@ -161,6 +163,7 @@ export class Overlay {
         this.#footer = footer;
         this.#footerStart = footerStart;
         this.#dialog = this.#build({ title, icon, content, classes, resizable, closeLabel });
+        this.#adoptStartItem();
         if (header) this.setHeader({ title, ...header });
     }
 
@@ -213,7 +216,8 @@ export class Overlay {
 
     /** Sets the footer's start line (a split footer's estimate); empty hides it. */
     setFooterStart(text) {
-        const line = this.#dialog.querySelector(".fwmb-overlay-footer > .fwmb-start");
+        // Only the footer's own line: a start item adopted from the content is left as it is
+        const line = this.#dialog.querySelector(".fwmb-overlay-footer > span.fwmb-start");
         if (!line) return;
         line.textContent = text ?? "";
         line.hidden = !text;
@@ -286,6 +290,18 @@ export class Overlay {
         return form;
     }
 
+    /**
+     * A split footer's start line is the content's own `.fwmb-start` when it has one (a setting such
+     * as Ask each time, or Save world when it finishes), moved into the footer after the way out.
+     */
+    #adoptStartItem() {
+        if (this.#footer !== "split") return;
+        const item = this.#dialog.querySelector(".fwmb-overlay-body .fwmb-start");
+        const line = this.#dialog.querySelector(".fwmb-overlay-footer > .fwmb-start");
+        if (!item || !line) return;
+        line.replaceWith(item);
+    }
+
     #buildFooter(doc) {
         const footer = doc.createElement("footer");
         footer.className = "fwmb-overlay-footer";
@@ -313,9 +329,12 @@ export class Overlay {
             element.type = "button";
             element.className = "fwmb-btn";
             element.dataset.overlayAction = button.action;
-            if (button.default) element.classList.add("fwmb-btn--primary");
-            if (button.tone) element.dataset.tone = button.tone;
-            if (button.icon) {
+            if (button.default) element.dataset.overlayDefault = "";
+            if (this.#isPrimary(button, split)) element.classList.add("fwmb-btn--primary");
+            const tone = this.#toneOf(button, split);
+            if (tone) element.dataset.tone = tone;
+            // In a split footer the way out (Cancel) is plain: no icon
+            if (button.icon && !(split && button.start)) {
                 const glyph = doc.createElement("i");
                 glyph.className = button.icon;
                 element.append(glyph);
@@ -325,6 +344,27 @@ export class Overlay {
         }
         footer.hidden = this.#buttons.length === 0;
         return footer;
+    }
+
+    /**
+     * Board N1's rule for a split footer (S0 step 8a; `claude/note-dialogue-style.md`): one primary,
+     * the default (or a button marked `primary`) among those at the end; the way out at the start is
+     * never primary, even when it is the default (Enter and the opening focus then go to it, which
+     * keeps a destructive dialogue from acting on Enter).
+     */
+    #isPrimary(button, split) {
+        if (!split) return !!button.default;
+        return !button.start && !!(button.primary ?? button.default);
+    }
+
+    /**
+     * Tones are v4's: in a split footer only a destructive action that is the dialogue's one action
+     * keeps its negative tone (Delete, Discard), every other button is plain or the primary.
+     */
+    #toneOf(button, split) {
+        if (!split) return button.tone ?? null;
+        const end = this.#buttons.filter((candidate) => !candidate.start);
+        return button.tone === "negative" && !button.start && end.length === 1 ? "negative" : null;
     }
 
     #show(onRender, focus = "field") {
@@ -357,10 +397,11 @@ export class Overlay {
         } else this.#focusFirst();
     }
 
-    /** Focus goes to the first field, or failing that the default button, then any control. */
+    /** Focus goes to the first field, or failing that the default button (or the primary), then any control. */
     #focusFirst() {
         const field = this.#dialog.querySelector(".fwmb-overlay-body :is(input, select, textarea):not([disabled], [type='hidden'])");
-        const target = field ?? this.#dialog.querySelector(".fwmb-overlay-footer .fwmb-btn--primary") ?? this.#dialog.querySelector(FOCUSABLE);
+        const footer = this.#dialog.querySelector(".fwmb-overlay-footer");
+        const target = field ?? footer?.querySelector("[data-overlay-default]") ?? footer?.querySelector(".fwmb-btn--primary") ?? this.#dialog.querySelector(FOCUSABLE);
         target?.focus();
     }
 

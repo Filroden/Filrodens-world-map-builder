@@ -671,6 +671,7 @@ export class RegionPanel {
             title: platform.i18n.format("FILRODENSWMB.UI.MergeRegionTitle", { name: region.name }),
             content,
             onSubmit: (form) => form.elements.mergeInto.value,
+            confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionMerge"),
         });
         if (!intoId) return false;
 
@@ -840,7 +841,7 @@ export class RegionPanel {
             return { depth, available: available(depth), selected: depth === preferred, label: text };
         });
         const content = await platform.templates.render(`${DIALOG_ROOT}move-to-political.hbs`, { hint, creates, choices });
-        const chosen = await platform.dialogs.prompt({ classes: ["fwmb"], title, content, onSubmit: (form) => form.elements.moveAs.value });
+        const chosen = await platform.dialogs.prompt({ classes: ["fwmb"], title, content, onSubmit: (form) => form.elements.moveAs.value, confirmLabel: platform.i18n.localize("FILRODENSWMB.UI.ActionMove") });
         const depth = Number.parseInt(chosen, 10);
         return Number.isInteger(depth) && available(depth) ? depth : null;
     }
