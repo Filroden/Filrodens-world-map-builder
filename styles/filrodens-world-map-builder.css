@@ -8584,11 +8584,15 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     gap: var(--fwmb-size-8);
 }
 
-/* A dialogue's paragraphs are spaced by its body's gap, not margins of their own (S0 step 8a): set
-   here, so neither the browser's margin (the web host) nor Foundry's (0.5rem) reaches them. Of the
-   lowest weight, so a paragraph's own class (.fwmb-hint) still sets its margin */
+/* A dialogue's paragraphs keep 0.5rem after them, none after the last (S0 step 8a; Ken, 2026-11-21:
+   the body's gap alone was too tight, and most dialogues' content is one column with no gap). Set
+   here, so neither the browser's margin (the web host) nor Foundry's reaches them. Of the lowest
+   weight, so a paragraph's own class (.fwmb-hint) still sets its margin */
 :where(.fwmb .fwmb-overlay-body) p {
-    margin-block: 0;
+    margin-block: 0 0.5rem;
+}
+:where(.fwmb .fwmb-overlay-body) p:last-child {
+    margin-block-end: 0;
 }
 
 /* A dialogue's form rows are the module's own (see .fwmb-form-group above), on both hosts: a label is
