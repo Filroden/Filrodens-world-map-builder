@@ -172,7 +172,7 @@ test("Out of date shows only for a map with a run, and the notices follow the ma
     app.modelRun = { run: "mine", stats: {} };
     const context = GeneratePanel.context(app);
     assert.equal(context.stale, true);
-    assert.equal(context.runBadge, "FILRODENSWMB.UI.GenerateOutOfDate");
+    assert.equal(context.runMark?.kind, "stale", "the Run heading's Out of date mark (MapMarks)");
 
     const regional = studio({ currentParentId: "parent", mapPins: [{ generated: { run: "parents" } }] });
     assert.deepEqual(GeneratePanel.context(regional).notices, ["FILRODENSWMB.UI.GenerateInheritedNotice"]);

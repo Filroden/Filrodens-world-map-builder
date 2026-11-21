@@ -52,6 +52,8 @@ test("the rail is the registration's: one mode's stages (every mode's when none 
     ]);
     assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface", "explore")), [["explore", ["history", "travel", "threeD"]]]);
     assert.equal(WORLD_DEFINITION.railStages("surface", "create").length, 3);
+    // The studio's one rail (S0 step 6, as v4's): every stage, Explore after Finish
+    assert.deepEqual(WORLD_DEFINITION.railStages("surface").map((stage) => stage.id), ["shape", "populate", "finish", "explore"]);
     assert.ok(WORLD_DEFINITION.offers("manage", "surface"), "an occasional tool is offered");
     assert.equal(WORLD_DEFINITION.offers("nothing", "surface"), false);
 });

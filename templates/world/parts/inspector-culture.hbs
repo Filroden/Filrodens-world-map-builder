@@ -97,9 +97,10 @@
         {{/each}}
     </ul>
     {{/if}}
-    <div class="fwmb-btn-row">
-        <button type="button" class="fwmb-btn" data-inspector-action="editZones" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureZonesEditHint'}}">
-            <i class="fwmb-icon fwmb-icon--tune" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.CultureZonesEdit"}}
+    <div class="fwmb-action-list">
+        <button type="button" class="fwmb-action-row" data-inspector-action="editZones">
+            <span class="fwmb-icon fwmb-icon--tune" aria-hidden="true"></span>
+            <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.CultureZonesEdit"}}…</b><span>{{localize "FILRODENSWMB.UI.CultureZonesEditHint"}}</span></span>
         </button>
     </div>
     {{/if}}

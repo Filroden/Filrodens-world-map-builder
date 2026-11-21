@@ -231,7 +231,7 @@ test("a run is out of date once the routes, settlement pins, Political regions o
     app.mapRoutes.push({ id: "my-road", name: "Old road", transport: "road", waypoints: [line[0], line.at(-1)], legs: [line] });
     assert.deepEqual(RunInputs.changed(app), ["routes"], "a route drawn");
     assert.equal(GeneratePanel.context(app).stale, true);
-    assert.equal(GeneratePanel.context(app).runBadge, "FILRODENSWMB.UI.GenerateOutOfDate");
+    assert.equal(GeneratePanel.context(app).runMark?.kind, "stale");
     VectorHistory.step(app, true);
     assert.deepEqual(RunInputs.changed(app), [], "and undone");
     const kept = app.mapRoutes[0];

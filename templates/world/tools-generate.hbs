@@ -21,7 +21,7 @@
 </div>
 {{/unless}}
 
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generateRun" title="FILRODENSWMB.UI.SectionGenerateRun" badge=generate.runBadge}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="generateRun" title="FILRODENSWMB.UI.SectionGenerateRun" badge=generate.runBadge mark=generate.runMark}}
     {{#if generate.held}}
     <p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateHeldNotice"}}</p>
     {{else}}

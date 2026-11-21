@@ -2,7 +2,9 @@
      step, and the map's engine for the tools the engine shapes), and Explore's read-only tag. See
      MapStudio's #panelContext. A world settings editor carries the World tag (board W2). Worlds,
      off every rail, has Close back to the tool left: on its board, a button naming where it goes
-     back to, as board W9 has it. The world's tools have none: a map in the layer switcher leaves them. --}}
+     back to, as board W9 has it. The world's tools have none: a map in the layer switcher leaves them.
+     Under it, the tool's lede: one sentence saying what it does on this map (S0 step 6), hidden by
+     Appearance › Tool descriptions. --}}
 <div class="fwmb-panel-header">
     <h2 class="fwmb-panel-title">{{panel.title}}</h2>
     {{#if panel.tag}}<span class="fwmb-tag">{{panel.tag}}</span>{{/if}}
@@ -11,3 +13,14 @@
     {{#if panel.closes}}{{#if panel.board}}<button type="button" class="fwmb-btn fwmb-panel-close" data-action="{{panel.closes}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>{{panel.back}}</button>
     {{else}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-panel-close" data-action="{{panel.closes}}" aria-label="{{localize 'FILRODENSWMB.UI.Close'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Close'}}"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span></button>{{/if}}{{/if}}
 </div>
+{{#if panel.lede}}<p class="fwmb-lede">{{panel.lede}}</p>{{/if}}
+{{!-- The action notice (S0 step 6): a state of this map that needs action, in every one of its tools --}}
+{{#if panel.notice}}
+<div class="fwmb-notice fwmb-panel-notice" role="status">
+    <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--{{panel.notice.icon}}" aria-hidden="true"></span>{{panel.notice.title}}</span>
+    {{#each panel.notice.lines}}<span>{{this}}</span>{{/each}}
+    <div class="fwmb-notice-actions">
+        {{#each panel.notice.actions}}<button type="button" class="fwmb-btn"{{#if this.off}} disabled data-tooltip="{{this.off}}"{{else}} data-action="{{this.action}}"{{/if}}{{#if this.data.worldId}} data-world-id="{{this.data.worldId}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</button>{{/each}}
+    </div>
+</div>
+{{/if}}

@@ -21,12 +21,12 @@ export class FirstOpening {
     /**
      * The notice's text, for templates/world/dialogs/first-opening.hbs.
      * @param {object} world - The world record (its migration, whether it is held).
-     * @param {{explore: boolean, source: string|null, link: string}} options - Whether it opened in
-     *     Explore; for a held world, the name of the world its settings come from; the migration page.
+     * @param {{source: string|null, link: string}} options - For a held world, the name of the world
+     *     its settings come from; the migration page.
      * @param {{localize: Function, format: Function, lang?: string}} i18n
      * @returns {{intro: string, items: string[], link: string, linkLabel: string}}
      */
-    static context(world, { explore, source, link }, i18n) {
+    static context(world, { source, link }, i18n) {
         const items = [i18n.localize("FILRODENSWMB.UI.FirstOpeningSurface")];
         const migration = world?.migration ?? {};
         if (world?.held && source) {
@@ -40,7 +40,6 @@ export class FirstOpening {
         } else {
             items.push(i18n.localize("FILRODENSWMB.UI.FirstOpeningSettings"));
         }
-        if (explore) items.push(i18n.localize("FILRODENSWMB.UI.FirstOpeningExplore"));
         return { intro: i18n.localize("FILRODENSWMB.UI.FirstOpeningIntro"), items, link, linkLabel: i18n.localize("FILRODENSWMB.UI.FirstOpeningLink") };
     }
 }

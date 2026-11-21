@@ -17,7 +17,7 @@
 import { platform } from "../platform/index.js";
 
 /** The settings' keys (in Foundry, under the module's namespace). */
-export const THEME_SETTINGS = Object.freeze({ MODE: "themeMode", HUE: "themeHue" });
+export const THEME_SETTINGS = Object.freeze({ MODE: "themeMode", HUE: "themeHue", TOOL_DESCRIPTIONS: "toolDescriptions" });
 
 /** The choices each setting offers, the first being its default. */
 export const THEME_CHOICES = Object.freeze({
@@ -25,10 +25,14 @@ export const THEME_CHOICES = Object.freeze({
     // The blue hue is stored as "teal", its name until v5 (Appearance shows Blue), so settings
     // saved before v5 keep their choice without a migration
     themeHue: Object.freeze(["gold", "teal"]),
+    // Appearance › Tool descriptions (S0 step 6): the lede under every panel's title, shown or hidden
+    toolDescriptions: Object.freeze(["shown", "hidden"]),
 });
 
 const MODE_ATTRIBUTE = "data-fwmb-theme";
 const HUE_ATTRIBUTE = "data-fwmb-hue";
+/** Written while the tool descriptions are hidden; the stylesheet hides every lede under it. */
+const LEDES_ATTRIBUTE = "data-fwmb-ledes";
 
 /** The elements the theme is written on. */
 const targets = new Set();
@@ -50,6 +54,11 @@ export function currentTheme() {
     return { mode: read(THEME_SETTINGS.MODE), hue: read(THEME_SETTINGS.HUE) };
 }
 
+/** Whether the panels' ledes are shown (Appearance › Tool descriptions). */
+export function toolDescriptionsShown() {
+    return read(THEME_SETTINGS.TOOL_DESCRIPTIONS) === "shown";
+}
+
 /** Writes the current choice on every registered element. */
 export function applyTheme() {
     const { mode, hue } = currentTheme();
@@ -57,11 +66,13 @@ export function applyTheme() {
         if (mode === "auto") element.removeAttribute(MODE_ATTRIBUTE);
         else element.setAttribute(MODE_ATTRIBUTE, mode);
         element.setAttribute(HUE_ATTRIBUTE, hue);
+        if (toolDescriptionsShown()) element.removeAttribute(LEDES_ATTRIBUTE);
+        else element.setAttribute(LEDES_ATTRIBUTE, "hidden");
     }
 }
 
 /**
- * Registers the two settings. Both are the reader's own (client scope) and are not listed in
+ * Registers the settings (Mode, Hue and Tool descriptions). Each is the reader's own (client scope) and is not listed in
  * Foundry's settings sheet: the studio offers them. The hue keeps the key it has always had, so a
  * choice made before carries over.
  */
@@ -90,6 +101,7 @@ export function attachTheme(element) {
         targets.delete(element);
         element.removeAttribute(MODE_ATTRIBUTE);
         element.removeAttribute(HUE_ATTRIBUTE);
+        element.removeAttribute(LEDES_ATTRIBUTE);
     };
 }
 

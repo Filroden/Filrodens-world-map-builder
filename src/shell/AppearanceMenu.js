@@ -1,4 +1,4 @@
-import { currentTheme, setTheme, THEME_CHOICES, THEME_SETTINGS } from "./Theme.js";
+import { currentTheme, setTheme, THEME_CHOICES, THEME_SETTINGS, toolDescriptionsShown } from "./Theme.js";
 import { positionPopoverMenu } from "./dropdowns.js";
 import { platform } from "../platform/index.js";
 
@@ -6,18 +6,20 @@ import { platform } from "../platform/index.js";
 const CHOICE_LABELS = Object.freeze({
     themeMode: Object.freeze({ auto: "FILRODENSWMB.UI.ThemeModeAuto", light: "FILRODENSWMB.UI.ThemeModeLight", dark: "FILRODENSWMB.UI.ThemeModeDark" }),
     themeHue: Object.freeze({ gold: "FILRODENSWMB.Settings.ThemeHue.Gold", teal: "FILRODENSWMB.Settings.ThemeHue.Teal" }),
+    toolDescriptions: Object.freeze({ shown: "FILRODENSWMB.UI.ToolDescriptionsShown", hidden: "FILRODENSWMB.UI.ToolDescriptionsHidden" }),
 });
-const GROUP_LABELS = Object.freeze({ themeMode: "FILRODENSWMB.UI.AppearanceMode", themeHue: "FILRODENSWMB.UI.AppearanceHue" });
+const GROUP_LABELS = Object.freeze({ themeMode: "FILRODENSWMB.UI.AppearanceMode", themeHue: "FILRODENSWMB.UI.AppearanceHue", toolDescriptions: "FILRODENSWMB.UI.ToolDescriptions" });
 
 /**
- * The rail's Appearance menu: the reader's colour theme (see Theme.js), two groups of
- * `menuitemradio` items, Mode (Auto, Light, Dark) and Hue (Gold, Teal), applied at once. It opens
+ * The rail's Appearance menu: the reader's colour theme (see Theme.js), groups of
+ * `menuitemradio` items, Mode (Auto, Light, Dark) and Hue (Gold, Blue), and Tool descriptions
+ * (Shown, Hidden: the lede under every panel's title; S0 step 6), applied at once. It opens
  * from its rail button as a popover in the top layer, beside the button, so the rail does not clip
  * it. Up, Down, Home and End move through its items; Space or Enter chooses one, leaving the menu
  * open; Escape (or Tab, or a press outside) closes it, Escape returning focus to the button. The
  * button's tooltip names the current choice ("Appearance: Dark, Teal").
  *
- * When the studio is short the occasional tools fold into More, and the two groups sit inline
+ * When the studio is short the occasional tools fold into More, and the groups sit inline
  * there, under the menu's own name (see toolbar.hbs). Both lists are kept in step, in place.
  */
 export class AppearanceMenu {
@@ -30,7 +32,7 @@ export class AppearanceMenu {
      */
     static context() {
         const theme = currentTheme();
-        const chosen = { themeMode: theme.mode, themeHue: theme.hue };
+        const chosen = { themeMode: theme.mode, themeHue: theme.hue, toolDescriptions: toolDescriptionsShown() ? "shown" : "hidden" };
         return {
             tooltip: this.#tooltip(theme),
             groups: Object.values(THEME_SETTINGS).map((key) => ({
@@ -114,7 +116,7 @@ export class AppearanceMenu {
     static sync(root) {
         if (!root) return;
         const theme = currentTheme();
-        const chosen = { themeMode: theme.mode, themeHue: theme.hue };
+        const chosen = { themeMode: theme.mode, themeHue: theme.hue, toolDescriptions: toolDescriptionsShown() ? "shown" : "hidden" };
         for (const item of root.querySelectorAll("[data-theme-key]")) item.setAttribute("aria-checked", String(chosen[item.dataset.themeKey] === item.dataset.value));
         const button = this.#button(root);
         if (button) {

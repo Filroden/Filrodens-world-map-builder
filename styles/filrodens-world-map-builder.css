@@ -2333,6 +2333,11 @@
     font-size: 0.75rem;
     line-height: 1rem;
 }
+/* Appearance › Tool descriptions, Hidden: no lede, on a map tool's panel or a world page (the
+   overview's line is what the world is, not a description, so it stays) */
+[data-fwmb-ledes="hidden"] :is(.fwmb-lede, .fwmb-page-lede:not(.fwmb-page-lede--line)) {
+    display: none;
+}
 .fwmb-subhead {
     padding: 0.375rem 0.5rem 0.125rem;
     color: var(--fwmb-text-muted);
@@ -2601,13 +2606,17 @@
     justify-content: flex-end;
 }
 
-/* v5: the short rail (below 680px of height): stage labels become dividers, buttons 2rem, Help
-   joins More */
-.fwmb-toolbar--short .fwmb-rail-btn {
-    width: 2rem;
-    height: 2rem;
+/* v5: the dense rail, its first fold (data-fwmb-short, see StudioLayout; S0 step 6, when Explore
+   joined the one rail): stage labels become dividers (their names in the group's label and the
+   divider's tooltip), buttons 2rem. Every later fold keeps it. */
+@media not (pointer: coarse) {
+    /* A finger keeps its 2.75rem targets (see touch below) */
+    .fwmb-studio[data-fwmb-short] .fwmb-toolbar .fwmb-rail-btn {
+        width: 2rem;
+        height: 2rem;
+    }
 }
-.fwmb-toolbar--short .fwmb-rail-stage {
+.fwmb-studio[data-fwmb-short] .fwmb-toolbar .fwmb-rail-stage {
     position: relative;
     width: 1.5rem;
     height: 1px;
@@ -2616,7 +2625,7 @@
     color: transparent;
     background: var(--fwmb-border-main);
 }
-.fwmb-toolbar--short .fwmb-rail-stage:first-child {
+.fwmb-studio[data-fwmb-short] .fwmb-toolbar .fwmb-rail-group:first-child .fwmb-rail-stage {
     margin-top: 0.125rem;
 }
 
@@ -3040,44 +3049,6 @@
     margin-inline: 0.125rem 0.25rem;
 }
 
-/* The mode switch: Create and Explore, a two-way segmented control in the accent fill. Its two
-   segments fill it edge to edge, as the layer switcher's do (Ken, 2026-11-18) */
-.fwmb-mode-switch {
-    display: inline-grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    height: 2.25rem;
-    padding: 0;
-    gap: 0;
-    border-radius: 6px;
-    background: var(--fwmb-bg-base);
-    border: 1px solid var(--fwmb-border-strong);
-    overflow: hidden;
-    flex: none;
-}
-.fwmb-mode-switch button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    padding: 0 0.75rem;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--fwmb-text-secondary);
-    font: 700 0.8125rem/1 var(--fwmb-font-ui);
-    cursor: pointer;
-}
-.fwmb-mode-switch button:hover {
-    background: var(--fwmb-bg-hover);
-    color: var(--fwmb-text-primary);
-}
-.fwmb-mode-switch button[aria-checked="true"] {
-    background: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-on-accent);
-    box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
-}
-
 /* The world bar in the studio (S0 step 3): its spacer, the parts later tracks fill (disabled, with
    their tooltip), and its fold forms (data-fold, see WorldBarFold). Every form is drawn; the fold
    shows one. 0: full names; 1: short names; 2: Settlement maps leaves the bar for the layer menu;
@@ -3086,16 +3057,12 @@
     flex: 1 1 0;
     min-width: 0;
 }
-.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button, .fwmb-mode-switch button)[aria-disabled="true"] {
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"] {
     opacity: 0.45;
     cursor: default;
 }
-.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button, .fwmb-mode-switch button)[aria-disabled="true"]:hover {
+.fwmb-worldbar :is(.fwmb-layer, .fwmb-barbtn, .fwmb-dropdown-menu button)[aria-disabled="true"]:hover {
     background: transparent;
-}
-/* The mode chosen stays lit when the other is off (Explore, with no Surface map made) */
-.fwmb-worldbar .fwmb-mode-switch button[aria-checked="true"][aria-disabled="true"] {
-    opacity: 1;
 }
 .fwmb-worldbar .fwmb-layer[aria-checked="true"][aria-disabled="true"] {
     opacity: 1;
@@ -3119,10 +3086,10 @@
     box-sizing: border-box;
     line-height: 1;
 }
-.fwmb-worldbar :is(.fwmb-layers, .fwmb-mode-switch) {
+.fwmb-worldbar .fwmb-layers {
     box-sizing: border-box;
 }
-.fwmb-worldbar :is(.fwmb-layer, .fwmb-mode-switch button) {
+.fwmb-worldbar .fwmb-layer {
     height: auto;
     min-height: 0;
     align-self: stretch;
@@ -3601,6 +3568,19 @@
 .fwmb-state-mark--icon {
     padding: 0 0.125rem;
 }
+/* A map's marks as icons on its layer switcher segment (MapMarks; the words are in its tooltip) */
+.fwmb-layer-mark {
+    display: inline-flex;
+    margin-left: 0.125rem;
+}
+.fwmb-layer-mark .fwmb-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    color: inherit !important;
+}
+.fwmb-menu-note {
+    color: var(--fwmb-text-secondary);
+}
 .fwmb-state-mark--regional {
     color: var(--fwmb-text-on-accent);
     background: var(--fwmb-fill-accent);
@@ -3725,7 +3705,6 @@
 .fwmb-layer:focus-visible,
 .fwmb-barbtn:focus-visible,
 .fwmb-world-menu:focus-visible,
-.fwmb-mode-switch button:focus-visible,
 .fwmb-seg button:focus-visible,
 .fwmb-card:focus-visible,
 .fwmb-version:focus-visible,
@@ -3801,6 +3780,18 @@
 }
 .fwmb-notice-title .fwmb-icon {
     color: var(--fwmb-color-warning);
+}
+
+/* The action notice's buttons, at the head of a map tool's panel (S0 step 6): stacked, so they
+   fit Foundry's narrow panel as the cut's foot does */
+.fwmb-notice-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.125rem;
+}
+.fwmb-notice-actions .fwmb-btn {
+    justify-content: flex-start;
 }
 
 /* What a change reaches, beside Revert changes in a world settings editor */
@@ -4866,7 +4857,7 @@
     .fwmb-worldbar {
         height: 3.5rem;
     }
-    :is(.fwmb-layers, .fwmb-mode-switch, .fwmb-barbtn, .fwmb-world-menu) {
+    :is(.fwmb-layers, .fwmb-barbtn, .fwmb-world-menu) {
         height: 2.75rem;
     }
     .fwmb-barbtn--icon {
@@ -4894,9 +4885,6 @@
     }
     .fwmb-list-item .fwmb-actions {
         display: inline-flex;
-    }
-    .fwmb-mode-switch button {
-        padding: 0 1rem;
     }
     .fwmb-crop i {
         width: 1.25rem;
@@ -6177,6 +6165,20 @@
     overflow: hidden;
     position: relative;
 }
+/* Covered (MapStudio.#cover, Cut again…): an opaque sheet over the whole studio, saying what is
+   happening, while the parent world opens only to be cut from. Dialogues show above it. */
+.fwmb .fwmb-studio[data-fwmb-covering]::after {
+    content: attr(data-fwmb-covering);
+    position: absolute;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-secondary);
+    font: 400 0.875rem/1.25rem var(--fwmb-font-ui);
+}
 .fwmb .fwmb-studio-body {
     flex: 1;
     min-width: 0;
@@ -6244,10 +6246,10 @@
 .fwmb-rail-more {
     display: none;
 }
-.fwmb-studio[data-fwmb-short] .fwmb-rail-occasional {
+.fwmb-studio[data-fwmb-short]:not([data-fwmb-short="dense"]) .fwmb-rail-occasional {
     display: none;
 }
-.fwmb-studio[data-fwmb-short] .fwmb-rail-more {
+.fwmb-studio[data-fwmb-short]:not([data-fwmb-short="dense"]) .fwmb-rail-more {
     display: flex;
 }
 /* More is a rail button like the others (the dropdown's own button look does not apply), and its

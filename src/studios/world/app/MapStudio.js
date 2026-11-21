@@ -88,7 +88,8 @@ import { StudioLayout } from "../../../shell/StudioLayout.js";
 import { moveAlongModes } from "../../../shell/BarFold.js";
 import { AppearanceMenu } from "../../../shell/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
-import { WorldsPanel } from "./WorldsPanel.js";
+import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
+import { MapMarks } from "./MapMarks.js";
 import { WorldEditors } from "./WorldEditors.js";
 import { WorldMapCard, WorldOverview } from "./WorldOverview.js";
 import { GenerateAll } from "./GenerateAll.js";
@@ -338,7 +339,6 @@ export class MapStudio {
         setCartographyMode(_e, t)       { this.uiState.cartographyMode = t.dataset.mode === "move" ? "move" : "select"; this.#modeChosen(false); },
         threeDZoom(_e, t)               { this.scene3D?.zoomBy(t.dataset.zoom === "in" ? MapStudio.#THREE_D_ZOOM : 1 / MapStudio.#THREE_D_ZOOM); },
         threeDResetView()               { this.scene3D?.resetView(); },
-        chooseMode(_e, t)               { this.enterMode(t.dataset.mode); },
         newWorld(e, t)                  { this._onNewWorld(e, t); },
         exportOpenWorld(e, t)           { this._onExportOpenWorld(e, t); },
         toggleAppearance(_e, t)         { AppearanceMenu.toggle(this.root, t); },
@@ -420,17 +420,27 @@ export class MapStudio {
     #dirty = false;
 
     /**
-     * The mode the studio is in (S0 step 3): Create, the map's tools, or Explore, reading the map
-     * (History, Travel, the 3D view). The tool last open in each mode is kept, so switching back
-     * returns to it; and each world's, for the session only (Ken, 2026-11-18), so reopening a world
-     * returns to where it was left. A world opened afresh opens in Explore when it has a run.
+     * Whether the open tool edits the map (Create) or reads it (Explore: History, Travel, the 3D
+     * view, their panels tagged read only). One rail holds both since S0 step 6 (Ken, 2026-11-20:
+     * the Explore stage after Finish, as v4), so the mode is the open tool's.
      */
-    mode = "create";
-    #modeTools = { create: null, explore: null };
-    #worldModes = new Map();
-    // The world the mode and tools are kept for: the one whose mode was last chosen, so a world
-    // being opened is not given the last one's while it loads
-    #modeWorldId = null;
+    get mode() {
+        return this.definition.tool(this.activeTool)?.mode === "explore" ? "explore" : "create";
+    }
+
+    /**
+     * The map tool last open, which the layer switcher's map and an aside's Close go back to; and
+     * each world's, for the session only (Ken, 2026-11-18), so reopening a world returns to the
+     * tool it was left on.
+     */
+    #mapTool = null;
+    #worldMapTools = new Map();
+    // The world the tool is kept for: the one last opened, so a world being opened is not given
+    // the last one's while it loads
+    #mapToolWorldId = null;
+
+    /** The tool a map opens on when none of its tools has been open yet. */
+    static #FIRST_MAP_TOOL = "scene";
 
     /**
      * The terrain's layers and the two map-control buttons that group them. Each group button
@@ -524,7 +534,7 @@ export class MapStudio {
         this.mapType = this.definition.mapTypes[0];
         this.canvasEngine = null;
         // The studio opens on Worlds (Ken, 2026-11-19): its Back to goes to the new world it made,
-        // on Map setup (see #modeTools), as the studio opened before
+        // on Map setup (see #mapTool), as the studio opened before
         this.activeTool = "manage";
         // Whether a world is open (S0 step 4c-2, board N5: the studio opens with none, on Worlds),
         // and whether its Surface map is made (a world can have no maps, board N3). The canvas and
@@ -914,10 +924,7 @@ export class MapStudio {
         const { definition } = this;
         // Full screen only where the host offers it and the page may use it (see platform.frame)
         const fullscreen = platform.frame?.fullscreen;
-        // An occasional tool belongs to a mode, as the stages' do (Reference image and Styles and
-        // icons are Create's); the menus and toggles are in both
-        const inMode = (entry) => !entry.tool || definition.tool(entry.tool)?.mode === this.mode;
-        const occasional = definition.occasional.filter((entry) => (entry.host !== "fullscreen" || fullscreen?.enabled()) && inMode(entry)).map((entry) => {
+        const occasional = definition.occasional.filter((entry) => entry.host !== "fullscreen" || fullscreen?.enabled()).map((entry) => {
             if (entry.tool) return { ...definition.tool(entry.tool), tool: entry.tool };
             if (entry.menu) return { ...entry, appearance: AppearanceMenu.context() };
             if (entry.host === "fullscreen") return { ...entry, ...this.#fullscreenState() };
@@ -937,7 +944,7 @@ export class MapStudio {
             })),
         }));
         const inWorld = this.inWorld;
-        let railStages = inWorld ? worldRail() : definition.railStages(this.mapType, this.mode);
+        let railStages = inWorld ? worldRail() : definition.railStages(this.mapType);
         // A world being made has its World setup alone (board N2); a Surface map not made yet its
         // Map setup alone (board N4); a world with no maps has nothing yet for All maps to act on
         const only = (keep) => railStages.map((stage) => ({ ...stage, tools: stage.tools.filter((tool) => keep(tool.id)) })).filter((stage) => stage.tools.length);
@@ -978,7 +985,11 @@ export class MapStudio {
         const worldName = i18n.localize("FILRODENSWMB.UI.LayerWorld");
         const world = { id: "world", icon: "public", full: worldName, short: worldName, tooltip: i18n.localize("FILRODENSWMB.UI.LayerWorldHint"), current: inWorld, action: inWorld ? null : "showWorld" };
         const surface = { id: "surface", icon: unmade ? "add" : "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: !inWorld && !inWorlds, action: inWorld || inWorlds ? "showMap" : null, unmade };
-        surface.tooltip = unmade ? i18n.localize("FILRODENSWMB.UI.LayerSurfaceUnmade") : surface.full;
+        // Its marks (MapMarks): icons on the segment, the words in its tooltip and the folded menu
+        surface.marks = unmade || noWorld ? [] : MapMarks.named(MapMarks.of(MapMarks.state(this, { regionalStale: !!this.world?.held && this.#staleLines.length > 0 })));
+        surface.markWords = surface.marks.map((mark) => mark.label).join(", ");
+        this.#surfaceMarksDrawn = surface.markWords;
+        surface.tooltip = unmade ? i18n.localize("FILRODENSWMB.UI.LayerSurfaceUnmade") : surface.markWords ? i18n.format("FILRODENSWMB.UI.LayerWithMarks", { map: surface.full, marks: surface.markWords }) : surface.full;
         // Nothing to switch to with no world open, nor while one is being made
         if (noWorld || creating) {
             const off = i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint");
@@ -999,9 +1010,6 @@ export class MapStudio {
             layerMenuLabel: i18n.format("FILRODENSWMB.UI.LayerMenuHint", { map: current.full }),
             addMap: notBuilt(i18n.localize("FILRODENSWMB.UI.AddMap")),
             settlementMaps: notBuilt(i18n.localize("FILRODENSWMB.UI.SettlementMaps")),
-            mode: this.mode,
-            // Explore needs a map to explore
-            exploreOff: noWorld || creating || unmade ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.NeedsSurfaceMap") : null,
             noWorld,
             // Save world and Save as have nothing to save with no world open or while one is made
             savesOff: noWorld || creating ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint") : null,
@@ -1126,6 +1134,10 @@ export class MapStudio {
         const next = entry?.next;
         return {
             title: i18n.localize(entry?.label ?? ""),
+            // What the tool does on this map, under its title (Appearance › Tool descriptions hides it)
+            lede: entry?.lede ? i18n.localize(entry.lede) : null,
+            // A state of the map that needs action, at the head of every one of its tools
+            notice: this.#isMapTool(tool) && this.surfaceMade ? this.#actionNotice() : null,
             // Explore's tools read the map and change nothing on it
             tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
             // A world settings editor's: what it edits is the world's, not this map's (board W2);
@@ -1143,6 +1155,57 @@ export class MapStudio {
             // No Next while the Surface map is not made: Map setup is all its rail holds
             next: next && this.surfaceMade ? { tool: next.tool, name: i18n.localize(definition.tool(next.tool).label), reason: i18n.localize(next.reason) } : null,
         };
+    }
+
+    /** The Surface segment's marks as the world bar last drew them (see #refreshSurfaceMarks). */
+    #surfaceMarksDrawn = "";
+
+    /**
+     * Redraws the world bar when the Surface map's marks (MapMarks) have changed since it was drawn:
+     * a run made or edited since, an undo, a save that makes a regional world Out of date. Whatever
+     * changed them redraws a panel, so this follows every redraw that leaves the bar out.
+     */
+    #refreshSurfaceMarks(regions) {
+        if (regions.includes("worldbar") || !this.worldOpen || !this.surfaceMade || this.#creatingWorld) return;
+        const marks = MapMarks.named(MapMarks.of(MapMarks.state(this, { regionalStale: !!this.world?.held && this.#staleLines.length > 0 })));
+        if (marks.map((mark) => mark.label).join(", ") !== this.#surfaceMarksDrawn) this.view?.render(["worldbar"]);
+    }
+
+    /**
+     * The action notice (S0 step 6; the GoAndNotices card): a state of the open map that needs
+     * action, at the head of every one of its tools' panels, or null. In S0 (Refresh from surface is
+     * Layers 1's): a held regional world Out of date, with Cut again… and Open parent world
+     * settings; and a map whose terrain would change under the latest engine, with the update (once
+     * its offer was turned down for good, the update is Map setup's button alone). A run edited
+     * since it was made is not one: it shows as a mark (MapMarks).
+     * @returns {{title: string, icon: string, lines: string[], actions: Array<{action: string, label: string, icon: string, off?: string, data?: object}>}|null}
+     */
+    #actionNotice() {
+        const { i18n } = platform;
+        if (this.world?.held && this.#staleLines.length) {
+            // Off, with why, when it cannot run (WorldEditor.cutAgain), as Worlds last drew the world;
+            // not yet drawn this sitting, it is offered and Cut again… says why if it cannot
+            const node = WorldsPanel.find(this, this.world.id);
+            const again = node ? WorldEditor.cutAgain(this, node) : null;
+            return {
+                title: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate"),
+                icon: "sync",
+                lines: [...this.#staleLines, i18n.localize("FILRODENSWMB.UI.NoticeStaleHint")],
+                actions: [
+                    { action: "cutAgain", label: i18n.localize("FILRODENSWMB.UI.WorldCutAgain"), icon: "crop", off: again?.off ?? null, data: { worldId: this.world.id } },
+                    { action: "openParentSettings", label: i18n.localize("FILRODENSWMB.UI.OpenParentSettings"), icon: "open-in-new" },
+                ],
+            };
+        }
+        if (this.terrainUpgrade && !this.uiState.terrainUpgradeDismissed) {
+            return {
+                title: i18n.localize("FILRODENSWMB.UI.NoticeOlderTerrain"),
+                icon: "warning-mark",
+                lines: [i18n.localize("FILRODENSWMB.UI.UpdateMapHint")],
+                actions: [{ action: "updateMapTerrain", label: i18n.localize("FILRODENSWMB.UI.UpdateMap"), icon: "sync" }],
+            };
+        }
+        return null;
     }
 
     /**
@@ -1505,7 +1568,8 @@ export class MapStudio {
         // The value per tick a bar matching the world draws (a number field, so unformatted)
         context.scaleBarValue = scaleBarTick(this.uiState, this.mapHeight).value;
         context.currentSaveName = this.currentSaveName;
-        context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
+        // Map setup's own Update button once the notice's offer was turned down for good
+        context.terrainUpgradeAvailable = this.terrainUpgrade !== null && this.uiState.terrainUpgradeDismissed === true;
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
         if (this.activeTool === "scene") context.terrainChoice = this.#terrainChoiceContext();
@@ -1687,6 +1751,7 @@ export class MapStudio {
      */
     #afterRegionsDrawn(regions) {
         if (this.#shutDown) return;
+        this.#refreshSurfaceMarks(regions);
         if (regions.includes("map")) this.#onMapDrawn();
         // Every redraw can change what the layout measures (the bar's folding, the rail's More
         // menu), and may have replaced an element it watches
@@ -5838,8 +5903,7 @@ export class MapStudio {
         this.markDirty();
 
         // Made from Map setup, which stays open; a Guided map starts drawing its masks
-        this.mode = "create";
-        this.#modeTools = { ...this.#modeTools, create: "scene" };
+        this.#mapTool = "scene";
         this.activeTool = "scene";
         if (newEngine === "guided" && !keptMasks.length) {
             this.uiState.sceneMode = "addMask";
@@ -5893,11 +5957,11 @@ export class MapStudio {
 
     /**
      * An aside's Close or Back to (Worlds, the overview, a world settings editor): the tool it was
-     * opened from (in the mode now shown), else the mode's first.
+     * opened from, else the map tool last open, else Map setup.
      */
     _onCloseWorlds() {
         const kept = this.#toolBeforeAside;
-        const tool = kept && !WorldEditors.isAside(kept) && this.definition.offers(kept, this.mapType, this.mode) ? kept : (this.#modeTools[this.mode] ?? MapStudio.#MODE_FIRST_TOOL[this.mode]);
+        const tool = kept && !WorldEditors.isAside(kept) && this.definition.offers(kept, this.mapType) ? kept : (this.#mapTool ?? MapStudio.#FIRST_MAP_TOOL);
         return this.switchTool(tool);
     }
 
@@ -5922,12 +5986,12 @@ export class MapStudio {
         return this.openWorldTool(this.#worldTool);
     }
 
-    /** A map in the layer switcher (S0: the Surface map): its rail, on the tool last open in the mode. */
+    /** A map in the layer switcher (S0: the Surface map): its rail, on the tool last open there. */
     showMap() {
         if (!this.inWorld && this.activeTool !== "manage") return;
         Inspector.close(this);
-        const kept = this.#modeTools[this.mode];
-        return this.switchTool(this.#isMapTool(kept) ? kept : MapStudio.#MODE_FIRST_TOOL[this.mode]);
+        const kept = this.#mapTool;
+        return this.switchTool(this.#isMapTool(kept) ? kept : MapStudio.#FIRST_MAP_TOOL);
     }
 
     /** Whether a tool is one of a map's, on its rail by stage: not the world's, nor Worlds. */
@@ -5947,7 +6011,7 @@ export class MapStudio {
     /**
      * Opens one of the world's tools from the World menu, the overview or a Go block: the overview,
      * a world settings editor, or (until S0 step 4b) the tool that still holds a world setting, at
-     * its section. An editor edits, so Explore gives way to Create first; the overview is either's.
+     * its section.
      * @param {string} tool
      * @param {string} [section] - A section of the tool's panel to open and show.
      */
@@ -5955,9 +6019,6 @@ export class MapStudio {
         if (!tool || !this.definition.tool(tool) || this.definition.tool(tool).later) return;
         // Cut regional world… goes back to where it was opened from, not to the tool Create opens on
         const from = this.activeTool;
-        if (tool !== "worldOverview" && this.mode !== "create") {
-            await this.enterMode("create");
-        }
         await this.switchTool(tool);
         if (tool === "worldCut" && this.activeTool === "worldCut" && from !== "worldCut") this.#cutReturn = from;
         if (!section) return;
@@ -6042,20 +6103,17 @@ export class MapStudio {
     }
 
     /**
-     * A Read by chip's Go: the map that has the tool (S0: the Surface map), in the tool's mode, with
-     * the tool open. The World segment returns to the page left.
+     * A Read by chip's Go: the map that has the tool (S0: the Surface map), with the tool open. The World segment returns to the page left.
      * @param {string} tool
      */
     async goToMapTool(tool, section = null) {
         const entry = this.definition.tool(tool);
-        if (!entry || !this.#isMapTool(tool) || !this.definition.offers(tool, this.mapType, entry.mode)) return;
+        if (!entry || !this.#isMapTool(tool) || !this.definition.offers(tool, this.mapType)) return;
         if (entry.mode === "explore" && !(this.modelRun || this.parentRun)) return;
         // A Surface map not made yet has its Map setup alone
         if (!this.surfaceMade && tool !== "scene") return;
         Inspector.close(this);
-        this.mode = entry.mode;
         await this.switchTool(tool, { force: true });
-        this.#rememberWorldMode();
         await this.view?.render(["worldbar", "toolbar", "context"]);
         if (!section) return;
         const details = this.root?.querySelector(`.fwmb-context-panel details[data-section="${section}"]`);
@@ -6215,58 +6273,26 @@ export class MapStudio {
         await this.worldAction("load", mapId, name, undefined, worldId);
     }
 
-    /** The tool each mode opens on when none of its tools has been open yet. */
-    static #MODE_FIRST_TOOL = Object.freeze({ create: "scene", explore: "history" });
-
-    /**
-     * Switches between Create and Explore (S0 step 3): the map stays; the mode's rail is drawn, and
-     * the tool last open in it opens again (its first tool when none has been).
-     * @param {"create"|"explore"} mode
-     */
-    async enterMode(mode) {
-        // From the world's rail, either mode goes to the map (in that mode)
-        if (!["create", "explore"].includes(mode) || (mode === this.mode && !this.inWorld)) return;
-        // Explore needs a map; with no world open, or one being made, there is no map to go to
-        if (!this.worldOpen || this.#creatingWorld || (mode === "explore" && !this.surfaceMade)) return;
-        this.mode = mode;
-        const kept = this.#modeTools[mode];
-        const tool = kept && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode];
-        this.#rememberWorldMode();
-        await this.switchTool(tool, { force: true });
-        this.view?.render(["worldbar"]);
-    }
-
-    /** Keeps the open world's mode and each mode's tool for the session (see mode). */
-    #rememberWorldMode() {
+    /** Keeps the open world's map tool for the session (see #mapTool). */
+    #rememberMapTool() {
         const id = this.world?.id ?? this.#saveId;
-        if (id && id === this.#modeWorldId) this.#worldModes.set(id, { mode: this.mode, tools: { ...this.#modeTools } });
+        if (id && id === this.#mapToolWorldId && this.#mapTool) this.#worldMapTools.set(id, this.#mapTool);
     }
 
     /**
-     * The mode a world opens in: as it was left this session, else Explore when the map has a run
-     * to explore and Create when it has none (see mode).
+     * The tool a world opens on: the map tool it was left on this session, else the map tool open
+     * now, else Map setup (Ken, 2026-11-20: a world with a run no longer opens on History).
      */
-    async #openWorldMode() {
-        this.#modeWorldId = this.world?.id ?? this.#saveId;
-        const kept = this.#worldModes.get(this.#modeWorldId);
-        // Its own run, or its copy of its parent's (the mesh the run's cells need may not be built yet)
-        const mode = kept?.mode ?? (this.modelRun || this.parentRun ? "explore" : "create");
-        if (kept) this.#modeTools = { ...kept.tools };
-        else this.#modeTools = { create: this.mode === "create" && this.#isMapTool(this.activeTool) ? this.activeTool : this.#modeTools.create, explore: null };
-        if (mode === this.mode) {
-            // A world opens on its map (S0 step 4c-2): leaving Worlds may have shown the world tool
-            // left, which the opening's overlay hid
-            const onMap = this.#isMapTool(this.activeTool) && this.definition.offers(this.activeTool, this.mapType, mode);
-            if (!onMap) {
-                const kept = this.#modeTools[mode];
-                await this.switchTool(this.#isMapTool(kept) && this.definition.offers(kept, this.mapType, mode) ? kept : MapStudio.#MODE_FIRST_TOOL[mode], { force: true });
-            }
-        } else {
-            this.mode = mode;
-            const tool = this.#isMapTool(this.#modeTools[mode]) && this.definition.offers(this.#modeTools[mode], this.mapType, mode) ? this.#modeTools[mode] : MapStudio.#MODE_FIRST_TOOL[mode];
-            await this.switchTool(tool, { force: true });
-        }
-        this.#rememberWorldMode();
+    async #openWorldOnItsTool() {
+        this.#mapToolWorldId = this.world?.id ?? this.#saveId;
+        const kept = this.#worldMapTools.get(this.#mapToolWorldId);
+        const offered = (tool) => this.#isMapTool(tool) && this.definition.offers(tool, this.mapType);
+        const tool = [kept, this.activeTool, this.#mapTool].find(offered) ?? MapStudio.#FIRST_MAP_TOOL;
+        this.#mapTool = tool;
+        // A world opens on its map (S0 step 4c-2): leaving Worlds may have shown the world tool
+        // left, which the opening's overlay hid
+        if (this.activeTool !== tool || !offered(this.activeTool)) await this.switchTool(tool, { force: true });
+        this.#rememberMapTool();
         this.view?.render(["worldbar", "toolbar"]);
     }
 
@@ -6294,11 +6320,10 @@ export class MapStudio {
         if (newTool === "worldCut" && this.activeTool !== "worldCut") this.#cutReturn = this.activeTool;
         // The 3D view closes as its tool is left, and opens as it is chosen (it has no panel)
         if (this.scene3D && newTool !== "threeD") await this._onThreeDView();
-        const toolMode = this.definition.tool(newTool)?.mode;
         // The World segment goes back to the world's page last open, not to the cut
         if (this.definition.isWorldTool(newTool)) this.#worldTool = newTool === "worldCut" ? this.#worldTool : newTool;
-        else if (toolMode && this.#isMapTool(newTool) && toolMode === this.mode) this.#modeTools[toolMode] = newTool;
-        this.#rememberWorldMode();
+        else if (this.#isMapTool(newTool)) this.#mapTool = newTool;
+        this.#rememberMapTool();
 
         // 1. Teardown current state. Automatic generation always comes back on when the tool
         // changes; changes deferred by the pause toggle are generated now (which also covers a
@@ -6938,20 +6963,40 @@ export class MapStudio {
         if (!parentMapId) return;
 
         Inspector.close(this);
-        // The world it was cut from, open as it was saved
-        if (this.world?.id !== parent.id || wasDirty) {
-            this.isDirty = false;
-            await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: parent.name || "" }));
-            try {
-                if (!(await this.#loadMap(parentMapId, parent.name))) return;
-            } finally {
-                this.#endProcessing();
+        // The studio covered throughout (Ken, 2026-11-20): the parent opens only to be cut from,
+        // so it is never seen between the regional world closing and its new cut opening
+        this.#cover(platform.i18n.format("FILRODENSWMB.UI.CuttingAgain", { name }));
+        try {
+            // The world it was cut from, open as it was saved
+            if (this.world?.id !== parent.id || wasDirty) {
+                this.isDirty = false;
+                await this.#startProcessing(platform.i18n.format("FILRODENSWMB.UI.OpeningWorld", { name: parent.name || "" }));
+                try {
+                    if (!(await this.#loadMap(parentMapId, parent.name))) return;
+                } finally {
+                    this.#endProcessing();
+                }
             }
+            await Worlds.rename(old.id, oldName);
+            const cut = await this.#cutWorld({ crop: entry.crop.parent, width: entry.size.width, name, infill: this.uiState.regionalInfill === true, align: entry.gridAligned !== false });
+            if (cut) await this.#openCutWorld(cut);
+            else await Worlds.rename(old.id, name);
+        } finally {
+            this.#uncover();
         }
-        await Worlds.rename(old.id, oldName);
-        const cut = await this.#cutWorld({ crop: entry.crop.parent, width: entry.size.width, name, infill: this.uiState.regionalInfill === true, align: entry.gridAligned !== false });
-        if (cut) await this.#openCutWorld(cut);
-        else await Worlds.rename(old.id, name);
+    }
+
+    /**
+     * Covers the whole studio (world bar, rail, panel and map) with an opaque sheet saying what is
+     * happening, for a sequence whose middle steps are not for the user to see (Cut again…).
+     * Dialogues still show above it. The map's own processing overlay keeps working under it.
+     */
+    #cover(message) {
+        this.root?.setAttribute("data-fwmb-covering", message);
+    }
+
+    #uncover() {
+        this.root?.removeAttribute("data-fwmb-covering");
     }
 
     /** "<name> (old, <date>)", numbered when that name is taken ("… (old, 20/11/2026) 2"). */
@@ -6980,7 +7025,7 @@ export class MapStudio {
         const choice = await MapDialogManager.promptOpenParentSettings(regionalName, source.name || "", this.isDirty);
         if (choice === "cancel") return;
         if (choice === "save" && !(await this.saveCurrentMap())) return;
-        const back = { worldId: this.world.id, mapId: this.currentSaveId, name: regionalName, tool: this.activeTool, mode: this.mode };
+        const back = { worldId: this.world.id, mapId: this.currentSaveId, name: regionalName, tool: this.activeTool };
         // The same page or map tool (Climate) on the parent; the overview from anywhere else
         const tool = this.activeTool;
         const onPage = this.inWorld && tool !== "worldCut";
@@ -7393,9 +7438,9 @@ export class MapStudio {
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.
-            // Its mode (Explore when it has a run, S0 step 3), then, for a world made from a 4.3 map,
-            // the notice saying what that means, once
-            await this.#openWorldMode();
+            // The tool it was left on, then, for a world made from a 4.3 map, the notice saying what
+            // that means, once
+            await this.#openWorldOnItsTool();
             return true;
         }
         return false;
@@ -7455,8 +7500,7 @@ export class MapStudio {
         this.surfaceMade = false;
         this.#creatingWorld = false;
         this.isDirty = false;
-        this.mode = "create";
-        this.#modeTools = { create: "scene", explore: null };
+        this.#mapTool = "scene";
         this.#worldTool = "worldOverview";
         this.#toolBeforeAside = null;
         this.#backTo = null;
@@ -7507,7 +7551,7 @@ export class MapStudio {
         this.worldSettingsOpened = settings;
         this.#creatingWorld = false;
         this.isDirty = false;
-        this.#modeWorldId = this.world.id;
+        this.#mapToolWorldId = this.world.id;
         this.#captureEditorBaseline();
         platform.notify.info(i18n.format("FILRODENSWMB.UI.SaveSuccess", { name }));
         await this.switchTool("worldOverview", { force: true });
@@ -7558,7 +7602,7 @@ export class MapStudio {
         this.worldSettingsOpened = this.#worldSettingsNow();
         this.#captureEditorBaseline();
         this.isDirty = false;
-        this.#modeWorldId = world.id;
+        this.#mapToolWorldId = world.id;
         await this.switchTool("worldOverview", { force: true });
         this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
         platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
@@ -7611,23 +7655,16 @@ export class MapStudio {
         } catch (error) {
             console.warn("FWMB | The world's first-opening notice could not be marked seen:", error);
         }
-        const explore = this.mode === "explore";
         const source = noticed.held ? await this.#heldSourceName() : null;
-        const content = await platform.templates.render(`${TEMPLATE_ROOT}world/dialogs/first-opening.hbs`, FirstOpening.context(noticed, { explore, source, link: FILRODENSWMB.HELP.UPDATING_5 }, i18n));
-        const choice = await platform.dialogs.choose({
+        const content = await platform.templates.render(`${TEMPLATE_ROOT}world/dialogs/first-opening.hbs`, FirstOpening.context(noticed, { source, link: FILRODENSWMB.HELP.UPDATING_5 }, i18n));
+        await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-first-opening"],
             title: i18n.format("FILRODENSWMB.UI.FirstOpeningTitle", { name: noticed.name || this.#saveName || "" }),
             icon: "fwmb-icon fwmb-icon--public",
             content,
-            buttons: explore
-                ? [
-                      { action: "create", label: i18n.localize("FILRODENSWMB.UI.FirstOpeningCreate") },
-                      { action: "explore", label: i18n.localize("FILRODENSWMB.UI.ModeExplore"), tone: "positive", default: true },
-                  ]
-                : [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), tone: "positive", default: true }],
+            buttons: [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), tone: "positive", default: true }],
             dismissed: "close",
         });
-        if (choice === "create") await this.enterMode("create");
     }
 
     /** The name of the world a held regional world reads its settings from (the top of its chain). */
@@ -7657,7 +7694,11 @@ export class MapStudio {
 
         const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, true);
         if (choice.apply) await this.#applyTerrainUpgrade();
-        else if (choice.dismiss) await TerrainUpgrade.dismiss(this);
+        else if (choice.dismiss) {
+            await TerrainUpgrade.dismiss(this);
+            // The notice goes; Map setup's Update button stays for it
+            this.view?.render(["context"]);
+        }
     }
 
     /**
@@ -7721,6 +7762,11 @@ export class MapStudio {
         const confirmed = await MapDialogManager._confirmDialog(undefined, content);
         if (!confirmed) return;
 
+        // Deleting the world the inspector shows (Ken, 2026-11-20): the inspector stays open, on
+        // the world it was cut from, else on a regional world it held; closed only with neither
+        const shown = worldId && Inspector.inspected(this).world === worldId ? WorldsPanel.find(this, worldId) : null;
+        const showNext = shown ? (shown.parentId ?? plan.released[0]?.id ?? plan.movedUp[0]?.id ?? null) : null;
+
         if (worldId) await Worlds.delete(worldId);
         else await platform.store.deleteSavedMap(mapId);
         if ((mapId && this.currentSaveId === mapId) || (worldId && this.world?.id === worldId)) {
@@ -7734,7 +7780,8 @@ export class MapStudio {
             // The open world may be one of those moved up or released
             this.world = (await Worlds.get(this.world.id)) ?? this.world;
         }
-        this.view?.render(["context"]);
+        await this.view?.render(["context"]);
+        if (showNext && (!Inspector.current(this) || Inspector.inspected(this).world === worldId)) WorldsPanel.select(this, showNext);
     }
 
     /** Renames a world: to the name given (Worlds' inspector), else to one asked for. */

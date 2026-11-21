@@ -11,6 +11,7 @@ import { Generation } from "./Generation.js";
 import { Inspector } from "./Inspector.js";
 import { isKept } from "./Regeneration.js";
 import { RunInputs } from "./RunInputs.js";
+import { MapMarks } from "./MapMarks.js";
 
 /** Why a run could not build on a settlement pin as its style asked (see Pipeline.markSeatPlaces), in the order the notices list them. */
 const SEAT_REASONS = Object.freeze(["water", "islet", "dry", "notCapital", "noPlace"]);
@@ -82,9 +83,11 @@ export class GeneratePanel {
             estimate: this.#estimate(app),
             stale,
             older,
-            // The Generation section's badge: Out of date once what the last run read has changed,
-            // else Older generator while the map keeps an older generator's rules
-            runBadge: held ? "FILRODENSWMB.UI.GenerateHeldBadge" : stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : older ? "FILRODENSWMB.UI.GenerateOlderRevision" : null,
+            // The Generation section's heading: fill in only on a map holding its parent's run; else
+            // the run's mark (MapMarks, as the layer switcher and the overview show it): Out of date
+            // once what the last run read has changed, else Older generator
+            runBadge: held ? "FILRODENSWMB.UI.GenerateHeldBadge" : null,
+            runMark: held ? null : (MapMarks.named(MapMarks.of({ hasRun, runEdited: stale, older }, { noRun: false }))[0] ?? null),
             notices: this.#notices(app),
             hasRun,
             world: WORLD_FIELDS.map(({ key, label, hint }) => {

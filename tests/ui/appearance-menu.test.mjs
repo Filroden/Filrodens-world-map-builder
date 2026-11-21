@@ -51,18 +51,18 @@ const key = (target, name) => {
     return AppearanceMenu.handleKey(document.querySelector(".fwmb-studio"), event);
 };
 
-test("the menu holds Mode (Auto, Light, Dark) and Hue (Gold, Teal), the current choice checked, the button named by it", async () => {
+test("the menu holds Mode (Auto, Light, Dark), Hue (Gold, Teal) and Tool descriptions (Shown, Hidden), the current choice checked, the button named by it", async () => {
     stored.set("themeMode", "dark");
     stored.set("themeHue", "teal");
     const root = await rail();
     const menu = root.querySelector(".fwmb-appearance-menu");
     assert.equal(menu.getAttribute("role"), "menu");
     const groups = [...menu.querySelectorAll('[role="group"]')].map((group) => [...group.querySelectorAll('[role="menuitemradio"]')].map((item) => item.dataset.value + (item.getAttribute("aria-checked") === "true" ? "*" : "")));
-    assert.deepEqual(groups, [["auto", "light", "dark*"], ["gold", "teal*"]]);
+    assert.deepEqual(groups, [["auto", "light", "dark*"], ["gold", "teal*"], ["shown*", "hidden"]]);
     const button = root.querySelector('[data-action="toggleAppearance"]');
     assert.match(button.dataset.tooltip, /AppearanceTooltip.*ThemeModeDark.*ThemeHue\.Teal/);
-    // More holds the same two groups, inline
-    assert.equal(root.querySelectorAll('.fwmb-rail-more [role="menuitemradio"]').length, 5);
+    // More holds the same groups, inline
+    assert.equal(root.querySelectorAll('.fwmb-rail-more [role="menuitemradio"]').length, 7);
 });
 
 test("a choice is stored and shown at once, in the menu, in More and in the button's name", async () => {
@@ -85,12 +85,12 @@ test("Up, Down, Home and End move through the items; Enter chooses, leaving the 
     assert.ok(key(items[0], "ArrowDown"));
     assert.equal(document.activeElement, items[1]);
     assert.ok(key(items[1], "End"));
-    assert.equal(document.activeElement, items[4]);
-    assert.ok(key(items[4], "ArrowDown"));
-    assert.equal(document.activeElement, items[0], "it wraps round");
+    assert.ok(document.activeElement === items[6], "End goes to the last item");
+    assert.ok(key(items[6], "ArrowDown"));
+    assert.ok(document.activeElement === items[0], "it wraps round");
     assert.ok(key(items[0], "ArrowUp"));
-    assert.ok(key(items[4], "Home"));
-    assert.equal(document.activeElement, items[0]);
+    assert.ok(key(items[6], "Home"));
+    assert.ok(document.activeElement === items[0]);
 
     assert.ok(key(items[4], "Enter"));
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -99,6 +99,21 @@ test("Up, Down, Home and End move through the items; Enter chooses, leaving the 
     assert.equal(document.activeElement, root.querySelector('[data-action="toggleAppearance"]'));
     assert.equal(root.querySelector('[data-action="toggleAppearance"]').getAttribute("aria-expanded"), "false");
     assert.equal(key(root.querySelector('[data-action="toggleAppearance"]'), "ArrowDown"), false, "keys outside the menu are not its");
+});
+
+test("Tool descriptions, Hidden, is stored and written on the theme's elements, and Shown takes it off", async () => {
+    const { attachTheme } = await import("../../src/shell/Theme.js");
+    stored.set("toolDescriptions", "shown");
+    const root = await rail();
+    const detach = attachTheme(root);
+    assert.equal(root.hasAttribute("data-fwmb-ledes"), false);
+    await AppearanceMenu.choose(root, root.querySelector('.fwmb-appearance-menu [data-theme-key="toolDescriptions"][data-value="hidden"]'));
+    assert.equal(stored.get("toolDescriptions"), "hidden");
+    assert.equal(root.getAttribute("data-fwmb-ledes"), "hidden");
+    await AppearanceMenu.choose(root, root.querySelector('.fwmb-appearance-menu [data-theme-key="toolDescriptions"][data-value="shown"]'));
+    assert.equal(root.hasAttribute("data-fwmb-ledes"), false);
+    detach();
+    stored.delete("toolDescriptions");
 });
 
 test("the web host's full screen follows the page, and Foundry offers none", async () => {

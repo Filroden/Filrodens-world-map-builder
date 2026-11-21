@@ -3,12 +3,13 @@
  * types, the rail's stages and the tools in them, the occasional tools at the rail's foot, each
  * tool's Next footer and what its editing does (its state word).
  *
- * In S0 a world has its Surface map only. The rail draws the open mode's stages (S0 step 3): Create's
- * Shape, Populate and Finish, or Explore's one stage, History, Travel and the 3D view. Reference
- * image is an occasional tool of Create (no stage); Worlds has no stage either
- * and opens from the world bar's name menu.
+ * In S0 a world has its Surface map only. Its rail holds every stage, as v4's did (Ken, 2026-11-20,
+ * undoing S0 step 3's Create and Explore modes): Shape, Populate and Finish, then Explore, whose
+ * tools (History, Travel, the 3D view) read the map rather than change it (`mode: "explore"`, their
+ * panels tagged read only). Reference image is an occasional tool (no stage); Worlds has no stage
+ * either and opens from the world bar's name menu.
  *
- * The world has a rail of its own (S0 step 4), shown in either mode while World is chosen in the
+ * The world has a rail of its own (S0 step 4), shown while World is chosen in the
  * layer switcher: the overview, the world's settings editors, and what acts on the whole world.
  * Parts a later step builds are drawn in their places, disabled, with a tooltip (`later`).
  */
@@ -16,8 +17,12 @@ import { defineStudio } from "../../shell/StudioRegistry.js";
 
 const SURFACE = ["surface"];
 
-/** A tool on the Surface map, in Create unless said. */
-const tool = (id, stage, icon, label, { mode = "create", next = null, stateWord = null } = {}) => ({ id, stage, mode, icon, label, mapTypes: SURFACE, next, stateWord });
+/**
+ * A tool on the Surface map, in Create unless said. Its lede (S0 step 6) is the sentence under its
+ * panel's title, `FILRODENSWMB.UI.Lede<Id>`; a tool with no panel of its own, or whose page draws
+ * its own (the world's, see WorldEditors), passes `lede: null`.
+ */
+const tool = (id, stage, icon, label, { mode = "create", next = null, stateWord = null, lede = `FILRODENSWMB.UI.Lede${id.charAt(0).toUpperCase()}${id.slice(1)}` } = {}) => ({ id, stage, mode, icon, label, mapTypes: SURFACE, next, stateWord, lede });
 const next = (toolId, reason) => ({ tool: toolId, reason });
 
 export const WORLD_DEFINITION = defineStudio({
@@ -59,27 +64,27 @@ export const WORLD_DEFINITION = defineStudio({
         tool("export", "finish", "png", "FILRODENSWMB.UI.ToolExport"),
         tool("history", "explore", "history", "FILRODENSWMB.UI.ToolHistory", { mode: "explore" }),
         tool("travel", "explore", "travel-explore", "FILRODENSWMB.UI.ToolTravel", { mode: "explore" }),
-        // The map shown in 3D, with no panel; another Explore tool, or Create, goes back to the flat map
-        tool("threeD", "explore", "three-d", "FILRODENSWMB.UI.ThreeDView", { mode: "explore" }),
+        // The map shown in 3D, with no panel; any other tool goes back to the flat map
+        tool("threeD", "explore", "three-d", "FILRODENSWMB.UI.ThreeDView", { mode: "explore", lede: null }),
         tool("reference", null, "image", "FILRODENSWMB.UI.ToolReference"),
-        tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage"),
+        tool("manage", null, "folder-open", "FILRODENSWMB.UI.ToolManage", { lede: null }),
         // The world's own (S0 step 4), on the world's rail (see WorldEditors)
-        tool("worldOverview", "worldSettings", "public", "FILRODENSWMB.UI.WorldOverview"),
-        tool("worldSetup", "worldSettings", "tune", "FILRODENSWMB.UI.WorldSetup"),
-        tool("worldCultures", "worldSettings", "groups", "FILRODENSWMB.UI.WorldCultures"),
-        tool("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges"),
+        tool("worldOverview", "worldSettings", "public", "FILRODENSWMB.UI.WorldOverview", { lede: null }),
+        tool("worldSetup", "worldSettings", "tune", "FILRODENSWMB.UI.WorldSetup", { lede: null }),
+        tool("worldCultures", "worldSettings", "groups", "FILRODENSWMB.UI.WorldCultures", { lede: null }),
+        tool("worldAges", "worldSettings", "history", "FILRODENSWMB.UI.WorldAges", { lede: null }),
         // Styles and icons keeps its v4.3 id (library): it left the map's rail for the world's
-        tool("library", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary"),
-        tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes"),
+        tool("library", "worldSettings", "palette", "FILRODENSWMB.UI.ToolLibrary", { lede: null }),
+        tool("worldBiomes", "worldSettings", "forest", "FILRODENSWMB.UI.WorldBiomes", { lede: null }),
         // Generate all acts at once (its dialogue), with no panel of its own
-        { ...tool("worldGenerateAll", "worldWhole", "run", "FILRODENSWMB.UI.GenerateAll"), act: "generateAll" },
+        { ...tool("worldGenerateAll", "worldWhole", "run", "FILRODENSWMB.UI.GenerateAll", { lede: null }), act: "generateAll" },
         // Cut regional world… (S0 step 5; board W7): the crop on the Surface map's canvas, beside
         // the world's rail, with its panel
         tool("worldCut", "worldWhole", "crop", "FILRODENSWMB.UI.CutRegionalWorld"),
     ],
     // The occasional tools: the Appearance menu (the reader's colour theme, see AppearanceMenu)
     // sits among them, and on the web the full-screen toggle (shown only where the host can go
-    // full screen). The 3D view is Explore's third tool (S0 step 3).
+    // full screen). The 3D view is the Explore stage's third tool.
     occasional: [
         { tool: "reference" },
         { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },

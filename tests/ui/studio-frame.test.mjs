@@ -34,9 +34,10 @@ test("the studio's width classes switch at 1,400 and 1,200px, and the rail folds
     assert.equal(widthClass(1100), "narrow");
     // A rail of a given length at each fold, in a studio of a given height
     const fold = (height, lengths) => railFold((at) => lengths[RAIL_FOLDS.indexOf(at)] > height);
-    const rail = [800, 640, 530];
-    assert.equal(fold(900, rail), null, "it all fits");
-    assert.equal(fold(700, rail), "", "the occasional tools fold");
+    const rail = [1000, 780, 660, 530];
+    assert.equal(fold(1100, rail), null, "it all fits");
+    assert.equal(fold(800, rail), "dense", "the stage names become dividers first, the occasional tools kept");
+    assert.equal(fold(700, rail), "", "then the occasional tools fold");
     assert.equal(fold(600, rail), "scroll", "then the rail scrolls (the file actions are the world bar's)");
     assert.equal(fold(400, rail), "scroll", "no further");
 });

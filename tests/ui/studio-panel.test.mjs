@@ -43,6 +43,21 @@ test("every tool has a Next entry and a state word entry", () => {
     }
 });
 
+test("every map tool with a panel has a lede, about a sentence long, in en.json (S0 step 6)", () => {
+    // The world's tools draw their own page lede (WorldEditors), and the 3D view and Worlds have no panel of their own
+    const without = ["threeD", "manage", "worldOverview", "worldSetup", "worldCultures", "worldAges", "library", "worldBiomes", "worldGenerateAll"];
+    for (const tool of Object.values(TOOLS)) {
+        if (without.includes(tool.id)) {
+            assert.equal(tool.lede, null, `${tool.id} has no lede`);
+            continue;
+        }
+        assert.ok(tool.lede, `${tool.id} has a lede`);
+        const text = STRINGS[tool.lede];
+        assert.ok(text, `${tool.lede} is in en.json`);
+        assert.ok(text.length <= 120 && /\.$/.test(text), `${tool.lede} is one sentence of about 100 characters`);
+    }
+});
+
 test("Next follows the stages' order, ends at the last tool, and gives its reason", () => {
     // An optional stage's tools are outside the order of work
     const order = STAGES.filter((stage) => !stage.optional).flatMap((stage) => stage.tools);

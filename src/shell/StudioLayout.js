@@ -12,9 +12,10 @@ import { mustFoldMapControls } from "./MapControls.js";
  * - `data-fwmb-width` on the studio: `wide` (1,400px or more), `compact` (1,200 to 1,399px: the
  *   compact rail, panel and inspector widths) or `narrow` (below 1,200px: the same widths; kept
  *   for rules that need the narrowest studio).
- * - `data-fwmb-short` on the studio while the whole rail would not fit its height: the rail folds
- *   its occasional tools into More (`""`), and should that still not fit, it scrolls (`"scroll"`;
- *   the file actions it once folded too are the world bar's from v5). Help, last, never folds. The rail is measured rather than given a fixed height,
+ * - `data-fwmb-short` on the studio while the whole rail would not fit its height: the rail grows
+ *   dense (`"dense"`: stage names as dividers, 2rem buttons), then also folds its occasional tools
+ *   into More (`""`), and should that still not fit, it scrolls (`"scroll"`; the file actions it
+ *   once folded too are the world bar's from v5). Help, last, never folds. The rail is measured rather than given a fixed height,
  *   since its length depends on the host (full screen on the web) and the width (stage names).
  * - `--fwmb-controls-w` on the map preview: the map controls' width (bottom end), which the hint
  *   (bottom start) leaves free beside it.
@@ -38,8 +39,12 @@ import { mustFoldMapControls } from "./MapControls.js";
  */
 export const STUDIO_WIDTH = Object.freeze({ COMPACT_BELOW: 1400, NARROW_BELOW: 1200 });
 
-/** How far the rail folds, least first: nothing, the occasional tools, then scrolling. */
-export const RAIL_FOLDS = Object.freeze([null, "", "scroll"]);
+/**
+ * How far the rail folds, least first: nothing; dense (the stage names become dividers and the
+ * buttons 2rem, the occasional tools kept: Ken, 2026-11-20, they stay on the rail while there is
+ * room); the occasional tools into More, dense; then scrolling.
+ */
+export const RAIL_FOLDS = Object.freeze([null, "dense", "", "scroll"]);
 
 /** The space kept between the canvas overlays, and between them and the canvas edge, in rem. */
 const OVERLAY_GAP_REM = 0.5;

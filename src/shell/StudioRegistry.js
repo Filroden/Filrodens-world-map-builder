@@ -73,7 +73,7 @@ export function defineStudio(spec) {
         if (!MODES.includes(tool.mode)) fail(id, `${tool.id} has no mode`);
         if (!tool.icon || !tool.label) fail(id, `${tool.id} has no icon or label`);
         if (!tool.mapTypes?.length || tool.mapTypes.some((type) => !mapTypes.includes(type))) fail(id, `${tool.id} names a map type the studio does not have`);
-        byId.set(tool.id, Object.freeze({ next: null, stateWord: null, ...tool, mapTypes: Object.freeze([...tool.mapTypes]) }));
+        byId.set(tool.id, Object.freeze({ next: null, stateWord: null, lede: null, ...tool, mapTypes: Object.freeze([...tool.mapTypes]) }));
     }
     for (const tool of byId.values()) {
         if (tool.next && !byId.has(tool.next.tool)) fail(id, `${tool.id}'s Next names ${tool.next.tool}, which it does not register`);

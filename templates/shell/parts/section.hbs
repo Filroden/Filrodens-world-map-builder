@@ -14,6 +14,7 @@
       title: localisation key of the title
       badge: optional localisation key of the cost badge ("rebuilds the whole map", "instant")
       instant: the badge marks a section that only redraws (its quieter look)
+      mark: optional state mark ({kind, icon, label}; MapMarks), drawn as the marks are elsewhere
       styleBadge: optional name of the style the section's fields follow (the inspector's styled
                   groups), shown in the secondary accent
       count: optional number shown as a count badge (a list's length)
@@ -31,6 +32,7 @@
         <span class="fwmb-chev" aria-hidden="true"></span>
         <span class="fwmb-section-title" data-tooltip="{{localize title}}">{{localize title}}</span>
         {{#if badge}}<span class="fwmb-badge{{#if instant}} fwmb-badge--instant{{/if}}">{{localize badge}}</span>{{/if}}
+        {{#if mark}}<span class="fwmb-state-mark fwmb-state-mark--{{mark.kind}}"><span class="fwmb-icon fwmb-icon--{{mark.icon}}" aria-hidden="true"></span>{{mark.label}}</span>{{/if}}
         {{#if styleBadge}}<span class="fwmb-badge fwmb-badge--style">{{styleBadge}}</span>{{/if}}
         {{#if (or count (eq count 0))}}<span class="fwmb-badge fwmb-badge--count">{{count}}</span>{{/if}}
         {{#if addAction}}

@@ -1,8 +1,7 @@
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
-import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { platform } from "../../../platform/index.js";
 import { Inspector } from "./Inspector.js";
-import { RunInputs } from "./RunInputs.js";
+import { MapMarks } from "./MapMarks.js";
 import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
 
 /** The engines' short names, as World setup and Worlds name them. */
@@ -72,22 +71,18 @@ export class WorldOverview {
     static surface(app) {
         const { i18n } = platform;
         const map = app.world?.maps?.find((each) => each.type === "surface") ?? null;
-        const hasRun = !!app.modelRun || !!app.uiState?.parentRun;
-        const stale = RunInputs.stale(app);
-        const older = hasRun && GeneratorRevision.isOlder(app.uiState);
+        const state = MapMarks.state(app);
         const saved = Date.parse(map?.savedAt ?? "");
         return {
             name: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"),
             thumbnail: (!app.isDirty && map?.thumbnail) || app.canvasEngine?.thumbnail?.() || map?.thumbnail || null,
-            meta: i18n.localize(!hasRun ? "FILRODENSWMB.UI.OverviewNoRun" : stale ? "FILRODENSWMB.UI.OverviewRunEdited" : "FILRODENSWMB.UI.OverviewRun"),
+            meta: i18n.localize(!state.hasRun ? "FILRODENSWMB.UI.OverviewNoRun" : state.runEdited ? "FILRODENSWMB.UI.OverviewRunEdited" : "FILRODENSWMB.UI.OverviewRun"),
             saved: [
                 Number.isFinite(saved) ? WorldsPanel.savedLabel(saved) : i18n.localize("FILRODENSWMB.UI.OverviewNotSaved"),
                 map?.revision ? i18n.format("FILRODENSWMB.UI.WorldMapRevision", { revision: map.revision }) : null,
             ].filter(Boolean).join(" · "),
-            marks: [
-                ...(stale ? [{ kind: "stale", icon: "warning-mark", label: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate") }] : []),
-                ...(older ? [{ kind: "older", icon: "history", label: i18n.localize("FILRODENSWMB.UI.MarkOlderGenerator") }] : []),
-            ],
+            // Its marks (MapMarks): No run is the line above, so not a mark here
+            marks: MapMarks.named(MapMarks.of(state, { noRun: false })),
         };
     }
 

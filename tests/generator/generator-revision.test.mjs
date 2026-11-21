@@ -119,11 +119,15 @@ test("the Generate panel shows one notice while the map keeps an older generator
     delete app.uiState.generatorRevision;
     context = GeneratePanel.context(app);
     assert.equal(context.older, true, "with or without a run: Travel follows the map's rules too");
-    assert.equal(context.runBadge, "FILRODENSWMB.UI.GenerateOlderRevision");
+    assert.equal(context.runMark, null, "with no run the heading carries no mark (MapMarks); the notice says it");
 
     app.modelRun = { run: "old", stats: {} };
+    context = GeneratePanel.context(app);
+    assert.equal(context.runMark?.kind, "older", "with a run: the Older generator mark");
+
     app.uiState.generatorStale = true;
     context = GeneratePanel.context(app);
-    assert.equal(context.runBadge, "FILRODENSWMB.UI.GenerateOutOfDate", "out of date says more, so its badge shows");
+    assert.equal(context.runMark?.kind, "stale", "out of date says more, so its mark shows");
+    assert.equal(context.runBadge, null);
     assert.equal(context.older, true, "the notice still shows beside it");
 });

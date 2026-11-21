@@ -24,11 +24,11 @@ test("the bar folds as little as it can: the first level that fits, the last whe
     assert.equal(foldLevel(widths, 700), 5);
 });
 
-test("each fold has its form in the stylesheet, and Save world and the modes never fold", () => {
+test("each fold has its form in the stylesheet, and Save world never folds", () => {
     const foldRules = [...CSS.matchAll(/\.fwmb-worldbar(?::not\()?(?::is\()?\[data-fold[^{]*\{[^}]*\}/g)].map((match) => match[0]);
     assert.ok(foldRules.length >= 5, "the folds' rules");
     for (const rule of foldRules) {
-        for (const never of [".fwmb-save", ".fwmb-mode-switch"]) assert.ok(!rule.includes(never), `${never} is never folded: ${rule.slice(0, 80)}`);
+        for (const never of [".fwmb-save"]) assert.ok(!rule.includes(never), `${never} is never folded: ${rule.slice(0, 80)}`);
     }
     // Open world and Save as into the menu from 1, short names from 2, Settlement maps gone from 3,
     // the layer menu from 4, the name shortened at 5
@@ -38,7 +38,9 @@ test("each fold has its form in the stylesheet, and Save world and the modes nev
     assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="3"\], \[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-worldbar-settlements \{\s*display: none;/);
     assert.match(CSS, /\.fwmb-worldbar:is\(\[data-fold="4"\], \[data-fold="5"\]\) \.fwmb-layers-menu \{\s*display: flex;/);
     assert.match(CSS, /\.fwmb-worldbar\[data-fold="5"\] \.fwmb-worldbar-menu \{\s*max-width:/);
-    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-worldbar-files", "fwmb-layers", "fwmb-layer--world", "fwmb-layers-menu", "fwmb-worldbar-settlements", "fwmb-mode-switch"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
+    for (const part of ["fwmb-world-menu", "fwmb-save", "fwmb-worldbar-files", "fwmb-layers", "fwmb-layer--world", "fwmb-layers-menu", "fwmb-worldbar-settlements"]) assert.ok(TEMPLATE.includes(part), `the template draws ${part}`);
+    // Create and Explore left the bar (S0 step 6, Ken, 2026-11-20): one rail holds both stages
+    assert.ok(!TEMPLATE.includes("fwmb-mode-switch") && !TEMPLATE.includes("chooseMode"), "no mode switch");
     assert.ok(!TEMPLATE.includes("fwmb-worldbar-world"), "no World menu: the world's tools are the world's rail (World in the layer switcher)");
 });
 
@@ -49,20 +51,18 @@ test("parts later tracks fill are drawn disabled, keeping their tooltips (aria-d
 
 const i18n = { localize: (key) => EN[key] ?? key, format: (key, data) => (EN[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => String(data[name])), lang: "en" };
 
-test("a world made from a 4.3 map is told what changed, and that it opened in Explore when it did", () => {
-    const plain = FirstOpening.context({ held: false, migration: { from: "4.3", changed: [] } }, { explore: true, source: null, link: "https://example.com" }, i18n);
-    assert.deepEqual(plain.items, [EN["FILRODENSWMB.UI.FirstOpeningSurface"], EN["FILRODENSWMB.UI.FirstOpeningSettings"], EN["FILRODENSWMB.UI.FirstOpeningExplore"]]);
+test("a world made from a 4.3 map is told what changed", () => {
+    const plain = FirstOpening.context({ held: false, migration: { from: "4.3", changed: [] } }, { source: null, link: "https://example.com" }, i18n);
+    assert.deepEqual(plain.items, [EN["FILRODENSWMB.UI.FirstOpeningSurface"], EN["FILRODENSWMB.UI.FirstOpeningSettings"]]);
     assert.equal(plain.link, "https://example.com");
-    const noRun = FirstOpening.context({ held: false, migration: { from: "4.3" } }, { explore: false, source: null, link: "" }, i18n);
-    assert.equal(noRun.items.length, 2);
 });
 
 test("a held regional world is told where its settings come from, and what was taken or carried up", () => {
-    const held = FirstOpening.context({ held: true, migration: { from: "4.3", changed: ["climate", "styles", "icons"], addedStyles: 2, addedBiomes: 1 } }, { explore: false, source: "Aethoria", link: "" }, i18n);
+    const held = FirstOpening.context({ held: true, migration: { from: "4.3", changed: ["climate", "styles", "icons"], addedStyles: 2, addedBiomes: 1 } }, { source: "Aethoria", link: "" }, i18n);
     assert.equal(held.items.length, 4);
     assert.match(held.items[1], /held by Aethoria/);
     assert.match(held.items[2], /Aethoria's are used now: Styles and icons and Climate|Aethoria's are used now: Climate and Styles and icons/);
     assert.match(held.items[3], /2 styles and 1 custom biomes it had of its own were added to Aethoria/);
-    const unchanged = FirstOpening.context({ held: true, migration: { from: "4.3", changed: [] } }, { explore: false, source: "Aethoria", link: "" }, i18n);
+    const unchanged = FirstOpening.context({ held: true, migration: { from: "4.3", changed: [] } }, { source: "Aethoria", link: "" }, i18n);
     assert.equal(unchanged.items.length, 2);
 });

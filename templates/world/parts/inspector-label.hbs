@@ -28,9 +28,10 @@
         </div>
     </div>
     {{else}}
-    <p class="fwmb-inspector-owner">{{localize "FILRODENSWMB.UI.InspectorLabelOf" kind=ownerKind name=text}}</p>
-    <div class="fwmb-btn-row">
-        <button type="button" class="fwmb-btn" data-inspector-action="goToOwner"><i class="fwmb-icon fwmb-icon--{{ownerIcon}}" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.InspectorGoTo" name=text}}</button>
+    {{!-- A Go block (GoAndNotices): where the label's name and look are set --}}
+    <div class="fwmb-goto">
+        <p class="fwmb-inspector-owner"><span class="fwmb-icon fwmb-icon--{{ownerIcon}}" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.InspectorLabelOf" kind=ownerKind name=text}}</p>
+        <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-inspector-action="goToOwner" aria-label="{{localize 'FILRODENSWMB.UI.InspectorGoTo' name=text}}" data-tooltip="{{localize 'FILRODENSWMB.UI.InspectorGoTo' name=text}}">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
     </div>
     {{/if}}
 </div>

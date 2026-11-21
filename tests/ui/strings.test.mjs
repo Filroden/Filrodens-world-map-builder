@@ -27,6 +27,7 @@ const SOURCES = ["src", "templates", "web", "main.js", "module.json"].flatMap((p
 const SOURCE = SOURCES.map((file) => file.text).join("\n");
 const CONFIG = readFileSync(join(ROOT, "src/config.js"), "utf8");
 const STUDIO = readFileSync(join(ROOT, "src/studios/world/app/MapStudio.js"), "utf8");
+const DEFINITION = readFileSync(join(ROOT, "src/studios/world/definition.js"), "utf8");
 /** Every quoted word in the code, which the families below look their values up in. */
 const LITERALS = new Set([...SOURCE.matchAll(/["'`]([A-Za-z0-9_]+)["'`]/g)].map((match) => match[1]));
 
@@ -41,6 +42,8 @@ const FAMILIES = [
     // The bar's groups and modes, named by suffix through MapStudio's ui(), mode() and the like
     { prefix: "FILRODENSWMB.UI.", values: STUDIO },
     "FILRODENSWMB.UI.Mode",
+    // Each map tool's lede, by its id (definition.js's tool())
+    { prefix: "FILRODENSWMB.UI.Lede", values: DEFINITION },
     "FILRODENSWMB.UI.RouteLeg",
     "FILRODENSWMB.UI.Transport",
     "FILRODENSWMB.UI.StateWord",
