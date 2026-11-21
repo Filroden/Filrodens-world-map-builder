@@ -65,6 +65,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/dialogs/move-to-political.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/name-all.hbs",
         "modules/filrodens-world-map-builder/templates/shell/dialogs/shortcuts.hbs",
+        "modules/filrodens-world-map-builder/templates/shell/dialogs/export.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/terrain-upgrade.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/first-opening.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/generate-all.hbs",

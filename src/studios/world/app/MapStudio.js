@@ -106,6 +106,7 @@ import { nameInset } from "../canvas/MapBorder.js";
 import { DrawnDecoration } from "../../../kernel/decorations/DrawnDecoration.js";
 import { ExportScale } from "../../../kernel/export/ExportScale.js";
 import { ImageFormat } from "../../../kernel/export/ImageFormat.js";
+import { ExportDialog } from "../../../kernel/export/ExportDialog.js";
 import { WORLD_DEFINITION } from "../definition.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
@@ -6553,50 +6554,65 @@ export class MapStudio {
         this.#applyCanvasInteractivity();
     }
 
+    /** Whether the export dialogue is open (a second Export image waits for it). */
+    #exporting = false;
+
     /**
-     * Extracts the currently active canvas state to a PNG.
+     * Export image (Export's, History's Export this age, Travel's Export this journey): the export
+     * dialogue (S0 step 7; see ExportDialog) on the map as it shows now, named with the age or
+     * the journey while either is shown.
      */
     async _onExportPng(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
-        const choice = await this.#chooseImageExport();
-        if (!choice) return;
-        const { scale, format } = choice;
-
-        const mapName = TravelView.exportName(this, HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName")));
-        platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
-        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
+        if (this.#exporting) return;
+        this.#exporting = true;
         try {
             await this.#labelFacesReady();
-            await this.canvasEngine.exportToPNG(mapName, scale, format);
+            const { i18n } = platform;
+            const base = this.currentSaveName || i18n.localize("FILRODENSWMB.UI.UnsavedMapName");
+            const aged = HistoryView.exportName(this, base);
+            const name = TravelView.exportName(this, aged);
+            const title = name !== aged ? "FILRODENSWMB.UI.ExportThisJourney" : aged !== base ? "FILRODENSWMB.UI.ExportThisAge" : "FILRODENSWMB.UI.ExportPNG";
+            const engine = this.canvasEngine;
+            const map = { width: this.mapWidth, height: this.mapHeight };
+            await ExportDialog.open({
+                kind: "png",
+                title: i18n.localize(title),
+                name,
+                map,
+                view: engine.viewRect(),
+                smallestLabelPx: engine.smallestLabelPx(),
+                kmPerPx: kmPerPxOf(this.uiState, this.mapHeight),
+                unit: cleanUnit(this.uiState.mapUnit),
+                // Every World studio map has raster terrain, drawn at the map's own pixels
+                rasterPx: this.mapWidth,
+                ceiling: FILRODENSWMB.EXPORT_PNG.SCALE.CEILING,
+                tileLimit: engine.exportTileLimit(),
+                drawPreview: (side) => engine.exportPreview(side),
+                samples: (area, scale) => engine.exportSamples(scale, { area }),
+                draw: (area, scale, options) => engine.drawExport(area, scale, options),
+                cutOff: () => this.cutOff(),
+                cut: (area) => this.#cutFromArea(area),
+            });
         } finally {
-            this.#endProcessing();
+            this.#exporting = false;
         }
     }
 
     /**
-     * Asks for the image's scale (see #exportScales) and format (see #exportFormats). Resolves
-     * with both, or null when cancelled. The format chosen is remembered for the next export.
-     * @returns {Promise<{scale: number, format: string}|null>}
+     * The export's steer at 4× (DE): Cut regional world… opened on the export's area, which its
+     * crop snaps as any crop it is given.
+     * @param {{x: number, y: number, width: number, height: number}} area
      */
-    async #chooseImageExport() {
-        const { plan, options, reason } = this.#exportScales();
-        const formats = await this.#exportFormats("png");
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/world/dialogs/export-png.hbs", { options, reason, formats });
-        const chosen = await platform.dialogs.prompt({
-            classes: ["fwmb"],
-            title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
-            content,
-            onRender: (element) => this.#estimateFormatSizes(element),
-            onSubmit: (form) => ({ scale: Number(form.elements.exportScale.value), format: form.elements.exportFormat.value }),
-        });
-        const scale = MapStudio.#allowedScale(plan, chosen?.scale);
-        if (!scale) return null;
-        const format = formats.some((each) => each.id === chosen.format) ? chosen.format : FILRODENSWMB.EXPORT_FORMATS.DEFAULT;
-        await ImageFormat.remember("png", format);
-        return { scale, format };
+    async #cutFromArea(area) {
+        if (this.cutOff()) return;
+        await this.openWorldTool("worldCut");
+        if (this.activeTool !== "worldCut" || !this.canvasEngine) return;
+        this.canvasEngine.setCropBox(area);
+        this.canvasEngine.onCropRelease?.({ ...area });
     }
 
     /**

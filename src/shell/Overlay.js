@@ -64,7 +64,10 @@ let titleCount = 0;
  *     positive goes ahead, negative gives something up (No, Cancel, Discard), and caution steps
  *     back without losing anything when a negative choice sits beside it. Without one, the button
  *     takes the accent colour.
- * @property {(form: HTMLFormElement) => unknown} [callback] - Reads the result from the dialogue's form.
+ * @property {(form: HTMLFormElement, overlay: Overlay) => unknown} [callback] - Reads the result from the dialogue's form.
+ * @property {boolean} [stays] - Pressing the button runs its callback and leaves the dialogue open
+ *     (the export's Export image, which draws in the dialogue and closes it when done).
+ * @property {boolean} [start] - In a split footer, the button sits at the start (Cancel).
  */
 
 export class Overlay {
@@ -88,6 +91,9 @@ export class Overlay {
      * @param {"field" | "dialogue" | "none"} [options.focus] - Where focus goes on opening: the first
      *     field (the default), the dialogue itself, so a key pressed next types into nothing, or
      *     nowhere: it stays where it was (a docked dialogue opened by work on the map).
+     * @param {"split"} [options.footer] - Board N1's footer: the buttons marked `start` (Cancel) at
+     *     the start after any start item, the rest at the end, each as wide as its label.
+     * @param {string} [options.footerStart] - A line of text at the footer's start (an estimate).
      * @returns {Promise<unknown>}
      */
     static open(options) {
@@ -143,12 +149,17 @@ export class Overlay {
     /** Keeps a placed dialogue inside the host when the host changes size. */
     #hostObserver = null;
 
-    constructor({ host, placement = "modal", title, icon, content, buttons = [], classes = [], resizable = false, closeLabel = "Close", dismissed = null, header = null }, resolve) {
+    #footer;
+    #footerStart;
+
+    constructor({ host, placement = "modal", title, icon, content, buttons = [], classes = [], resizable = false, closeLabel = "Close", dismissed = null, header = null, footer = null, footerStart = null }, resolve) {
         this.#host = host;
         this.#placement = placement;
         this.#buttons = buttons;
         this.#dismissed = dismissed;
         this.#resolve = resolve;
+        this.#footer = footer;
+        this.#footerStart = footerStart;
         this.#dialog = this.#build({ title, icon, content, classes, resizable, closeLabel });
         if (header) this.setHeader({ title, ...header });
     }
@@ -193,6 +204,24 @@ export class Overlay {
                 line.title = subtitle;
             } else line?.remove();
         }
+    }
+
+    /** A footer button's element, by its action (null if there is none). */
+    button(action) {
+        return this.#dialog.querySelector(`.fwmb-overlay-footer [data-overlay-action="${CSS.escape(action)}"]`);
+    }
+
+    /** Sets the footer's start line (a split footer's estimate); empty hides it. */
+    setFooterStart(text) {
+        const line = this.#dialog.querySelector(".fwmb-overlay-footer > .fwmb-start");
+        if (!line) return;
+        line.textContent = text ?? "";
+        line.hidden = !text;
+    }
+
+    /** Closes the dialogue, resolving with `value` (a dialogue whose button stays open closes itself). */
+    close(value) {
+        this.#close(value);
     }
 
     /** The dialogue's element (null once it has closed). */
@@ -260,7 +289,24 @@ export class Overlay {
     #buildFooter(doc) {
         const footer = doc.createElement("footer");
         footer.className = "fwmb-overlay-footer";
-        for (const button of this.#buttons) {
+        const split = this.#footer === "split";
+        if (split) {
+            footer.classList.add("fwmb-overlay-footer--split");
+            const line = doc.createElement("span");
+            line.className = "fwmb-start fwmb-hint";
+            line.textContent = this.#footerStart ?? "";
+            line.hidden = !this.#footerStart;
+            footer.append(line);
+        }
+        // In a split footer the start buttons come first, then a gap that pushes the rest to the end
+        const ordered = split ? [...this.#buttons.filter((button) => button.start), null, ...this.#buttons.filter((button) => !button.start)] : this.#buttons;
+        for (const button of ordered) {
+            if (button === null) {
+                const gap = doc.createElement("span");
+                gap.className = "fwmb-overlay-gap";
+                footer.append(gap);
+                continue;
+            }
             const element = doc.createElement("button");
             element.type = "button";
             element.className = "fwmb-btn";
@@ -452,8 +498,13 @@ export class Overlay {
     #press(action) {
         const button = this.#buttons.find((candidate) => candidate.action === action);
         if (!button) return;
+        if (this.button(action)?.disabled) return;
         const form = this.#dialog.querySelector(".fwmb-overlay-body");
-        this.#close(button.callback ? button.callback(form) : action);
+        if (button.stays) {
+            button.callback?.(form, this);
+            return;
+        }
+        this.#close(button.callback ? button.callback(form, this) : action);
     }
 
     /** Closes the dialogue as Escape would, resolving with its `dismissed` value. */

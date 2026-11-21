@@ -1750,7 +1750,27 @@ export const FILRODENSWMB = {
     // The PNG export (see ExportScale): the scales offered, the height the smallest name shown
     // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
     // may make, and the largest tile drawn at once
-    EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
+    EXPORT_PNG: Object.freeze({
+        SCALES: Object.freeze([1, 2, 3, 4]),
+        MIN_LABEL_PX: 12,
+        MAX_SIDE: 16384,
+        MAX_PIXELS: 150_000_000,
+        TILE_PX: 4096,
+        // The export dialogue's Scale (S0 step 7): one slider from MIN in steps of STEP to the map
+        // type's ceiling (CEILING on a map with raster terrain, whose terrain would only look softer
+        // above it), its stops marked, MINOR ones with a short tick and no label
+        SCALE: Object.freeze({ MIN: 0.25, STEP: 0.05, CEILING: 4, STOPS: Object.freeze([0.25, 1, 2, 3, 4]), MINOR: Object.freeze([0.5]) }),
+        // The Area's presets and aspects, the first of each the default; remembered per kind of export
+        PRESETS: Object.freeze(["whole", "screen"]),
+        ASPECTS: Object.freeze([
+            Object.freeze({ id: "free", ratio: null }),
+            Object.freeze({ id: "map", ratio: "map" }),
+            Object.freeze({ id: "4:3", ratio: 4 / 3 }),
+            Object.freeze({ id: "16:9", ratio: 16 / 9 }),
+            Object.freeze({ id: "square", ratio: 1 }),
+        ]),
+        SETTINGS: Object.freeze({ PRESET_PNG: "exportPresetPng", ASPECT_PNG: "exportAspectPng", PRESET_SCENE: "exportPresetScene", ASPECT_SCENE: "exportAspectScene" }),
+    }),
     // The image formats an export can be saved in (see ImageFormat), in the order offered: PNG,
     // WebP at quality 1 (lossless in the browsers that encode WebP) and WebP at 0.9 (lossy, about
     // a fifth of a PNG with the line work intact). Their sizes are estimated from a few sample

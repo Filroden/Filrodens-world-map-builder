@@ -221,3 +221,35 @@ test("dialogues open in the element attached most recently", async () => {
     assert.equal(await result, false);
     assert.equal(Overlay.dismissAll(host), undefined);
 });
+
+test("show() returns a dialogue its caller drives: a split footer, a button that stays open, a start line", async () => {
+    let pressed = 0;
+    const overlay = dialogs.show({
+        title: "Export image",
+        content: "<p>Body</p>",
+        footer: "split",
+        footerStart: "Drawn in 4 tiles and joined",
+        dismissed: false,
+        buttons: [
+            { action: "export", label: "Export image", default: true, stays: true, callback: (_form, shown) => { pressed++; assert.equal(shown, overlay); } },
+            { action: "cancel", label: "Cancel", start: true, callback: () => false },
+        ],
+    });
+    const footer = dialog().querySelector(".fwmb-overlay-footer");
+    assert.ok(footer.classList.contains("fwmb-overlay-footer--split"));
+    assert.deepEqual([...footer.children].map((child) => child.dataset.overlayAction ?? child.className), ["fwmb-start fwmb-hint", "cancel", "fwmb-overlay-gap", "export"], "the start line, Cancel, the gap, then the rest");
+    assert.equal(footer.querySelector(".fwmb-start").textContent, "Drawn in 4 tiles and joined");
+    assert.equal(overlay.button("export"), button("export"));
+    button("export").click();
+    assert.equal(pressed, 1);
+    assert.ok(dialog(), "a button that stays leaves the dialogue open");
+    overlay.button("export").disabled = true;
+    button("export").click();
+    key(dialog().querySelector(".fwmb-overlay-body"), "Enter");
+    assert.equal(pressed, 1, "a disabled button is not pressed, nor by Enter");
+    overlay.setFooterStart("");
+    assert.ok(footer.querySelector(".fwmb-start").hidden);
+    overlay.close(true);
+    assert.equal(await overlay.closed, true, "the caller closes it with a value");
+    assert.equal(dialog(), null);
+});

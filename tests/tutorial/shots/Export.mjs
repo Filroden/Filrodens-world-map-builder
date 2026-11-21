@@ -12,13 +12,16 @@ export default [
     {
         slug: "export-png-dialogue",
         start: MAP.regional,
-        caption: "Export image on a regional map, with the recommended scale, the reason for it, and each format's estimated size.",
+        caption: "Export image on a regional map: the Area over the map as it shows now, the recommended scale and the reason for it, the image's size, and each format's estimated size.",
         action: [
             { do: "click", target: '[data-region="context"] [data-action="exportPng"]' },
             { do: "waitForDialog" },
             {
                 do: "expect",
-                check: () => [...document.querySelectorAll('dialog.fwmb-overlay-modal[open] select[name="exportFormat"] option')].every((option) => !option.dataset.estimating && !/working/i.test(option.textContent)),
+                check: () => {
+                    const sizes = [...document.querySelectorAll("dialog.fwmb-export[open] .fwmb-format-size")];
+                    return sizes.length > 0 && sizes.every((size) => /\d/.test(size.textContent));
+                },
                 message: "every format's size was worked out",
                 within: 60000,
             },

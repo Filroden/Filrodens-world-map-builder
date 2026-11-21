@@ -118,6 +118,22 @@ export class ImageFormat {
         await platform.settings.set(this.#settingOf(kind), id);
     }
 
+    /**
+     * Saves an image file through a detached link (which Electron's navigation interceptors
+     * leave alone), the browser's downloads taking it.
+     * @param {Blob} blob
+     * @param {string} fileName - With its extension.
+     */
+    static download(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        // Revoked once the download has had time to start
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
     static #settingOf(kind) {
         const { PNG, SCENE } = FILRODENSWMB.EXPORT_FORMATS.SETTINGS;
         return kind === "scene" ? SCENE : PNG;
@@ -125,12 +141,17 @@ export class ImageFormat {
 }
 
 /**
- * Registers the reader's own last choices of format (client scope, not listed in Foundry's
- * settings sheet: the export dialogues offer them).
+ * Registers the reader's own last choices of format, and of the Area's preset and aspect (client
+ * scope, not listed in Foundry's settings sheet: the export dialogue offers them).
  */
 export function registerExportFormatSettings() {
     for (const key of Object.values(FILRODENSWMB.EXPORT_FORMATS.SETTINGS)) {
         platform.settings.register(key, { scope: "client", config: false, type: String, default: FILRODENSWMB.EXPORT_FORMATS.DEFAULT });
+    }
+    // The export dialogue's Area: the preset and the aspect last chosen for each kind of export
+    const { PRESETS, ASPECTS, SETTINGS } = FILRODENSWMB.EXPORT_PNG;
+    for (const [name, key] of Object.entries(SETTINGS)) {
+        platform.settings.register(key, { scope: "client", config: false, type: String, default: name.startsWith("PRESET") ? PRESETS[0] : ASPECTS[0].id });
     }
 }
 

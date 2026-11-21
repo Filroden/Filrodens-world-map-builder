@@ -1463,20 +1463,10 @@ export class StudioCanvas {
         const origY = this.stage.position.y;
         const origScaleX = this.stage.scale.x;
         const origScaleY = this.stage.scale.y;
-        const texts = [];
+        const texts = this.#raiseTextResolution(factor);
         try {
             const width = Math.round(this.mapWidth * factor);
             const height = Math.round(this.mapHeight * factor);
-
-            // Text is drawn into its own texture at its resolution: raised to the scale, so names
-            // are drawn afresh at the size they take in the image
-            this.stage.children.forEach(function collect(child) {
-                if (child instanceof PIXI.Text) {
-                    texts.push({ text: child, resolution: child.resolution, auto: child._autoResolution });
-                    child.resolution = Math.max(child.resolution, factor);
-                }
-                child.children?.forEach(collect);
-            });
 
             this.stage.scale.set(factor);
             // Sample tiles only (for an estimate of the file's size): each drawn on its own canvas
@@ -1505,12 +1495,32 @@ export class StudioCanvas {
         } finally {
             this.stage.position.set(origX, origY);
             this.stage.scale.set(origScaleX, origScaleY);
-            for (const { text, resolution, auto } of texts) {
-                if (text.destroyed) continue;
-                text.resolution = resolution;
-                // PIXI's own flag: the text follows the screen's pixel ratio again
-                text._autoResolution = auto;
+            this.#restoreTextResolution(texts);
+        }
+    }
+
+    /**
+     * Text is drawn into its own texture at its resolution: raised to an export's scale, names
+     * are drawn afresh at the size they take in the image. Returns what to put back.
+     */
+    #raiseTextResolution(factor) {
+        const texts = [];
+        this.stage.children.forEach(function collect(child) {
+            if (child instanceof PIXI.Text) {
+                texts.push({ text: child, resolution: child.resolution, auto: child._autoResolution });
+                child.resolution = Math.max(child.resolution, factor);
             }
+            child.children?.forEach(collect);
+        });
+        return texts;
+    }
+
+    #restoreTextResolution(texts) {
+        for (const { text, resolution, auto } of texts) {
+            if (text.destroyed) continue;
+            text.resolution = resolution;
+            // PIXI's own flag: the text follows the screen's pixel ratio again
+            text._autoResolution = auto;
         }
     }
 
@@ -1535,6 +1545,10 @@ export class StudioCanvas {
     }
 
     /** The largest tile an export draws at once: EXPORT_PNG.TILE_PX, or less if the graphics card's textures are smaller. */
+    exportTileLimit() {
+        return this.#exportTileLimit();
+    }
+
     #exportTileLimit() {
         return Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, this.maxTextureSize());
     }
@@ -1552,44 +1566,87 @@ export class StudioCanvas {
     }
 
     /**
-     * Exports the map as an image at a scale (see #renderForExport), in a format (see
-     * ImageFormat; PNG where the browser cannot write the one asked for). The reference image and
-     * the land masks' outlines are working aids, never exported. The file is downloaded through a
-     * detached link, which Electron's navigation interceptors leave alone.
-     * @param {string} [filename]
-     * @param {number} [scale] - 1 draws the map at its own size.
-     * @param {string} [format] - An EXPORT_FORMATS id.
-     * @returns {Promise<boolean>} Whether the image was made.
+     * Draws an area of the map for the export dialogue (S0 step 7; see ExportDialog) at a scale,
+     * as #renderForExport draws, but **one tile a frame**, so the studio keeps drawing between
+     * tiles and Cancel is heard: `onTile(n)` before tile n is drawn (and with the count once all
+     * are), and the drawing stops between tiles once `signal` is aborted (resolving with null).
+     * The camera and the hidden layers are put back after every tile, so the screen goes on
+     * showing the map as it was; names keep their raised resolution until the last tile. The
+     * reference image and the land masks' outlines are working aids, never exported.
+     * @param {{x: number, y: number, width: number, height: number}} area - In map pixels.
+     * @param {number} scale
+     * @param {{onTile?: (done: number) => void, signal?: AbortSignal}} [options]
+     * @returns {Promise<HTMLCanvasElement|null>}
      */
-    async exportToPNG(filename = "world-map", scale = 1, format = "png") {
-        const referenceVisible = this.layers.reference.visible;
-        const landMasksVisible = this.layers.landMasks.visible;
+    async drawExport(area, scale, { onTile = null, signal = null } = {}) {
+        const factor = Number(scale) > 0 ? scale : 1;
+        const left = Math.round(area.x * factor);
+        const top = Math.round(area.y * factor);
+        const width = Math.max(1, Math.round(area.width * factor));
+        const height = Math.max(1, Math.round(area.height * factor));
+        const tiles = ExportScale.tiles(width, height, this.#exportTileLimit());
+        const output = document.createElement("canvas");
+        output.width = width;
+        output.height = height;
+        const context = output.getContext("2d");
+        const texts = this.#raiseTextResolution(factor);
         try {
-            this.layers.reference.visible = false;
-            this.layers.landMasks.visible = false;
-            let output;
-            try {
-                output = this.#renderForExport(scale);
-            } finally {
-                this.layers.reference.visible = referenceVisible;
-                this.layers.landMasks.visible = landMasksVisible;
+            for (const [index, tile] of tiles.entries()) {
+                onTile?.(index);
+                // A frame between tiles: the studio draws, and Cancel can be pressed
+                await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+                if (signal?.aborted || this.app?.renderer == null) return null;
+                const hidden = [this.layers.reference, this.layers.landMasks];
+                const visibility = hidden.map((layer) => layer.visible);
+                const camera = { x: this.stage.position.x, y: this.stage.position.y, scaleX: this.stage.scale.x, scaleY: this.stage.scale.y };
+                const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
+                try {
+                    for (const layer of hidden) layer.visible = false;
+                    this.stage.scale.set(factor);
+                    this.stage.position.set(-(left + tile.x), -(top + tile.y));
+                    this.app.renderer.render(this.stage, { renderTexture });
+                    context.drawImage(this.app.renderer.extract.canvas(renderTexture), tile.x, tile.y);
+                } finally {
+                    renderTexture.destroy(true);
+                    this.stage.position.set(camera.x, camera.y);
+                    this.stage.scale.set(camera.scaleX, camera.scaleY);
+                    hidden.forEach((layer, i) => {
+                        layer.visible = visibility[i];
+                    });
+                }
             }
-
-            const { blob, format: written } = await ImageFormat.encode(output, format);
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = blobUrl;
-            const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-            a.download = `fwmb_${safeName}.${written.extension}`;
-            a.click();
-            // Revoked once the download has had time to start
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-            return true;
-        } catch (err) {
-            console.error("FWMB | Failed to export PNG:", err);
-            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
-            return false;
+            onTile?.(tiles.length);
+            return output;
+        } finally {
+            this.#restoreTextResolution(texts);
         }
+    }
+
+    /**
+     * The map as it shows now, its longest side `side` pixels (never larger than the map): the
+     * export dialogue's preview, drawn as an export is, the working aids hidden.
+     * @param {number} side
+     * @returns {HTMLCanvasElement|null}
+     */
+    exportPreview(side) {
+        const longest = Math.max(this.mapWidth, this.mapHeight);
+        if (!(longest > 0)) return null;
+        const hidden = [this.layers.reference, this.layers.landMasks];
+        const visibility = hidden.map((layer) => layer.visible);
+        try {
+            for (const layer of hidden) layer.visible = false;
+            return this.#renderForExport(Math.min(1, side / longest));
+        } finally {
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
+    }
+
+    /** What is on screen now, in map pixels (it may reach past the map). */
+    viewRect() {
+        const zoom = this.stage.scale.x || 1;
+        return { x: -this.stage.position.x / zoom, y: -this.stage.position.y / zoom, width: this.app.screen.width / zoom, height: this.app.screen.height / zoom };
     }
 
     /**
@@ -2482,28 +2539,33 @@ export class StudioCanvas {
     }
 
     /**
-     * A few tiles of an export drawn at its scale (see ExportScale), spread over the map, for an
+     * A few tiles of an export drawn at its scale (see ExportScale), spread over its area (the
+     * whole map when none is given), for an
      * estimate of the file's size in each format (see ImageFormat.estimate): drawn as the export
      * of that kind would be, the reference image and the land masks' outlines (and for a scene,
      * the grid) hidden.
      * @param {number} scale
      * @param {object} [options]
      * @param {boolean} [options.forScene]
+     * @param {{x: number, y: number, width: number, height: number}} [options.area] - In map pixels.
      * @returns {{tiles: HTMLCanvasElement[], pixels: number}}
      */
-    exportSamples(scale, { forScene = false } = {}) {
+    exportSamples(scale, { forScene = false, area = null } = {}) {
         const { TILES, TILE_PX } = FILRODENSWMB.EXPORT_FORMATS.ESTIMATE;
-        const width = Math.round(this.mapWidth * scale);
-        const height = Math.round(this.mapHeight * scale);
+        const box = area ?? { x: 0, y: 0, width: this.mapWidth, height: this.mapHeight };
+        const left = Math.round(box.x * scale);
+        const top = Math.round(box.y * scale);
+        const width = Math.max(1, Math.round(box.width * scale));
+        const height = Math.max(1, Math.round(box.height * scale));
         const side = Math.min(TILE_PX, width, height);
-        // Spread over the map: at the middles of its four quarters
+        // Spread over the area: at the middles of its four quarters
         const across = Math.max(1, Math.round(Math.sqrt(TILES)));
         const places = [];
         for (let row = 0; row < across; row++) {
             for (let column = 0; column < across && places.length < TILES; column++) {
                 const x = Math.round(((column + 0.5) / across) * width - side / 2);
                 const y = Math.round(((row + 0.5) / across) * height - side / 2);
-                places.push({ x: Math.max(0, Math.min(width - side, x)), y: Math.max(0, Math.min(height - side, y)), width: side, height: side });
+                places.push({ x: left + Math.max(0, Math.min(width - side, x)), y: top + Math.max(0, Math.min(height - side, y)), width: side, height: side });
             }
         }
         const hidden = [this.layers.reference, this.layers.landMasks, ...(forScene ? [this.gridLayer] : [])];

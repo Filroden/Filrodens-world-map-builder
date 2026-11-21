@@ -1,0 +1,103 @@
+{{!--
+    The export dialogue (S0 step 7; boards X1a, X1b, X2a, X2b; see kernel/export/ExportDialog.js),
+    the dialogue's body (.fwmb-export-body) in two columns. At the start the Area: its presets, Drawn
+    once the area is drawn, Aspect, the map as it shows now with the area over it, how to change the
+    area and its size on the ground. At the end: the drawing's progress (shown while it draws),
+    Scale (the slider, the number, the ground a pixel, why one scale is recommended, the terrain
+    line or the steer to Cut regional world…), then the image: its size or Too large with the two
+    nearest fits, Image format and quality with each format's estimated size, and File name. The
+    controller fills in every value; the template holds the parts.
+--}}
+<div class="fwmb-export-col">
+    <section class="fwmb-group" data-export-part="area">
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportArea"}}</div>
+        <div class="fwmb-area-head">
+            <div class="fwmb-presets" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ExportAreaPresets'}}">
+                {{#each presets}}
+                <button type="button" class="fwmb-preset" data-export-preset="{{this.id}}" aria-pressed="false">{{this.label}}</button>
+                {{/each}}
+                <span class="fwmb-drawn-tag" data-export-drawn hidden>{{localize "FILRODENSWMB.UI.ExportDrawn"}}</span>
+            </div>
+            <label class="fwmb-aspect">
+                <span class="fwmb-label">{{localize "FILRODENSWMB.UI.ExportAspect"}}</span>
+                <select name="exportAspect">
+                    {{#each aspects}}
+                    <option value="{{this.id}}">{{this.label}}</option>
+                    {{/each}}
+                </select>
+            </label>
+        </div>
+        <div class="fwmb-export-preview" data-export-preview style="--ar: {{ratio}}"></div>
+        <div class="fwmb-area-foot">
+            <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportAreaHint"}}</p>
+            <span class="fwmb-readout" data-export-area-read></span>
+        </div>
+    </section>
+</div>
+<div class="fwmb-export-col">
+    <section class="fwmb-group fwmb-group--keep" data-export-progress hidden>
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportDrawing"}}</div>
+        <div class="fwmb-export-progress" role="status">
+            <div class="fwmb-export-progress-row">
+                <b class="fwmb-readout" data-export-tile></b>
+                <span class="fwmb-hint" data-export-then></span>
+            </div>
+            <div class="fwmb-export-progress-row">
+                <div class="fwmb-export-progress-bar" data-export-bar style="--p: 0%"><i></i></div>
+                <button type="button" class="fwmb-btn" data-export-stop><i class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Cancel"}}</button>
+            </div>
+        </div>
+    </section>
+    <section class="fwmb-group" data-export-part="scale">
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</div>
+        <div class="fwmb-scale">
+            <div class="fwmb-scale-row">
+                <div class="fwmb-scale-track" role="slider" tabindex="0" aria-label="{{localize 'FILRODENSWMB.UI.ExportPngScale'}}" aria-valuemin="{{min}}" aria-valuemax="{{ceiling}}" data-export-track>
+                    <span class="fwmb-scale-fill"></span>
+                    {{#each stops}}
+                    <span class="fwmb-scale-stop{{#if this.minor}} fwmb-scale-stop--minor{{/if}}" style="left: {{this.pos}}%">{{#unless this.minor}}<span>{{this.label}}</span>{{/unless}}</span>
+                    {{/each}}
+                    <span class="fwmb-scale-rec" data-export-rec></span>
+                    <span class="fwmb-scale-thumb"></span>
+                </div>
+                <input type="text" class="fwmb-input fwmb-input--number" name="exportScale" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="{{localize 'FILRODENSWMB.UI.ExportPngScale'}}">
+            </div>
+            <div class="fwmb-scale-read"><b data-export-scale-read></b><span data-export-ground></span></div>
+            <p class="fwmb-hint fwmb-export-line"><span class="fwmb-scale-rec-key" aria-hidden="true"></span><span data-export-reason></span></p>
+            <p class="fwmb-hint fwmb-export-line" data-export-terrain hidden></p>
+            <div class="fwmb-export-steer" data-export-steer hidden>
+                <p class="fwmb-hint fwmb-export-line">{{localize "FILRODENSWMB.UI.ExportSteer"}}</p>
+                <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-export-cut>{{localize "FILRODENSWMB.UI.CutRegionalWorld"}}</button></div>
+            </div>
+        </div>
+    </section>
+    <section class="fwmb-group" data-export-part="image">
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportImage"}}</div>
+        <div class="fwmb-result" data-export-result>
+            <span class="fwmb-k">{{localize "FILRODENSWMB.UI.ExportImage"}}</span>
+            <b data-export-size></b>
+            <span class="fwmb-result-note" data-export-what></span>
+        </div>
+        <div class="fwmb-toolarge" role="alert" data-export-toolarge hidden>
+            <div class="fwmb-notice-title"><i class="fwmb-icon fwmb-icon--warning-mark" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ExportTooLarge"}}</div>
+            <p data-export-limit></p>
+            <div class="fwmb-toolarge-fits">
+                <button type="button" class="fwmb-btn" data-export-fit="scale"><i class="fwmb-icon fwmb-icon--zoom-out" aria-hidden="true"></i><span class="fwmb-fit-text"><b></b><span></span></span></button>
+                <button type="button" class="fwmb-btn" data-export-fit="area"><i class="fwmb-icon fwmb-icon--crop" aria-hidden="true"></i><span class="fwmb-fit-text"><b></b><span></span></span></button>
+            </div>
+        </div>
+        <span class="fwmb-label" id="fwmb-export-formats">{{localize "FILRODENSWMB.UI.ExportFormat"}}</span>
+        <div class="fwmb-formats" role="radiogroup" aria-labelledby="fwmb-export-formats">
+            {{#each formats}}
+            <button type="button" class="fwmb-format" role="radio" aria-checked="false" data-export-format="{{this.id}}"><span class="fwmb-radio" aria-hidden="true"></span><span>{{this.label}}</span><span class="fwmb-format-size"></span></button>
+            {{/each}}
+        </div>
+        <div class="fwmb-form-group fwmb-form-group--stacked">
+            <label class="fwmb-label" for="fwmb-export-file-name">{{localize "FILRODENSWMB.UI.ExportFileName"}}</label>
+            <div class="fwmb-filename">
+                <input type="text" class="fwmb-input" id="fwmb-export-file-name" name="exportFileName" autocomplete="off" spellcheck="false">
+                <span class="fwmb-ext" data-export-ext></span>
+            </div>
+        </div>
+    </section>
+</div>

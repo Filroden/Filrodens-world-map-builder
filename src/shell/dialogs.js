@@ -110,10 +110,30 @@ export function createOverlayDialogs({ localize }) {
         return open(options, buttons, dismissed);
     }
 
+    /**
+     * Opens a dialogue its caller drives (the export dialogue): as open() does, with every
+     * Overlay option, returning the Overlay itself, so the caller can enable its buttons, change
+     * its footer's start line and close it; its `closed` promise resolves as open()'s would.
+     */
+    function show({ onRender, placement = DEFAULT_PLACEMENT, ...options }) {
+        const host = hosts.at(-1);
+        if (!host) throw new Error("Dialogues need an element to be drawn in: none is attached");
+        return Overlay.show({
+            ...options,
+            host,
+            placement,
+            closeLabel: localize("FILRODENSWMB.UI.Close"),
+            onRender: (element) => {
+                onRender?.(element);
+                RangeDisplay.syncAllFills(element);
+            },
+        });
+    }
+
     function dismiss({ placement = null } = {}) {
         const host = hosts.at(-1);
         if (host) Overlay.dismissAll(host, placement);
     }
 
-    return { confirm, prompt, choose, dismiss, attach };
+    return { confirm, prompt, choose, show, dismiss, attach };
 }
