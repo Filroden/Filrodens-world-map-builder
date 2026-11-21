@@ -237,7 +237,7 @@ test("show() returns a dialogue its caller drives: a split footer, a button that
     });
     const footer = dialog().querySelector(".fwmb-overlay-footer");
     assert.ok(footer.classList.contains("fwmb-overlay-footer--split"));
-    assert.deepEqual([...footer.children].map((child) => child.dataset.overlayAction ?? child.className), ["fwmb-start fwmb-hint", "cancel", "fwmb-overlay-gap", "export"], "the start line, Cancel, the gap, then the rest");
+    assert.deepEqual([...footer.children].map((child) => child.dataset.overlayAction ?? child.className), ["cancel", "fwmb-start fwmb-hint", "fwmb-overlay-gap", "export"], "Cancel, the start line, the gap, then the rest");
     assert.equal(footer.querySelector(".fwmb-start").textContent, "Drawn in 4 tiles and joined");
     assert.equal(overlay.button("export"), button("export"));
     button("export").click();

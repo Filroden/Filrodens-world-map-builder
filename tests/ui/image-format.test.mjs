@@ -86,3 +86,31 @@ test("a re-exported scene finds its earlier GM overlay in either format", () => 
     for (const src of ["fwmb-exports/harbour_gm.png", "fwmb-exports/harbour_gm.webp", "fwmb-exports/harbour_gm.webp?1730000000"]) assert.ok(SceneExporter.isOverlayTile(src), src);
     for (const src of ["fwmb-exports/harbour_player.webp", "tiles/gm.png", null, undefined]) assert.ok(!SceneExporter.isOverlayTile(src), String(src));
 });
+
+test("a scene is the area's size with its whole-pixel grid, and keeps the area and scale it was made with", () => {
+    const made = { x: 150, y: 50, width: 600, height: 450, scale: 2 };
+    const gridData = { grid: { size: 50 }, cells: {} };
+    const data = SceneExporter.sceneData({ name: "Westmarch coast", width: 1200, height: 900, grid: { type: 1, size: 100, distance: 31.2, units: "km" }, gridData, made }, "worlds/w/fwmb-exports/westmarch_coast_player.webp");
+    assert.equal(data.width, 1200);
+    assert.equal(data.height, 900);
+    assert.deepEqual({ type: data.grid.type, size: data.grid.size, distance: data.grid.distance, units: data.grid.units }, { type: 1, size: 100, distance: 31.2, units: "km" });
+    assert.deepEqual(data.flags[FILRODENSWMB.ID][FILRODENSWMB.FLAGS.EXPORT_AREA], made);
+    assert.equal(data.flags[FILRODENSWMB.ID][FILRODENSWMB.FLAGS.GRID_DATA], gridData);
+    assert.equal(data.levels[0].background.src, "worlds/w/fwmb-exports/westmarch_coast_player.webp");
+    const gridless = SceneExporter.sceneData({ name: "Open sea", width: 10, height: 10, grid: { type: 0, size: 40 }, gridData: null, made }, "x.png");
+    assert.ok(!(FILRODENSWMB.FLAGS.GRID_DATA in gridless.flags[FILRODENSWMB.ID]), "no grid data on a gridless scene");
+    assert.ok(!("distance" in gridless.grid), "nor a distance it could not work out");
+});
+
+test("exporting again: the scene's earlier area and scale are found, and only a different choice differs", () => {
+    const made = { x: 150, y: 50, width: 600, height: 450, scale: 2 };
+    const scenes = { "Westmarch coast": { getFlag: (scope, key) => (scope === FILRODENSWMB.ID && key === FILRODENSWMB.FLAGS.EXPORT_AREA ? made : null) }, "Old scene": { getFlag: () => null } };
+    globalThis.game = { ...(globalThis.game ?? {}), scenes: { getName: (name) => scenes[name] ?? null } };
+    assert.deepEqual(SceneExporter.previous("Westmarch coast"), made);
+    assert.equal(SceneExporter.previous("Old scene"), null, "a scene made before scenes kept their area");
+    assert.equal(SceneExporter.previous("Nowhere"), null);
+    assert.equal(SceneExporter.differs(made, { ...made }), false, "the same area and scale: no warning");
+    assert.equal(SceneExporter.differs(made, { ...made, scale: 1.5 }), true);
+    assert.equal(SceneExporter.differs(made, { ...made, x: 200 }), true);
+    assert.equal(SceneExporter.differs(null, made), false, "no earlier export: no warning");
+});

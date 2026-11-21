@@ -33,14 +33,19 @@ export class GridDataExporter {
      *     `{ id, name, visibility, layer: {id, name}, contains(px, py), bounds }`, in place of the
      *     mesh session's (for comparing another description of the same regions, such as the
      *     polygons a map's regions were migrated from).
+     * @param {{x: number, y: number, width: number, height: number}|null} [options.area] - An
+     *     export's area (S0 step 7b), snapped to the grid (see SceneArea.snap): only the cells over
+     *     it are built, in the map's own pixels.
+     * @param {{i: number, j: number}} [options.offset] - Subtracted from every cell's offsets (and
+     *     the bounds), so the cell at the area's corner is the scene's first (see SceneArea.offset).
      * @returns {object|null} The full `gridData` payload, or `null` for a gridless map - there is
      * no cell geometry to aggregate into, so the feature does not run.
      */
-    static build(app, { regions = null } = {}) {
+    static build(app, { regions = null, area = null, offset = { i: 0, j: 0 } } = {}) {
         if (app.uiState.gridType === GridDataExporter.#GRIDLESS_TYPE) return null;
 
         const grid = GridDataExporter.#buildGrid(app.uiState);
-        const [i0, j0, i1, j1] = grid.getOffsetRange({ x: 0, y: 0, width: app.mapWidth, height: app.mapHeight });
+        const [i0, j0, i1, j1] = grid.getOffsetRange(area ?? { x: 0, y: 0, width: app.mapWidth, height: app.mapHeight });
 
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         const biomeIdToKey = GridDataExporter.#buildBiomeIdToKeyMap();
@@ -72,7 +77,7 @@ export class GridDataExporter {
             for (let j = j0; j < j1; j++) {
                 const polygon = grid.getVertices({ i, j });
                 const cellBounds = GridAggregator.getPolygonPixelBounds(polygon);
-                cells[`${i},${j}`] = GridDataExporter.#buildCell(app, params, polygon, cellBounds, biomeIdToKey, visibleRegions, visiblePins, visibleRoutes, namedRivers);
+                cells[`${i - offset.i},${j - offset.j}`] = GridDataExporter.#buildCell(app, params, polygon, cellBounds, biomeIdToKey, visibleRegions, visiblePins, visibleRoutes, namedRivers);
             }
         }
 
@@ -81,7 +86,7 @@ export class GridDataExporter {
             schemaVersion: FILRODENSWMB.GRID_DATA.SCHEMA_VERSION,
             generatedAt: new Date().toISOString(),
             grid: { type: gridType.value, typeName: gridType.name, size: MapStateManager.gridSizeOf(app.uiState.gridSize) },
-            bounds: { iMin: i0, iMax: i1 - 1, jMin: j0, jMax: j1 - 1 },
+            bounds: { iMin: i0 - offset.i, iMax: i1 - 1 - offset.i, jMin: j0 - offset.j, jMax: j1 - 1 - offset.j },
             cells,
         };
     }

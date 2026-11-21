@@ -1,6 +1,6 @@
 // Symbol size (SymbolScale): Auto from how much a map is magnified against its world, a chosen
-// size, and names' outlines in proportion to them; and the PNG export's scales (ExportScale): what
-// each makes, which are allowed, the recommendation and its reason, and the tiles.
+// size, and names' outlines in proportion to them; and the tiles an export is drawn in (ExportScale;
+// the area, the scale and the recommendation are export-area.test.mjs's).
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -46,32 +46,6 @@ test("a name's outline and shadow are in proportion to it, within their limits",
     near(halo(14.4).shadow, 1.2);
     assert.deepEqual(halo(48), { stroke: 3, shadow: 2 }, "a realm's name: as before");
     assert.deepEqual(halo(0), { stroke: 1, shadow: 0.5 });
-});
-
-test("the export recommends the smallest allowed scale that makes the smallest name readable, and says why", () => {
-    const region = ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 7.2 });
-    assert.deepEqual(region.options.map((option) => [option.scale, option.width, option.height, option.allowed]), [[1, 3000, 1680, true], [2, 6000, 3360, true], [3, 9000, 5040, true], [4, 12000, 6720, true]]);
-    assert.equal(region.recommended, 2);
-    assert.deepEqual(region.options.map((option) => option.recommended), [false, true, false, false]);
-    assert.deepEqual(region.reason, { kind: "reaches", px: 7.2, scaledPx: 14.4, scale: 2 });
-    assert.deepEqual(ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 14.4 }).reason.kind, "enough");
-    assert.equal(ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 11.76 }).recommended, 1, "a name that reads as 12 px is enough");
-    const none = ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: null });
-    assert.equal(none.recommended, 1);
-    assert.equal(none.reason.kind, "none");
-    // A large map: 3x passes a side's limit and 4x the pixels' too
-    const large = ExportScale.plan({ width: 6000, height: 6000, smallestLabelPx: 2 });
-    assert.deepEqual(large.options.map((option) => option.allowed), [true, true, false, false]);
-    assert.equal(large.recommended, 2);
-    assert.deepEqual(large.reason, { kind: "short", px: 2, scaledPx: 4, scale: 2 });
-});
-
-test("a scene's scales stop at the graphics card's largest texture, the recommendation with them", () => {
-    const scene = ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 4, maxSide: 8192 });
-    assert.deepEqual(scene.options.map((option) => option.allowed), [true, true, false, false], "6000 fits 8192; 9000 does not");
-    assert.equal(scene.recommended, 2);
-    assert.equal(scene.reason.kind, "short");
-    assert.deepEqual(ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 4, maxSide: 100_000 }).options.map((option) => option.allowed), [true, true, true, true], "never past the PNG's own limit");
 });
 
 test("the tiles cover the image exactly, none larger than the limit", () => {

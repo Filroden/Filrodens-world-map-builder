@@ -67,6 +67,9 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
             async run() {
                 throw new Error("The web version cannot export to a scene");
             },
+            async previous() {
+                return null;
+            },
         },
         frame: {
             idLength: TITLE_ID_LENGTH,

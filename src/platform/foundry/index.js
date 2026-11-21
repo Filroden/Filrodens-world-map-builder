@@ -105,13 +105,20 @@ export const foundryFrame = {
 
 /**
  * Exporting a map to a Foundry scene. The exporter is loaded when it is first used, which keeps
- * it (and the grid data export it builds on) out of the start-up path.
+ * it out of the start-up path; the studio hands it the images, the grid cell data and the journal
+ * pages it has made.
  */
 const scene = {
     available: true,
-    async run(app, config, playerBlob, gmBlob) {
+    /** Makes the scene from what the studio worked out (see SceneExporter's SceneExport). */
+    async run(config) {
         const { SceneExporter } = await import("./SceneExporter.js");
-        return SceneExporter.run(app, config, playerBlob, gmBlob);
+        return SceneExporter.run(config);
+    },
+    /** The area and scale the scene of this name was made with, or null (see SceneExporter.previous). */
+    async previous(name) {
+        const { SceneExporter } = await import("./SceneExporter.js");
+        return SceneExporter.previous(name);
     },
 };
 

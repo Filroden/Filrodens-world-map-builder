@@ -116,9 +116,17 @@ export class AreaControl {
         this.#crop.classList.toggle("fwmb-crop--whole", width >= map.width * 0.98 && height >= map.height * 0.98);
     }
 
-    /** Whether the area has room to move: one that fills the map is drawn afresh by a drag inside it. */
+    /** How much of the map, across and down, an area may cover and still be moved by a drag inside it. */
+    static FILLS_SHARE = 0.95;
+
+    /**
+     * Whether a drag inside the area moves it. One that (all but) fills the map, such as Whole map
+     * snapped to a scene's grid a few pixels short, leaves nowhere outside it to draw from, so a
+     * drag inside it draws a new area.
+     */
     #movable() {
-        return this.#area.width < this.#map.width || this.#area.height < this.#map.height;
+        const share = AreaControl.FILLS_SHARE;
+        return this.#area.width < this.#map.width * share || this.#area.height < this.#map.height * share;
     }
 
     #min() {

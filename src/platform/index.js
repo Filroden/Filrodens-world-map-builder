@@ -42,8 +42,9 @@
  *   Foundry's version (null on the web).
  * - `grid`: `create({ type, size })`, a grid offering `getOffsetRange(rect)` and
  *   `getVertices({ i, j })` for "square", "hexR" and "hexC".
- * - `scene`: `available` (whether maps can be exported to a scene) and
- *   `run(app, config, playerBlob, gmBlob)`.
+ * - `scene`: `available` (whether maps can be exported to a scene), `run(config)` with what the
+ *   studio has made (see foundry/SceneExporter.js), and `previous(name)`, the area and scale the
+ *   scene of that name was made with (null on the web, or for no such scene).
  * - `frame`: `setTitle(text)`, the title of what holds the studio (Foundry's window, or the web
  *   page), and `idLength`, how many characters of a saved map's id the title shows (undefined
  *   for all of them). On the web only, `fullscreen`: `enabled()` (whether the page can go full

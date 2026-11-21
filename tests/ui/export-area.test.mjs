@@ -87,3 +87,38 @@ test("the file name: the name, where, and the scale", () => {
 function near(actual, expected, tolerance, message) {
     assert.ok(Math.abs(actual - expected) <= tolerance, `${message ?? ""} ${actual} vs ${expected}`);
 }
+
+const { SceneArea } = await import("../../src/kernel/export/ExportScale.js");
+
+test("a scene's area snaps to whole square cells with its corner on a grid corner, kept on the map", () => {
+    const grid = { type: "square", size: 50 };
+    const snapped = SceneArea.snap({ x: 130, y: 70, width: 610, height: 440 }, grid, MAP);
+    assert.deepEqual(snapped, { area: { x: 150, y: 50, width: 600, height: 450 }, cells: { across: 12, down: 9 } });
+    const edge = SceneArea.snap({ x: 1990, y: 1590, width: 300, height: 300 }, grid, MAP);
+    assert.ok(edge.area.x + edge.area.width <= 2000 && edge.area.y + edge.area.height <= 1600 && edge.cells.across >= 1, `kept on the map (${JSON.stringify(edge)})`);
+    assert.deepEqual(SceneArea.snap({ x: 3.4, y: 5.6, width: 100.2, height: 80 }, { type: "none", size: 50 }, MAP).area, { x: 3, y: 6, width: 100, height: 80 }, "a gridless map keeps the area as drawn");
+});
+
+test("a hex grid's area starts every two rows (or columns), so row parity is kept, and its offsets are even", () => {
+    const rows = { type: "hexR", size: 50 };
+    const rowStep = (50 * Math.sqrt(3)) / 2;
+    const snapped = SceneArea.snap({ x: 120, y: 100, width: 400, height: 300 }, rows, MAP);
+    near(snapped.area.y / (rowStep * 2), Math.round(snapped.area.y / (rowStep * 2)), 1e-9, "the corner on a two-row period");
+    assert.equal(snapped.area.x % 50, 0);
+    assert.equal(SceneArea.offset(snapped.area, rows).i % 2, 0, "an even row offset");
+    assert.equal(snapped.cells.down, Math.round(300 / rowStep));
+    const columns = { type: "hexC", size: 50 };
+    const cut = SceneArea.snap({ x: 300, y: 120, width: 400, height: 300 }, columns, MAP);
+    assert.equal(SceneArea.offset(cut.area, columns).j % 2, 0, "an even column offset");
+    assert.deepEqual(SceneArea.offset({ x: 150, y: 50 }, { type: "square", size: 50 }), { i: 1, j: 3 });
+});
+
+test("a scene's scale makes each cell whole pixels, never smaller than the least grid size", () => {
+    assert.deepEqual(SceneArea.scale(2, { type: "square", size: 50 }, 20), { scale: 2, cell: 100, floor: 0.4 });
+    assert.deepEqual(SceneArea.scale(1.05, { type: "square", size: 50 }, 20), { scale: 1.06, cell: 53, floor: 0.4 }, "52.5 px rounds to 53");
+    assert.equal(SceneArea.scale(0.25, { type: "square", size: 50 }, 20).cell, 20, "the floor");
+    assert.deepEqual(SceneArea.scale(0.3, { type: "none", size: 50 }, 20), { scale: 0.3, cell: null, floor: 0 });
+    assert.ok(SceneArea.same({ x: 1, y: 2, width: 3, height: 4, scale: 2 }, { x: 1.2, y: 2, width: 3, height: 4, scale: 2.0004 }));
+    assert.ok(!SceneArea.same({ x: 1, y: 2, width: 3, height: 4, scale: 2 }, { x: 1, y: 2, width: 3, height: 4, scale: 1.96 }));
+    assert.ok(!SceneArea.same(null, { x: 1 }));
+});

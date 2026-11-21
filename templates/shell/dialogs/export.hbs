@@ -7,6 +7,11 @@
     line or the steer to Cut regional world…), then the image: its size or Too large with the two
     nearest fits, Image format and quality with each format's estimated size, and File name. The
     controller fills in every value; the template holds the parts.
+
+    Export to scene (board X4) adds its own: the area snapped to the grid (the drawn outline dashed
+    beside it, the grid over the preview), the journal and GM overlay choices under the Area, and
+    the scene's name and folder (with the warning when the scene was made with another area or
+    scale) heading the end column. It has no file name.
 --}}
 <div class="fwmb-export-col">
     <section class="fwmb-group" data-export-part="area">
@@ -29,10 +34,20 @@
         </div>
         <div class="fwmb-export-preview" data-export-preview style="--ar: {{ratio}}"></div>
         <div class="fwmb-area-foot">
-            <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportAreaHint"}}</p>
+            <p class="fwmb-hint" data-export-area-hint>{{#if snaps}}{{localize "FILRODENSWMB.UI.ExportSceneSnapHint"}}{{else}}{{localize "FILRODENSWMB.UI.ExportAreaHint"}}{{/if}}</p>
             <span class="fwmb-readout" data-export-area-read></span>
         </div>
     </section>
+    {{#if scene}}
+    <section class="fwmb-group" data-export-part="contents">
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportSceneContents"}}</div>
+        <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateJournalsHint'}}"><input type="checkbox" name="generateJournals" class="fwmb-checkbox" checked><span data-export-pages>{{localize "FILRODENSWMB.UI.GenerateJournals"}}</span></label>
+        <label class="fwmb-setting-row"><input type="checkbox" name="overwriteJournals" class="fwmb-checkbox"><span>{{localize "FILRODENSWMB.UI.OverwriteJournals"}}</span></label>
+        <p class="fwmb-hint fwmb-hint--danger fwmb-export-line">{{localize "FILRODENSWMB.UI.OverwriteJournalsHint"}}</p>
+        <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.CreateGMOverlayHint'}}"><input type="checkbox" name="createGmOverlay" class="fwmb-checkbox" checked><span>{{localize "FILRODENSWMB.UI.ExportSceneOverlay"}}</span></label>
+        <p class="fwmb-hint fwmb-export-line">{{localize "FILRODENSWMB.UI.ExportSceneCellData"}}</p>
+    </section>
+    {{/if}}
 </div>
 <div class="fwmb-export-col">
     <section class="fwmb-group fwmb-group--keep" data-export-progress hidden>
@@ -44,10 +59,29 @@
             </div>
             <div class="fwmb-export-progress-row">
                 <div class="fwmb-export-progress-bar" data-export-bar style="--p: 0%"><i></i></div>
-                <button type="button" class="fwmb-btn" data-export-stop><i class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Cancel"}}</button>
+                <button type="button" class="fwmb-btn" data-export-stop data-tooltip="{{localize 'FILRODENSWMB.UI.ExportStopHint'}}"><i class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Cancel"}}</button>
             </div>
+            <p class="fwmb-hint fwmb-export-line">{{#if scene}}{{localize "FILRODENSWMB.UI.ExportKeepHintScene"}}{{else}}{{localize "FILRODENSWMB.UI.ExportKeepHint"}}{{/if}}</p>
         </div>
     </section>
+    {{#if scene}}
+    <section class="fwmb-group" data-export-part="scene">
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportSceneGroup"}}</div>
+        <div class="fwmb-form-group fwmb-form-group--stacked">
+            <label class="fwmb-label" for="fwmb-export-scene-name">{{localize "FILRODENSWMB.UI.SceneName"}}</label>
+            <input type="text" class="fwmb-input" id="fwmb-export-scene-name" name="sceneName" maxlength="{{fwmbTextLimit 'name'}}" value="{{sceneName}}" autocomplete="off">
+        </div>
+        <div class="fwmb-form-group fwmb-form-group--stacked">
+            <label class="fwmb-label" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportFolderHint'}}">{{localize "FILRODENSWMB.UI.ExportFolder"}}</label>
+            <file-picker type="folder" name="exportFolder" value="{{folder}}"></file-picker>
+        </div>
+        <div class="fwmb-scene-warn" role="alert" data-export-warn hidden>
+            <div class="fwmb-notice-title"><i class="fwmb-icon fwmb-icon--warning-mark" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ExportSceneWarnTitle"}}</div>
+            <p class="fwmb-export-line" data-export-warn-text></p>
+            <div class="fwmb-row"><button type="button" class="fwmb-btn" data-export-use-made><i class="fwmb-icon fwmb-icon--accept" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ExportSceneUseMade"}}</button></div>
+        </div>
+    </section>
+    {{/if}}
     <section class="fwmb-group" data-export-part="scale">
         <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</div>
         <div class="fwmb-scale">
@@ -64,6 +98,7 @@
             </div>
             <div class="fwmb-scale-read"><b data-export-scale-read></b><span data-export-ground></span></div>
             <p class="fwmb-hint fwmb-export-line"><span class="fwmb-scale-rec-key" aria-hidden="true"></span><span data-export-reason></span></p>
+            <p class="fwmb-hint fwmb-export-line" data-export-floor hidden></p>
             <p class="fwmb-hint fwmb-export-line" data-export-terrain hidden></p>
             <div class="fwmb-export-steer" data-export-steer hidden>
                 <p class="fwmb-hint fwmb-export-line">{{localize "FILRODENSWMB.UI.ExportSteer"}}</p>
@@ -92,6 +127,7 @@
             <button type="button" class="fwmb-format" role="radio" aria-checked="false" data-export-format="{{this.id}}"><span class="fwmb-radio" aria-hidden="true"></span><span>{{this.label}}</span><span class="fwmb-format-size"></span></button>
             {{/each}}
         </div>
+        {{#unless scene}}
         <div class="fwmb-form-group fwmb-form-group--stacked">
             <label class="fwmb-label" for="fwmb-export-file-name">{{localize "FILRODENSWMB.UI.ExportFileName"}}</label>
             <div class="fwmb-filename">
@@ -99,5 +135,6 @@
                 <span class="fwmb-ext" data-export-ext></span>
             </div>
         </div>
+        {{/unless}}
     </section>
 </div>

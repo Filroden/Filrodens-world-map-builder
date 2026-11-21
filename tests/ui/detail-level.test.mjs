@@ -189,7 +189,9 @@ test("a scene export gives generated items pages only where the map labels them,
     assert.deepEqual(world.pins.map((page) => page.item.id), ["city", "inn"], "the town is below the detail level; the hand-made pin keeps its page");
     assert.deepEqual(world.regions.map((page) => page.item.name), ["Ashford", "Grange"]);
     assert.deepEqual(world.routes, [], "an unnamed route has no page");
-    assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234\nFILRODENSWMB.UI.GeneratedShownFrom: FILRODENSWMB.UI.DetailWorld\nFILRODENSWMB.UI.GeneratedNextRun: FILRODENSWMB.UI.GeneratedReplaced");
+    assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234", "the studio's own rows (Shown from, Generate again) are left out");
+    assert.ok(world.regions.every((page) => !/GeneratedShownFrom|GeneratedNameShownFrom|GeneratedNextRun/.test(page.text)), "and a region's");
+    assert.ok(world.regions[0].text.includes("FILRODENSWMB.UI.GeneratedPopulation: 120,000"), "its figures kept");
     const regional = GeneratedDetails.journalPages(generatedMap(2));
     assert.deepEqual(regional.pins.map((page) => page.item.id), ["city", "inn"], "the town is shown at Regional but named only from Local");
     const everything = GeneratedDetails.journalPages(generatedMap(FILRODENSWMB.DETAIL.EVERYTHING));
@@ -203,6 +205,25 @@ test("a scene export gives generated items pages only where the map labels them,
     const unlabelled = GeneratedDetails.journalPages(hidden);
     assert.deepEqual(unlabelled.pins.map((page) => page.item.id), ["city", "inn"], "a place whose label is hidden");
     assert.equal(unlabelled.regions.length, 6, "a region whose label style is turned off in the Labels menu");
+});
+
+test("a scene export with an area gives pages only to what is inside it", () => {
+    const app = generatedMap(FILRODENSWMB.DETAIL.EVERYTHING);
+    Object.assign(app.mapPins[0], { x: 100, y: 100 });
+    Object.assign(app.mapPins[1], { x: 900, y: 900 });
+    Object.assign(app.mapPins[2], { x: 150, y: 120 });
+    app.mapRoutes = [
+        { id: "in", name: "Coast road", points: [{ x: 50, y: 50 }, { x: 160, y: 160 }] },
+        { id: "out", name: "Far road", points: [{ x: 700, y: 700 }, { x: 800, y: 800 }] },
+    ];
+    const boxes = { 1: { minX: 0, minY: 0, maxX: 300, maxY: 300 }, 8: { minX: 600, minY: 600, maxX: 900, maxY: 900 } };
+    app.meshSession = { regionBounds: (_level, key) => boxes[key] ?? { minX: 0, minY: 0, maxX: 1000, maxY: 1000 } };
+    const area = { x: 0, y: 0, width: 200, height: 200 };
+    const pages = GeneratedDetails.journalPages(app, { area });
+    assert.deepEqual(pages.pins.map((page) => page.item.id), ["city", "inn"], "the pins in the area");
+    assert.deepEqual(pages.routes.map((page) => page.item.id), ["in"], "a route with a point in it");
+    assert.ok(!pages.regions.some((page) => page.item.name === "Grange") && pages.regions.some((page) => page.item.name === "Ashford"), "regions whose extent meets it");
+    assert.equal(GeneratedDetails.journalPages(app).pins.length, 3, "no area: everything");
 });
 
 test("with ages, a place's section gives its history and when it was a capital; a ruin what it was; an old road its kind", () => {

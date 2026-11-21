@@ -1,12 +1,11 @@
-// A regional map's grid (RegionalExtractor.planCrop) and a scene's grid scale (SceneExporter.gridScale):
+// A regional map's grid (RegionalExtractor.planCrop) and a scene's grid scale (MapScale.gridDistanceOf):
 // the regional map keeps its parent's grid size in pixels, its zoom is a whole number when there is a
 // grid, so the two grids line up, and the scene's ruler measures each cell at the map's own scale.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { RegionalExtractor } = await import("../../src/studios/world/app/RegionalExtractor.js");
-const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
-const { kmPerPxOf } = await import("../../src/studios/world/data/MapScale.js");
+const { gridDistanceOf, kmPerPxOf } = await import("../../src/studios/world/data/MapScale.js");
 
 const PARENT = { width: 2000, height: 1600 };
 const plan = (crop, width, grid) => RegionalExtractor.planCrop(crop, width, grid, PARENT.width, PARENT.height);
@@ -83,23 +82,15 @@ test("a gridless parent keeps the zoom the crop and width give", () => {
 test("a scene's grid measures one cell at the map's scale, in the map's unit", () => {
     const uiState = { latTop: 60, latBottom: -60, world: null, mapUnit: "leagues" };
     const app = { uiState, mapHeight: 1600 };
-    const scale = SceneExporter.gridScale(app, 50);
+    const scale = gridDistanceOf(app.uiState, app.mapHeight, 50);
     assert.equal(scale.units, "leagues");
     assert.equal(scale.distance, Number((50 * kmPerPxOf(uiState, 1600)).toPrecision(3)));
 
     // A regional map four times closer: the same 50 pixels cover a quarter of the ground
-    const regional = SceneExporter.gridScale({ uiState: { ...uiState, latTop: 15, latBottom: -15 }, mapHeight: 1600 }, 50);
+    const regional = gridDistanceOf({ ...uiState, latTop: 15, latBottom: -15 }, 1600, 50);
     assert.ok(Math.abs(regional.distance - scale.distance / 4) <= scale.distance * 0.01);
 
-    assert.equal(SceneExporter.gridScale({ uiState: { mapUnit: "" }, mapHeight: 1600 }, 50).units, "km", "no unit named, the default");
-});
-
-test("a scene's scale is a whole number from 1", () => {
-    assert.equal(SceneExporter.sceneScale(2), 2);
-    assert.equal(SceneExporter.sceneScale("3"), 3);
-    assert.equal(SceneExporter.sceneScale(0), 1);
-    assert.equal(SceneExporter.sceneScale(undefined), 1);
-    assert.equal(SceneExporter.sceneScale(Number.NaN), 1);
+    assert.equal(gridDistanceOf({ mapUnit: "" }, 1600, 50).units, "km", "no unit named, the default");
 });
 
 test("a crop kept where it is drawn (not lined up with the grid) keeps its corner and the zoom it gives, on any grid", () => {

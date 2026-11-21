@@ -92,7 +92,7 @@ export class Overlay {
      *     field (the default), the dialogue itself, so a key pressed next types into nothing, or
      *     nowhere: it stays where it was (a docked dialogue opened by work on the map).
      * @param {"split"} [options.footer] - Board N1's footer: the buttons marked `start` (Cancel) at
-     *     the start after any start item, the rest at the end, each as wide as its label.
+     *     the start with any start line after them, the rest at the end, each as wide as its label.
      * @param {string} [options.footerStart] - A line of text at the footer's start (an estimate).
      * @returns {Promise<unknown>}
      */
@@ -290,17 +290,19 @@ export class Overlay {
         const footer = doc.createElement("footer");
         footer.className = "fwmb-overlay-footer";
         const split = this.#footer === "split";
-        if (split) {
-            footer.classList.add("fwmb-overlay-footer--split");
-            const line = doc.createElement("span");
-            line.className = "fwmb-start fwmb-hint";
-            line.textContent = this.#footerStart ?? "";
-            line.hidden = !this.#footerStart;
-            footer.append(line);
-        }
-        // In a split footer the start buttons come first, then a gap that pushes the rest to the end
-        const ordered = split ? [...this.#buttons.filter((button) => button.start), null, ...this.#buttons.filter((button) => !button.start)] : this.#buttons;
+        if (split) footer.classList.add("fwmb-overlay-footer--split");
+        // In a split footer the start buttons (Cancel) come first, then the start line, then a gap
+        // that pushes the rest to the end
+        const ordered = split ? [...this.#buttons.filter((button) => button.start), "line", null, ...this.#buttons.filter((button) => !button.start)] : this.#buttons;
         for (const button of ordered) {
+            if (button === "line") {
+                const line = doc.createElement("span");
+                line.className = "fwmb-start fwmb-hint";
+                line.textContent = this.#footerStart ?? "";
+                line.hidden = !this.#footerStart;
+                footer.append(line);
+                continue;
+            }
             if (button === null) {
                 const gap = doc.createElement("span");
                 gap.className = "fwmb-overlay-gap";

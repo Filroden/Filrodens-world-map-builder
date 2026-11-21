@@ -27,15 +27,22 @@ const MIX_MIN_SHARE = 0.05;
 /** Each settlement tier's name, from its default pin style. */
 const TIER_NAMES = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name]));
 
+/**
+ * The rows only the studio needs (Ken, 2026-11-21): which detail level shows an item or its name,
+ * and what Generate again does with it. A scene's journal pages leave them out.
+ */
+const STUDIO_ONLY = new Set(["FILRODENSWMB.UI.GeneratedShownFrom", "FILRODENSWMB.UI.GeneratedNameShownFrom", "FILRODENSWMB.UI.GeneratedNextRun"]);
+
 export class GeneratedDetails {
     /**
      * A generated pin's rows, or a hand-placed settlement pin's from what the last run gave it as a
      * seat (`modelled`, see Generation.seats); null for a pin no run made or built on.
      * @param {object} app
      * @param {object} pin
+     * @param {{journal?: boolean}} [options] - journal: the rows a journal page gives, without the studio's own.
      * @returns {{label: string, value: string}[]|null}
      */
-    static forPin(app, pin) {
+    static forPin(app, pin, { journal = false } = {}) {
         const generated = pin.generated ?? pin.modelled;
         if (!generated) return null;
         const tierName = TIER_NAMES.get(generated.tier);
@@ -49,7 +56,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
             ["FILRODENSWMB.UI.GeneratedNameShownFrom", this.#nameLevel(app, pin)],
             ["FILRODENSWMB.UI.GeneratedNextRun", pin.generated ? this.#fate(pin) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptSeat")],
-        ]);
+        ], { journal });
     }
 
     /** The level a pin's name shows from, when it is later than the pin's own (null when hidden or the same). */
@@ -66,9 +73,10 @@ export class GeneratedDetails {
      * beneath it, and the detail level it is shown from.
      * @param {object} app
      * @param {object} region
+     * @param {{journal?: boolean}} [options] - journal: the rows a journal page gives, without the studio's own.
      * @returns {{label: string, value: string}[]|null}
      */
-    static forRegion(app, region) {
+    static forRegion(app, region, { journal = false } = {}) {
         const generated = region.generated ?? region.modelled;
         if (!generated) return null;
         const place = this.#placeOf(app, region);
@@ -83,7 +91,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedCounties", place ? this.#count(below[COUNTIES - place.depth - 1]) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", place ? this.#levelName(DetailLevel.ofLevel(place.set, place.level)) : null],
             ["FILRODENSWMB.UI.GeneratedNextRun", region.generated ? this.#fate(region, place) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRegion")],
-        ]);
+        ], { journal });
     }
 
     /**
@@ -91,26 +99,43 @@ export class GeneratedDetails {
      * A generated item has a page only while the map labels it at its detail level (a run makes
      * thousands of places, and a fill-in thousands more): shown, with its name drawn at that level,
      * its label not hidden and its label style not turned off in the Labels menu. Its page holds its
-     * description, then its generated figures as plain lines. Others have one as before: when they
-     * have a name or a description.
+     * description, then its generated figures as plain lines (not the studio's own: the detail level
+     * it is shown from and what Generate again does with it). Others have one as before: when they
+     * have a name or a description. With an export's area, only what is inside it.
      * @param {object} app
+     * @param {{area?: {x: number, y: number, width: number, height: number}|null}} [options]
      * @returns {{pins: {item: object, text: string}[], regions: {item: object, text: string}[], routes: {item: object, text: string}[]}}
      */
-    static journalPages(app) {
+    static journalPages(app, { area = null } = {}) {
         const page = (item, rows) => ({ item, text: this.#pageText(item.description, rows) });
+        // Inside an export's area (S0 step 7b): a pin at a point in it, a route with a point in it,
+        // a region whose extent meets it
+        const inside = (x, y) => !area || (x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height);
+        const meets = (box) => !area || (!!box && box.minX <= area.x + area.width && box.maxX >= area.x && box.minY <= area.y + area.height && box.maxY >= area.y);
+        const routeInside = (route) => {
+            if (!area) return true;
+            if (route.points) return route.points.some((point) => inside(point.x, point.y));
+            const line = route.legs && app.meshSession ? app.meshSession.routeLine(route) : [];
+            for (let i = 0; i < line.length; i += 2) if (inside(line[i], line[i + 1])) return true;
+            return false;
+        };
         const wanted = (item) => !!(item.name || item.description);
         const { showsName } = DetailLevel.shown(app);
         const styleShown = ContentRows.labelShown(app);
         const labelled = (item) => !!item.name && item.label?.visibility !== "none" && styleShown(item.label);
-        const pins = (app.mapPins ?? []).filter((pin) => wanted(pin) && (!pin.generated || (DetailLevel.shows(app, "pin", pin) && showsName(pin) && labelled(pin)))).map((pin) => page(pin, this.forPin(app, pin)));
+        const pins = (app.mapPins ?? []).filter((pin) => wanted(pin) && inside(pin.x, pin.y) && (!pin.generated || (DetailLevel.shows(app, "pin", pin) && showsName(pin) && labelled(pin)))).map((pin) => page(pin, this.forPin(app, pin, { journal: true })));
         const regions = [];
         for (const set of app.layerSets ?? []) {
             for (const level of set.levels) {
                 const shown = DetailLevel.shows(app, "region", { set, level });
-                for (const region of level.regions) if (wanted(region) && (!region.generated || (shown && labelled(region)))) regions.push(page(region, this.forRegion(app, region)));
+                for (const region of level.regions) {
+                    if (!wanted(region) || (region.generated && !(shown && labelled(region)))) continue;
+                    if (area && !meets(app.meshSession?.regionBounds(level.id, region.key))) continue;
+                    regions.push(page(region, this.forRegion(app, region, { journal: true })));
+                }
             }
         }
-        const routes = (app.mapRoutes ?? []).filter((route) => wanted(route) && (!route.generated || labelled(route))).map((route) => page(route, null));
+        const routes = (app.mapRoutes ?? []).filter((route) => wanted(route) && (!route.generated || labelled(route)) && routeInside(route)).map((route) => page(route, null));
         return { pins, regions, routes };
     }
 
@@ -227,8 +252,8 @@ export class GeneratedDetails {
     }
 
     /** The rows whose value is known, localised. */
-    static #rows(entries) {
-        return entries.filter(([, value]) => value !== null && value !== undefined).map(([label, value]) => ({ label: platform.i18n.localize(label), value }));
+    static #rows(entries, { journal = false } = {}) {
+        return entries.filter(([label, value]) => value !== null && value !== undefined && !(journal && STUDIO_ONLY.has(label))).map(([label, value]) => ({ label: platform.i18n.localize(label), value }));
     }
 
     static #count(value) {

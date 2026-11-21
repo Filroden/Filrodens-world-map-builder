@@ -32,6 +32,7 @@
  */
 import { Idiomorph } from "../../vendor/idiomorph/idiomorph.esm.js";
 import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
+import { StudioHold } from "./StudioHold.js";
 
 /** Elements carrying this attribute are never changed or removed by a redraw. */
 const MORPH_IGNORE_ATTRIBUTE = "data-morph-ignore";
@@ -98,6 +99,9 @@ export class StudioView {
 
     #destroyed = false;
 
+    /** Holds the studio while work reads its map (see StudioHold). */
+    #hold;
+
     /**
      * @param {object} options
      * @param {HTMLElement} options.root - The element the regions live in; also where clicks are listened for.
@@ -121,6 +125,7 @@ export class StudioView {
         this.#afterRender = afterRender;
         this.#listRows = listRows;
 
+        this.#hold = new StudioHold(root);
         root.addEventListener("click", this.#onClick);
         root.addEventListener("input", this.#onSliderInput);
         root.addEventListener("dblclick", this.#onSliderDoubleClick);
@@ -129,6 +134,21 @@ export class StudioView {
     /** The element the regions live in. */
     get root() {
         return this.#root;
+    }
+
+    /**
+     * Holds the studio while work reads its map, or ends the hold (see StudioHold): every control
+     * that would change the map or what it shows waits, with `reason` as its tooltip, except the
+     * actions `allowed`.
+     * @param {{reason: string, allowed?: Iterable<string>}|null} hold
+     */
+    hold(hold) {
+        if (!this.#destroyed) this.#hold.set(hold);
+    }
+
+    /** Whether the studio is held (see hold). */
+    get held() {
+        return this.#hold.held;
     }
 
     /**
@@ -301,6 +321,7 @@ export class StudioView {
     #onClick = (event) => {
         const target = event.target.closest?.("[data-action]");
         if (!target || !this.#root.contains(target) || target.closest("dialog")) return;
+        if (this.#hold.refuses(target.dataset.action)) return;
         const handler = this.#actions[target.dataset.action];
         if (handler) handler.call(this.#controller, event, target);
     };
@@ -335,6 +356,7 @@ export class StudioView {
     /** Stops listening and drops any queued redraw. */
     destroy() {
         this.#destroyed = true;
+        this.#hold.destroy();
         this.#root.removeEventListener("click", this.#onClick);
         this.#root.removeEventListener("input", this.#onSliderInput);
         this.#root.removeEventListener("dblclick", this.#onSliderDoubleClick);

@@ -3,7 +3,7 @@
  * scale bar's tick and place. The unit's name and how distances are written are the kernel's (MapUnit); the
  * scale itself comes from the map's latitudes and world (see Schema.effectiveKmPerPx).
  */
-import { worldScaleTick } from "../../../kernel/data/MapUnit.js";
+import { cleanUnit, worldScaleTick } from "../../../kernel/data/MapUnit.js";
 import { effectiveKmPerPx } from "../mesh/Schema.js";
 
 /** The scale bar's interval when a map has none (as the bar has always drawn). */
@@ -53,4 +53,23 @@ export function scaleBarOnMap(state, mapWidth, mapHeight) {
         x: Math.max(margin, Math.min(x, mapWidth - margin - width)),
         y: Math.max(margin, Math.min(y, mapHeight - margin)),
     };
+}
+
+/** Significant figures kept in a scene's grid distance: enough for the ruler, without a long tail of digits. */
+const GRID_DISTANCE_FIGURES = 3;
+
+/**
+ * The ground one grid cell covers, as Foundry's grid distance and units: the cell's width at the
+ * map's scale, to three significant figures, in the map's unit. A regional map keeps its parent's
+ * grid size in pixels, so its cells measure less. The same at any export scale: a cell is the same
+ * piece of the map.
+ * @param {object} state - The studio's uiState (latitudes, world, map unit).
+ * @param {number} mapHeight
+ * @param {number} gridSize - The grid's size in map pixels.
+ * @returns {{distance: number, units: string}|{}} Nothing when the scale cannot be worked out.
+ */
+export function gridDistanceOf(state, mapHeight, gridSize) {
+    const distance = gridSize * kmPerPxOf(state, mapHeight);
+    if (!(distance > 0) || !Number.isFinite(distance)) return {};
+    return { distance: Number(distance.toPrecision(GRID_DISTANCE_FIGURES)), units: cleanUnit(state?.mapUnit) };
 }

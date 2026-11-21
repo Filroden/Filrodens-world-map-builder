@@ -14,6 +14,9 @@ export const FILRODENSWMB = {
     ID: "filrodens-world-map-builder",
     FLAGS: {
         IS_ACTIVE: "isActiveCanvas",
+        // The area and scale a scene was exported with (S0 step 7b), so exporting again can say
+        // when a different choice would leave its walls, lights and tokens out of line
+        EXPORT_AREA: "exportArea",
         HEX_DATA: "hexData",
         PARAMS: "generationParams",
         // Where GridDataExporter writes the per-grid-cell exploration data layer at export time

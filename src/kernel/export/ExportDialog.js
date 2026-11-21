@@ -2,13 +2,16 @@ import { FILRODENSWMB } from "../../config.js";
 import { platform } from "../../platform/index.js";
 import { formatDistance } from "../data/MapUnit.js";
 import { AreaControl } from "./AreaControl.js";
-import { ExportArea, ExportScale } from "./ExportScale.js";
+import { ExportArea, ExportScale, SceneArea } from "./ExportScale.js";
 import { ImageFormat } from "./ImageFormat.js";
 
 const TEMPLATE = "modules/filrodens-world-map-builder/templates/shell/dialogs/export.hbs";
 
 /** How long the estimates wait after the area or scale last changed. */
 const ESTIMATE_WAIT_MS = 250;
+
+/** How long the scene's name waits after typing before the dialogue looks for a scene of that name. */
+const NAME_WAIT_MS = 300;
 
 /** The preview's longest side, in pixels drawn (its CSS size at twice the pixels). */
 const PREVIEW_SIDE = 1200;
@@ -18,20 +21,26 @@ const ONE_COLUMN_BELOW = 900;
 const SHORT_BELOW = 760;
 
 /**
- * The export dialogue (S0 step 7; the decision record's §9, DE; boards X1a, X1b, X2a, X2b): one
- * dialogue for every image export. The **Area** (presets, Aspect, the map as it shows now with
- * the area over it, see AreaControl), **Scale** (one slider in steps of 0.05 from 0.25× to the
- * map type's ceiling, the recommendation flagged, the terrain line, and at the ceiling the steer
- * to Cut regional world…), the image's size or **Too large** with its two nearest fits, **Image
- * format and quality** with each format's size estimated from sample tiles inside the area, and
- * **File name**. Export draws the image in tiles, one a frame, with its progress and Cancel in the
- * dialogue, then saves it and closes. The preset, aspect and format are remembered for each kind
- * of export; a drawn area never is.
+ * The export dialogue (S0 step 7; the decision record's §9, DE; boards X1a, X1b, X2a, X2b, X4): one
+ * dialogue for every image export and for Export to scene. The **Area** (presets, Aspect, the map
+ * as it shows now with the area over it, see AreaControl), **Scale** (one slider in steps of 0.05
+ * from 0.25× to the map type's ceiling, the recommendation flagged, the terrain line, and at the
+ * ceiling the steer to Cut regional world…), the image's size or **Too large** with its two
+ * nearest fits, **Image format and quality** with each format's size estimated from sample tiles
+ * inside the area, and **File name**. Export draws the image in tiles, one a frame, with its
+ * progress and Cancel in the dialogue; **Close and keep drawing** leaves a toast with Cancel, and
+ * the studio is held meanwhile (see the source's `hold`). The preset, aspect and format are
+ * remembered for each kind of export; a drawn area never is.
+ *
+ * **Export to scene** (step 7b) snaps the area to the grid on release (whole cells, its corner on
+ * a grid corner; see SceneArea), takes a scale at which a cell is whole pixels, offers the journal
+ * and GM overlay choices and the scene's name and folder, and warns when the scene of that name
+ * was made with another area or scale.
  *
  * The studio hands it a **source**: what it needs of the map, and how to draw it.
  *
  * @typedef {object} ExportSource
- * @property {"png"} kind - The kind of export, whose choices are remembered.
+ * @property {"png"|"scene"} kind - The kind of export, whose choices are remembered.
  * @property {string} title - The dialogue's title (Export image, Export this age…).
  * @property {string} name - What the file is named from (the map's, the age's, the journey's).
  * @property {{width: number, height: number}} map - The map's size in pixels.
@@ -44,13 +53,23 @@ const SHORT_BELOW = 760;
  * @property {number} tileLimit - The largest tile drawn at once.
  * @property {(side: number) => HTMLCanvasElement|null} drawPreview - The map as it shows now, its longest side `side`.
  * @property {(area: object, scale: number) => {tiles: HTMLCanvasElement[], pixels: number}} samples
- * @property {(area: object, scale: number, options: {onTile: Function, signal: AbortSignal}) => Promise<HTMLCanvasElement|null>} draw
+ * @property {(area: object, scale: number, options: {onTile: Function, signal: AbortSignal}) => Promise<HTMLCanvasElement|null>} [draw] - An image export's drawing.
  * @property {(() => string|null)} [cutOff] - Why a regional world cannot be cut (null when it can).
  * @property {((area: object) => void)} [cut] - Opens Cut regional world… on the area.
+ * @property {((on: boolean) => void)} [hold] - Holds the studio while the export draws, and frees it.
+ * @property {{type: string, size: number}} [grid] - A scene's: the map's grid type and size.
+ * @property {number} [minCell] - A scene's: the least grid size, in the scene's pixels.
+ * @property {number} [maxSide] - A scene's: the graphics card's largest texture.
+ * @property {string} [sceneName] - A scene's: the name it is first offered.
+ * @property {string} [folder] - A scene's: the folder it is first offered.
+ * @property {(area: object) => number} [pageCount] - A scene's: the journal pages the area gives.
+ * @property {(name: string) => Promise<object|null>} [previous] - A scene's: the area and scale the scene of that name was made with.
+ * @property {(choice: object, progress: {onTile: Function, onStage: Function, signal: AbortSignal}) => Promise<boolean>} [exportScene] - Makes the scene.
  */
 export class ExportDialog {
     /**
-     * Opens the dialogue. Resolves once it has closed: true when the image was saved.
+     * Opens the dialogue. Resolves once it has closed and any drawing left going has ended: true
+     * when the image was saved (or the scene made).
      * @param {ExportSource} source
      * @returns {Promise<boolean>}
      */
@@ -60,11 +79,14 @@ export class ExportDialog {
     }
 
     #source;
+    #scene;
     #overlay = null;
     #parts = {};
     #control = null;
     #formats = [];
     #area;
+    #cells = null;
+    #drawnOutline = null;
     #preset;
     #lastPreset;
     #aspect;
@@ -74,26 +96,43 @@ export class ExportDialog {
     #typedName = null;
     #estimates = new Map();
     #estimateTimer = null;
+    #previous = null;
+    #nameTimer = null;
     #drawing = null;
+    #running = null;
+    #kept = false;
+    #toast = null;
     #resize = null;
 
     constructor(source) {
         this.#source = source;
+        this.#scene = source.kind === "scene";
+    }
+
+    /** The setting keys of this kind's remembered preset and aspect. */
+    get #settings() {
+        const { SETTINGS } = FILRODENSWMB.EXPORT_PNG;
+        return this.#scene ? { preset: SETTINGS.PRESET_SCENE, aspect: SETTINGS.ASPECT_SCENE } : { preset: SETTINGS.PRESET_PNG, aspect: SETTINGS.ASPECT_PNG };
+    }
+
+    /** Whether the area snaps to a grid (a scene's, on a map with one). */
+    get #snaps() {
+        return this.#scene && !!SceneArea.geometry(this.#source.grid ?? {});
     }
 
     async #open() {
         const { i18n } = platform;
         const source = this.#source;
-        const { PRESETS, ASPECTS, SCALE, SETTINGS } = FILRODENSWMB.EXPORT_PNG;
+        const { PRESETS, ASPECTS, SCALE } = FILRODENSWMB.EXPORT_PNG;
         const available = await ImageFormat.available();
         this.#formats = available.map((id) => ({ id, label: i18n.localize(ImageFormat.byId(id).label) }));
         this.#format = ImageFormat.remembered(source.kind, available);
-        this.#preset = this.#setting(SETTINGS.PRESET_PNG, PRESETS);
+        this.#preset = this.#setting(this.#settings.preset, PRESETS);
         this.#lastPreset = this.#preset;
-        this.#aspect = this.#setting(SETTINGS.ASPECT_PNG, ASPECTS.map((aspect) => aspect.id));
-        this.#area = this.#presetArea(this.#preset);
+        this.#aspect = this.#setting(this.#settings.aspect, ASPECTS.map((aspect) => aspect.id));
+        this.#setArea(this.#presetArea(this.#preset));
         this.#recommend = ExportArea.recommend(source.smallestLabelPx, source.ceiling);
-        this.#scale = this.#recommend.scale;
+        this.#scale = this.#sceneScale(this.#recommend.scale);
 
         const stops = [...SCALE.STOPS.filter((stop) => stop <= source.ceiling).map((stop) => ({ stop, minor: false })), ...SCALE.MINOR.map((stop) => ({ stop, minor: true }))];
         const content = await platform.templates.render(TEMPLATE, {
@@ -104,8 +143,13 @@ export class ExportDialog {
             ceiling: source.ceiling,
             stops: stops.map(({ stop, minor }) => ({ minor, pos: this.#position(stop) * 100, label: `${stop}×` })),
             formats: this.#formats,
+            scene: this.#scene,
+            snaps: this.#snaps,
+            sceneName: source.sceneName ?? "",
+            folder: source.folder ?? "",
         });
 
+        const action = this.#scene ? { label: "FILRODENSWMB.UI.ExportScene", icon: "fwmb-icon fwmb-icon--map" } : { label: "FILRODENSWMB.UI.ExportPNG", icon: "fwmb-icon fwmb-icon--png" };
         this.#overlay = platform.dialogs.show({
             title: source.title,
             content,
@@ -114,17 +158,25 @@ export class ExportDialog {
             dismissed: false,
             buttons: [
                 { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), start: true, callback: () => false },
-                { action: "export", label: i18n.localize("FILRODENSWMB.UI.ExportPNG"), icon: "fwmb-icon fwmb-icon--png", default: true, stays: true, callback: () => this.#export() },
+                { action: "keep", label: i18n.localize("FILRODENSWMB.UI.ExportKeepDrawing"), stays: true, callback: () => this.#keepDrawing() },
+                { action: "export", label: i18n.localize(action.label), icon: action.icon, default: true, stays: true, callback: () => this.#export() },
             ],
             onRender: (element) => this.#bind(element),
         });
+        this.#overlay.button("keep").hidden = true;
+        this.#overlay.button("keep").dataset.tooltip = i18n.localize(this.#scene ? "FILRODENSWMB.UI.ExportKeepDrawingSceneHint" : "FILRODENSWMB.UI.ExportKeepDrawingHint");
         // The footer is drawn with the dialogue: its start line and Export follow the choice now
         this.#update();
-        const saved = await this.#overlay.closed;
-        this.#drawing?.abort();
+        if (this.#scene) this.#lookForScene();
+
+        const closed = await this.#overlay.closed;
         clearTimeout(this.#estimateTimer);
+        clearTimeout(this.#nameTimer);
         this.#resize?.disconnect();
         this.#control?.destroy();
+        // Closed while drawing: Close and keep drawing leaves it going; Cancel and Escape stop it
+        if (closed !== "kept") this.#drawing?.abort();
+        const saved = this.#running ? await this.#running : closed === true;
         return saved === true;
     }
 
@@ -145,6 +197,26 @@ export class ExportDialog {
         return ExportArea.withAspect(area, ExportArea.ratio(this.#aspect, map), map);
     }
 
+    /** The area, snapped to the grid for a scene (see SceneArea.snap). */
+    #setArea(area, { fit = false } = {}) {
+        if (this.#snaps) {
+            const snapped = SceneArea.snap(area, this.#source.grid, this.#source.map, { fit });
+            this.#area = snapped.area;
+            this.#cells = snapped.cells;
+        } else {
+            this.#area = ExportArea.clip(area, this.#source.map);
+            this.#cells = null;
+        }
+        if (this.#control) this.#control.area = this.#area;
+    }
+
+    /** A scale offered: in the slider's steps, and for a scene one that makes each cell whole pixels. */
+    #sceneScale(value, { fit = false } = {}) {
+        const stepped = ExportArea.snapScale(value, this.#source.ceiling);
+        if (!this.#snaps) return stepped;
+        return SceneArea.scale(fit ? value : stepped, this.#source.grid, this.#source.minCell ?? FILRODENSWMB.LIMITS.MIN_GRID_SIZE, { fit }).scale;
+    }
+
     // ------------------------------------------------------------------ the parts
 
     #bind(element) {
@@ -157,6 +229,7 @@ export class ExportDialog {
             drawn: find("[data-export-drawn]"),
             aspect: find('[name="exportAspect"]'),
             preview: find("[data-export-preview]"),
+            areaHint: find("[data-export-area-hint]"),
             areaRead: find("[data-export-area-read]"),
             progress: find("[data-export-progress]"),
             tile: find("[data-export-tile]"),
@@ -169,6 +242,7 @@ export class ExportDialog {
             scaleRead: find("[data-export-scale-read]"),
             ground: find("[data-export-ground]"),
             reason: find("[data-export-reason]"),
+            floor: find("[data-export-floor]"),
             terrain: find("[data-export-terrain]"),
             steer: find("[data-export-steer]"),
             cut: find("[data-export-cut]"),
@@ -182,6 +256,15 @@ export class ExportDialog {
             formatRows: [...element.querySelectorAll("[data-export-format]")],
             fileName: find('[name="exportFileName"]'),
             ext: find("[data-export-ext]"),
+            pages: find("[data-export-pages]"),
+            sceneName: find('[name="sceneName"]'),
+            folder: find('[name="exportFolder"]'),
+            journals: find('[name="generateJournals"]'),
+            overwrite: find('[name="overwriteJournals"]'),
+            overlay: find('[name="createGmOverlay"]'),
+            warn: find("[data-export-warn]"),
+            warnText: find("[data-export-warn-text]"),
+            useMade: find("[data-export-use-made]"),
         };
         const parts = this.#parts;
         parts.aspect.value = this.#aspect;
@@ -193,15 +276,12 @@ export class ExportDialog {
         } catch (error) {
             console.warn("FWMB | The export's preview could not be drawn:", error);
         }
+        this.#showGrid();
         this.#control = new AreaControl(parts.preview, {
             map: this.#source.map,
             area: this.#area,
             label: platform.i18n.localize("FILRODENSWMB.UI.ExportArea"),
-            onChange: (area, { final }) => {
-                this.#area = area;
-                this.#preset = "drawn";
-                this.#update({ estimate: final });
-            },
+            onChange: (area, { final }) => this.#onAreaChange(area, final),
         });
         this.#control.ratio = ExportArea.ratio(this.#aspect, this.#source.map);
         parts.rec.style.left = `${this.#position(this.#recommend.scale) * 100}%`;
@@ -223,10 +303,19 @@ export class ExportDialog {
         parts.fitArea.addEventListener("click", () => this.#useFit("area"));
         for (const row of parts.formatRows) row.addEventListener("click", () => this.#chooseFormat(row.dataset.exportFormat));
         parts.formatRows[0]?.parentElement.addEventListener("keydown", this.#onFormatKey);
-        parts.fileName.addEventListener("input", () => {
+        parts.fileName?.addEventListener("input", () => {
             this.#typedName = parts.fileName.value.trim() || null;
         });
         parts.stop.addEventListener("click", () => this.#drawing?.abort());
+        parts.sceneName?.addEventListener("input", () => {
+            clearTimeout(this.#nameTimer);
+            this.#nameTimer = setTimeout(() => this.#lookForScene(), NAME_WAIT_MS);
+        });
+        parts.sceneName?.addEventListener("keydown", (event) => {
+            // Enter in the name exports, once the name has been looked for
+            if (event.key === "Enter") this.#lookForScene();
+        });
+        parts.useMade?.addEventListener("click", () => this.#useMade());
 
         // Two columns while the studio has room, one below that; the preview shorter on a short studio
         const host = element.parentElement;
@@ -244,14 +333,57 @@ export class ExportDialog {
         element.classList.toggle("fwmb-export--short", host.clientHeight < SHORT_BELOW);
     }
 
+    /** A square grid's lines over the preview while the area snaps to it (board X4). */
+    #showGrid() {
+        if (!this.#snaps || this.#source.grid.type !== "square") return;
+        const { map, grid } = this.#source;
+        const lines = this.#parts.element.ownerDocument.createElement("span");
+        lines.className = "fwmb-export-grid";
+        lines.style.setProperty("--cell-x", `${(grid.size / map.width) * 100}%`);
+        lines.style.setProperty("--cell-y", `${(grid.size / map.height) * 100}%`);
+        this.#parts.preview.append(lines);
+    }
+
+    /** The dashed outline of the area as drawn, beside the snapped one, until the area next changes. */
+    #showDrawn(area) {
+        this.#drawnOutline?.remove();
+        this.#drawnOutline = null;
+        if (!area) return;
+        const map = this.#source.map;
+        const outline = this.#parts.element.ownerDocument.createElement("span");
+        outline.className = "fwmb-crop-drawn";
+        Object.assign(outline.style, {
+            left: `${(area.x / map.width) * 100}%`,
+            top: `${(area.y / map.height) * 100}%`,
+            width: `${(area.width / map.width) * 100}%`,
+            height: `${(area.height / map.height) * 100}%`,
+        });
+        this.#parts.preview.append(outline);
+        this.#drawnOutline = outline;
+    }
+
     // ------------------------------------------------------------------ choices
+
+    #onAreaChange(area, final) {
+        this.#preset = "drawn";
+        if (!final) {
+            // While it is dragged the area follows the pointer; it snaps when let go
+            this.#area = area;
+            this.#showDrawn(null);
+            this.#update();
+            return;
+        }
+        this.#setArea(area);
+        this.#showDrawn(this.#snaps ? area : null);
+        this.#update({ estimate: true });
+    }
 
     #choosePreset(preset) {
         if (this.#drawing) return;
         this.#preset = preset;
         this.#lastPreset = preset;
-        this.#area = this.#presetArea(preset);
-        this.#control.area = this.#area;
+        this.#setArea(this.#presetArea(preset));
+        this.#showDrawn(null);
         this.#update({ estimate: true });
     }
 
@@ -260,15 +392,15 @@ export class ExportDialog {
         const ratio = ExportArea.ratio(aspect, this.#source.map);
         this.#control.ratio = ratio;
         // A preset is reshaped from its own area; a drawn one about its centre
-        this.#area = this.#preset === "drawn" ? ExportArea.withAspect(this.#area, ratio, this.#source.map) : this.#presetArea(this.#preset);
-        this.#control.area = this.#area;
+        this.#setArea(this.#preset === "drawn" ? ExportArea.withAspect(this.#area, ratio, this.#source.map) : this.#presetArea(this.#preset));
+        this.#showDrawn(null);
         this.#update({ estimate: true });
     }
 
     #setScale(value, { estimate = true } = {}) {
         if (this.#drawing) return;
         // A number that cannot be read leaves the scale as it was (and the field shows it again)
-        if (Number.isFinite(value)) this.#scale = ExportArea.snapScale(value, this.#source.ceiling);
+        if (Number.isFinite(value)) this.#scale = this.#sceneScale(value);
         this.#update({ estimate });
     }
 
@@ -280,11 +412,11 @@ export class ExportDialog {
 
     #useFit(which) {
         const plan = this.#plan();
-        if (which === "scale" && plan.fitScale) this.#scale = plan.fitScale;
+        if (which === "scale" && plan.fitScale) this.#scale = this.#sceneScale(plan.fitScale, { fit: true });
         if (which === "area" && plan.fitArea) {
-            this.#area = plan.fitArea;
             this.#preset = "drawn";
-            this.#control.area = this.#area;
+            this.#setArea(plan.fitArea, { fit: true });
+            this.#showDrawn(null);
         }
         this.#update({ estimate: true });
     }
@@ -297,13 +429,42 @@ export class ExportDialog {
         this.#source.cut?.(area);
     }
 
+    /** Looks for a scene of the name given, made by an earlier export (see the warning). */
+    async #lookForScene() {
+        const name = this.#sceneNameChosen();
+        let previous = null;
+        try {
+            previous = (await this.#source.previous?.(name)) ?? null;
+        } catch (error) {
+            console.warn("FWMB | The scene's earlier export could not be read:", error);
+        }
+        if (name !== this.#sceneNameChosen()) return;
+        this.#previous = previous;
+        this.#update();
+    }
+
+    #sceneNameChosen() {
+        return this.#parts.sceneName?.value.trim() || this.#source.sceneName || "";
+    }
+
+    /** The warning's Use the scene's area and scale. */
+    #useMade() {
+        const made = this.#previous;
+        if (!made || this.#drawing) return;
+        this.#preset = "drawn";
+        this.#setArea(made);
+        this.#scale = this.#sceneScale(made.scale);
+        this.#showDrawn(null);
+        this.#update({ estimate: true });
+    }
+
     // ------------------------------------------------------------------ the slider
 
     /** Where a scale sits along the slider, 0 to 1: by its square root, so the low scales have room. */
     #position(scale) {
         const { MIN } = FILRODENSWMB.EXPORT_PNG.SCALE;
         const low = Math.sqrt(MIN);
-        return (Math.sqrt(scale) - low) / (Math.sqrt(this.#source.ceiling) - low);
+        return Math.min(Math.max((Math.sqrt(scale) - low) / (Math.sqrt(this.#source.ceiling) - low), 0), 1);
     }
 
     #fromPosition(position) {
@@ -339,12 +500,12 @@ export class ExportDialog {
     };
 
     #onTrackKey = (event) => {
-        const { STEP, STOPS, MIN } = FILRODENSWMB.EXPORT_PNG.SCALE;
+        const { STOPS, MIN } = FILRODENSWMB.EXPORT_PNG.SCALE;
         const ceiling = this.#source.ceiling;
         const stops = STOPS.filter((stop) => stop <= ceiling);
         let next = null;
-        if (event.key === "ArrowRight" || event.key === "ArrowUp") next = this.#scale + STEP;
-        else if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = this.#scale - STEP;
+        if (event.key === "ArrowRight" || event.key === "ArrowUp") next = this.#nextStep(1);
+        else if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = this.#nextStep(-1);
         else if (event.key === "PageUp") next = stops.find((stop) => stop > this.#scale + 1e-9) ?? ceiling;
         else if (event.key === "PageDown") next = [...stops].reverse().find((stop) => stop < this.#scale - 1e-9) ?? MIN;
         else if (event.key === "Home") next = MIN;
@@ -354,6 +515,15 @@ export class ExportDialog {
         event.stopPropagation();
         this.#setScale(next);
     };
+
+    /** The next scale along the slider that differs from this one (a scene's whole cells may need more than one step). */
+    #nextStep(direction) {
+        const { STEP, MIN } = FILRODENSWMB.EXPORT_PNG.SCALE;
+        for (let value = this.#scale + direction * STEP; value >= MIN - 1e-9 && value <= this.#source.ceiling + 1e-9; value += direction * STEP) {
+            if (Math.abs(this.#sceneScale(value) - this.#scale) > 1e-9) return value;
+        }
+        return this.#scale;
+    }
 
     #onFormatKey = (event) => {
         const rows = this.#parts.formatRows;
@@ -370,11 +540,20 @@ export class ExportDialog {
     // ------------------------------------------------------------------ drawing the parts
 
     #plan() {
-        return ExportArea.plan(this.#source.map, this.#area, this.#scale);
+        return ExportArea.plan(this.#source.map, this.#area, this.#scale, { maxSide: this.#scene ? (this.#source.maxSide ?? Infinity) : Infinity });
     }
 
     #km(px) {
         return formatDistance(px * this.#source.kmPerPx);
+    }
+
+    #scaleText(scale = this.#scale) {
+        return `${scale.toLocaleString(undefined, { maximumFractionDigits: 2 })}×`;
+    }
+
+    /** The scene's cell at the scale, in its pixels (null on a gridless map). */
+    #cell() {
+        return this.#snaps ? Math.round(this.#source.grid.size * this.#scale) : null;
     }
 
     #update({ estimate = false } = {}) {
@@ -385,26 +564,37 @@ export class ExportDialog {
         const number = (value) => value.toLocaleString();
         const plan = this.#plan();
         const scale = this.#scale;
-        const scaleText = `${scale.toLocaleString(undefined, { maximumFractionDigits: 2 })}×`;
+        const scaleText = this.#scaleText();
+        const cell = this.#cell();
 
         // The Area
         for (const button of parts.presets) button.setAttribute("aria-pressed", String(button.dataset.exportPreset === this.#preset));
         parts.drawn.hidden = this.#preset !== "drawn";
         const ground = i18n.format("FILRODENSWMB.UI.ExportAreaGround", { width: this.#km(this.#area.width), height: this.#km(this.#area.height), unit: source.unit });
-        parts.areaRead.textContent = this.#preset === "drawn" ? ground : i18n.format("FILRODENSWMB.UI.ExportAreaPresetGround", { preset: i18n.localize(PRESET_LABELS[this.#preset]), ground });
-        this.#control.setLabel(ground);
+        if (this.#snaps) {
+            parts.areaRead.textContent = i18n.format("FILRODENSWMB.UI.ExportAreaMapPixels", { width: number(Math.round(this.#area.width)), height: number(Math.round(this.#area.height)) });
+            this.#control.setLabel(this.#cells ? i18n.format("FILRODENSWMB.UI.ExportSnappedCells", { across: this.#cells.across, down: this.#cells.down }) : ground);
+        } else {
+            parts.areaRead.textContent = this.#preset === "drawn" ? ground : i18n.format("FILRODENSWMB.UI.ExportAreaPresetGround", { preset: i18n.localize(PRESET_LABELS[this.#preset]), ground });
+            this.#control.setLabel(ground);
+        }
         this.#control.setOver(!plan.fits);
+        if (parts.pages) parts.pages.textContent = this.#pagesText();
 
         // Scale
         const position = this.#position(scale);
         parts.track.style.setProperty("--pos", `${position * 100}%`);
         parts.track.setAttribute("aria-valuenow", String(scale));
         const groundPx = i18n.format("FILRODENSWMB.UI.ExportGroundPixel", { distance: formatDistance(source.kmPerPx / scale), unit: source.unit });
-        parts.track.setAttribute("aria-valuetext", `${scaleText}, ${groundPx}`);
+        const groundLine = cell ? i18n.format("FILRODENSWMB.UI.ExportGroundCells", { ground: groundPx, cell }) : groundPx;
+        parts.track.setAttribute("aria-valuetext", `${scaleText}, ${groundLine}`);
         if (parts.element.ownerDocument.activeElement !== parts.scaleField) parts.scaleField.value = scaleText;
         parts.scaleRead.textContent = scaleText;
-        parts.ground.textContent = groundPx;
+        parts.ground.textContent = groundLine;
         parts.reason.textContent = this.#reasonText();
+        const floor = this.#snaps ? SceneArea.scale(1, source.grid, source.minCell ?? FILRODENSWMB.LIMITS.MIN_GRID_SIZE).floor : 0;
+        parts.floor.hidden = !(floor > FILRODENSWMB.EXPORT_PNG.SCALE.MIN);
+        if (!parts.floor.hidden) parts.floor.textContent = i18n.format("FILRODENSWMB.UI.ExportSceneFloor", { cell: source.minCell ?? FILRODENSWMB.LIMITS.MIN_GRID_SIZE, scale: this.#scaleText(floor) });
         const atCeiling = source.rasterPx > 0 && scale >= source.ceiling - 1e-9;
         parts.terrain.hidden = !(source.rasterPx > 0 && scale > 1 && !atCeiling);
         if (!parts.terrain.hidden) parts.terrain.textContent = i18n.format("FILRODENSWMB.UI.ExportTerrainLine", { scale: scaleText, px: number(source.rasterPx) });
@@ -419,27 +609,12 @@ export class ExportDialog {
         // The image, or Too large
         parts.result.hidden = !plan.fits;
         parts.tooLarge.hidden = plan.fits;
-        const what = i18n.format(this.#preset === "whole" ? "FILRODENSWMB.UI.ExportOfTheMap" : this.#preset === "screen" ? "FILRODENSWMB.UI.ExportOfTheView" : "FILRODENSWMB.UI.ExportOfTheArea", { scale: scaleText });
         const sizeText = i18n.format("FILRODENSWMB.UI.ExportPixels", { width: number(plan.width), height: number(plan.height) });
         if (plan.fits) {
             parts.size.textContent = sizeText;
-            parts.what.textContent = what;
+            parts.what.textContent = this.#whatText(scaleText, cell);
         } else {
-            const { MAX_SIDE, MAX_PIXELS } = FILRODENSWMB.EXPORT_PNG;
-            parts.limit.innerHTML = i18n.format("FILRODENSWMB.UI.ExportTooLargeLine", {
-                scale: `<b>${scaleText}</b>`,
-                size: `<b>${sizeText}</b>`,
-                side: number(MAX_SIDE),
-                pixels: number(MAX_PIXELS / 1e6),
-            });
-            this.#fitButton(parts.fitScale, plan.fitScale, () => {
-                const size = ExportArea.size(this.#area, plan.fitScale);
-                return [i18n.format("FILRODENSWMB.UI.ExportFitScale", { scale: `${plan.fitScale}×` }), i18n.format("FILRODENSWMB.UI.ExportFitScaleLine", { size: i18n.format("FILRODENSWMB.UI.ExportPixels", { width: number(size.width), height: number(size.height) }) })];
-            });
-            this.#fitButton(parts.fitArea, plan.fitArea, () => [
-                i18n.localize("FILRODENSWMB.UI.ExportFitArea"),
-                i18n.format("FILRODENSWMB.UI.ExportFitAreaLine", { width: this.#km(plan.fitArea.width), height: this.#km(plan.fitArea.height), unit: source.unit, scale: scaleText }),
-            ]);
+            this.#tooLarge(plan, scaleText, sizeText);
         }
 
         // Formats, with their estimates
@@ -455,17 +630,53 @@ export class ExportDialog {
             else size.textContent = i18n.localize("FILRODENSWMB.UI.ExportEstimating");
         }
 
-        // File name
-        if (this.#typedName === null) parts.fileName.value = this.#fileName();
-        parts.ext.textContent = `.${ImageFormat.byId(this.#format).extension}`;
+        // File name (an image's), and the warning (a scene's)
+        if (parts.fileName) {
+            if (this.#typedName === null) parts.fileName.value = this.#fileName();
+            parts.ext.textContent = `.${ImageFormat.byId(this.#format).extension}`;
+        }
+        if (parts.warn) {
+            const differs = !!this.#previous && !SceneArea.same(this.#previous, { ...this.#area, scale });
+            parts.warn.hidden = !differs;
+            if (differs) parts.warnText.innerHTML = this.#warnText();
+        }
 
         // The footer: how many tiles, and Export only while the choice fits
-        const tiles = ExportScale.tiles(plan.width, plan.height, source.tileLimit).length;
-        this.#overlay?.setFooterStart(plan.fits && tiles > 1 ? i18n.format("FILRODENSWMB.UI.ExportTiles", { count: tiles }) : "");
-        const exportButton = this.#overlay?.button("export");
-        if (exportButton) exportButton.disabled = !plan.fits || !!this.#drawing;
+        if (!this.#drawing) {
+            const tiles = ExportScale.tiles(plan.width, plan.height, source.tileLimit).length;
+            this.#overlay?.setFooterStart(plan.fits && tiles > 1 ? i18n.format("FILRODENSWMB.UI.ExportTiles", { count: tiles }) : "");
+            const exportButton = this.#overlay?.button("export");
+            if (exportButton) exportButton.disabled = !plan.fits;
+        }
 
         if (estimate && plan.fits) this.#scheduleEstimate();
+    }
+
+    #whatText(scaleText, cell) {
+        const { i18n } = platform;
+        if (this.#scene && cell && this.#cells) return i18n.format("FILRODENSWMB.UI.ExportSceneCells", { across: this.#cells.across, down: this.#cells.down, cell });
+        const key = this.#preset === "whole" ? "FILRODENSWMB.UI.ExportOfTheMap" : this.#preset === "screen" ? "FILRODENSWMB.UI.ExportOfTheView" : "FILRODENSWMB.UI.ExportOfTheArea";
+        return i18n.format(key, { scale: scaleText });
+    }
+
+    #tooLarge(plan, scaleText, sizeText) {
+        const { i18n } = platform;
+        const parts = this.#parts;
+        const source = this.#source;
+        const number = (value) => value.toLocaleString();
+        const { MAX_SIDE, MAX_PIXELS } = FILRODENSWMB.EXPORT_PNG;
+        const side = this.#scene ? Math.min(MAX_SIDE, source.maxSide ?? MAX_SIDE) : MAX_SIDE;
+        const key = this.#scene && side < MAX_SIDE ? "FILRODENSWMB.UI.ExportTooLargeSceneLine" : "FILRODENSWMB.UI.ExportTooLargeLine";
+        parts.limit.innerHTML = i18n.format(key, { scale: `<b>${scaleText}</b>`, size: `<b>${sizeText}</b>`, side: number(side), pixels: number(MAX_PIXELS / 1e6) });
+        const fitScale = plan.fitScale ? this.#sceneScale(plan.fitScale, { fit: true }) : null;
+        this.#fitButton(parts.fitScale, fitScale, () => {
+            const size = ExportArea.size(this.#area, fitScale);
+            return [i18n.format("FILRODENSWMB.UI.ExportFitScale", { scale: this.#scaleText(fitScale) }), i18n.format("FILRODENSWMB.UI.ExportFitScaleLine", { size: i18n.format("FILRODENSWMB.UI.ExportPixels", { width: number(size.width), height: number(size.height) }) })];
+        });
+        this.#fitButton(parts.fitArea, plan.fitArea, () => [
+            i18n.localize("FILRODENSWMB.UI.ExportFitArea"),
+            i18n.format("FILRODENSWMB.UI.ExportFitAreaLine", { width: this.#km(plan.fitArea.width), height: this.#km(plan.fitArea.height), unit: source.unit, scale: scaleText }),
+        ]);
     }
 
     #fitButton(button, fit, text) {
@@ -485,6 +696,24 @@ export class ExportDialog {
         if (reason.kind === "enough") return i18n.format("FILRODENSWMB.UI.ExportReasonEnough", { scale, px: px(reason.px) });
         if (reason.kind === "reaches") return i18n.format("FILRODENSWMB.UI.ExportReasonReaches", { scale, px: px(reason.px), scaledPx: px(reason.scaledPx) });
         return i18n.format("FILRODENSWMB.UI.ExportReasonShort", { scale, px: px(reason.px), scaledPx: px(reason.scaledPx) });
+    }
+
+    /** Generate journals, with how many pages the area gives. */
+    #pagesText() {
+        const { i18n } = platform;
+        const count = this.#source.pageCount?.(this.#area);
+        return Number.isFinite(count) ? i18n.format(count === 1 ? "FILRODENSWMB.UI.ExportScenePage" : "FILRODENSWMB.UI.ExportScenePages", { count }) : i18n.localize("FILRODENSWMB.UI.GenerateJournals");
+    }
+
+    /** The warning's text: what the scene was made with (escaped), and what a different choice leaves. */
+    #warnText() {
+        const { i18n, utils } = platform;
+        const made = this.#previous;
+        const name = `<b>${utils.escapeHtml(this.#sceneNameChosen())}</b>`;
+        const whole = SceneArea.same({ ...made, scale: 1 }, { ...SceneArea.snap({ x: 0, y: 0, ...this.#source.map }, this.#source.grid ?? {}, this.#source.map).area, scale: 1 });
+        const scale = this.#scaleText(Number(made.scale));
+        const first = whole ? i18n.format("FILRODENSWMB.UI.ExportSceneWarnWhole", { name, scale }) : i18n.format("FILRODENSWMB.UI.ExportSceneWarnArea", { name, scale, width: Math.round(made.width).toLocaleString(), height: Math.round(made.height).toLocaleString() });
+        return `${first} ${i18n.localize("FILRODENSWMB.UI.ExportSceneWarnLine")}`;
     }
 
     #fileName() {
@@ -519,74 +748,165 @@ export class ExportDialog {
 
     // ------------------------------------------------------------------ export
 
-    /** Export: the image drawn in tiles with its progress, then saved; the dialogue closes when done. */
-    async #export() {
+    /** Export: the image drawn in tiles with its progress, then saved (or the scene made); the dialogue closes when done. */
+    #export() {
         const plan = this.#plan();
         if (!plan.fits || this.#drawing) return;
+        this.#running = this.#run(plan);
+    }
+
+    async #run(plan) {
         const { i18n } = platform;
         const parts = this.#parts;
+        const source = this.#source;
         const area = { ...this.#area };
         const scale = this.#scale;
         const format = this.#format;
-        const fileName = (this.#typedName ?? this.#fileName()).replace(/[\\/:*?"<>|]+/g, "_");
-        const tiles = ExportScale.tiles(plan.width, plan.height, this.#source.tileLimit);
+        const fileName = this.#scene ? null : (this.#typedName ?? this.#fileName()).replace(/[\\/:*?"<>|]+/g, "_");
+        const tiles = ExportScale.tiles(plan.width, plan.height, source.tileLimit);
         const formatLabel = this.#formats.find((each) => each.id === format)?.label ?? format;
+        const choice = this.#scene ? this.#sceneChoice(area, scale, format) : null;
         const drawing = new AbortController();
         this.#drawing = drawing;
         clearTimeout(this.#estimateTimer);
-        const marks = this.#showTiles(area, plan, tiles);
-        this.#setDrawing(true);
+        const marks = this.#showTiles(area, tiles);
+        this.#setDrawing(true, tiles.length * (choice?.gmOverlay ? 2 : 1));
         parts.then.textContent = i18n.format(tiles.length > 1 ? "FILRODENSWMB.UI.ExportThenJoined" : "FILRODENSWMB.UI.ExportThenSaved", { format: formatLabel });
-        const progress = (done) => {
-            const shown = Math.min(done + 1, tiles.length);
-            parts.tile.textContent = i18n.format("FILRODENSWMB.UI.ExportTileOf", { number: shown, count: tiles.length });
-            parts.bar.style.setProperty("--p", `${(done / tiles.length) * 100}%`);
+        const stage = (text) => {
+            parts.tile.textContent = text;
+            this.#toastLine(text);
+        };
+        // Tile n of m (a scene drawn twice, the player image then the GM overlay, counts both)
+        const progress = (done, total = tiles.length) => {
+            const shown = Math.min(done + 1, total);
+            stage(i18n.format("FILRODENSWMB.UI.ExportTileOf", { number: shown, count: total }));
+            parts.bar.style.setProperty("--p", `${(done / total) * 100}%`);
+            // The tiles of the pass being drawn: those before the one now are done
+            const at = done % tiles.length;
             marks.forEach((mark, index) => {
-                mark.classList.toggle("fwmb-is-done", index < done);
-                mark.classList.toggle("fwmb-is-now", index === done);
+                mark.classList.toggle("fwmb-is-done", done >= total || index < at);
+                mark.classList.toggle("fwmb-is-now", done < total && index === at);
             });
         };
+        source.hold?.(true);
         progress(0);
         let saved = false;
         try {
-            const canvas = await this.#source.draw(area, scale, { signal: drawing.signal, onTile: progress });
-            if (canvas && !drawing.signal.aborted) {
-                parts.tile.textContent = i18n.format("FILRODENSWMB.UI.ExportSaving", { format: formatLabel });
-                parts.bar.style.setProperty("--p", "100%");
-                const { blob, format: written } = await ImageFormat.encode(canvas, format);
-                if (!drawing.signal.aborted) {
-                    ImageFormat.download(blob, `${fileName}.${written.extension}`);
-                    saved = true;
+            if (this.#scene) {
+                saved = await source.exportScene(choice, { signal: drawing.signal, onTile: progress, onStage: (key) => stage(i18n.localize(key)) });
+            } else {
+                const canvas = await source.draw(area, scale, { signal: drawing.signal, onTile: progress });
+                if (canvas && !drawing.signal.aborted) {
+                    stage(i18n.format("FILRODENSWMB.UI.ExportSaving", { format: formatLabel }));
+                    parts.bar.style.setProperty("--p", "100%");
+                    const { blob, format: written } = await ImageFormat.encode(canvas, format);
+                    if (!drawing.signal.aborted) {
+                        ImageFormat.download(blob, `${fileName}.${written.extension}`);
+                        platform.notify.info(i18n.format("FILRODENSWMB.UI.ExportSaved", { name: `${fileName}.${written.extension}` }));
+                        saved = true;
+                    }
                 }
             }
         } catch (error) {
-            console.error("FWMB | Failed to export the image:", error);
-            platform.notify.error(i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
+            console.error("FWMB | Failed to export:", error);
+            platform.notify.error(i18n.localize(this.#scene ? "FILRODENSWMB.UI.ExportSceneFailed" : "FILRODENSWMB.UI.ExportPngFailed"));
         } finally {
             this.#drawing = null;
             marks[0]?.parentElement?.remove();
+            source.hold?.(false);
+            this.#toast?.remove();
+            this.#toast = null;
         }
         if (saved) {
             await this.#remember();
             this.#overlay.close(true);
-            return;
+            return true;
         }
+        if (this.#kept) return false;
         this.#setDrawing(false);
         this.#update();
+        return false;
     }
 
-    #setDrawing(on) {
+    /** What a scene export makes, from the dialogue's fields. */
+    #sceneChoice(area, scale, format) {
         const parts = this.#parts;
+        return {
+            area,
+            scale,
+            format,
+            cell: this.#cell(),
+            name: this.#sceneNameChosen() || platform.i18n.localize("FILRODENSWMB.UI.DefaultSceneName"),
+            folder: parts.folder?.value?.trim() || this.#source.folder || "fwmb-exports",
+            generateJournals: !!parts.journals?.checked,
+            overwriteJournals: !!parts.overwrite?.checked,
+            gmOverlay: !!parts.overlay?.checked,
+        };
+    }
+
+    #setDrawing(on, total = 0) {
+        const parts = this.#parts;
+        const { i18n } = platform;
         parts.element.classList.toggle("fwmb-is-drawing", on);
         parts.progress.hidden = !on;
         this.#control.disabled = on;
-        const exportButton = this.#overlay.button("export");
-        if (exportButton) exportButton.disabled = on || !this.#plan().fits;
-        if (on) parts.stop.focus();
+        if (parts.areaHint) parts.areaHint.textContent = i18n.localize(on ? "FILRODENSWMB.UI.ExportDrawingHint" : this.#snaps ? "FILRODENSWMB.UI.ExportSceneSnapHint" : "FILRODENSWMB.UI.ExportAreaHint");
+        // Board X2b: while it draws, the footer offers only Close and keep drawing (Cancel is in the progress)
+        this.#overlay.button("cancel").hidden = on;
+        this.#overlay.button("export").hidden = on;
+        this.#overlay.button("keep").hidden = !on;
+        if (on) {
+            this.#overlay.setFooterStart(i18n.format("FILRODENSWMB.UI.ExportDrawingTiles", { count: total }));
+            parts.stop.focus();
+        } else {
+            this.#overlay.button("export").disabled = !this.#plan().fits;
+        }
+    }
+
+    /**
+     * Close and keep drawing: the dialogue goes, the drawing goes on with a toast (its line and
+     * Cancel) at the studio's foot, and the studio stays held until it ends.
+     */
+    #keepDrawing() {
+        if (!this.#drawing) return;
+        const host = this.#parts.element.parentElement;
+        this.#kept = true;
+        this.#overlay.close("kept");
+        if (!host) return;
+        const doc = host.ownerDocument;
+        const { i18n } = platform;
+        const toast = doc.createElement("div");
+        toast.className = "fwmb-toast fwmb-export-toast";
+        toast.setAttribute("role", "status");
+        toast.dataset.fwmbHoldFree = "";
+        const dot = doc.createElement("span");
+        dot.className = "fwmb-dot";
+        const text = doc.createElement("span");
+        text.className = "fwmb-export-toast-text";
+        const title = doc.createElement("b");
+        title.textContent = this.#source.title;
+        const line = doc.createElement("span");
+        line.dataset.exportToastLine = "";
+        line.textContent = this.#parts.tile.textContent;
+        text.append(title, line);
+        const cancel = doc.createElement("button");
+        cancel.type = "button";
+        cancel.className = "fwmb-btn";
+        cancel.textContent = i18n.localize("FILRODENSWMB.UI.Cancel");
+        cancel.dataset.tooltip = i18n.localize("FILRODENSWMB.UI.ExportStopHint");
+        cancel.addEventListener("click", () => this.#drawing?.abort());
+        toast.append(dot, text, cancel);
+        host.append(toast);
+        this.#toast = toast;
+    }
+
+    #toastLine(text) {
+        const line = this.#toast?.querySelector("[data-export-toast-line]");
+        if (line) line.textContent = text;
     }
 
     /** The tiles over the area on the preview, marked as they are drawn (board X2b). */
-    #showTiles(area, plan, tiles) {
+    #showTiles(area, tiles) {
         if (tiles.length < 2) return [];
         const map = this.#source.map;
         const doc = this.#parts.element.ownerDocument;
@@ -610,11 +930,10 @@ export class ExportDialog {
 
     /** The preset, aspect and format, for the next export of this kind (never a drawn area). */
     async #remember() {
-        const { SETTINGS } = FILRODENSWMB.EXPORT_PNG;
         try {
             await ImageFormat.remember(this.#source.kind, this.#format);
-            await platform.settings.set(SETTINGS.PRESET_PNG, this.#lastPreset);
-            await platform.settings.set(SETTINGS.ASPECT_PNG, this.#aspect);
+            await platform.settings.set(this.#settings.preset, this.#lastPreset);
+            await platform.settings.set(this.#settings.aspect, this.#aspect);
         } catch (error) {
             console.warn("FWMB | The export's choices could not be remembered:", error);
         }

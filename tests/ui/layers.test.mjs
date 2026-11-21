@@ -3,9 +3,9 @@
 // code only through the kernel, and the shell reaches a studio only through its registration,
 // which the hosts hand it (src/studios/index.js).
 //
-// One exception is known and kept for now: the Foundry platform's scene export and store still
-// reach into the World studio (SceneExporter, store.js). The export dialogue moves into the kernel
-// in S0 step 7, and these move with it.
+// One exception is known and kept for now: the Foundry platform's store still reaches into the
+// World studio (store.js). The scene export no longer does (S0 step 7b): the studio hands it the
+// images, the grid cell data and the journal pages it has made.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -54,7 +54,7 @@ const ALLOWED = {
 };
 
 /** The known exceptions (see the comment at the top). */
-const KNOWN = new Set(["src/platform/foundry/SceneExporter.js", "src/platform/foundry/store.js"]);
+const KNOWN = new Set(["src/platform/foundry/store.js"]);
 
 test("the shell and the kernel never import a studio, and a studio never imports another", () => {
     const crossings = [];

@@ -58,7 +58,6 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/dialogs/biome-rule-editor.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/culture-zones-editor.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/edit-pin-icon.hbs",
-        "modules/filrodens-world-map-builder/templates/world/dialogs/export-scene.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/export-settings.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/mass-edit.hbs",
         "modules/filrodens-world-map-builder/templates/world/dialogs/merge-region.hbs",

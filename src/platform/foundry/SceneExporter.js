@@ -1,10 +1,6 @@
 import { FILRODENSWMB } from "../../config.js";
 import { Sanitize } from "../../kernel/data/Sanitize.js";
-import { GridDataExporter } from "../../studios/world/app/GridDataExporter.js";
-import { MapStateManager } from "../../studios/world/app/MapStateManager.js";
-import { GeneratedDetails } from "../../studios/world/app/GeneratedDetails.js";
-import { cleanUnit } from "../../kernel/data/MapUnit.js";
-import { kmPerPxOf } from "../../studios/world/data/MapScale.js";
+import { SceneArea } from "../../kernel/export/ExportScale.js";
 
 /**
  * A description as a journal page's HTML. Descriptions are plain text (typed into a textarea, or
@@ -19,11 +15,32 @@ function journalHtml(description) {
     return foundry.utils.cleanHTML(Sanitize.textToHtml(description ?? ""));
 }
 
-/** Significant figures kept in a scene's grid distance: enough for the ruler, without a long tail of digits. */
-const GRID_DISTANCE_FIGURES = 3;
-
 /** A scene image's file extension from its blob's type (see ImageFormat): webp or png. */
 const extensionOf = (blob) => (blob?.type === "image/webp" ? "webp" : "png");
+
+/**
+ * What a scene export hands the exporter (S0 step 7b): everything already worked out by the studio,
+ * so the exporter reads nothing of the studio itself.
+ * @typedef {object} SceneExport
+ * @property {string} name - The scene's (and its journal's) name.
+ * @property {string} folder - The folder in the world's data the images go to.
+ * @property {boolean} generateJournals
+ * @property {boolean} overwriteJournals
+ * @property {Blob} playerBlob
+ * @property {Blob|null} gmBlob - The GM overlay, cut to the same area.
+ * @property {number} width - The scene's size in pixels: the area at the scale.
+ * @property {number} height
+ * @property {{type: number, size: number, distance?: number, units?: string}} grid - Foundry's
+ *     grid type, the cell in the scene's pixels, and what a cell measures.
+ * @property {object|null} gridData - The grid cell data for the area, keyed from its corner.
+ * @property {{pins: object[], regions: object[], routes: object[]}|null} pages - The journal
+ *     pages, each `{item, text}`; an item takes the id of the page made for it.
+ * @property {{x: number, y: number, width: number, height: number, scale: number}} made - The
+ *     area and scale the scene was made with, kept on it so exporting again can say when they differ.
+ * @property {() => Promise<unknown>} save - Saves the map once its items have their page ids.
+ * @property {(key: string) => void} [onStage] - Told each stage as it starts, by its string's key
+ *     (the export dialogue's progress shows it).
+ */
 
 export class SceneExporter {
     /**
@@ -38,53 +55,59 @@ export class SceneExporter {
     }
 
     /**
-     * Executes the full asynchronous export pipeline. A failure is not reported here: it reaches
-     * the caller (MapStudio's scene export), which logs it and shows its own localised message,
-     * so no error text (which can carry a file or scene name) is ever put into a notification.
+     * Makes (or updates) the scene: the images uploaded, the journal pages, the scene with its grid
+     * and grid cell data, the GM overlay tile and a thumbnail; then the map saved and the scene
+     * shown. A failure is not reported here: it reaches the caller (the studio's scene export),
+     * which logs it and shows its own localised message, so no error text (which can carry a file
+     * or scene name) is ever put into a notification.
+     * @param {SceneExport} config
      */
-    static async run(app, config, playerBlob, gmBlob) {
-        const { sceneName, exportFolder, generateJournals, overwriteJournals, createGmOverlay } = config;
+    static async run(config) {
+        const { name, folder, generateJournals, overwriteJournals, playerBlob, gmBlob } = config;
         const FilePickerV2 = foundry.applications.apps.FilePicker.implementation;
+        const stage = (key) => config.onStage?.(key);
+        stage("FILRODENSWMB.UI.ExportStepUpload");
+        const targetPath = await this.#ensureDirectoryExists(folder);
 
-        // 1. Validate and Create Server Directory
-        const targetPath = await this.#ensureDirectoryExists(exportFolder);
-
-        // 2. Extract and Upload Player Background
-        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepPlayer"));
         // Each image is named and typed as what it is: PNG or WebP (see ImageFormat)
-        const stem = sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const stem = name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
         const playerFilename = `${stem}_player.${extensionOf(playerBlob)}`;
-        const playerFile = new File([playerBlob], playerFilename, { type: playerBlob.type });
-
-        await FilePickerV2.upload("data", targetPath, playerFile);
+        await FilePickerV2.upload("data", targetPath, new File([playerBlob], playerFilename, { type: playerBlob.type }));
         const playerImgPath = `${targetPath}/${playerFilename}`;
 
         let gmImgPath = null;
-
-        // 3. Extract and Upload GM Overlay (If requested)
-        if (createGmOverlay && gmBlob) {
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepGm"));
+        if (gmBlob) {
             const gmFilename = `${stem}_gm.${extensionOf(gmBlob)}`;
-            const gmFile = new File([gmBlob], gmFilename, { type: gmBlob.type });
-
-            await FilePickerV2.upload("data", targetPath, gmFile);
+            await FilePickerV2.upload("data", targetPath, new File([gmBlob], gmFilename, { type: gmBlob.type }));
             gmImgPath = `${targetPath}/${gmFilename}`;
         }
 
-        // 4. Generate Journals
-        let journalObj = null;
-        if (generateJournals) {
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepJournals"));
-            journalObj = await this.#createJournals(app, sceneName, overwriteJournals);
-        }
-
-        // 5. Construct the Scene
-        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepScene"));
-        await this.#createScene(app, sceneName, playerImgPath, gmImgPath, journalObj, this.sceneScale(config.scale));
+        if (generateJournals && config.pages) stage("FILRODENSWMB.UI.ExportStepJournals");
+        const journalObj = generateJournals && config.pages ? await this.#createJournals(name, config.pages, overwriteJournals) : null;
+        stage("FILRODENSWMB.UI.ExportStepScene");
+        await this.#createScene(config, playerImgPath, gmImgPath, journalObj);
 
         // The scene's name is the GM's own text: it goes in as a format value, which Foundry's
         // notifications escape
-        ui.notifications.info("FILRODENSWMB.UI.ExportSceneDone", { format: { name: sceneName } });
+        ui.notifications.info("FILRODENSWMB.UI.ExportSceneDone", { format: { name } });
+    }
+
+    /**
+     * The area and scale the scene of this name was made with by an earlier export (null when there
+     * is no such scene, or it was made before scenes kept them): what the export dialogue compares
+     * the choice with, to warn that walls, lights and tokens stay where they were.
+     * @param {string} name
+     * @returns {{x: number, y: number, width: number, height: number, scale: number}|null}
+     */
+    static previous(name) {
+        const scene = name ? game.scenes?.getName(name) : null;
+        const made = scene?.getFlag?.(FILRODENSWMB.ID, FILRODENSWMB.FLAGS.EXPORT_AREA) ?? null;
+        return made && ["x", "y", "width", "height", "scale"].every((key) => Number.isFinite(Number(made[key]))) ? { ...made } : null;
+    }
+
+    /** Whether a choice of area and scale differs from what the scene was made with (see previous). */
+    static differs(previous, chosen) {
+        return !!previous && !SceneArea.same(previous, chosen);
     }
 
     /**
@@ -105,7 +128,7 @@ export class SceneExporter {
         return basePath;
     }
 
-    static async #createJournals(app, sceneName, overwriteJournals) {
+    static async #createJournals(sceneName, pages, overwriteJournals) {
         const folderName = `${FILRODENSWMB.COMPENDIUM.LABEL}`;
         let folder = game.folders.find((f) => f.type === "JournalEntry" && f.name === folderName);
         if (!folder) {
@@ -169,8 +192,8 @@ export class SceneExporter {
             }
         };
 
-        // The items that get a page: generated ones only where the map labels them (see GeneratedDetails)
-        const pages = GeneratedDetails.journalPages(app);
+        // The items that get a page: generated ones only where the map labels them, and only those
+        // inside the export's area (see GeneratedDetails.journalPages)
         for (const { item, text } of pages.pins) {
             if (item.type === "spring" || item.type === "block_spring") continue;
             await syncJournalPage(item, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedLocation"), text);
@@ -182,32 +205,23 @@ export class SceneExporter {
     }
 
     /**
-     * The export's scale as a whole number from 1 (the scales offered are whole; see ExportScale).
-     * @param {*} value
-     * @returns {number}
-     */
-    static sceneScale(value) {
-        const scale = Math.round(Number(value));
-        return scale >= 1 ? scale : 1;
-    }
-
-    /**
-     * Creates the Scene for the exported map, or updates the one of the same name from an earlier
-     * export, then adds the GM overlay tile and a thumbnail, and finally shows it.
-     * Each extra is optional: a failure in one is logged and the rest of the export carries on.
+     * Creates the Scene for the export, or updates the one of the same name from an earlier export,
+     * then adds the GM overlay tile and a thumbnail, and finally shows it. Each extra is optional:
+     * a failure in one is logged and the rest of the export carries on.
      *
-     * The scene is the size of its images: the map's size times the export's scale, with the grid
-     * scaled alike. Foundry fits a background to the scene's size, so a 2x image on a scene of the
-     * map's own size would be shrunk back on screen and its names drawn no larger than at 1x; on a
-     * 2x scene they are shown as the 2x PNG shows them. Every cell is the same cell of the map at
-     * any scale (the grid data is keyed by cell, not by pixel), and measures the same ground.
+     * The scene is the size of its images: the export's area times its scale, with a grid whose
+     * cell is a whole number of pixels at that scale. Foundry fits a background to the scene's
+     * size, so a 2x image on a scene of the map's own size would be shrunk back on screen and its
+     * names drawn no larger than at 1x; on a 2x scene they are shown as the 2x image shows them.
+     * Every cell is the same cell of the map at any scale and measures the same ground; the area's
+     * corner is on a grid corner (see SceneArea.snap), so the scene's own grid falls on the map's.
      */
-    static async #createScene(app, sceneName, bgPath, gmOverlayPath, journalObj, scale = 1) {
-        const gridData = this.#buildGridData(app);
-        const sceneData = this.#sceneData(app, sceneName, bgPath, gridData, scale);
+    static async #createScene(config, bgPath, gmOverlayPath, journalObj) {
+        const sceneData = this.sceneData(config, bgPath);
+        const { gridData } = config;
         if (gridData) gridData.grid.size = sceneData.grid.size;
 
-        const scene = await this.#saveScene(sceneName, sceneData, gridData, journalObj);
+        const scene = await this.#saveScene(config.name, sceneData, gridData, journalObj);
         if (!scene) return;
 
         this.#warnIfGridSizeChanged(scene, sceneData, gridData);
@@ -215,41 +229,24 @@ export class SceneExporter {
         await this.#updateThumbnail(scene);
 
         // Save the map payload so the new journalPageId links persist
-        await app.saveCurrentMap();
+        await config.save?.();
         scene.view();
     }
 
     /**
-     * Computes the grid-cell exploration data layer. This happens before the Scene document
-     * exists, since it only needs the map's own generation buffers and grid settings, not a live
-     * placed Scene. A failure here should not abort the whole export (the background, journals
-     * and the Scene itself matter more), so it is logged and treated as "no grid data" rather
-     * than thrown.
-     *
-     * @returns {object|null} The grid data, or null when there is none or it could not be built.
+     * The Scene document's data: the image as its background, its size and grid, and its flags:
+     * the grid cell data when there is any, and the area and scale it was made with.
+     * @param {SceneExport} config
+     * @param {string} bgPath
      */
-    static #buildGridData(app) {
-        try {
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepGridData"));
-            return GridDataExporter.build(app);
-        } catch (err) {
-            console.error("FWMB | Grid data export failed.", err);
-            return null;
-        }
-    }
-
-    /** The Scene document's data: the map as its background, its grid, and the grid data flag when there is grid data. */
-    static #sceneData(app, sceneName, bgPath, gridData, scale = 1) {
-        // Foundry's raw integer grid-type constants, shared with GridDataExporter so the Scene
-        // document's own grid config and the exported grid-data payload always agree on which
-        // numeric type a given uiState.gridType maps to.
-        const mappedGridType = FILRODENSWMB.GRID_TYPES[app.uiState.gridType]?.value ?? 1;
-        const gridSize = MapStateManager.gridSizeOf(app.uiState.gridSize);
-
-        const sceneData = {
-            name: sceneName,
-            width: Math.round(app.mapWidth * scale),
-            height: Math.round(app.mapHeight * scale),
+    static sceneData(config, bgPath) {
+        const { name, width, height, grid, gridData, made } = config;
+        const flags = { [FILRODENSWMB.FLAGS.EXPORT_AREA]: { ...made } };
+        if (gridData) flags[FILRODENSWMB.FLAGS.GRID_DATA] = gridData;
+        return {
+            name,
+            width: Math.round(width),
+            height: Math.round(height),
             padding: 0,
             backgroundColor: "#222222",
             tokenVision: false,
@@ -257,12 +254,10 @@ export class SceneExporter {
                 globalLight: { enabled: true },
             },
             grid: {
-                type: mappedGridType,
-                // The same size the grid data was built with (see MapStateManager.gridSizeOf)
-                size: gridSize * scale,
-                // What one cell measures in the map's own unit, so Foundry's ruler reads true (the
-                // same at any export scale: a cell is the same piece of the map)
-                ...this.gridScale(app, gridSize),
+                type: grid.type,
+                size: grid.size,
+                // What one cell measures in the map's own unit, so Foundry's ruler reads true
+                ...(grid.distance > 0 ? { distance: grid.distance, units: grid.units } : {}),
                 color: "#000000",
                 alpha: 0.4, // Fixed opacity to guarantee visibility in Foundry
             },
@@ -273,11 +268,8 @@ export class SceneExporter {
                     background: { src: bgPath },
                 },
             ],
+            flags: { [FILRODENSWMB.ID]: flags },
         };
-        if (gridData) {
-            sceneData.flags = { [FILRODENSWMB.ID]: { [FILRODENSWMB.FLAGS.GRID_DATA]: gridData } };
-        }
-        return sceneData;
     }
 
     /**
@@ -291,7 +283,6 @@ export class SceneExporter {
         let scene = game.scenes.getName(sceneName);
         try {
             if (scene) {
-                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepSceneUpdate"));
                 await scene.update(sceneData);
                 await this.#clearPreviousExport(scene, gridData, journalObj);
             } else {
@@ -355,25 +346,9 @@ export class SceneExporter {
         }
     }
 
-    /**
-     * The ground one grid cell covers, as Foundry's grid distance and units: the cell's width at
-     * the map's scale (see MapUnit.kmPerPxOf), to three significant figures, in the map's unit. A
-     * regional map keeps its parent's grid size in pixels, so its cells measure less.
-     *
-     * @param {object} app - Reads uiState (latitudes, world, map unit) and mapHeight.
-     * @param {number} gridSize - The grid's size in pixels.
-     * @returns {{distance: number, units: string}|{}} Nothing when the scale cannot be worked out.
-     */
-    static gridScale(app, gridSize) {
-        const distance = gridSize * kmPerPxOf(app.uiState, app.mapHeight);
-        if (!(distance > 0) || !Number.isFinite(distance)) return {};
-        return { distance: Number(distance.toPrecision(GRID_DISTANCE_FIGURES)), units: cleanUnit(app.uiState.mapUnit) };
-    }
-
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */
     static async #updateThumbnail(scene) {
         try {
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepThumbnail"));
             const thumbData = await scene.createThumbnail();
             if (thumbData?.thumb) {
                 await scene.update({ thumb: thumbData.thumb });

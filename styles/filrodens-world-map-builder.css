@@ -4804,6 +4804,62 @@ button.fwmb-format {
 .fwmb-filename .fwmb-input {
     min-width: 0;
 }
+/* S0 step 7b: Export to scene's parts (board X4): the journal and overlay choices under the Area,
+   the drawn outline and the grid over the preview, the warning on exporting again */
+.fwmb-export-body .fwmb-setting-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+}
+.fwmb-export-body .fwmb-setting-row .fwmb-checkbox {
+    flex: none;
+    margin: 0.125rem 0 0;
+}
+.fwmb-export-preview .fwmb-crop-drawn,
+.fwmb-export-preview .fwmb-export-grid {
+    pointer-events: none;
+}
+.fwmb-scene-warn .fwmb-notice-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--fwmb-text-primary);
+    font-weight: 700;
+}
+
+/* Close and keep drawing (board X2b): the drawing's toast at the studio's foot, above the map
+   controls, with its line and Cancel; free while the studio is held */
+.fwmb-export-toast {
+    position: absolute;
+    inset-inline-end: 1rem;
+    inset-block-end: 3.5rem;
+    z-index: 505;
+    align-items: center;
+    min-width: 16rem;
+}
+.fwmb-export-toast .fwmb-dot {
+    margin-top: 0;
+    background: var(--fwmb-accent-secondary);
+}
+.fwmb-export-toast-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.fwmb-export-toast-text span {
+    color: var(--fwmb-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Held while an export draws (StudioHold): what waits looks off, its tooltip saying why */
+.fwmb-studio[data-fwmb-exporting] [data-fwmb-held]:not(input, select, textarea, [data-fwmb-held] [data-fwmb-held]) {
+    opacity: 0.5;
+    cursor: default;
+}
+
 @media (pointer: coarse) {
     .fwmb-export-preview .fwmb-crop-edge {
         display: block;
@@ -8556,8 +8612,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     flex: 1;
 }
 
-/* Board N1's footer (S0 step 7, then every dialogue in step 8): Cancel at the start, after any
-   start line, the other buttons at the end, each as wide as its label */
+/* Board N1's footer (S0 step 7, then every dialogue in step 8): Cancel at the start, any start
+   line after it (Ken, 2026-11-21), the other buttons at the end, each as wide as its label */
 .fwmb .fwmb-overlay-footer--split {
     align-items: center;
 }

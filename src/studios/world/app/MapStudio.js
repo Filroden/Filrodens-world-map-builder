@@ -36,7 +36,7 @@ import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
-import { kmPerPxOf, scaleBarOnMap, scaleBarTick } from "../data/MapScale.js";
+import { gridDistanceOf, kmPerPxOf, scaleBarOnMap, scaleBarTick } from "../data/MapScale.js";
 import { cleanUnit, formatDistance, unitFromSaved } from "../../../kernel/data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
 import { HistoryView } from "./HistoryView.js";
@@ -104,8 +104,10 @@ import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../../../kernel/util/SymbolScale.js";
 import { nameInset } from "../canvas/MapBorder.js";
 import { DrawnDecoration } from "../../../kernel/decorations/DrawnDecoration.js";
-import { ExportScale } from "../../../kernel/export/ExportScale.js";
+import { ExportScale, SceneArea } from "../../../kernel/export/ExportScale.js";
 import { ImageFormat } from "../../../kernel/export/ImageFormat.js";
+import { GeneratedDetails } from "./GeneratedDetails.js";
+import { GridDataExporter } from "./GridDataExporter.js";
 import { ExportDialog } from "../../../kernel/export/ExportDialog.js";
 import { WORLD_DEFINITION } from "../definition.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
@@ -2020,6 +2022,8 @@ export class MapStudio {
         // Keys that move go no further than the studio: in Foundry the arrows (and W, A, S and D)
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
+        // While an export draws, the map's shortcuts wait with its controls (see #holdForExport)
+        if (this.view?.held) return;
         // The Regions lists' keys: moving through a list, Unassigned, and naming
         if (
             AppearanceMenu.handleKey(this.root, event) ||
@@ -6554,8 +6558,21 @@ export class MapStudio {
         this.#applyCanvasInteractivity();
     }
 
-    /** Whether the export dialogue is open (a second Export image waits for it). */
+    /** Whether the export dialogue is open, or its export still drawing (a second waits for it). */
     #exporting = false;
+
+    /**
+     * What stays free while an export draws (S0 step 7b; Ken, 2026-11-21): moving the camera,
+     * Save world, Help, Appearance and the keyboard shortcuts. The tiles are drawn from the canvas
+     * as it shows the map, so everything else that would change the map, or what it shows, waits.
+     */
+    static #FREE_WHILE_EXPORTING = Object.freeze(["zoomIn", "zoomOut", "resetZoom", "saveMap", "toggleHelp", "openShortcuts", "toggleFullscreen", "toggleAppearance", "chooseAppearance", "cancelProcessing", "keepProcessing"]);
+
+    /** Holds the studio while an export draws, or frees it (see StudioView.hold). */
+    #holdForExport(on) {
+        this.view?.hold(on ? { reason: platform.i18n.localize("FILRODENSWMB.UI.ExportHeld"), allowed: MapStudio.#FREE_WHILE_EXPORTING } : null);
+        this.#applyCanvasInteractivity();
+    }
 
     /**
      * Export image (Export's, History's Export this age, Travel's Export this journey): the export
@@ -6577,29 +6594,37 @@ export class MapStudio {
             const name = TravelView.exportName(this, aged);
             const title = name !== aged ? "FILRODENSWMB.UI.ExportThisJourney" : aged !== base ? "FILRODENSWMB.UI.ExportThisAge" : "FILRODENSWMB.UI.ExportPNG";
             const engine = this.canvasEngine;
-            const map = { width: this.mapWidth, height: this.mapHeight };
             await ExportDialog.open({
+                ...this.#exportSource(),
                 kind: "png",
                 title: i18n.localize(title),
                 name,
-                map,
-                view: engine.viewRect(),
-                smallestLabelPx: engine.smallestLabelPx(),
-                kmPerPx: kmPerPxOf(this.uiState, this.mapHeight),
-                unit: cleanUnit(this.uiState.mapUnit),
-                // Every World studio map has raster terrain, drawn at the map's own pixels
-                rasterPx: this.mapWidth,
-                ceiling: FILRODENSWMB.EXPORT_PNG.SCALE.CEILING,
-                tileLimit: engine.exportTileLimit(),
-                drawPreview: (side) => engine.exportPreview(side),
                 samples: (area, scale) => engine.exportSamples(scale, { area }),
                 draw: (area, scale, options) => engine.drawExport(area, scale, options),
-                cutOff: () => this.cutOff(),
-                cut: (area) => this.#cutFromArea(area),
             });
         } finally {
             this.#exporting = false;
         }
+    }
+
+    /** What every export's dialogue reads of the map (see ExportDialog's ExportSource). */
+    #exportSource() {
+        const engine = this.canvasEngine;
+        return {
+            map: { width: this.mapWidth, height: this.mapHeight },
+            view: engine.viewRect(),
+            smallestLabelPx: engine.smallestLabelPx(),
+            kmPerPx: kmPerPxOf(this.uiState, this.mapHeight),
+            unit: cleanUnit(this.uiState.mapUnit),
+            // Every World studio map has raster terrain, drawn at the map's own pixels
+            rasterPx: this.mapWidth,
+            ceiling: FILRODENSWMB.EXPORT_PNG.SCALE.CEILING,
+            tileLimit: engine.exportTileLimit(),
+            drawPreview: (side) => engine.exportPreview(side),
+            cutOff: () => this.cutOff(),
+            cut: (area) => this.#cutFromArea(area),
+            hold: (on) => this.#holdForExport(on),
+        };
     }
 
     /**
@@ -6616,192 +6641,131 @@ export class MapStudio {
     }
 
     /**
-     * The image formats an export offers (see ImageFormat): those this browser can write, the
-     * one last chosen for this kind of export selected.
-     * @param {"png"|"scene"} kind
-     * @returns {Promise<{id: string, label: string, selected: boolean}[]>}
-     */
-    async #exportFormats(kind) {
-        const available = await ImageFormat.available();
-        const chosen = ImageFormat.remembered(kind, available);
-        return available.map((id) => ({ id, label: platform.i18n.localize(ImageFormat.byId(id).label), selected: id === chosen }));
-    }
-
-    /**
-     * Shows each format's estimated file size beside its name in an export dialogue, worked out
-     * again when the scale changes (see StudioCanvas.exportSamples and ImageFormat.estimate). Each
-     * scale's sizes are kept while the dialogue is open; a slower answer for a scale no longer
-     * chosen is ignored.
-     * @param {HTMLElement} element - The dialogue.
-     * @param {object} [options]
-     * @param {boolean} [options.forScene]
-     */
-    #estimateFormatSizes(element, { forScene = false } = {}) {
-        const scaleField = element.querySelector('[name="exportScale"]');
-        const formatField = element.querySelector('[name="exportFormat"]');
-        if (!scaleField || !formatField || !this.canvasEngine?.exportSamples) return;
-        const label = (option) => option.dataset.label ?? option.textContent;
-        for (const option of formatField.options) option.dataset.label = option.textContent.trim();
-        const known = new Map();
-        let asked = 0;
-        const show = (sizes) => {
-            for (const option of formatField.options) {
-                option.textContent = sizes ? platform.i18n.format("FILRODENSWMB.UI.ExportFormatOption", { format: label(option), size: ImageFormat.sizeText(sizes[option.value] ?? 0) }) : platform.i18n.format("FILRODENSWMB.UI.ExportFormatEstimating", { format: label(option) });
-            }
-        };
-        const update = async () => {
-            const turn = ++asked;
-            const scale = Number(scaleField.value);
-            show(known.get(scale) ?? null);
-            if (known.has(scale)) return;
-            // Drawn after the dialogue has shown, so opening it is never held up
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            try {
-                const { tiles, pixels } = this.canvasEngine.exportSamples(scale, { forScene });
-                known.set(scale, await ImageFormat.estimate(tiles, pixels, [...formatField.options].map((option) => option.value)));
-            } catch (error) {
-                console.warn("FWMB | Export size estimate failed", error);
-                return;
-            }
-            if (turn === asked && element.isConnected) show(known.get(scale));
-        };
-        scaleField.addEventListener("change", update);
-        update();
-    }
-
-    /** The scale chosen, if the plan allows it; null otherwise (a cancelled dialogue included). */
-    static #allowedScale(plan, chosen) {
-        return plan.options.some((option) => option.allowed && option.scale === chosen) ? chosen : null;
-    }
-
-    /**
-     * The export scales offered (see ExportScale), for the PNG export and the scene export alike:
-     * each with the image's size, the recommended one marked, from the smallest name drawn now,
-     * and the reason as text. A scene's background must fit the graphics card's largest texture to
-     * be shown, so for a scene no larger scale is allowed.
-     * @param {object} [options]
-     * @param {boolean} [options.forScene]
-     * @returns {{plan: object, options: object[], reason: string}}
-     */
-    #exportScales({ forScene = false } = {}) {
-        const maxSide = forScene ? this.canvasEngine.maxTextureSize() : Infinity;
-        const plan = ExportScale.plan({ width: this.mapWidth, height: this.mapHeight, smallestLabelPx: this.canvasEngine.smallestLabelPx(), maxSide });
-        const number = (value) => value.toLocaleString();
-        const options = plan.options.map((option) => {
-            const key = option.recommended ? "FILRODENSWMB.UI.ExportPngScaleRecommended" : option.allowed ? "FILRODENSWMB.UI.ExportPngScaleOption" : "FILRODENSWMB.UI.ExportPngScaleTooLarge";
-            return { ...option, label: platform.i18n.format(key, { scale: option.scale, width: number(option.width), height: number(option.height) }) };
-        });
-        const { reason } = plan;
-        const px = (value) => Math.round(value);
-        const reasons = {
-            none: () => platform.i18n.localize("FILRODENSWMB.UI.ExportPngReasonNone"),
-            enough: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonEnough", { px: px(reason.px) }),
-            reaches: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonReaches", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
-            short: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonShort", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
-        };
-        return { plan, options, reason: reasons[reason.kind]() };
-    }
-
-    /**
-     * Prompts the user with the export configuration dialogue before triggering the async build pipeline.
+     * Export to scene (Foundry; S0 step 7b, board X4): the export dialogue with the scene's
+     * choices, its area snapped to the map's grid and its scale giving whole cells. The scene is made
+     * from the area (see #exportScene).
      */
     async _onExportScene(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
+        if (this.#exporting) return;
+        this.#exporting = true;
+        try {
+            await this.#labelFacesReady();
+            const { i18n } = platform;
+            const engine = this.canvasEngine;
+            await ExportDialog.open({
+                ...this.#exportSource(),
+                kind: "scene",
+                title: i18n.localize("FILRODENSWMB.UI.ExportScene"),
+                name: this.currentSaveName || i18n.localize("FILRODENSWMB.UI.UnsavedMapName"),
+                sceneName: this.currentSaveName || i18n.localize("FILRODENSWMB.UI.DefaultSceneName"),
+                folder: "fwmb-exports",
+                grid: this.#exportGrid(),
+                minCell: FILRODENSWMB.LIMITS.MIN_GRID_SIZE,
+                // A scene's background must fit the graphics card's largest texture to be shown
+                maxSide: engine.maxTextureSize(),
+                samples: (area, scale) => engine.exportSamples(scale, { area, forScene: true }),
+                pageCount: (area) => MapStudio.#pageCount(GeneratedDetails.journalPages(this, { area })),
+                previous: (name) => platform.scene.previous?.(name) ?? null,
+                exportScene: (choice, progress) => this.#exportScene(choice, progress),
+            });
+        } finally {
+            this.#exporting = false;
+        }
+    }
 
-        const defaultName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.DefaultSceneName");
-        const defaultFolder = "fwmb-exports";
+    /** The map's grid as the scene export snaps to it: its type ("none" for gridless) and size in map pixels. */
+    #exportGrid() {
+        return { type: this.uiState.gridType ?? "none", size: MapStateManager.gridSizeOf(this.uiState.gridSize) };
+    }
 
-        const scales = this.#exportScales({ forScene: true });
-        const formats = await this.#exportFormats("scene");
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/world/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason, formats });
-
-        const config = await platform.dialogs.prompt({
-            classes: ["fwmb"],
-            title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene"),
-            content: content,
-            onRender: (element) => this.#estimateFormatSizes(element, { forScene: true }),
-            onSubmit: (form) => ({
-                format: formats.some((each) => each.id === form.elements.exportFormat?.value) ? form.elements.exportFormat.value : FILRODENSWMB.EXPORT_FORMATS.DEFAULT,
-                sceneName: form.elements["sceneName"].value.trim() || defaultName,
-                exportFolder: form.elements["exportFolder"].value.trim() || defaultFolder,
-                generateJournals: form.elements["generateJournals"].checked,
-                overwriteJournals: form.elements["overwriteJournals"].checked,
-                createGmOverlay: form.elements["createGmOverlay"].checked,
-                scale: MapStudio.#allowedScale(scales.plan, Number(form.elements.exportScale.value)) ?? 1,
-            }),
-        });
-
-        if (!config) return; // User cancelled
-        await ImageFormat.remember("scene", config.format);
-
-        // The user has confirmed. Hand off to the background processing pipeline.
-        this.#executeSceneExportPipeline(config);
+    /** The journal pages a scene export makes (springs have none). */
+    static #pageCount(pages) {
+        return pages.pins.filter((page) => page.item.type !== "spring" && page.item.type !== "block_spring").length + pages.regions.length + pages.routes.length;
     }
 
     /**
-     * The background orchestrator for slicing the canvas and creating the Foundry Documents.
+     * Makes the scene from the export dialogue's choice: the player image, then the GM overlay,
+     * drawn in tiles from the area (each pass's vectors rebuilt first, as the canvas shows them for
+     * that pass), the images encoded, the grid cell data and journal pages for the area worked out,
+     * and the scene made by the host (see SceneExporter). Resolves false when cancelled.
+     * @param {{area: object, scale: number, format: string, cell: number|null, name: string, folder: string, generateJournals: boolean, overwriteJournals: boolean, gmOverlay: boolean}} choice
+     * @param {{onTile: (done: number, total: number) => void, onStage: (key: string) => void, signal: AbortSignal}} progress
+     * @returns {Promise<boolean>}
      */
-    async #executeSceneExportPipeline(config) {
-        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingScene"));
-        await this.#labelFacesReady();
-
-        try {
-            // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
-            const origX = this.canvasEngine.stage.position.x;
-            const origY = this.canvasEngine.stage.position.y;
-            const origScaleX = this.canvasEngine.stage.scale.x;
-            const origScaleY = this.canvasEngine.stage.scale.y;
-
-            this.canvasEngine.stage.position.set(0, 0);
-            this.canvasEngine.stage.scale.set(1, 1);
-
-            const activeWindow = this.root.ownerDocument.defaultView || window;
-            const textEl = this.root.querySelector(".fwmb-processing-text");
-
-            // --- 1. PLAYER PASS ---
-            if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepPlayer");
-
-            this.canvasEngine.setRenderPass("player");
-            this._repaintVectors(); // Rebuilds the vectors based on player visibility
-
-            // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
-            await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
-
-            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale, config.format);
-
-            // --- 2. GM OVERLAY PASS ---
-            let gmBlob = null;
-            if (config.createGmOverlay) {
-                if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepGm");
-
-                this.canvasEngine.setRenderPass("gm");
-                this._repaintVectors(); // Rebuilds the vectors based on GM visibility
-
-                // YIELD again for the new GM sprites
-                await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
-
-                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale, config.format);
-            }
-
-            if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepScene");
-
-            // Restore the normal view and the exact camera transform the user was looking at
-            this.canvasEngine.stage.position.set(origX, origY);
-            this.canvasEngine.stage.scale.set(origScaleX, origScaleY);
-            this.canvasEngine.setRenderPass("normal");
+    async #exportScene(choice, { onTile, onStage, signal }) {
+        const engine = this.canvasEngine;
+        const { area, scale, format } = choice;
+        const width = Math.max(1, Math.round(area.width * scale));
+        const height = Math.max(1, Math.round(area.height * scale));
+        const perPass = ExportScale.tiles(width, height, engine.exportTileLimit()).length;
+        const total = perPass * (choice.gmOverlay ? 2 : 1);
+        const activeWindow = this.root?.ownerDocument.defaultView || window;
+        // Each pass rebuilds the vectors for who sees them; the new sprites need a moment to reach the GPU
+        const pass = async (mode, first) => {
+            engine.setRenderPass(mode);
             this._repaintVectors();
-
-            // Hand off the physical Blobs to the server-side Exporter utility
-            await platform.scene.run(this, config, playerBlob, gmBlob);
-        } catch (err) {
-            console.error("FWMB | Pipeline Error:", err);
-            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportSceneFailed"));
+            await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
+            if (signal.aborted) return null;
+            return engine.drawExport(area, scale, { signal, pass: mode, onTile: (done) => onTile(first + Math.min(done, perPass), total) });
+        };
+        let player;
+        let gm = null;
+        try {
+            onStage("FILRODENSWMB.UI.ExportStepPlayer");
+            player = await pass("player", 0);
+            if (player && choice.gmOverlay) {
+                onStage("FILRODENSWMB.UI.ExportStepGm");
+                gm = await pass("gm", perPass);
+                if (!gm) player = null;
+            }
         } finally {
-            this.#endProcessing();
+            engine.setRenderPass("normal");
+            this._repaintVectors();
         }
+        if (!player || signal.aborted) return false;
+
+        onStage("FILRODENSWMB.UI.ExportStepEncoding");
+        const { blob: playerBlob } = await ImageFormat.encode(player, format);
+        const gmBlob = gm ? (await ImageFormat.encode(gm, format)).blob : null;
+        onStage("FILRODENSWMB.UI.ExportStepGridData");
+        const grid = this.#exportGrid();
+        let gridData = null;
+        if (grid.type !== "none") {
+            try {
+                gridData = GridDataExporter.build(this, { area, offset: SceneArea.offset(area, grid) });
+            } catch (error) {
+                // The grid data is an extra: the scene is still made without it
+                console.error("FWMB | Grid data export failed.", error);
+            }
+        }
+        if (signal.aborted) return false;
+        await platform.scene.run({
+            name: choice.name,
+            folder: choice.folder,
+            generateJournals: choice.generateJournals,
+            overwriteJournals: choice.overwriteJournals,
+            playerBlob,
+            gmBlob,
+            width,
+            height,
+            grid: {
+                type: FILRODENSWMB.GRID_TYPES[grid.type]?.value ?? FILRODENSWMB.GRID_TYPES.square.value,
+                // A gridless scene still needs a size for Foundry's measuring; the map's own at the scale
+                size: choice.cell ?? Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Math.round(grid.size * scale)),
+                // What one cell measures in the map's own unit, the same at any scale
+                ...gridDistanceOf(this.uiState, this.mapHeight, grid.size),
+            },
+            gridData,
+            pages: choice.generateJournals ? GeneratedDetails.journalPages(this, { area }) : null,
+            made: { x: area.x, y: area.y, width: area.width, height: area.height, scale },
+            save: () => this.saveCurrentMap(),
+            onStage,
+        });
+        return true;
     }
 
     /**
@@ -8303,6 +8267,8 @@ export class MapStudio {
      * is open); and in the Select mode of Regions and of Routes, which pick objects without editing.
      */
     #canvasInteractive() {
+        // While an export draws, the map takes no edits: only the camera moves
+        if (this.view?.held) return false;
         if (this.uiState.isEditMode) return true;
         // Cut regional world…'s crop takes the map's drags
         if (this.activeTool === "worldCut") return true;

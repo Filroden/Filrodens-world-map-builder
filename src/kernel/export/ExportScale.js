@@ -1,51 +1,10 @@
 import { FILRODENSWMB } from "../../config.js";
 
 /**
- * The PNG export's scales: what each makes, which the map allows, and which is recommended, so
- * the smallest name shown can be read in the image without zooming in.
- *
- * A scale is allowed while the image stays within EXPORT_PNG.MAX_SIDE on a side (or a smaller
- * limit given, such as the graphics card's largest texture for a scene's background) and
- * EXPORT_PNG.MAX_PIXELS in all. The recommended scale is the smallest allowed one at which the
- * smallest name shown is at least EXPORT_PNG.MIN_LABEL_PX tall, in whole pixels; when none reaches it, the largest
- * allowed; with no names shown, 1x.
+ * How an export is drawn: in tiles no larger than EXPORT_PNG.TILE_PX (or the graphics card's
+ * texture limit). The area, the scale and what fits are ExportArea's; a scene's grid is SceneArea's.
  */
 export class ExportScale {
-    /**
-     * @param {object} options
-     * @param {number} options.width - The map's width in pixels (the image's at 1x).
-     * @param {number} options.height
-     * @param {number|null} options.smallestLabelPx - The smallest name shown, in map pixels (null for none).
-     * @param {number} [options.maxSide] - The longest side allowed, if less than EXPORT_PNG.MAX_SIDE.
-     * @returns {{options: {scale: number, width: number, height: number, allowed: boolean, recommended: boolean}[], recommended: number, reason: {kind: string, px?: number, scaledPx?: number, scale?: number}}}
-     */
-    static plan({ width, height, smallestLabelPx, maxSide = Infinity }) {
-        const { SCALES, MIN_LABEL_PX, MAX_PIXELS } = FILRODENSWMB.EXPORT_PNG;
-        const MAX_SIDE = Math.min(FILRODENSWMB.EXPORT_PNG.MAX_SIDE, maxSide);
-        const options = SCALES.map((scale) => {
-            const w = Math.round(width * scale);
-            const h = Math.round(height * scale);
-            return { scale, width: w, height: h, allowed: scale === SCALES[0] || (Math.max(w, h) <= MAX_SIDE && w * h <= MAX_PIXELS), recommended: false };
-        });
-        const allowed = options.filter((option) => option.allowed);
-        let recommended = allowed[0].scale;
-        let reason = { kind: "none" };
-        if (Number(smallestLabelPx) > 0) {
-            const px = smallestLabelPx;
-            // Decided on the whole pixels the reason gives, so the two always agree
-            const reaching = allowed.find((option) => Math.round(px * option.scale) >= MIN_LABEL_PX);
-            if (reaching) {
-                recommended = reaching.scale;
-                reason = { kind: reaching.scale === SCALES[0] ? "enough" : "reaches", px, scaledPx: px * reaching.scale, scale: reaching.scale };
-            } else {
-                recommended = allowed.at(-1).scale;
-                reason = { kind: "short", px, scaledPx: px * recommended, scale: recommended };
-            }
-        }
-        for (const option of options) option.recommended = option.scale === recommended;
-        return { options, recommended, reason };
-    }
-
     /**
      * The tiles an image is drawn in, each at most `tile` pixels on a side, covering it exactly
      * (left to right, then top to bottom).
@@ -206,5 +165,93 @@ export const ExportArea = Object.freeze({
         const where = preset === "drawn" ? "_area" : preset === "screen" ? "_view" : "";
         const times = `${String(Math.round(scale * 100) / 100).replace(".", "-")}x`;
         return `fwmb_${slug}${where}_${times}`;
+    },
+});
+
+/**
+ * Export to scene with an area (S0 step 7b; the decision record's §9, DE; board X4): the area in
+ * whole grid cells with its corner where the grid's pattern starts again, so the scene's own grid
+ * (which Foundry draws from the scene's corner) falls on the map's; a scale that makes each cell a
+ * whole number of pixels, no smaller than Foundry allows; and the offsets by which the grid cell
+ * data's keys move, so its first cell is the scene's. Pure, as ExportArea.
+ */
+export const SceneArea = Object.freeze({
+    /**
+     * A grid's cell steps (how far apart cells are across and down) and its period (how far apart
+     * the points are where its pattern starts again), in map pixels; null for a gridless map. A hex
+     * grid's size is the distance between its flat sides (see RegionalExtractor.planCrop): pointed-
+     * top rows ("hexR") are size × √3 / 2 apart and repeat every two rows; flat-topped columns
+     * ("hexC") likewise across.
+     * @param {{type: string, size: number}} grid
+     */
+    geometry({ type, size }) {
+        const s = Number(size);
+        if (!(s > 0)) return null;
+        const offset = (s * Math.sqrt(3)) / 2;
+        if (type === "square") return { step: { x: s, y: s }, period: { x: s, y: s } };
+        if (type === "hexR") return { step: { x: s, y: offset }, period: { x: s, y: offset * 2 } };
+        if (type === "hexC") return { step: { x: offset, y: s }, period: { x: offset * 2, y: s } };
+        return null;
+    },
+
+    /**
+     * An area snapped to the grid (DE): its corner at the nearest start of the grid's pattern, then
+     * as many whole cells across and down as fit nearest what was drawn, kept on the map (the corner
+     * moving back a period where the map's edge leaves no room). A gridless map keeps the area as
+     * drawn. With `fit`, the cells are as many as fit inside what was given (a nearest fit for Too
+     * large must stay as small as it was worked out to be).
+     * @returns {{area: {x: number, y: number, width: number, height: number}, cells: {across: number, down: number}|null}}
+     */
+    snap(area, grid, map, { fit = false } = {}) {
+        const geometry = this.geometry(grid);
+        if (!geometry) return { area: ExportArea.clip(area, map), cells: null };
+        const { step, period } = geometry;
+        const axis = (start, length, stepSize, periodSize, limit) => {
+            let corner = Math.max(0, Math.round(start / periodSize)) * periodSize;
+            while (corner > 0 && limit - corner < stepSize - 1e-9) corner -= periodSize;
+            corner = Math.max(0, corner);
+            const room = Math.max(1, Math.floor((limit - corner) / stepSize + 1e-9));
+            const count = Math.min(room, Math.max(1, (fit ? Math.floor : Math.round)(length / stepSize + (fit ? 1e-9 : 0))));
+            return { corner, count };
+        };
+        const across = axis(area.x, area.width, step.x, period.x, map.width);
+        const down = axis(area.y, area.height, step.y, period.y, map.height);
+        return {
+            area: { x: across.corner, y: down.corner, width: across.count * step.x, height: down.count * step.y },
+            cells: { across: across.count, down: down.count },
+        };
+    },
+
+    /**
+     * The scene's scale for a chosen one: the scale at which a cell is a whole number of pixels,
+     * the nearest to it, and never smaller than `minCell` pixels (Foundry's least grid size). A
+     * gridless map takes the scale as chosen. With `fit`, the largest such scale not above it.
+     * @returns {{scale: number, cell: number|null, floor: number}} The scale, the cell in the
+     *     scene's pixels, and the lowest scale the grid allows.
+     */
+    scale(chosen, grid, minCell, { fit = false } = {}) {
+        const size = Number(grid?.size);
+        if (!this.geometry(grid)) return { scale: chosen, cell: null, floor: 0 };
+        const cell = Math.max(minCell, (fit ? Math.floor : Math.round)(size * chosen + (fit ? 1e-9 : 0)));
+        return { scale: cell / size, cell, floor: minCell / size };
+    },
+
+    /**
+     * How far the grid cell data's offsets move for an area snapped to the grid, so the cell at the
+     * area's corner is the scene's first: in Foundry's offsets, `i` rows down and `j` columns
+     * across. Whole periods, so a hex grid's row (or column) parity is kept.
+     * @returns {{i: number, j: number}}
+     */
+    offset(area, grid) {
+        const geometry = this.geometry(grid);
+        if (!geometry) return { i: 0, j: 0 };
+        return { i: Math.round(area.y / geometry.step.y), j: Math.round(area.x / geometry.step.x) };
+    },
+
+    /** Whether two choices of area and scale make the same scene (to a pixel, and the scale to 0.001). */
+    same(a, b) {
+        if (!a || !b) return false;
+        const close = (p, q, tolerance) => Math.abs(Number(p) - Number(q)) <= tolerance;
+        return close(a.x, b.x, 0.5) && close(a.y, b.y, 0.5) && close(a.width, b.width, 0.5) && close(a.height, b.height, 0.5) && close(a.scale, b.scale, 0.001);
     },
 });

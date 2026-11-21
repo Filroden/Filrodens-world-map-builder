@@ -155,6 +155,25 @@ test("grid data: region coverage from the cell raster matches the polygon test w
     assert.ok(Object.values(mesh.cells).some((cell) => cell.infrastructure.routes.length > 0), "routes on the mesh still mark the cells they cross");
 });
 
+test("grid data for an area: only its cells, keyed from the area's corner, each the same as the whole map's", { skip: P0_SKIP }, async () => {
+    const { GridDataExporter } = await import("../../src/studios/world/app/GridDataExporter.js");
+    const { SceneArea } = await import("../../src/kernel/export/ExportScale.js");
+    const { app, v3 } = await exporterApp();
+    const regions = await polygonRegions(v3.regionLayers);
+    const whole = GridDataExporter.build(app, { regions });
+    const grid = { type: "square", size: 100 };
+    const { area } = SceneArea.snap({ x: 310, y: 190, width: 420, height: 300 }, grid, { width: app.mapWidth, height: app.mapHeight });
+    const offset = SceneArea.offset(area, grid);
+    assert.deepEqual(offset, { i: 2, j: 3 });
+    const part = GridDataExporter.build(app, { regions, area, offset });
+    assert.deepEqual(part.bounds, { iMin: 0, iMax: 2, jMin: 0, jMax: 3 }, "3 rows by 4 columns, from 0");
+    assert.equal(Object.keys(part.cells).length, 12);
+    for (const [key, cell] of Object.entries(part.cells)) {
+        const [i, j] = key.split(",").map(Number);
+        assert.deepEqual({ ...cell }, { ...whole.cells[`${i + offset.i},${j + offset.j}`] }, `cell ${key} is the map's ${i + offset.i},${j + offset.j}`);
+    }
+});
+
 test("a route the crop splits keeps its id on its first stretch and <id>-<n> on the rest, the same for every cut", { skip: P0_SKIP }, async () => {
     const { session, mapData } = await openV3();
     // In from the west, out through the south edge, back in, and out again east: two stretches inside

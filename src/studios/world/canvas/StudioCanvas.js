@@ -10,7 +10,6 @@ import { LabelFonts } from "../../../kernel/util/LabelFonts.js";
 import { LabelWidth } from "../../../kernel/util/LabelWidth.js";
 import { SymbolScale } from "../../../kernel/util/SymbolScale.js";
 import { ExportScale } from "../../../kernel/export/ExportScale.js";
-import { ImageFormat } from "../../../kernel/export/ImageFormat.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { borderLines } from "./MapBorder.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
@@ -1556,7 +1555,7 @@ export class StudioCanvas {
     /**
      * The largest texture side this graphics card takes (MIN_GUARANTEED_TEXTURE_SIZE when it
      * cannot be read). A scene's background must fit it to be shown, so the scene export offers
-     * no scale beyond it (see ExportScale.plan).
+     * no scale beyond it (see ExportArea.plan).
      * @returns {number}
      */
     maxTextureSize() {
@@ -1575,10 +1574,13 @@ export class StudioCanvas {
      * reference image and the land masks' outlines are working aids, never exported.
      * @param {{x: number, y: number, width: number, height: number}} area - In map pixels.
      * @param {number} scale
-     * @param {{onTile?: (done: number) => void, signal?: AbortSignal}} [options]
+     * A scene's images (S0 step 7b) are drawn the same way with a `pass`: "player" without the
+     * grid (which Foundry draws), "gm" with only what players must not see (no terrain, contours,
+     * thematic layers, rivers and faults, grid or cartography).
+     * @param {{onTile?: (done: number) => void, signal?: AbortSignal, pass?: "player"|"gm"|null}} [options]
      * @returns {Promise<HTMLCanvasElement|null>}
      */
-    async drawExport(area, scale, { onTile = null, signal = null } = {}) {
+    async drawExport(area, scale, { onTile = null, signal = null, pass = null } = {}) {
         const factor = Number(scale) > 0 ? scale : 1;
         const left = Math.round(area.x * factor);
         const top = Math.round(area.y * factor);
@@ -1596,7 +1598,7 @@ export class StudioCanvas {
                 // A frame between tiles: the studio draws, and Cancel can be pressed
                 await new Promise((resolve) => requestAnimationFrame(() => resolve()));
                 if (signal?.aborted || this.app?.renderer == null) return null;
-                const hidden = [this.layers.reference, this.layers.landMasks];
+                const hidden = this.#exportHidden(pass);
                 const visibility = hidden.map((layer) => layer.visible);
                 const camera = { x: this.stage.position.x, y: this.stage.position.y, scaleX: this.stage.scale.x, scaleY: this.stage.scale.y };
                 const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
@@ -1620,6 +1622,19 @@ export class StudioCanvas {
         } finally {
             this.#restoreTextResolution(texts);
         }
+    }
+
+    /** The layers an export hides: the working aids always, and for a scene pass what that pass leaves out. */
+    #exportHidden(pass) {
+        const hidden = [this.layers.reference, this.layers.landMasks];
+        if (pass) hidden.push(this.gridLayer);
+        if (pass === "gm") {
+            // The GM overlay holds only what players must not see; a thematic layer is in the
+            // player image already
+            const { terrain, contours, thematic, trade, travel, features, cartography } = this.layers;
+            hidden.push(terrain, contours, thematic, trade, travel, features, cartography);
+        }
+        return hidden;
     }
 
     /**
@@ -2502,40 +2517,6 @@ export class StudioCanvas {
             entityId: dec.id,
         });
         if (showHandles) this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
-    }
-
-    /**
-     * One of a scene export's images as a blob in a format (see ImageFormat), drawn exactly as
-     * the image export draws (see #renderForExport) at the scale chosen: the player image (no
-     * grid, which Foundry draws), or the GM overlay (only what players must not see: no terrain,
-     * contours, thematic layers, rivers and faults, grid or cartography). The reference image and
-     * the land masks' outlines are never exported. Every layer goes back to how it was.
-     * @param {"player"|"gm"} [passType]
-     * @param {number} [scale] - 1 draws the map at its own size.
-     * @param {string} [format] - An EXPORT_FORMATS id.
-     * @returns {Promise<Blob|null>}
-     */
-    async extractCanvasBlob(passType = "player", scale = 1, format = "png") {
-        const hidden = [this.gridLayer, this.layers.reference, this.layers.landMasks];
-        if (passType === "gm") {
-            // The GM overlay holds only what players must not see; a thematic layer is in the
-            // player image already
-            const { terrain, contours, thematic, trade, travel, features, cartography } = this.layers;
-            hidden.push(terrain, contours, thematic, trade, travel, features, cartography);
-        }
-        const visibility = hidden.map((layer) => layer.visible);
-        let canvas;
-        try {
-            for (const layer of hidden) layer.visible = false;
-            canvas = this.#renderForExport(scale);
-        } finally {
-            // Each layer goes back to how the person had it, rather than always to visible
-            hidden.forEach((layer, index) => {
-                layer.visible = visibility[index];
-            });
-        }
-        const { blob } = await ImageFormat.encode(canvas, format);
-        return blob;
     }
 
     /**
