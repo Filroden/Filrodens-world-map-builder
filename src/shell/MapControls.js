@@ -1,5 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
-import { setOn, setPressed } from "./aria.js";
+import { setOn } from "./aria.js";
 import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
 
 /**
@@ -7,19 +7,23 @@ import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
  * will contain. The map region is drawn once, so its controls are never redrawn from a template
  * after that: every change to a view is written onto them here, from the studio's state, by
  * MapStudio#syncMapControls. Nothing else sets their state, so a control can never disagree with
- * the view it switches (a grid size change that turns the grid on shows on the Grid toggle).
+ * the view it switches (a grid size change that turns the grid on shows on Map aids' Grid row).
  *
- * The same state appears twice: as the wide row of buttons, and as the rows of the Layers menu
- * that replaces most of them when the canvas is too narrow (see foldMapControls). Both carry the
- * same data-action and data attributes, so one pass marks both, each in the way its role reads it
- * (aria-pressed on a button, aria-checked on a menu row).
+ * Since S0 step 6b they are three labelled menus (the CanvasOverlays card): **Visibility**,
+ * **Show** (a row a part of the map, those with parts opening a submenu, and Detail) and
+ * **Thematic views**. A Show row with parts reads its submenu's state in `data-state` (on, partial,
+ * off), drawn as its tick, with the partial dot; a menu's button shows the dot while some of what
+ * it holds is off.
  */
 
 /** The layers switched on and off one by one with the toggleLayer action, in the controls' order. */
 export const VIEW_LAYERS = Object.freeze([...FILRODENSWMB.STUDIO.VIEW_LAYERS, ...FILRODENSWMB.STUDIO.OVERLAY_LAYERS].filter((layer) => layer.action !== "toggleGrid").map((layer) => layer.id));
 
+/** The map aids (Show's Map aids row): drawn over the map to work with, never the map's content. */
+export const MAP_AIDS = Object.freeze(FILRODENSWMB.STUDIO.OVERLAY_LAYERS.map((layer) => layer.id ?? "grid"));
+
 /** Whether all, some or none of a list of switches are on. */
-function groupState(values) {
+export function groupState(values) {
     const on = values.filter(Boolean).length;
     if (on === values.length) return "on";
     return on === 0 ? "off" : "partial";
@@ -28,15 +32,38 @@ function groupState(values) {
 const ARIA_CHECKED = { on: "true", partial: "mixed", off: "false" };
 
 /**
- * How many of the switches the Layers menu lists are on: every terrain layer, every view layer
- * and the grid. (The view filters and zoom stay outside the menu, so they do not count.)
+ * Each of Show's rows, as on, partial or off: Terrain and Biomes from their layers, Regions and
+ * Labels from their rows, Places and routes and Cartography as they are, and Map aids from its
+ * three. Detail is a choice, not a part, so it has none.
  *
  * @param {object} state - As for syncMapControls.
- * @returns {{shown: number, total: number}}
+ * @returns {Object<string, string>} Row id → "on", "partial" or "off".
  */
-export function layersShown(state) {
-    const values = [...state.terrainGroups.flatMap((group) => group.items.map((item) => item.on)), ...VIEW_LAYERS.map((id) => state.layers[id]), state.grid];
-    return { shown: values.filter(Boolean).length, total: values.length };
+export function showStates(state) {
+    const rows = {};
+    for (const group of state.terrainGroups) rows[group.id] = groupState(group.items.map((item) => item.on));
+    for (const layer of FILRODENSWMB.STUDIO.VIEW_LAYERS) {
+        const content = (state.contentGroups ?? []).find((group) => group.id === layer.id);
+        rows[layer.id] = content ? content.state : state.layers[layer.id] ? "on" : "off";
+    }
+    rows.aids = groupState(MAP_AIDS.map((id) => (id === "grid" ? state.grid : state.layers[id])));
+    return rows;
+}
+
+/**
+ * Whether a menu's button shows the partial dot: Visibility while Everyone or GM only is off
+ * (Hidden is off by default, so its being off is not news); Show while any part of the map's
+ * content is not wholly shown (the map aids are off by default, so they do not count).
+ *
+ * @param {object} state - As for syncMapControls.
+ * @returns {{visibility: boolean, show: boolean}}
+ */
+export function menuDots(state) {
+    const rows = showStates(state);
+    return {
+        visibility: !state.viewFilters.all || !state.viewFilters.gm,
+        show: Object.entries(rows).some(([id, value]) => id !== "aids" && value !== "on"),
+    };
 }
 
 /**
@@ -51,18 +78,17 @@ export function layersShown(state) {
  *   layer groups (Terrain, Biomes) and their layers.
  * @param {boolean} state.threeD - Whether the 3D view is showing.
  * @param {{id: string, state: string, rows: object[]}[]} [state.contentGroups] - The Labels and
- *   Regions menus' rows (see ContentRows).
+ *   Regions submenus' rows (see ContentRows).
  * @param {number} state.detailLevel - The map's detail level (see DetailLevel).
  * @param {boolean} state.avoidOverlaps - Whether names avoid each other (see LabelLayout).
  * @param {{value: string, percent: number, auto: boolean, selected: boolean}[]} [state.symbolSizes] - The
  *   symbol size rows (see SymbolScale.choices), Auto first.
  * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], opacity: number, note: string}} [state.thematic] - The
- *   thematic layers' menu (see ThematicView.controlState).
+ *   thematic views' menu (see ThematicView.controlState).
+ * @param {(level: number) => string} detailName - The name of a detail level, at Show's Detail row's end.
  * @param {(percent: number) => string} [autoLabel] - The Auto row's name for its value.
- * @param {(shown: number, total: number) => string} layersLabel - The Layers button's name for a count.
- * @param {(level: number) => string} detailLabel - The Detail button's name for a level.
  */
-export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel = (percent) => `${percent}%`) {
+export function syncMapControls(root, state, detailName, autoLabel = (percent) => `${percent}%`) {
     if (!root) return;
     const each = (selector, apply) => root.querySelectorAll(selector).forEach(apply);
 
@@ -74,8 +100,9 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
     for (const group of state.contentGroups ?? []) syncContentGroup(root, group);
     if (state.thematic) syncThematic(root, state.thematic);
 
-    // The Detail menu: one level chosen, named on its button
+    // Detail: one level chosen, named at the end of Show's Detail row
     each('[data-action="setDetailLevel"]', (row) => row.setAttribute("aria-checked", String(Number(row.dataset.detailLevel) === state.detailLevel)));
+    each("[data-detail-name]", (element) => (element.textContent = detailName(state.detailLevel)));
     each('[data-action="toggleLabelOverlaps"]', (row) => setOn(row, state.avoidOverlaps));
     for (const choice of state.symbolSizes ?? []) {
         each(`[data-action="setSymbolSize"][data-symbol-size="${choice.value}"]`, (row) => {
@@ -84,42 +111,34 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
             if (name) name.textContent = autoLabel(choice.percent);
         });
     }
-    each('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]', (button) => {
-        const label = detailLabel(state.detailLevel);
-        button.setAttribute("aria-label", label);
-        button.dataset.tooltip = label;
-    });
 
     for (const group of state.terrainGroups) {
         const status = groupState(group.items.map((item) => item.on));
-        // The wide control: one button opening the group's own list
-        each(`.fwmb-layer-group[data-layer-group="${group.id}"] > [data-action="toggleLayerMenu"]`, (button) => {
-            setPressed(button, status === "on");
-            button.classList.toggle("fwmb-is-partial", status === "partial");
-        });
-        // The group's "All" row (wide list) and its group row (Layers menu)
         each(`[data-action="toggleTerrainLayer"][data-layer-group="${group.id}"][data-terrain-layer="all"]`, (row) => row.setAttribute("aria-checked", ARIA_CHECKED[status]));
         for (const item of group.items) {
             each(`[data-action="toggleTerrainLayer"][data-layer-group="${group.id}"][data-terrain-layer="${item.key}"]`, (row) => setOn(row, item.on));
         }
     }
 
-    // The Layers button that stands in for the layer toggles when the controls are folded
-    const { shown, total } = layersShown(state);
-    each('.fwmb-layer-group[data-layer-group="layers"] > [data-action="toggleLayerMenu"]', (button) => {
-        setPressed(button, shown > 0);
-        button.classList.toggle("fwmb-is-partial", shown > 0 && shown < total);
-        const label = layersLabel(shown, total);
-        button.setAttribute("aria-label", label);
-        button.dataset.tooltip = label;
-    });
+    // Show's rows with parts: their tick and dot from their submenus
+    for (const [id, value] of Object.entries(showStates(state))) {
+        each(`[data-action="openShowPart"][data-show-part="${id}"]`, (row) => {
+            row.dataset.state = value;
+            row.classList.toggle("fwmb-is-partial", value === "partial");
+        });
+    }
+
+    // The menus' buttons: the partial dot while some of what they hold is off
+    const dots = menuDots(state);
+    each('.fwmb-layer-group[data-layer-group="visibility"] > [data-action="toggleLayerMenu"]', (button) => button.classList.toggle("fwmb-is-partial", dots.visibility));
+    each('.fwmb-layer-group[data-layer-group="show"] > [data-action="toggleLayerMenu"]', (button) => button.classList.toggle("fwmb-is-partial", dots.show));
 }
 
 /**
- * The thematic layers' menu: the colour layer chosen
- * (None when none is drawn), the line layers shown, the layers the map's run cannot show marked
+ * The thematic views' menu: the colour view chosen
+ * (None when none is drawn), the line views shown, the views the map's run cannot show marked
  * disabled with the reason as their tooltip, the note at its head, the opacity slider (idle while
- * no colour layer is drawn), and the button pressed while any layer is drawn.
+ * no colour view is drawn), and the view shown named on the button.
  *
  * @param {ParentNode} root
  * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], lines?: {id: string, on: boolean, disabled: boolean, title: string}[], opacity: number, note: string}} thematic
@@ -150,13 +169,26 @@ function syncThematic(root, thematic) {
             element.dataset.tooltip = line.title;
         });
     }
-    const anyShown = !!thematic.fill || (thematic.lines ?? []).some((line) => line.on);
-    root.querySelectorAll('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]').forEach((button) => setPressed(button, anyShown));
+    // The view shown names the button (the CanvasOverlays card: "its name as the count"): the
+    // colour view, else the line views shown
+    const names = [];
+    if (thematic.fill) names.push(nameOf(root.querySelector(`[data-action="setThematicFill"][data-thematic-layer="${thematic.fill}"]`)));
+    else for (const line of thematic.lines ?? []) if (line.on) names.push(nameOf(root.querySelector(`[data-action="toggleThematicLine"][data-thematic-line="${line.id}"]`)));
+    const count = names.filter(Boolean).join(", ");
+    root.querySelectorAll("[data-thematic-count]").forEach((element) => {
+        element.textContent = count;
+        element.classList.toggle("fwmb-hidden", !count);
+    });
+}
+
+/** A menu row's name, as drawn. */
+function nameOf(row) {
+    return row?.textContent.trim() ?? "";
 }
 
 /**
- * Whether the map controls must fold their layer toggles into the Layers menu: when the whole row
- * of buttons is wider than the room the canvas leaves it beside the hint at its narrowest.
+ * Whether the map controls must fold, their three menus to icon buttons: when the whole row,
+ * labelled, is wider than the room the canvas leaves it beside the hint at its narrowest.
  *
  * @param {number} wideWidth - The width of the controls with every toggle shown.
  * @param {number} room - The canvas width less the hint's narrowest width and the margins around and between them.
@@ -167,9 +199,8 @@ export function mustFoldMapControls(wideWidth, room) {
 }
 
 /**
- * One of the Labels and Regions menus (see ContentRows): its rows written into the wide menu and
- * the folded Layers menu when they change (styles and levels come and go with the map), then
- * each marked, the All row and the group's button with them.
+ * One of the Labels and Regions submenus (see ContentRows): its rows written when they change
+ * (styles and tiers come and go with the map), then each marked, the All row with them.
  *
  * @param {ParentNode} root
  * @param {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, mixed?: boolean, sub?: boolean, separator?: boolean}[]}} group
@@ -186,15 +217,11 @@ function syncContentGroup(root, group) {
         });
     }
     root.querySelectorAll(`[data-action="toggleContentRow"][data-content-group="${group.id}"][data-content-kind="all"]`).forEach((element) => element.setAttribute("aria-checked", ARIA_CHECKED[group.state]));
-    root.querySelectorAll(`.fwmb-layer-group[data-layer-group="${group.id}"] > [data-action="toggleLayerMenu"]`).forEach((button) => {
-        setPressed(button, group.state === "on");
-        button.classList.toggle("fwmb-is-partial", group.state === "partial");
-    });
 }
 
 /**
- * A menu's rows as buttons, indented one step further in the folded Layers menu
- * (data-content-indent); a row marked separator (Regions' Fills) has a rule above it.
+ * A submenu's rows as buttons (data-content-indent indents them further); a row marked separator
+ * (Regions' Fills) has a rule above it.
  */
 function writeContentRows(container, group) {
     const indent = Number(container.dataset.contentIndent ?? 0);

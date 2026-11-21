@@ -84,7 +84,9 @@ test("the map controls' toggles have names in en.json and icons with masks", () 
         assert.ok(STRINGS[layer.label], `${layer.label} is in en.json`);
         assert.match(CSS, new RegExp(`\\.fwmb-icon--${layer.icon} \\{`), `${layer.icon} has an icon mask`);
     }
-    assert.match(STRINGS["FILRODENSWMB.UI.LayersMenuCount"], /\{shown\}.*\{total\}/);
+    // The three menus (S0 step 6b) and Show's own rows
+    for (const key of ["Visibility", "ShowMenu", "ThematicLayers", "ShowMapAids", "ShowOtherMaps", "ShowTheSurface", "VisibilityEveryone", "VisibilityGMOnly"]) assert.ok(STRINGS[`FILRODENSWMB.UI.${key}`], `${key} is in en.json`);
+    assert.equal(STRINGS["FILRODENSWMB.UI.ThematicLayers"], "Thematic views");
 });
 
 test("a hint lists the mode's actions first in the normal ink, then movement, muted", () => {

@@ -6517,12 +6517,23 @@
     background: rgba(255, 255, 255, 0.18);
     margin: 0 0.125rem;
 }
-.fwmb-map-controls-folded,
-.fwmb-map-controls[data-fold] .fwmb-map-controls-wide {
+/* Folded (StudioLayout, when the labelled row does not fit beside the hint) and on touch: the
+   three menus as icon buttons, named by their aria-label and tooltip */
+.fwmb-map-controls[data-fold] .fwmb-map-menu :is(.fwmb-map-menu-label, .fwmb-count) {
     display: none;
 }
-.fwmb-map-controls[data-fold] .fwmb-map-controls-folded {
-    display: flex;
+@media (pointer: coarse) {
+    .fwmb-map-controls .fwmb-map-menu :is(.fwmb-map-menu-label, .fwmb-count) {
+        display: none;
+    }
+}
+.fwmb-map-controls .fwmb-map-menu .fwmb-icon {
+    width: var(--fwmb-size-16);
+    height: var(--fwmb-size-16);
+    min-width: var(--fwmb-size-16);
+}
+.fwmb-map-controls[data-fold] .fwmb-map-menu {
+    padding: 0 0.375rem;
 }
 
 .fwmb .fwmb-map-btn .fwmb-icon {
@@ -6578,6 +6589,87 @@
 
 .fwmb-layer-menu.fwmb-hidden {
     display: none;
+}
+
+/* A row's icon (Visibility's: who the row is for) */
+.fwmb .fwmb-layer-menu button > .fwmb-icon {
+    width: var(--fwmb-size-16);
+    height: var(--fwmb-size-16);
+    min-width: var(--fwmb-size-16);
+    color: var(--fwmb-overlay-accent);
+}
+
+/* Show's submenus: beside the menu on its start side (the controls sit at the canvas's end), the
+   bottoms lined up; --fwmb-submenu-offset is the menu's width (MapStudio#openShowPart) */
+.fwmb-layer-submenu {
+    inset-inline-end: var(--fwmb-submenu-offset, 12rem);
+}
+
+/* No room beside the menu (MapStudio#openShowPart): the submenu takes the menu's place, its Back
+   row at its head; Back shows only then */
+.fwmb .fwmb-layer-menu button.fwmb-submenu-back {
+    display: none;
+    font-weight: 700;
+    border-block-end: 1px solid var(--fwmb-overlay-border);
+    border-radius: 0;
+    margin-block-end: 0.125rem;
+}
+.fwmb-layer-group[data-submenu-over] > .fwmb-layer-submenu {
+    inset-inline-end: 0;
+}
+.fwmb .fwmb-layer-group[data-submenu-over] > .fwmb-layer-submenu button.fwmb-submenu-back {
+    display: flex;
+}
+.fwmb-layer-group[data-submenu-over] > .fwmb-layer-menu:not(.fwmb-layer-submenu) {
+    visibility: hidden;
+}
+.fwmb-show-chevron--back::after {
+    content: "‹";
+}
+[dir="rtl"] .fwmb-show-chevron--back::after {
+    content: "›";
+}
+
+/* Show's rows with parts: their tick from the submenu's state (data-state), the name, an end note
+   (Detail's level), the partial dot, the chevron toward the submenu; the open one as the Menu
+   card's (bg-selected and a bar in the secondary accent) */
+.fwmb .fwmb-layer-menu button.fwmb-show-row {
+    gap: 0.5rem;
+}
+.fwmb-show-name {
+    flex: 1 1 auto;
+    text-align: start;
+}
+/* Show's menu: wide enough for its heading, Other maps beneath this one, on one line */
+.fwmb-layer-group[data-layer-group="show"] > .fwmb-layer-menu:not(.fwmb-layer-submenu) {
+    min-inline-size: 14rem;
+}
+.fwmb-show-end {
+    color: var(--fwmb-overlay-muted);
+    font-size: 0.75rem;
+}
+.fwmb-show-chevron::after {
+    content: "‹";
+    color: var(--fwmb-overlay-muted);
+    font-size: 1rem;
+    line-height: 1;
+}
+[dir="rtl"] .fwmb-show-chevron::after {
+    content: "›";
+}
+.fwmb-show-row.fwmb-is-partial .fwmb-show-name::after {
+    content: "";
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--fwmb-overlay-accent);
+    margin-inline-start: 0.375rem;
+    vertical-align: middle;
+}
+.fwmb .fwmb-layer-menu button.fwmb-show-row.fwmb-menu-item--open {
+    background: var(--fwmb-overlay-control-hover);
+    box-shadow: inset 3px 0 0 var(--fwmb-overlay-accent-secondary);
 }
 
 .fwmb .fwmb-layer-menu button {
@@ -6679,12 +6771,12 @@
     justify-content: center;
 }
 
-.fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check {
+.fwmb-layer-menu :is([aria-checked="true"], [data-state="on"]) .fwmb-layer-check {
     background: var(--fwmb-fill-accent);
     border-color: var(--fwmb-fill-accent-edge);
 }
 
-.fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check::after {
+.fwmb-layer-menu :is([aria-checked="true"], [data-state="on"]) .fwmb-layer-check::after {
     content: "";
     inline-size: 0.25rem;
     block-size: 0.5rem;
@@ -6706,11 +6798,11 @@
     transform: none;
 }
 
-.fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check {
+.fwmb-layer-menu :is([aria-checked="mixed"], [data-state="partial"]) .fwmb-layer-check {
     border-color: var(--fwmb-overlay-accent);
 }
 
-.fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check::after {
+.fwmb-layer-menu :is([aria-checked="mixed"], [data-state="partial"]) .fwmb-layer-check::after {
     content: "";
     inline-size: 0.5rem;
     block-size: 0.125rem;

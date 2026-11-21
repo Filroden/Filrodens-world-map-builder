@@ -366,6 +366,8 @@ export class MapStudio {
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
+        openShowPart(_e, t)             { this.#openShowPart(t, { focus: true }); },
+        closeShowPart()                 { this.#backToShow(); },
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
         toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
         toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
@@ -1562,7 +1564,7 @@ export class MapStudio {
         context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
         context.areaFactorRange = { min: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[0], max: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[1] };
         context.mapUnit = cleanUnit(this.uiState.mapUnit);
-        // The map controls' Thematic layers menu (the map region is drawn once; see ThematicView)
+        // The map controls' Thematic views menu (the map region is drawn once; see ThematicView)
         context.thematic = ThematicView.menuContext();
         context.pixelScale = this.#pixelScaleText();
         // The value per tick a bar matching the world draws (a number field, so unformatted)
@@ -3840,8 +3842,8 @@ export class MapStudio {
             thematic,
         };
         const detailName = (level) => platform.i18n.localize(FILRODENSWMB.DETAIL.LEVELS.find((choice) => choice.value === level).label);
-        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }), (level) => platform.i18n.format("FILRODENSWMB.UI.DetailMenuLevel", { level: detailName(level) }), (percent) => platform.i18n.format("FILRODENSWMB.UI.SymbolSizeAutoValue", { percent }));
-        // The Layers button's name grows and shrinks with the count; the controls may fold differently
+        syncMapControls(this.root, state, detailName, (percent) => platform.i18n.format("FILRODENSWMB.UI.SymbolSizeAutoValue", { percent }));
+        // Thematic views' button grows and shrinks with the view's name; the controls may fold differently
         this.#layout?.update();
     }
 
@@ -3865,26 +3867,96 @@ export class MapStudio {
         }
 
         this.#closeLayerMenu();
-        container.querySelector(".fwmb-layer-menu")?.classList.remove("fwmb-hidden");
+        const menu = container.querySelector(":scope > .fwmb-layer-menu:not(.fwmb-layer-submenu)");
+        menu?.classList.remove("fwmb-hidden");
         target.setAttribute("aria-expanded", "true");
         this.#openLayerMenu = container;
 
         const doc = this.root.ownerDocument;
         doc.addEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
         doc.addEventListener("keydown", this.#onMenuKeyDown, true);
+        // Show's rows open their submenus under a fine pointer as it passes over them
+        container.addEventListener("pointerover", this.#onMenuPointerOver);
         // A list of choices opens on the one chosen; a list of switches on its first
-        (container.querySelector('[role="menuitemradio"][aria-checked="true"]') ?? container.querySelector(MapStudio.#MENU_ROWS))?.focus();
+        (menu?.querySelector('[role="menuitemradio"][aria-checked="true"]') ?? menu?.querySelector(MapStudio.#MENU_ROWS))?.focus();
     }
 
     /** The rows of the map controls' menus the arrow keys move between. */
-    static #MENU_ROWS = '[role="menuitemcheckbox"], [role="menuitemradio"]';
+    static #MENU_ROWS = '[role="menuitemcheckbox"]:not([aria-disabled="true"]), [role="menuitemradio"], [role="menuitem"]';
+
+    /** Show's open submenu, and the row that opened it. */
+    #openSubmenu = null;
+
+    /**
+     * Opens one of Show's submenus beside the menu, from its row (a click, Enter or the arrow key
+     * toward it, or a fine pointer passing over the row), closing any other. Bottom-aligned with the
+     * menu, on its start side (the controls sit at the canvas's end).
+     */
+    #openShowPart(row, { focus = false, hover = false } = {}) {
+        const container = row?.closest(".fwmb-layer-group");
+        const panel = container?.querySelector(`[data-show-panel="${row.dataset.showPart}"]`);
+        if (!panel) return;
+        if (this.#openSubmenu?.row !== row) {
+            const menu = row.closest(".fwmb-layer-menu");
+            // No room beside the menu on the canvas (a narrow window): the submenu takes the
+            // menu's place, with a way back at its head; then only a click opens it, never a
+            // pointer passing over the row (it would cover the rows the pointer is heading for)
+            const preview = container.closest(".fwmb-map-preview")?.getBoundingClientRect();
+            const box = menu.getBoundingClientRect();
+            const rtl = container.ownerDocument.defaultView.getComputedStyle(container).direction === "rtl";
+            const room = preview ? (rtl ? preview.right - box.right : box.left - preview.left) : Infinity;
+            panel.classList.remove("fwmb-hidden");
+            const over = panel.offsetWidth + 8 > room;
+            if (over && hover) {
+                panel.classList.add("fwmb-hidden");
+                this.#closeSubmenu();
+                return;
+            }
+            this.#closeSubmenu();
+            panel.classList.remove("fwmb-hidden");
+            container.style.setProperty("--fwmb-submenu-offset", `${menu.offsetWidth + 4}px`);
+            container.toggleAttribute("data-submenu-over", over);
+            row.setAttribute("aria-expanded", "true");
+            row.classList.add("fwmb-menu-item--open");
+            this.#openSubmenu = { row, panel };
+        }
+        if (focus) (panel.querySelector('[role="menuitemradio"][aria-checked="true"]') ?? [...panel.querySelectorAll(MapStudio.#MENU_ROWS)].find((each) => each.offsetParent !== null))?.focus();
+    }
+
+    #closeSubmenu() {
+        const open = this.#openSubmenu;
+        if (!open) return;
+        open.panel.closest(".fwmb-layer-group")?.removeAttribute("data-submenu-over");
+        open.panel.classList.add("fwmb-hidden");
+        open.row.setAttribute("aria-expanded", "false");
+        open.row.classList.remove("fwmb-menu-item--open");
+        this.#openSubmenu = null;
+    }
+
+    /** Back from a submenu to its row in Show (the submenu's Back, when it took the menu's place). */
+    #backToShow() {
+        const row = this.#openSubmenu?.row;
+        this.#closeSubmenu();
+        row?.focus();
+    }
+
+    /** A fine pointer over Show's rows: a row with parts opens its submenu, any other closes it. */
+    #onMenuPointerOver = (event) => {
+        if (event.pointerType && event.pointerType !== "mouse") return;
+        const row = event.target.closest?.(".fwmb-layer-menu:not(.fwmb-layer-submenu) > [role]");
+        if (!row || row.closest("[data-submenu-over]")) return;
+        if (row.dataset.action === "openShowPart") this.#openShowPart(row, { hover: true });
+        else this.#closeSubmenu();
+    };
 
     /** Closes the open terrain layer list, if any. */
     #closeLayerMenu() {
         const container = this.#openLayerMenu;
         if (!container) return;
 
-        container.querySelector(".fwmb-layer-menu")?.classList.add("fwmb-hidden");
+        this.#closeSubmenu();
+        container.removeEventListener("pointerover", this.#onMenuPointerOver);
+        container.querySelector(":scope > .fwmb-layer-menu:not(.fwmb-layer-submenu)")?.classList.add("fwmb-hidden");
         container.querySelector('[data-action="toggleLayerMenu"]')?.setAttribute("aria-expanded", "false");
         this.#openLayerMenu = null;
 
@@ -3898,21 +3970,47 @@ export class MapStudio {
         if (this.#openLayerMenu && !this.#openLayerMenu.contains(event.target)) this.#closeLayerMenu();
     };
 
-    /** Escape closes the open list and returns focus to its button; the arrow keys move along it. */
+    /**
+     * Escape closes the open submenu, else the open list, returning focus to what opened it; the
+     * arrow keys move along the list the focus is in. Across (either way: the convention's
+     * ArrowRight, or toward the submenu, which is drawn on the start side) a Show row opens its
+     * submenu, and a submenu gives the focus back to its row.
+     */
     #onMenuKeyDown = (event) => {
         if (!this.#openLayerMenu) return;
+        const panel = event.target.closest?.(".fwmb-layer-menu");
         // The arrow keys move between the list's rows, wrapping round at either end
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            const rows = [...this.#openLayerMenu.querySelectorAll(MapStudio.#MENU_ROWS)];
+            const rows = [...(panel ?? this.#openLayerMenu).querySelectorAll(MapStudio.#MENU_ROWS)].filter((row) => row.offsetParent !== null);
             const index = rows.indexOf(event.target);
             if (index === -1) return;
             event.preventDefault();
             event.stopPropagation();
-            rows[(index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length].focus();
+            const next = rows[(index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length];
+            next.focus();
+            // Moving along Show's rows closes the submenu of the row left
+            if (!panel?.classList.contains("fwmb-layer-submenu") && next.dataset.action !== "openShowPart") this.#closeSubmenu();
+            return;
+        }
+        // Either way across: the menu convention's ArrowRight, or toward the submenu as it is drawn
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            if (event.target.dataset?.action === "openShowPart") {
+                event.preventDefault();
+                event.stopPropagation();
+                this.#openShowPart(event.target, { focus: true });
+            } else if (panel?.classList.contains("fwmb-layer-submenu") && this.#openSubmenu) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.#backToShow();
+            }
             return;
         }
         if (event.key !== "Escape") return;
         event.stopPropagation();
+        if (panel?.classList.contains("fwmb-layer-submenu") && this.#openSubmenu) {
+            this.#backToShow();
+            return;
+        }
         const button = this.#openLayerMenu.querySelector('[data-action="toggleLayerMenu"]');
         this.#closeLayerMenu();
         button?.focus();
