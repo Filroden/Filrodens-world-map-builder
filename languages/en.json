@@ -1394,6 +1394,7 @@
     "FILRODENSWMB.UI.NoSavedWorlds": "No saved worlds yet. Start a new world, or import one from a file.",
     "FILRODENSWMB.UI.WorldsSearch": "Search worlds",
     "FILRODENSWMB.UI.WorldsNoMatches": "No world or map matches the search.",
+    "FILRODENSWMB.UI.WorldsChooseHint": "Choose a world to see its maps and regional worlds, and to open it.",
     "FILRODENSWMB.UI.WorldsBackupHint": "On the web your worlds live in this browser: a backup now and then keeps them safe if its storage is cleared.",
     "FILRODENSWMB.UI.WorldFamily": "Its family",
     "FILRODENSWMB.UI.WorldMaps": "Its maps",

@@ -3385,6 +3385,8 @@
 .fwmb .fwmb-make-foot--stack {
     flex-direction: column-reverse;
 }
+/* One row of four while there is room for their labels, two rows of two in a narrow window (S0
+   step 8c; the panel is the fwmb-side container) */
 .fwmb .fwmb-worlds-foot {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3398,6 +3400,11 @@
 .fwmb .fwmb-worlds-foot .fwmb-hint {
     grid-column: 1 / -1;
     margin: 0;
+}
+@container fwmb-side (max-width: 47rem) {
+    .fwmb .fwmb-worlds-foot {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 /* A world in the inspector: its family as a tree, each row choosing that world */
@@ -8475,6 +8482,29 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     z-index: 5;
 }
 
+/* Worlds keeps the inspector's column (S0 step 8c; WorldsPanel.reserve): with no world chosen it
+   stands empty with a hint, so choosing a card fills the column rather than narrowing the cards */
+.fwmb .fwmb-inspector-reserve {
+    order: 10;
+    flex: 0 0 var(--fwmb-inspector-width);
+    width: var(--fwmb-inspector-width);
+    box-sizing: border-box;
+    padding: 1rem 0.75rem;
+    background: var(--fwmb-bg-base);
+    border-inline-start: 1px solid var(--fwmb-border-main);
+    overflow: hidden;
+}
+.fwmb .fwmb-inspector-reserve > .fwmb-hint {
+    margin: 0;
+}
+.fwmb .fwmb-studio-body:has(> .fwmb-overlay-docked[open]) > .fwmb-inspector-reserve {
+    display: none;
+}
+/* With no world saved there is nothing to choose: the column stays, without its hint */
+.fwmb .fwmb-studio-body:has(.fwmb-worlds-empty) > .fwmb-inspector-reserve > .fwmb-hint {
+    display: none;
+}
+
 /* A docked dialogue is as wide as it is and no wider (it cannot be resized, as a modal one can),
    so nothing inside it may be wider than its body: every box is sized with its padding and border
    inside, a fieldset gives up its minimum content width (a fieldset's default, which lets it
@@ -10035,4 +10065,22 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 .fwmb-worldbar:is([data-fold="3"], [data-fold="4"], [data-fold="5"]) .fwmb-worldbar-for {
     display: none;
+}
+
+/* --- TOUCH: EVERY TARGET 2.75REM (S0 step 8c) ---
+   On a coarse pointer every button the studio draws is at least 2.75rem each way (the decision
+   record's Q7), whatever size its own rules give it: the world bar's buttons and layer switcher
+   (whose own rules outranked the touch block above), the map controls, the inspector's and the
+   dialogues' buttons, their close buttons, and a file field. min-height and min-width win over a
+   smaller height or width, so the rules elsewhere need no touch form of their own. A list row's
+   own actions (its eye, focus and menu) are the exception: the row is the 2.75rem target, and its
+   actions keep their width so the name keeps its room in a narrow panel. */
+@media (pointer: coarse) {
+    .fwmb :is(button, .fwmb-btn, .fwmb-barbtn, .fwmb-world-menu, .fwmb-layer, .fwmb-map-btn, .fwmb-map-menu, .fwmb-rail-btn):not([hidden], .fwmb-list-item *) {
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+    }
+    .fwmb :is(.fwmb-worldbar .fwmb-layers, file-picker) {
+        min-height: 2.75rem;
+    }
 }

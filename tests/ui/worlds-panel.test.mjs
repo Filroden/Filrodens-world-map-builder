@@ -230,3 +230,17 @@ test("a held world copied by a save keeps the card its map had (WorldRecord.crea
     const record = WorldRecord.create({ id: "w", name: "W", maps: [{ id: "m", type: "surface", thumbnail: THUMB, run: true, junk: 1 }] });
     assert.deepEqual(record.maps, [{ thumbnail: THUMB, run: true, id: "m", type: "surface" }]);
 });
+
+test("Worlds keeps the inspector's column: one empty column with its hint, before any docked dialogue, gone outside Worlds (S0 step 8c)", () => {
+    const app = studio();
+    host.innerHTML = '<div class="fwmb-studio-body"><div data-region="context"></div><dialog class="fwmb-overlay-docked"></dialog></div>';
+    WorldsPanel.reserve(app, true);
+    WorldsPanel.reserve(app, true);
+    const body = host.querySelector(".fwmb-studio-body");
+    const columns = body.querySelectorAll(":scope > .fwmb-inspector-reserve");
+    assert.equal(columns.length, 1, "drawn once, however often Worlds is drawn");
+    assert.equal(columns[0].textContent, "WorldsChooseHint");
+    assert.equal(columns[0].nextElementSibling, body.querySelector(".fwmb-overlay-docked"), "the inspector opens in its place");
+    WorldsPanel.reserve(app, false);
+    assert.equal(body.querySelector(".fwmb-inspector-reserve"), null);
+});

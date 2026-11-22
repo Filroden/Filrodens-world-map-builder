@@ -1774,6 +1774,8 @@ export class MapStudio {
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
+        // Worlds keeps the inspector's column (S0 step 8c): its cards never move when one is chosen
+        if (regions.includes("context")) WorldsPanel.reserve(this, this.activeTool === "manage");
         // Each list is one tab stop, its rows' controls none (see ListNav)
         if (regions.includes("context")) {
             ListQuery.settle(this, this.root);
@@ -6459,9 +6461,15 @@ export class MapStudio {
 
         // 4. Paint (the world bar too when the world or a map comes to be worked on: its switcher)
         this._repaintVectors();
-        this.view?.render(["toolbar", "context", "editToolbar", ...(wasOn !== this.#workingOn() ? ["worldbar"] : [])]);
+        const drawn = this.view?.render(["toolbar", "context", "editToolbar", ...(wasOn !== this.#workingOn() ? ["worldbar"] : [])]);
         this.#updateCanvasHint();
         if (newTool === "threeD" && !this.scene3D) await this._onThreeDView();
+        // Worlds opens with the open world chosen (board W9), its inspector filling the column kept
+        // for it (WorldsPanel.reserve)
+        if (newTool === "manage" && wasOn !== "worlds" && this.world?.id) {
+            await drawn;
+            if (this.activeTool === "manage" && !Inspector.current(this)) WorldsPanel.select(this, this.world.id);
+        }
     }
 
     /**

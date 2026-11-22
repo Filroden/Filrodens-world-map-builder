@@ -4,8 +4,9 @@
 //
 // Needs Chromium for Playwright (npx playwright install chromium, or FWMB_CHROMIUM); skipped,
 // saying so, without it. The pages are slow (a few minutes each, up to twenty for the generated
-// ones, since every step waits for the map to settle as a reader would), so FWMB_TUTORIAL=0 skips
-// them for a quick run of the rest; FWMB_TUTORIAL_CONCURRENCY plays several at once.
+// ones, since every step waits for the map to settle as a reader would);
+// FWMB_TUTORIAL_CONCURRENCY plays several at once. Until the v5 rewrite they are skipped unless
+// FWMB_TUTORIAL=1 (see EXCLUDED below).
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,7 +16,12 @@ import { findChromium, startStudioHost } from "./lib/studio.mjs";
 import { loadPages, PATHS, ROOT, runPage } from "./run.mjs";
 
 const pages = await loadPages();
-const found = process.env.FWMB_TUTORIAL === "0" ? { reason: "FWMB_TUTORIAL=0" } : await findChromium();
+// Excluded until the tutorial is rewritten for v5 (S0 step 8c; Ken, 2026-11-21): its pages were
+// written against v4.3's controls (New map, the Maps tool, the Create and Explore modes, the Layers
+// menu) and wait for a map at load, where v5 opens on Worlds with no world. FWMB_TUTORIAL=1 plays
+// them anyway, to see how far they get.
+const EXCLUDED = "the tutorial's pages are excluded until the tutorial is rewritten for v5 (FWMB_TUTORIAL=1 plays them)";
+const found = process.env.FWMB_TUTORIAL !== "1" ? { reason: EXCLUDED } : await findChromium();
 const skip = found.reason ?? false;
 
 let host;

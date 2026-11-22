@@ -209,6 +209,36 @@ export class WorldsPanel {
     }
 
     /** A card, chip or tree row chosen: the world in the inspector. */
+    /**
+     * Worlds keeps the inspector's column (Ken, S0 step 8c; board W9 draws it always there): with no
+     * world chosen, an empty column of the inspector's width and surface stands at the body's end
+     * and says what choosing a card shows, so the cards never move when one is chosen (the grid
+     * would otherwise lose a column, and the pointer land on another world). The stylesheet hides
+     * it while the inspector itself is open. Outside Worlds it goes.
+     * @param {object} app
+     * @param {boolean} shown - Whether Worlds is what the studio shows.
+     */
+    static reserve(app, shown) {
+        const body = app.root?.querySelector(":scope > .fwmb-studio-body");
+        if (!body) return;
+        let column = body.querySelector(":scope > .fwmb-inspector-reserve");
+        if (!shown) {
+            column?.remove();
+            return;
+        }
+        if (column) return;
+        column = body.ownerDocument.createElement("aside");
+        column.className = "fwmb-inspector-reserve";
+        const text = body.ownerDocument.createElement("p");
+        text.className = "fwmb-hint";
+        text.textContent = platform.i18n.localize("FILRODENSWMB.UI.WorldsChooseHint");
+        column.append(text);
+        // Before any docked dialogue, so the inspector opens in its place
+        const docked = body.querySelector(":scope > .fwmb-overlay-docked");
+        if (docked) docked.before(column);
+        else body.append(column);
+    }
+
     static select(app, worldId) {
         if (!this.find(app, worldId)) return false;
         return Inspector.open(app, WorldEditor, { id: worldId }, { keepFocus: true });
