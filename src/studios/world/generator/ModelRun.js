@@ -153,7 +153,7 @@ export function encodeModelRun(result, runId) {
         stats: { ...result.stats },
         cells,
         ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
-        seats: result.seats ? { used: result.seats.used, unhonoured: result.seats.unhonoured.map(({ pin, kind, reason }) => ({ pin, kind, reason })) } : null,
+        seats: result.seats ? seatReport(result.seats) : null,
         history: (result.history ?? []).map(encodeAge),
     };
 }
@@ -162,6 +162,18 @@ export function encodeModelRun(result, runId) {
 const ROAD = Object.freeze({ type: "index", scale: 1, offset: 0 });
 
 /** An earlier age in its saved form: its lists as plain arrays, its per-cell and road arrays packed. */
+/**
+ * The run's report on the settlement pins it built on, as the map keeps it: the pins used, those it
+ * could not honour, and (when any) those short of their entered populations and those that gave up
+ * people to hold to them (see Pipeline.markSeatPlaces).
+ */
+function seatReport({ used, unhonoured, short, givenUp }) {
+    const report = { used, unhonoured: unhonoured.map(({ pin, kind, reason }) => ({ pin, kind, reason })) };
+    if (short?.length) report.short = short.map(({ pin, entered, made }) => ({ pin, entered, made }));
+    if (givenUp?.length) report.givenUp = givenUp.map(({ pin, toTowns, toCountry }) => ({ pin, toTowns, toCountry }));
+    return report;
+}
+
 function encodeAge(age) {
     const { realm, culture, roadFrom, roadTo, ...rest } = age;
     const saved = { ...rest, places: Array.from(age.places), castles: Array.from(age.castles), seats: Array.from(age.seats), realm: packArray(realm, FIELDS.realm) };

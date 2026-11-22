@@ -13,6 +13,7 @@ import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { Regeneration, isKept } from "./Regeneration.js";
+import { UserFigures } from "./UserFigures.js";
 import { RunInputs } from "./RunInputs.js";
 import { VectorHistory } from "./VectorHistory.js";
 
@@ -345,8 +346,15 @@ export class Generation {
      * its display cell lies in, with the pin's point and whether it stands on land (see #onLand),
      * so a pin on a coast in a model cell the model counts as sea is built on the land beside it
      * (see Pipeline.seatsOf).
+     *
+     * A pin with an entered population (see UserFigures) carries it as `target`, the figure its
+     * town is held to (a castle's never). A pin whose style has no settlement tier the model makes
+     * (no style, a Village or a custom one) is a seat of its own kind, `entered`, when its entered
+     * population is a town's (UserFigures.TOWN_MIN or more); below that it is a village's figure,
+     * which a world run builds no town for. Only pins with an entered figure carry one, so the
+     * seats of a map without any are as they were (and so is the run's fingerprint, RunInputs).
      * @param {object} app
-     * @returns {{cell: number, kind: string, pin: string, x: number, y: number, land: boolean|null}[]}
+     * @returns {{cell: number, kind: string, pin: string, x: number, y: number, land: boolean|null, target?: number}[]}
      */
     static seats(app) {
         const session = app.meshSession;
@@ -355,11 +363,15 @@ export class Generation {
         const seats = [];
         for (const pin of app.mapPins ?? []) {
             if (pin.generated && !isKept(pin)) continue;
-            const kind = styles.get(pin.pinStyle)?.tier;
-            if (!SEAT_KINDS.has(kind) || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+            const tier = styles.get(pin.pinStyle)?.tier;
+            const target = UserFigures.takes(tier) ? UserFigures.population(pin) : null;
+            const kind = SEAT_KINDS.has(tier) ? tier : target !== null && target >= UserFigures.TOWN_MIN ? "entered" : null;
+            if (!kind || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
             const display = session.cellAt(pin.x, pin.y);
             if (!(display >= 0)) continue;
-            seats.push({ cell: session.mesh.parentOf[display], kind, pin: pin.id, x: pin.x, y: pin.y, land: this.#onLand(app, display, pin) });
+            const seat = { cell: session.mesh.parentOf[display], kind, pin: pin.id, x: pin.x, y: pin.y, land: this.#onLand(app, display, pin) };
+            if (target !== null && kind !== "castle") seat.target = target;
+            seats.push(seat);
         }
         return seats;
     }

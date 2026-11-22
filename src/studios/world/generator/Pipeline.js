@@ -16,7 +16,7 @@ import { buildRealmsAround, userZones } from "./UserRealms.js";
 import { applyUserRivers, uncoveredTraffic, userRoutes } from "./UserRoutes.js";
 import { routeChains } from "./RouteChains.js";
 import { placeTowns } from "./Towns.js";
-import { tradeRounds } from "./Trade.js";
+import { tierOfPopulation, tradeRounds } from "./Trade.js";
 
 /**
  * The generator's run: the stages in order, with progress reports and the chance to stop.
@@ -95,6 +95,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     // Settlement pins the run must build on, in every age
     run.seatsOffLand = [];
     run.cells.seats = run.rules.seats ? seatsOf(payload.seats, run.cells, run.seatsOffLand) : null;
+    // The entered populations the present age's towns are held to, by model cell (none without any)
+    run.targets = seatTargets(run.cells.seats);
     // The map's own realms, duchies and counties, which the present age's realms are built round
     run.userZones = run.rules.userRegions ? userZones(payload.userRegions, run.cells) : null;
     run.graph = new CellGraph(run.cells);
@@ -158,9 +160,11 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const userBuilt = run.userRoutes?.built ?? null;
     // The map's own regions hold in the present age only: the ages before are its history
     const userZonesOfAge = index === ages.length - 1 ? run.userZones : null;
+    // Entered populations hold in the present age only, as the map's own regions do
+    const targets = index === ages.length - 1 ? run.targets : null;
     const realmsOf = (context) => (userZonesOfAge ? buildRealmsAround(run.graph, { ...context, userZones: userZonesOfAge }) : buildRealms(run.graph, context));
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
-    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null, userBuilt }), run);
+    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null, userBuilt, targets }), run);
     const realms = await driver.step("realms", () => {
         const context = { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null };
         const withExtra = (extra) => ({ ...context, ...extra, keptSeats: extra.barredSeats && context.keptSeats ? new Set([...context.keptSeats].filter((seat) => !extra.barredSeats.has(seat))) : context.keptSeats });
@@ -173,7 +177,7 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife, strifeAt }), run);
 
     const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats, tradeWar: events.tradeWar(realms) };
-    const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final, userBuilt }), run);
+    const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final, userBuilt, targets }), run);
     const finalRealms = await driver.step("finalRealms", () => realmsOf({ ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats, ...events.realmExtra }), run);
 
     return {
@@ -478,7 +482,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]), culture: countyMix[index][0]?.[0] ?? -1, ...userFields(county) })),
         routes,
         stats: statistics(run, { feedback, finalTrade, finalRealms, routes, places }),
-        seats: markSeatPlaces(run, places, seats),
+        seats: markSeatPlaces(run, places, seats, finalTrade.towns),
         timings: run.timings,
         cellCount: cells.count,
     };
@@ -512,15 +516,22 @@ function userFields(unit) {
  * reports how many seats there were and each pin whose seat the run could not honour as asked: a
  * port on a cell that cannot load ships (kept as a town), a capital that is no realm's seat, or a
  * settlement on a cell with no town. Null without seats.
- * @returns {{used: number, unhonoured: {pin: string, kind: string, reason: string}[]}|null}
+ *
+ * With entered populations it also reports, only when there is something to say: `short`, each pin
+ * whose town the round's townspeople could not bring to its figure (entered, and made: what the
+ * land and trade supported), and `givenUp`, each pin whose town gave up people to hold to its
+ * figure (how many went to other towns, and how many stayed in the countryside).
+ * @returns {{used: number, unhonoured: {pin: string, kind: string, reason: string}[], short?: {pin: string, entered: number, made: number}[], givenUp?: {pin: string, toTowns: number, toCountry: number}[]}|null}
  */
-function markSeatPlaces(run, places, realmSeats) {
+function markSeatPlaces(run, places, realmSeats, towns = []) {
     const seats = run.cells.seats;
     if (!seats) return run.seatsOffLand?.length ? { used: 0, unhonoured: [...run.seatsOffLand] } : null;
     const placeAt = new Map();
     for (const place of places) if (!placeAt.has(place.cell) || place.kind === "town") placeAt.set(place.cell, place);
     const castleAt = new Map(places.filter((place) => place.kind === "castle").map((place) => [place.cell, place]));
     const unhonoured = [...(run.seatsOffLand ?? [])];
+    const townAt = new Map(towns.map((town) => [town.cell, town]));
+    const entered = [];
     let used = 0;
     for (const [cell, seat] of seats) {
         const place = seat.kind === "castle" ? castleAt.get(cell) : placeAt.get(cell);
@@ -532,8 +543,32 @@ function markSeatPlaces(run, places, realmSeats) {
         if (place) place.seat = [...seat.pins];
         used += seat.pins.length;
         if (reason) for (const pin of seat.pins) unhonoured.push({ pin, kind: seat.kind, reason });
+        if (town && seat.target !== undefined) entered.push({ seat, town, held: townAt.get(cell) });
     }
-    return { used, unhonoured };
+    const report = { used, unhonoured };
+    const short = [];
+    const givenUp = [];
+    for (const { seat, town, held } of entered) {
+        // A share of a percent short is the rounding of the townspeople shared out, not a shortfall
+        if (town.population < seat.target * SHORT_BELOW) short.push({ pin: seat.targetPin, entered: Math.round(seat.target), made: town.population });
+        const toTowns = Math.round(held?.givenToTowns ?? 0);
+        const toCountry = Math.round(held?.givenToCountry ?? 0);
+        if (toTowns + toCountry > 0) givenUp.push({ pin: seat.targetPin, toTowns, toCountry });
+    }
+    if (short.length) report.short = short;
+    if (givenUp.length) report.givenUp = givenUp;
+    return report;
+}
+
+/** A town made under this share of its entered figure is reported short of it. */
+const SHORT_BELOW = 0.995;
+
+/** The entered populations of the seats that have one, by model cell; null when none has. */
+function seatTargets(seats) {
+    if (!seats) return null;
+    const targets = new Map();
+    for (const [cell, seat] of seats) if (seat.target !== undefined) targets.set(cell, seat.target);
+    return targets.size ? targets : null;
 }
 
 /**
@@ -589,8 +624,12 @@ function placeShore(run, town) {
     return { at: [pixel % width, Math.floor(pixel / width)] };
 }
 
-/** Each seat kind's town tier (0 city, 1 large town, 2 town); a castle has none. */
-const SEAT_TIERS = Object.freeze({ capital: 0, city: 0, largeTown: 1, town: 2, fortifiedTown: 2, port: 2, castle: undefined });
+/**
+ * Each seat kind's town tier (0 city, 1 large town, 2 town); a castle has none. `entered` is a pin
+ * whose style has no settlement tier but which has a town's population entered: its tier is its
+ * population's (see seatsOf).
+ */
+const SEAT_TIERS = Object.freeze({ capital: 0, city: 0, largeTown: 1, town: 2, fortifiedTown: 2, port: 2, castle: undefined, entered: undefined });
 
 /** How many rings of neighbours a seat on land in a model cell the model counts as water looks through for a land cell (see landCellFor). */
 const SEAT_LAND_RINGS = 2;
@@ -606,7 +645,11 @@ const SEAT_LAND_RINGS = 2;
  * landCellFor). A seat whose pin stands on water is left out (reason `water`), and so is one on
  * land the model has no land cell near, an islet or a thin spit smaller than half a model cell
  * (reason `islet`); its pins are listed in `offLand`.
- * @returns {Map<number, {kind: string, tier: number|undefined, pins: string[]}>|null}
+ *
+ * A seat may carry an entered population, `target` (a castle never does): its town is held to that
+ * figure in the present age (see Trade). An `entered` seat's tier is the target's; where several
+ * pins in one cell have one, the largest is the cell's, and `targetPin` names its pin.
+ * @returns {Map<number, {kind: string, tier: number|undefined, pins: string[], target?: number, targetPin?: string}>|null}
  */
 function seatsOf(list, cells, offLand) {
     if (!Array.isArray(list) || !list.length) return null;
@@ -619,14 +662,19 @@ function seatsOf(list, cells, offLand) {
             offLand.push({ pin, kind, reason: seat.land === true ? "islet" : "water" });
             continue;
         }
-        const tier = SEAT_TIERS[kind];
+        const target = kind !== "castle" && Number.isFinite(seat.target) && seat.target >= 0 ? seat.target : undefined;
+        if (kind === "entered" && target === undefined) continue;
+        const tier = kind === "entered" ? tierOfPopulation(target) : SEAT_TIERS[kind];
         const held = seats.get(cell);
         if (!held) {
-            seats.set(cell, { kind, tier, pins: [pin] });
+            const entry = { kind, tier, pins: [pin] };
+            if (target !== undefined) Object.assign(entry, { target, targetPin: pin });
+            seats.set(cell, entry);
             continue;
         }
         held.pins.push(pin);
         if ((tier ?? Infinity) < (held.tier ?? Infinity)) Object.assign(held, { kind, tier });
+        if (target !== undefined && !(held.target >= target)) Object.assign(held, { target, targetPin: pin });
     }
     return seats.size ? seats : null;
 }

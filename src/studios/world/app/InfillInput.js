@@ -3,6 +3,7 @@ import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { decodeModelRun } from "../generator/ModelRun.js";
 import { parentRunSites } from "../generator/ParentRun.js";
 import { cellsFromSites, travelCellOfPixels, travelGrid } from "../travel/TravelGrid.js";
+import { UserFigures } from "./UserFigures.js";
 
 /**
  * What in-fill reads of an open regional map (see Infill.runInfill), gathered on the main thread:
@@ -106,9 +107,10 @@ export class InfillInput {
      * castle (SETTLEMENT_TIERS): a town the parent's run made, a settlement pin the parent's run
      * built on (with its `modelled` figures), one drawn on the regional map, and the villages and
      * market towns of an earlier fill-in the reader kept, whatever made them. Its people are its
-     * figures (`generated`, else `modelled`), else its tier's least (INFILL.PIN_PEOPLE). A
-     * generated town whose style has no tier counts by its own. Before, only the generated towns,
-     * by their figures.
+     * entered population (see UserFigures), else its figures (`generated`, else `modelled`), else
+     * its tier's least (INFILL.PIN_PEOPLE). A generated town whose style has no tier counts by its
+     * own, and a pin of any other style with an entered population by the tier its people make
+     * (see enteredTier). Before, only the generated towns, by their figures.
      * @param {object[]} pins
      * @param {object[]} pinStyles
      * @param {{seats?: boolean}} [rules]
@@ -125,9 +127,13 @@ export class InfillInput {
         for (const pin of pins ?? []) {
             if (!pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
             const styled = styles.get(pin.pinStyle)?.tier ?? null;
-            const tier = styled ?? (pin.generated?.kind === "town" ? (pin.generated.tier ?? null) : null);
-            if (!SETTLEMENT_TIERS.has(tier) && !(styled == null && pin.generated?.kind === "town")) continue;
-            const figures = Number(pin.generated?.population ?? pin.modelled?.population);
+            const entered = UserFigures.takes(styled) ? UserFigures.population(pin) : null;
+            let tier = styled ?? (pin.generated?.kind === "town" ? (pin.generated.tier ?? null) : null);
+            if (!SETTLEMENT_TIERS.has(tier) && !(styled == null && pin.generated?.kind === "town")) {
+                if (entered === null) continue;
+                tier = enteredTier(entered);
+            }
+            const figures = Number(entered ?? pin.generated?.population ?? pin.modelled?.population);
             const population = Number.isFinite(figures) && figures >= 0 ? figures : (people[tier] ?? 0);
             places.push({ pin, tier, population, x: pin.x, y: pin.y });
         }
@@ -165,6 +171,15 @@ export class InfillInput {
 
 /** The pin style tiers in-fill builds round from revision 2: the settlements and castles (see places). */
 const SETTLEMENT_TIERS = new Set(Object.keys(FILRODENSWMB.INFILL.PIN_PEOPLE));
+
+/**
+ * The settlement tier a population makes, for a pin with an entered population whose style has no
+ * settlement tier: the largest tier whose least people (INFILL.PIN_PEOPLE) it reaches.
+ */
+function enteredTier(population) {
+    const tiers = ["city", "largeTown", "town", "marketTown", "village"];
+    return tiers.find((tier) => population >= FILRODENSWMB.INFILL.PIN_PEOPLE[tier]) ?? "village";
+}
 
 /** Each parent cell's main culture (the largest share), or -1. */
 function mainCultures({ shareStart, shareCulture, shareValue }, count) {

@@ -156,6 +156,17 @@ const MODELLED_REGION = obj(
     { nullable: true },
 );
 
+/**
+ * The figures a reader entered on a settlement pin (see UserFigures): its population, a whole
+ * number. Only the inspector writes it; a run never refreshes it.
+ */
+const USER_FIGURES = obj(
+    {
+        population: int(0, 1e7),
+    },
+    { nullable: true },
+);
+
 // ------------------------------------------------------------------ labels, pins, decorations
 
 /** The look of a label, owned (a pin's, route's or region's) or standalone. */
@@ -197,6 +208,7 @@ const PIN = obj({
     cell: int(0, 1e9, { nullable: true }),
     generated: GENERATED,
     modelled: MODELLED,
+    userFigures: USER_FIGURES,
     type: enumOf(["spring", "block_spring"]),
     radius: num(RANGE.SIZE),
     inflow: num(RANGE.SIGNED),
@@ -886,7 +898,16 @@ const MODEL_RUN = obj({
     // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
     // A fingerprint of the map's own items the run read, as it left them (see RunInputs)
     inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key, influences: key }, { nullable: true }),
-    seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
+    seats: obj(
+        {
+            used: int(0, 1e6),
+            unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle", "entered"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })),
+            // Entered populations (see UserFigures): the pins the run could not bring to their figure, and where the people given up by the others went
+            short: list(obj({ pin: ref(), entered: num(RANGE.COUNT), made: num(RANGE.COUNT) })),
+            givenUp: list(obj({ pin: ref(), toTowns: num(RANGE.COUNT), toCountry: num(RANGE.COUNT) })),
+        },
+        { nullable: true },
+    ),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
     history: list(RUN_AGE),

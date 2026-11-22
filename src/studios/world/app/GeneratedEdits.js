@@ -1,4 +1,5 @@
 import { MapStateManager } from "./MapStateManager.js";
+import { UserFigures } from "./UserFigures.js";
 
 /**
  * Marking generated items as the reader's own (generated.edited), so Generate again keeps them
@@ -16,7 +17,8 @@ export class GeneratedEdits {
      * @param {object} item
      */
     static toggleLock(app, item) {
-        if (!item?.generated) return;
+        // An entered figure keeps the pin: Lock stays ticked until the figure is cleared (see UserFigures)
+        if (!item?.generated || UserFigures.has(item)) return;
         MapStateManager.pushVectorState(app);
         item.generated.locked = !item.generated.locked;
         app.markDirty?.();

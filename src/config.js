@@ -2644,6 +2644,9 @@ export const FILRODENSWMB = {
             // A town's culture mix drops cultures below this share
             MIX_MIN_SHARE: 0.01,
         }),
+        // The figures a reader enters on a settlement pin (see UserFigures): the largest population
+        // the inspector takes
+        USER_FIGURES: Object.freeze({ MAX_POPULATION: 10000000 }),
         // Stage 2: population and central places. Tiers largest first: spacing and reach in flat-km,
         // the urban share of the catchment, and the least a town of the tier may hold.
         TOWNS: Object.freeze({

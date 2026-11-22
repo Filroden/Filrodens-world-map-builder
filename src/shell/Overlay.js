@@ -90,8 +90,8 @@ export class Overlay {
      * @param {string} [options.closeLabel] - The close control's accessible name.
      * @param {unknown} [options.dismissed] - What closing without a button resolves with.
      * @param {(element: HTMLDialogElement) => void} [options.onRender] - Runs once the dialogue is in the page.
-     * @param {{swatch?: string|null, subtitle?: string|null}} [options.header] - A swatch before the
-     *     title and a line naming what the dialogue shows after it (the inspector's header).
+     * @param {{swatch?: string|null, subtitle?: string|null, mark?: {kind: string, icon: string, label: string, tooltip?: string}|null}} [options.header] - A swatch before the
+     *     title, a line naming what the dialogue shows after it, and a state mark after that (the inspector's header).
      * @param {"field" | "dialogue" | "none"} [options.focus] - Where focus goes on opening: the first
      *     field (the default), the dialogue itself, so a key pressed next types into nothing, or
      *     nowhere: it stays where it was (a docked dialogue opened by work on the map).
@@ -175,12 +175,13 @@ export class Overlay {
     }
 
     /**
-     * Updates the header: the title, and the swatch and the line after the title that name what
-     * the dialogue shows. A part left out keeps what it shows; null removes it.
+     * Updates the header: the title, the swatch and the line after the title that name what the
+     * dialogue shows, and a state mark after them (an inspected pin's Entered). A part left out
+     * keeps what it shows; null removes it.
      *
-     * @param {{title?: string, swatch?: string|null, subtitle?: string|null}} parts
+     * @param {{title?: string, swatch?: string|null, subtitle?: string|null, mark?: {kind: string, icon: string, label: string, tooltip?: string}|null}} parts
      */
-    setHeader({ title, swatch, subtitle }) {
+    setHeader({ title, swatch, subtitle, mark }) {
         const header = this.#dialog.querySelector(".fwmb-overlay-header");
         const heading = header.querySelector("h2");
         const doc = this.#host.ownerDocument;
@@ -208,6 +209,19 @@ export class Overlay {
                 // The line is cut short with an ellipsis in a narrow inspector, so it carries itself in full
                 line.title = subtitle;
             } else line?.remove();
+        }
+        if (mark !== undefined) {
+            header.querySelector(".fwmb-overlay-mark")?.remove();
+            if (mark) {
+                const badge = doc.createElement("span");
+                badge.className = `fwmb-state-mark fwmb-state-mark--${mark.kind} fwmb-overlay-mark`;
+                if (mark.tooltip) badge.dataset.tooltip = mark.tooltip;
+                const glyph = doc.createElement("span");
+                glyph.className = `fwmb-icon fwmb-icon--${mark.icon}`;
+                glyph.setAttribute("aria-hidden", "true");
+                badge.append(glyph, doc.createTextNode(mark.label));
+                header.querySelector(".fwmb-overlay-close").before(badge);
+            }
         }
     }
 

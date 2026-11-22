@@ -448,6 +448,26 @@ test("what a run gave a settlement pin, and the run's report of its seats, keep 
     assert.deepEqual(modelRun?.seats?.unhonoured.map((entry) => Object.keys(entry).sort()) ?? [], [["pin", "reason"], ["kind", "pin"]], "an unknown kind or reason is dropped");
 });
 
+test("a pin's entered figures, and the run's report of entered towns, keep to their rules", () => {
+    const file = v4Map();
+    file.mapPins[0].userFigures = { population: 40000 };
+    file.modelRun = { ...savedModelRun(), seats: { used: 1, unhonoured: [], short: [{ pin: "pinAAAAAAAAAAAAA", entered: 40000, made: 22000 }], givenUp: [{ pin: "pinAAAAAAAAAAAAA", toTowns: 1800, toCountry: 0 }] } };
+    const kept = MapImport.read(structuredClone(file));
+    assert.deepEqual(kept.mapData.mapPins[0].userFigures, { population: 40000 });
+    assert.deepEqual(kept.modelRun.seats, file.modelRun.seats);
+    assert.equal(kept.corrected, 0);
+
+    file.mapPins[0].userFigures = { population: 1e12, flag: "<b>x</b>", __proto__: { polluted: true } };
+    file.modelRun.seats.short = [{ pin: "pinAAAAAAAAAAAAA", entered: -3, made: SCRIPT }];
+    const { mapData, modelRun } = MapImport.read(file);
+    assert.deepEqual(mapData.mapPins[0].userFigures, { population: 1e7 }, "people kept in range, an unknown key dropped");
+    assert.equal({}.polluted, undefined);
+    assert.equal(modelRun.seats.short[0].entered, 0);
+    assert.ok(!("made" in modelRun.seats.short[0]), "a figure that is no number is dropped");
+    file.mapPins[0].userFigures = "forty thousand";
+    assert.equal(MapImport.read(file).mapData.mapPins[0].userFigures, undefined, "a record that is no record is dropped");
+});
+
 test("a run's fingerprint of the map's own items it read keeps to its rules", () => {
     const file = v4Map();
     const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" };

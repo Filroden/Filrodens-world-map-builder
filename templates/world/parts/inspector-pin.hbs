@@ -1,6 +1,8 @@
 {{!--
     The inspector's pin (see PinEditor): its name, description and visibility; its look (a pin
-    style, or its own icon, colour and scale); its label; and Focus view and Delete. Every field
+    style, or its own icon, colour and scale); its Settlement card (its entered population, under
+    Look: the style says what the place is, the card how many live there); its label; and Focus
+    view and Delete. Every field
     applies when committed, one undo step each (see Inspector). The icon grid is a disclosure: a
     choice in it applies at once and closes it.
 --}}
@@ -65,9 +67,10 @@
     </div>
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="pinScale" label="FILRODENSWMB.UI.InspectorScale" value=pin.scale min=0.2 max=16 step=0.1}}
 </div>
+{{> "modules/filrodens-world-map-builder/templates/world/parts/inspector-settlement.hbs" settlement=settlement}}
 
 {{> "modules/filrodens-world-map-builder/templates/world/parts/label-fields.hbs" label=label choices=labelChoices styleName=labelStyleName visibilities=labelVisibilities sectionId="inspectorLabel" sectionTitle="FILRODENSWMB.UI.InspectorLabel" closed=true}}
-{{> "modules/filrodens-world-map-builder/templates/world/parts/inspector-generated.hbs" generated=generated locked=generatedLocked modelled=generatedModelled}}
+{{> "modules/filrodens-world-map-builder/templates/world/parts/inspector-generated.hbs" generated=generated locked=generatedLocked lockHeld=generatedLockHeld modelled=generatedModelled}}
 
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>

@@ -206,6 +206,21 @@ test("from revision 2, every settlement pin is a place in-fill builds round, hol
     ]);
     assert.deepEqual(InfillInput.places(pins, pinStyles, {}).map(({ pin }) => pin.name), ["Ashby"], "revision 1: the generated towns only");
 
+    // An entered population (UC) is the people a place holds, before its figures; a pin of a style
+    // with no settlement tier counts once it has one, by the tier its people make
+    const entered = [
+        { name: "Handford", x: 240, y: 180, pinStyle: "styleCity", modelled: { population: 15000 }, userFigures: { population: 22000 } },
+        { name: "The Inn", x: 280, y: 120, pinStyle: "styleInn", userFigures: { population: 5000 } },
+        { name: "Wayside", x: 290, y: 130, pinStyle: "styleInn", userFigures: { population: 400 } },
+        { name: "Keep", x: 200, y: 240, pinStyle: "styleCastle", userFigures: { population: 900 } },
+    ];
+    assert.deepEqual(InfillInput.places(entered, pinStyles, { seats: true }).map(({ pin, tier, population }) => [pin.name, tier, population]), [
+        ["Handford", "city", 22000],
+        ["The Inn", "largeTown", 5000],
+        ["Wayside", "marketTown", 400],
+        ["Keep", "castle", 0],
+    ]);
+
     const gather = (rules) => {
         const { input } = InfillInput.gather({ mesh, parentRun, payload, pins, routes: [], speeds: FILRODENSWMB.TRAVEL_TIME.SPEEDS, seed: "SYNTH", nameBase: "English", pinStyles, rules });
         input.options = { ROUTE_REACH_KM: 1e9 };

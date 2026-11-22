@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-pin.hbs", "world/parts/inspector-label.hbs", "world/parts/inspector-region.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-river.hbs", "world/parts/inspector-fault.hbs", "world/parts/inspector-decoration.hbs", "world/parts/inspector-land-mask.hbs", "world/parts/inspector-level.hbs", "world/parts/inspector-set.hbs", "world/parts/inspector-biome.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-pin.hbs", "world/parts/inspector-settlement.hbs", "world/parts/inspector-label.hbs", "world/parts/inspector-region.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-river.hbs", "world/parts/inspector-fault.hbs", "world/parts/inspector-decoration.hbs", "world/parts/inspector-land-mask.hbs", "world/parts/inspector-level.hbs", "world/parts/inspector-set.hbs", "world/parts/inspector-biome.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -65,6 +65,8 @@ const { PickTool } = await import("../../src/studios/world/app/PickTool.js");
 const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/studios/world/app/FeatureEditors.js");
 const { LayerSetEditor, LevelEditor } = await import("../../src/studios/world/app/LayerEditors.js");
 const { BiomeEditor } = await import("../../src/studios/world/app/BiomeEditor.js");
+const { isKept } = await import("../../src/studios/world/app/Regeneration.js");
+const { Generation } = await import("../../src/studios/world/app/Generation.js");
 const { VectorHistory } = await import("../../src/studios/world/app/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/studios/world/mesh/Schema.js");
 const { allLevels } = await import("../../src/studios/world/mesh/LayerTree.js");
@@ -865,6 +867,95 @@ test("Lock, in the Generated section, keeps an item on Generate again; one undo 
     await undo(app);
     assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.locked, false);
     assert.equal(form(app).querySelector('[data-inspector-action="lock"]').checked, false, "the box follows the pin, not the click");
+});
+
+// ------------------------------------------------------------------ entered figures (UC phase 1)
+
+const header = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-header");
+
+test("the Settlement card enters a pin's population: one undo step, the Entered mark, Clear entered figures", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    pin.modelled = { ...made(), population: 3200 };
+    await PinEditor.open(app, "keep");
+    const population = field(app, "pinPopulation");
+    assert.ok(population, "a pin with no style takes a population");
+    assert.equal(population.value, "");
+    assert.match(population.placeholder, /InspectorPopulationMade.*3,200/, "the run's figure as the placeholder");
+    assert.equal(header(app).querySelector(".fwmb-overlay-mark"), null);
+    const before = steps(app);
+    await commit(app, "pinPopulation", "40000");
+    assert.deepEqual(pin.userFigures, { population: 40000 });
+    assert.equal(steps(app), before + 1, "one undo step");
+    assert.ok(header(app).querySelector(".fwmb-state-mark--entered"), "the header carries the Entered mark");
+    assert.ok(form(app).querySelector(".fwmb-settlement .fwmb-state-mark--entered"), "so does the card");
+    assert.match(form(app).textContent, /GeneratedSupport/, "the run's figure is what the land and trade support");
+    await commit(app, "pinPopulation", "40000");
+    assert.equal(steps(app), before + 1, "the same figure again changes nothing");
+    await commit(app, "pinPopulation", "not a number");
+    assert.equal(steps(app), before + 2, "a field that is no number clears the figure");
+    assert.equal(pin.userFigures, undefined);
+    await undo(app);
+    assert.equal(app.mapPins[0].userFigures.population, 40000, "undo brings it back");
+    form(app).querySelector('[data-inspector-action="clearFigures"]').click();
+    await settle();
+    assert.equal(app.mapPins[0].userFigures, undefined, "Clear entered figures hands it back");
+    assert.equal(header(app).querySelector(".fwmb-overlay-mark"), null, "and the mark goes");
+    assert.deepEqual(app.mapPins[0].modelled.population, 3200, "the run's figures are left as they are");
+});
+
+test("an entered population keeps a generated pin: Lock ticked and held until the figure is cleared", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    pin.generated = made();
+    await PinEditor.open(app, "keep");
+    assert.equal(isKept(pin), false);
+    await commit(app, "pinPopulation", "9000");
+    assert.equal(isKept(app.mapPins[0]), true, "Generate again keeps it");
+    const box = form(app).querySelector(".fwmb-checkbox-label input[disabled]");
+    assert.ok(box && box.checked, "Lock is ticked and held");
+    assert.equal(form(app).querySelector('[data-inspector-action="lock"]'), null);
+    assert.match(form(app).textContent, /GeneratedKeptEntered/);
+    assert.equal(app.mapPins[0].generated.locked, false, "the pin's own Lock is left as it was");
+    form(app).querySelector('[data-inspector-action="clearFigures"]').click();
+    await settle();
+    assert.ok(form(app).querySelector('[data-inspector-action="lock"]'), "Lock is the reader's again");
+    assert.equal(isKept(app.mapPins[0]), false);
+});
+
+test("a figure below a town's size is a village's; a castle's or a ruin's pin takes none", async () => {
+    const { app } = await studio();
+    await PinEditor.open(app, "keep");
+    await commit(app, "pinPopulation", "600");
+    assert.match(form(app).textContent, /InspectorPopulationVillageHint/);
+    app.uiState.customPinStyles.push({ id: "fort", name: "Fort", tier: "castle", icon: "castle", scale: 1, color: "#ffffff", label: { fontSize: 1, visibility: "all", quickStyle: "realm" }, detailLevel: 3 });
+    app.mapPins[0].pinStyle = "fort";
+    await Inspector.refresh(app);
+    assert.equal(field(app, "pinPopulation"), undefined, "no Settlement card on a castle");
+});
+
+test("seats carry an entered population; a pin with none, or a castle's, carries no figure", () => {
+    const style = (id, tier) => ({ id, name: id, tier });
+    const app = {
+        uiState: { customPinStyles: [style("town", "town"), style("fort", "castle"), style("hamlet", "village")] },
+        meshSession: { mesh: { parentOf: [0, 1, 2, 3], width: 4 }, cellAt: (x) => x, aggregates: { land: [1, 1, 1, 1] } },
+        mapPins: [
+            { id: "a", pinStyle: "town", x: 0, y: 0 },
+            { id: "b", pinStyle: "town", x: 1, y: 0, userFigures: { population: 5000 } },
+            { id: "c", pinStyle: "fort", x: 2, y: 0, userFigures: { population: 5000 } },
+            { id: "d", pinStyle: "hamlet", x: 3, y: 0, userFigures: { population: 2500 } },
+            { id: "e", pinStyle: "hamlet", x: 3, y: 0, userFigures: { population: 400 } },
+            { id: "f", pinStyle: "hamlet", x: 3, y: 0 },
+        ],
+    };
+    const seats = Object.fromEntries(Generation.seats(app).map((seat) => [seat.pin, seat]));
+    assert.ok(!("target" in seats.a), "no figure, no target: the seats (and the run's fingerprint) of a map without entered figures are as they were");
+    assert.equal(seats.b.target, 5000);
+    assert.ok(!("target" in seats.c), "a castle carries none");
+    assert.equal(seats.d.kind, "entered", "a village style with a town's figure is a seat of its own");
+    assert.equal(seats.d.target, 2500);
+    assert.equal(seats.e, undefined, "a village's figure builds no town");
+    assert.equal(seats.f, undefined);
 });
 
 // ------------------------------------------------------------------ custom biomes

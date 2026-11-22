@@ -11,13 +11,15 @@ import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { RandomNames } from "./RandomNames.js";
+import { UserFigures } from "./UserFigures.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
 
 /**
  * A pin in the inspector (see Inspector): its name, description and visibility; its look (a pin
- * style, or its own icon, colour and scale); its label; and Focus view and Delete.
+ * style, or its own icon, colour and scale); its Settlement card (its entered population, see
+ * UserFigures; not on a castle's or a ruin's); its label; and Focus view and Delete.
  *
  * A pin follows a pin style (its `pinStyle`) as other objects follow theirs: picking one writes
  * the style's icon, scale, colour and label fields onto the pin (PinStyles.apply); choosing an
@@ -44,7 +46,7 @@ export class PinEditor {
         id: "pin",
         template: "modules/filrodens-world-map-builder/templates/world/parts/inspector-pin.hbs",
         find: (app, ref) => PinEditor.#find(app, ref),
-        header: (_app, pin) => ({ title: pin.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitlePin"), swatch: pin.color ?? null }),
+        header: (_app, pin) => ({ title: pin.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitlePin"), swatch: pin.color ?? null, mark: PinEditor.#mark(pin) }),
         context: (app, pin) => PinEditor.#context(app, pin),
         apply: (app, pin, _ref, form, field) => PinEditor.#apply(app, pin, form, field),
         actions: {
@@ -52,6 +54,7 @@ export class PinEditor {
             pickIcon: (app, pin, _ref, button) => PinEditor.#pickIcon(app, pin, button.dataset.icon),
             delete: (app, pin) => MapDialogManager.deleteEntityById(app, "pin", pin.id),
             lock: (app, pin) => GeneratedEdits.toggleLock(app, pin),
+            clearFigures: (app, pin) => PinEditor.#clearFigures(app, pin),
             randomName: (app, pin) => RandomNames.press(app, "pin", pin),
             saveStyle: (app, pin, _ref, button) => PinEditor.#saveStyle(app, pin, button.dataset.styleType),
             placeLabel: (app, pin) => InspectorFields.placeLabel(app, pin),
@@ -74,15 +77,67 @@ export class PinEditor {
             labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
+            settlement: this.#settlement(pin, pinStyle),
             generated: GeneratedDetails.forPin(app, pin),
             generatedLocked: pin.generated?.locked === true,
+            // An entered population keeps a generated pin: Lock ticked and held (see UserFigures)
+            generatedLockHeld: !!pin.generated && UserFigures.has(pin),
             // A hand-placed settlement pin a run built on: its figures, without Lock (it is the reader's own)
             generatedModelled: !pin.generated && !!pin.modelled,
         };
     }
 
+    /**
+     * The Settlement card's context (see UserFigures): the entered population, else the run's
+     * figure as the field's placeholder; whether the figure is a village's (below a town's size).
+     * Null for a pin with no people of its own (a castle's or a ruin's).
+     */
+    static #settlement(pin, pinStyle) {
+        if (!UserFigures.takes(pinStyle?.tier ?? null)) return null;
+        const entered = UserFigures.population(pin);
+        const made = UserFigures.made(pin);
+        const lang = platform.i18n.lang;
+        return {
+            value: entered ?? "",
+            placeholder: entered === null && made !== null ? platform.i18n.format("FILRODENSWMB.UI.InspectorPopulationMade", { count: made.toLocaleString(lang) }) : "",
+            entered: entered !== null,
+            village: entered !== null && entered < UserFigures.TOWN_MIN,
+            townMin: UserFigures.TOWN_MIN.toLocaleString(lang),
+            max: UserFigures.MAX,
+        };
+    }
+
+    /** The inspector header's mark: Entered, while the pin has an entered population. */
+    static #mark(pin) {
+        if (!UserFigures.has(pin)) return null;
+        return { kind: "entered", icon: "edit", label: platform.i18n.localize("FILRODENSWMB.UI.MarkEntered"), tooltip: platform.i18n.localize("FILRODENSWMB.UI.MarkEnteredHint") };
+    }
+
+    /**
+     * The Population field committed: the figure entered (a whole number), or, emptied, none. One
+     * undo step when it changed. A run's figures are left as they are.
+     */
+    static #applyPopulation(app, pin, form) {
+        const value = UserFigures.parse(form.elements.pinPopulation.value);
+        if (value === UserFigures.population(pin)) return false;
+        MapStateManager.pushVectorState(app);
+        if (value === null) delete pin.userFigures;
+        else pin.userFigures = { ...(pin.userFigures ?? {}), population: value };
+        this.#redraw(app);
+        return true;
+    }
+
+    /** Clear entered figures: the pin back to the model's figures. One undo step. */
+    static #clearFigures(app, pin) {
+        if (!pin.userFigures) return;
+        MapStateManager.pushVectorState(app);
+        delete pin.userFigures;
+        this.#redraw(app);
+    }
+
     /** Applies the form to the pin as one undo step, when anything changed. */
     static #apply(app, pin, form, field) {
+        if (field === "pinPopulation") return this.#applyPopulation(app, pin, form);
         const elements = form.elements;
         // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the pin's own
         const values = typed(

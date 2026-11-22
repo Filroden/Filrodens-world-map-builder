@@ -31,7 +31,7 @@ import { platform } from "../../../platform/index.js";
  * - `template`: the body's template path (`templates/world/parts/inspector-<kind>.hbs`).
  * - `find(app, ref)`: the object, or null once it has gone (deleted, or undone away).
  * - `context(app, object, ref)`: the template's context.
- * - `header(app, object, ref)`: `{ title, subtitle, swatch }` for the header.
+ * - `header(app, object, ref)`: `{ title, subtitle, swatch, mark }` for the header (mark: a state mark, or none).
  * - `opened(app, object, ref)`: optional; makes the object the one being worked on.
  * - `apply(app, object, ref, form, field)`: reads the form and applies what changed as one undo
  *   step, returning whether anything did. `field` is the name of the field committed.
@@ -84,7 +84,7 @@ export class Inspector {
             host: app.root,
             placement: "docked",
             title: header.title,
-            header: { swatch: header.swatch ?? null, subtitle: header.subtitle ?? null },
+            header: { swatch: header.swatch ?? null, subtitle: header.subtitle ?? null, mark: header.mark ?? null },
             content,
             classes: ["fwmb", "fwmb-inspector", `fwmb-inspector--${kind.id}`],
             closeLabel: platform.i18n.localize("FILRODENSWMB.UI.Close"),

@@ -1,0 +1,29 @@
+{{!--
+    The pin inspector's Settlement card (see PinEditor, UserFigures): the pin's population, entered
+    by the reader. The style above says what the place is; this says how many live there. Until a
+    figure is entered the field shows what the last run made as its placeholder. Once entered, the
+    card carries the Entered mark and Clear entered figures; the run's own figure stays in the
+    Generated section, as what the land and trade support. Context: settlement (null for a pin with
+    no people of its own: a castle or a ruin), with value, placeholder, entered, village.
+--}}
+{{#if settlement}}
+<div class="fwmb-group fwmb-settlement">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.InspectorSettlement"}}{{#if settlement.entered}} <span class="fwmb-state-mark fwmb-state-mark--entered"><span class="fwmb-icon fwmb-icon--edit" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MarkEntered"}}</span>{{/if}}</div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-population">{{localize "FILRODENSWMB.UI.InspectorPopulation"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="number" id="fwmb-inspector-population" class="fwmb-input-population" name="pinPopulation" value="{{settlement.value}}" placeholder="{{settlement.placeholder}}" min="0" max="{{settlement.max}}" step="1" aria-describedby="fwmb-inspector-population-unit fwmb-inspector-population-hint" />
+            <span class="fwmb-unit" id="fwmb-inspector-population-unit">{{localize "FILRODENSWMB.UI.UnitPeople"}}</span>
+        </div>
+    </div>
+    <p class="fwmb-hint" id="fwmb-inspector-population-hint">{{#if settlement.village}}{{localize "FILRODENSWMB.UI.InspectorPopulationVillageHint" min=settlement.townMin}}{{else if settlement.entered}}{{localize "FILRODENSWMB.UI.InspectorPopulationEnteredHint"}}{{else}}{{localize "FILRODENSWMB.UI.InspectorPopulationHint"}}{{/if}}</p>
+    {{#if settlement.entered}}
+    <div class="fwmb-action-list">
+        <button type="button" class="fwmb-action-row" data-inspector-action="clearFigures">
+            <span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>
+            <span class="fwmb-action-text"><b>{{localize "FILRODENSWMB.UI.ClearEnteredFigures"}}</b><span>{{localize "FILRODENSWMB.UI.ClearEnteredFiguresNote"}}</span></span>
+        </button>
+    </div>
+    {{/if}}
+</div>
+{{/if}}

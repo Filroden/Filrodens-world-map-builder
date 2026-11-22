@@ -10082,6 +10082,41 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: none;
 }
 
+/* --- UC: ENTERED FIGURES ON SETTLEMENT PINS ---
+   The pin inspector's Settlement card under Look (board U1): the population a reader enters, with
+   the Entered mark (a pencil tag in the hue, kept apart from the held lock) in the card's title and
+   the inspector's header. The field reads as a number, aligned to its end. */
+.fwmb-state-mark--entered {
+    color: var(--fwmb-text-primary);
+    border-color: var(--fwmb-accent-main);
+}
+.fwmb-state-mark--entered .fwmb-icon {
+    color: var(--fwmb-accent-main) !important;
+}
+.fwmb .fwmb-overlay-header .fwmb-overlay-mark {
+    flex: none;
+}
+.fwmb-settlement .fwmb-section-title .fwmb-state-mark {
+    margin-inline-start: 0.375rem;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.fwmb input.fwmb-input-population {
+    width: 7.5rem;
+    text-align: end;
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb input.fwmb-input-population::placeholder {
+    color: var(--fwmb-text-muted);
+    font-family: var(--fwmb-font-ui);
+}
+@media (pointer: coarse) {
+    .fwmb input.fwmb-input-population {
+        min-height: 2.75rem;
+    }
+}
+
 /* --- TOUCH: EVERY TARGET 2.75REM (S0 step 8c) ---
    On a coarse pointer every button the studio draws is at least 2.75rem each way (the decision
    record's Q7), whatever size its own rules give it: the world bar's buttons and layer switcher

@@ -173,6 +173,23 @@ test("a generated place's section gives its place, population and the level it i
     assert.equal(GeneratedDetails.forPin(app, app.mapPins[2]), null, "a hand-made pin has none");
 });
 
+test("an entered population (UC): the inspector names the run's figure what the land and trade support; a journal page leads with the entered one", () => {
+    const app = generatedMap(FILRODENSWMB.DETAIL.EVERYTHING);
+    const city = app.mapPins[0];
+    city.userFigures = { population: 40000 };
+    const rows = Object.fromEntries(GeneratedDetails.forPin(app, city).map((row) => [row.label, row.value]));
+    assert.equal(rows["FILRODENSWMB.UI.GeneratedSupport"], "15,234");
+    assert.ok(!("FILRODENSWMB.UI.GeneratedPopulation" in rows), "the entered figure is the Settlement card's");
+    assert.equal(rows["FILRODENSWMB.UI.GeneratedNextRun"], "FILRODENSWMB.UI.GeneratedKeptEntered");
+    const page = GeneratedDetails.journalPages(app).pins.find((each) => each.item.id === "city");
+    assert.match(page.text, /GeneratedPopulation: 40,000\nFILRODENSWMB.UI.GeneratedSupport: 15,234/);
+    const inn = app.mapPins[2];
+    inn.userFigures = { population: 300 };
+    inn.name = "The Bell";
+    assert.equal(GeneratedDetails.journalPages(app).pins.find((each) => each.item.id === "inn").text, "FILRODENSWMB.UI.GeneratedPopulation: 300", "a pin with an entered figure and no run gives its population");
+    assert.equal(GeneratedDetails.forPin(app, inn), null, "and no Generated section in the inspector");
+});
+
 test("a generated region's section counts the duchies and counties beneath it", () => {
     const app = generatedMap(3);
     const [realms, duchies, counties] = app.layerSets[0].levels;

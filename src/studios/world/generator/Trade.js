@@ -33,6 +33,12 @@ import { SearchSpace, leastCostPerKm } from "./Search.js";
  * towns as the feedback pass left them, their trade share removed so it is recomputed, and traders
  * avoid insecure ground.
  *
+ * A town on a settlement pin with an entered population (its `target`, present age only; see
+ * Pipeline.seatsOf) is held to it in every round: one above it gives up the rest to the round's
+ * townspeople for the other towns, and one below it draws what it lacks from them first, with no
+ * cap, so it reaches its figure while the round has townspeople to spare. Its own trade still
+ * lays roads and lanes, but none of the round's townspeople are shared out to it beyond its figure.
+ *
  * Like every stage, this is a generator yielding its progress (0 to 1).
  */
 
@@ -53,6 +59,8 @@ const REPORT_EVERY = 32;
  *     the first round starts from them.
  * @param {Uint8Array} [context.userBuilt] - Edges the map's own routes make roads and lanes (see
  *     UserRoutes): built from the start of every round, so no new road is counted on them.
+ * @param {Map<number, number>} [context.targets] - Entered populations by model cell (the present
+ *     age's seats with one; see Pipeline.seatsOf): each town there is held to its figure.
  * @returns {Generator<number, {towns: object[], traffic: Float64Array, newRoadKm: number}>}
  */
 export function* tradeRounds(graph, context) {
@@ -86,6 +94,11 @@ function createState(graph, context) {
     else if (context.built) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.built[edge]) state.road[edge] = 1;
     // The map's own roads and lanes are built from the start, in every round (see UserRoutes)
     if (context.userBuilt) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.userBuilt[edge]) state.road[edge] = 1;
+    for (const town of state.towns) {
+        const target = context.targets?.get(town.cell);
+        if (target === undefined) delete town.target;
+        else town.target = target;
+    }
     indexTowns(state);
     return state;
 }
@@ -110,7 +123,7 @@ function indexTowns(state) {
     state.towns.forEach((town, index) => (state.townAt[town.cell] = index));
 }
 
-function tierOfPopulation(population) {
+export function tierOfPopulation(population) {
     const [city, large] = FILRODENSWMB.GENERATOR.TOWNS.TIERS.map((tier) => tier.minPop);
     if (population >= city) return 0;
     return population >= large ? 1 : 2;
@@ -446,21 +459,43 @@ function tradeToTownspeople(state, flows) {
     const { score, total } = tradeScores(state, flows);
     if (!(total > 0)) {
         for (const town of state.towns) town.population = town.stage2Pop;
+        // With no trade to share, a town held to an entered figure still keeps to it
+        const givenUp = holdToTargets(state);
+        const budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * (state.context.world.tradeBoom ?? 1) * state.context.totalPop + givenUp;
+        supplyTargets(state, budget);
+        recordGivenUp(state, givenUp, budget, 0);
         retier(state);
         recordTrade(state, score, flows);
         return;
     }
     let budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * (state.context.world.tradeBoom ?? 1) * state.context.totalPop;
     for (const town of state.towns) town.population = town.stage2Pop;
+    // What a town held to an entered figure would have made this round, by its trade score as any
+    // other town: what it is short of, or gives up, is told against it (see recordGivenUp)
+    for (const town of state.towns) if (town.target !== undefined) town.wouldMake = town.stage2Pop + (budget * score[town.cell]) / total;
+    const givenUp = holdToTargets(state);
+    budget += givenUp;
+    budget -= supplyTargets(state, budget);
     budget -= supplySeats(state, budget);
+    // The rest is shared by trade score among the cells with no entered figure: a town held to one
+    // takes no more than it, and what no town takes stays in the countryside
+    let open = total;
+    for (const town of state.towns) if (town.target !== undefined) open -= score[town.cell];
     const byScore = [];
-    for (let cell = 0; cell < score.length; cell++) if (score[cell] > 0) byScore.push(cell);
+    for (let cell = 0; cell < score.length; cell++) if (score[cell] > 0 && state.towns[state.townAt[cell]]?.target === undefined) byScore.push(cell);
     byScore.sort((a, b) => score[b] - score[a] || a - b);
+    let shared = 0;
     for (const cell of byScore) {
-        const added = (budget * score[cell]) / total;
-        if (state.townAt[cell] >= 0) state.towns[state.townAt[cell]].population += added;
-        else if (added >= state.tierMin[2] && !nearTown(state, cell)) createTradeTown(state, cell, added, flows);
+        const added = open > 0 ? (budget * score[cell]) / open : 0;
+        if (state.townAt[cell] >= 0) {
+            state.towns[state.townAt[cell]].population += added;
+            shared += added;
+        } else if (added >= state.tierMin[2] && !nearTown(state, cell)) {
+            createTradeTown(state, cell, added, flows);
+            shared += added;
+        }
     }
+    recordGivenUp(state, givenUp, budget, shared);
     // Trade towns from an earlier round that no longer get enough trade fade away
     state.towns = state.towns.filter((town) => town.stage2Pop > 0 || town.population >= state.tierMin[2]);
     indexTowns(state);
@@ -478,7 +513,7 @@ function supplySeats(state, budget) {
     const short = [];
     let wanted = 0;
     for (const town of state.towns) {
-        if (town.seatTier === undefined) continue;
+        if (town.seatTier === undefined || town.target !== undefined) continue;
         const lack = state.tierMin[town.seatTier] - town.population;
         if (lack > 0) {
             short.push([town, lack]);
@@ -489,6 +524,60 @@ function supplySeats(state, budget) {
     const scale = Math.min(1, (SEAT_SUPPLY_SHARE * budget) / wanted);
     for (const [town, lack] of short) town.population += lack * scale;
     return wanted * scale;
+}
+
+/**
+ * Each town above its entered figure is brought down to it; returns the people they gave up, which
+ * join the round's townspeople. Each such town keeps what it gave (`givenUp`) for the report.
+ */
+function holdToTargets(state) {
+    let given = 0;
+    for (const town of state.towns) {
+        if (town.target === undefined) continue;
+        const excess = town.population - town.target;
+        town.givenUp = Math.max(0, excess);
+        if (excess > 0) {
+            town.population = town.target;
+            given += excess;
+        }
+    }
+    return given;
+}
+
+/**
+ * Each town below its entered figure draws what it lacks from the round's townspeople, before any
+ * other town is given its share and with no cap: an entered figure is the reader's word. When the
+ * round has too few for them all, each draws the same share of what it lacks. Returns what they drew.
+ */
+function supplyTargets(state, budget) {
+    let wanted = 0;
+    for (const town of state.towns) if (town.target !== undefined) wanted += Math.max(0, town.target - town.population);
+    if (!(wanted > 0) || !(budget > 0)) return 0;
+    const scale = Math.min(1, budget / wanted);
+    for (const town of state.towns) if (town.target !== undefined) town.population += Math.max(0, town.target - town.population) * scale;
+    return wanted * scale;
+}
+
+/**
+ * Where the people given up by towns above their entered figures went, for the report: each such
+ * town gave up what it would have made this round beyond its figure (its base and its share of
+ * the round's townspeople by trade score), and of that, the share the other towns took and the
+ * share that stayed in the countryside (the round's townspeople no town took), in the proportion
+ * the round shared them. Told against what it would have made, not against its base alone, and the
+ * most over the present age's rounds, since the final round starts from the towns as the earlier
+ * rounds held them to their figures.
+ */
+function recordGivenUp(state, givenUp, budget, shared) {
+    const toTowns = budget > 0 ? Math.min(1, shared / budget) : 0;
+    for (const town of state.towns) {
+        if (town.target === undefined) continue;
+        // The final round starts from the towns as the earlier rounds held them, so what it would
+        // make is near the figure already: the most any round gave up is the town's
+        const over = Math.max(town.givenOver ?? 0, (town.wouldMake ?? town.stage2Pop) - town.target, 0);
+        town.givenOver = over;
+        town.givenToTowns = over * toTowns;
+        town.givenToCountry = over - town.givenToTowns;
+    }
 }
 
 /** The most of a round's townspeople the seats short of their tier's minimum may draw between them. */

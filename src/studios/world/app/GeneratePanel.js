@@ -24,6 +24,16 @@ const SEAT_NOTICE = Object.freeze({
     noPlace: { heading: "FILRODENSWMB.UI.GenerateSeatNoPlaceHeading", hint: "FILRODENSWMB.UI.GenerateSeatNoPlaceHint" },
 });
 
+/** What each kind of the run's fingerprint names when it has changed since (see RunInputs), in its order. */
+const CHANGED_KINDS = Object.freeze({
+    routes: "FILRODENSWMB.UI.GenerateChangedRoutes",
+    seats: "FILRODENSWMB.UI.GenerateChangedSeats",
+    regions: "FILRODENSWMB.UI.GenerateChangedRegions",
+    rivers: "FILRODENSWMB.UI.GenerateChangedRivers",
+    features: "FILRODENSWMB.UI.GenerateChangedFeatures",
+    influences: "FILRODENSWMB.UI.GenerateChangedInfluences",
+});
+
 /**
  * The Generate tool's panel (templates/world/tools-generate.hbs): the settings a run is made with, kept
  * with the map in uiState.generatorSettings (see GeneratorSettings.panelSettings), what a run is
@@ -82,6 +92,8 @@ export class GeneratePanel {
             nameBases: this.nameBaseChoices(settings.nameBase),
             estimate: this.#estimate(app),
             stale,
+            // What of the map's own the run read has changed since, named (UC, board U3)
+            staleWhat: stale ? this.#changedSince(app) : null,
             older,
             // The Generation section's heading: fill in only on a map holding its parent's run; else
             // the run's mark (MapMarks, as the layer switcher and the overview show it): Out of date
@@ -237,31 +249,66 @@ export class GeneratePanel {
             const key = culture.homelandsAuto ? "FILRODENSWMB.UI.GenerateHomelandsPlacedNotice" : "FILRODENSWMB.UI.GenerateHomelandsLeftOutNotice";
             notices.push({ text: platform.i18n.format(key, { name: culture.name, count: culture.homelandsLeftOut }) });
         }
-        notices.push(...this.#seatNotices(app));
         return notices;
     }
 
     /**
-     * The settlement pins the last run could not build on as their styles asked, one notice per
-     * reason (in SEAT_REASONS' order): a heading saying why, a tooltip with the detail, and the
-     * pins' names in alphabetical order. Pins deleted since are left out, and a reason with none
-     * left gives no notice.
+     * The map's own items the last run read that have changed since, as one sentence ("Changed
+     * since: settlement pins and their entered populations, and routes."), or null when none has
+     * (a change to the terrain, climate or settings is said by the hint alone).
+     */
+    static #changedSince(app) {
+        const kinds = RunInputs.changed(app).filter((kind) => CHANGED_KINDS[kind]);
+        if (!kinds.length) return null;
+        const list = new Intl.ListFormat(platform.i18n.lang, { type: "conjunction" }).format(kinds.map((kind) => platform.i18n.localize(CHANGED_KINDS[kind])));
+        return platform.i18n.format("FILRODENSWMB.UI.GenerateChangedSince", { list });
+    }
+
+    /**
+     * What the last run did with the settlement pins, for the Results section (board U3): one
+     * notice per reason it could not build on a pin as its style asked (in SEAT_REASONS' order),
+     * then, with entered populations (see UserFigures), the pins it could not bring to their figure
+     * and the pins whose towns gave up people to keep to theirs. Each is a heading, a tooltip with
+     * the detail, and the pins (with their figures) in alphabetical order. Pins deleted since are
+     * left out, and a notice with none left is not given.
      */
     static #seatNotices(app) {
         const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
         const unnamed = platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed");
+        const nameOf = (id) => byId.get(id).name || unnamed;
+        const lang = platform.i18n.lang;
+        const count = (value) => Math.round(value).toLocaleString(lang);
         const names = new Map(SEAT_REASONS.map((reason) => [reason, []]));
-        for (const { pin, reason } of app.modelRun?.seats?.unhonoured ?? []) {
-            if (byId.has(pin) && names.has(reason)) names.get(reason).push(byId.get(pin).name || unnamed);
+        const seats = app.modelRun?.seats;
+        for (const { pin, reason } of seats?.unhonoured ?? []) {
+            if (byId.has(pin) && names.has(reason)) names.get(reason).push(nameOf(pin));
         }
-        return SEAT_REASONS.filter((reason) => names.get(reason).length).map((reason) => {
+        const notices = SEAT_REASONS.filter((reason) => names.get(reason).length).map((reason) => {
             const { heading, hint } = SEAT_NOTICE[reason];
-            return {
-                text: platform.i18n.localize(heading),
-                hint: platform.i18n.localize(hint),
-                items: names.get(reason).sort((a, b) => a.localeCompare(b)),
-            };
+            return { text: platform.i18n.localize(heading), hint: platform.i18n.localize(hint), items: names.get(reason).sort((a, b) => a.localeCompare(b)) };
         });
+        const byName = (a, b) => a.name.localeCompare(b.name);
+        const short = (seats?.short ?? []).filter(({ pin }) => byId.has(pin)).map((entry) => ({ ...entry, name: nameOf(entry.pin) })).sort(byName);
+        if (short.length) {
+            notices.push({
+                text: platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatShortHeading"),
+                hint: platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatShortHint"),
+                items: short.map(({ name, entered, made }) => platform.i18n.format("FILRODENSWMB.UI.GenerateSeatShortItem", { name, entered: count(entered), made: count(made) })),
+            });
+        }
+        const given = (seats?.givenUp ?? []).filter(({ pin }) => byId.has(pin)).map((entry) => ({ ...entry, name: nameOf(entry.pin) })).sort(byName);
+        if (given.length) {
+            notices.push({
+                text: platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatGivenHeading"),
+                hint: platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatGivenHint"),
+                items: given.map(({ name, toTowns, toCountry }) => {
+                    if (!toCountry) return platform.i18n.format("FILRODENSWMB.UI.GenerateSeatGivenTowns", { name, towns: count(toTowns) });
+                    if (!toTowns) return platform.i18n.format("FILRODENSWMB.UI.GenerateSeatGivenCountry", { name, country: count(toCountry) });
+                    return platform.i18n.format("FILRODENSWMB.UI.GenerateSeatGivenBoth", { name, towns: count(toTowns), country: count(toCountry) });
+                }),
+            });
+        }
+        return notices;
     }
 
     /**
@@ -318,6 +365,8 @@ export class GeneratePanel {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),
             population: population.toLocaleString(platform.i18n.lang),
             cultures: this.#cultureShares(app, regions),
+            // What the run did with the settlement pins (moved here from Run: UC, board U3)
+            notices: this.#seatNotices(app),
         };
     }
 

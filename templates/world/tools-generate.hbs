@@ -48,7 +48,7 @@
     {{#if generate.estimate.long}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLongRun"}}</p>{{/if}}
     {{/if}}
 
-    {{#if generate.held}}{{else if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
+    {{#if generate.held}}{{else if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}{{#if generate.staleWhat}} {{generate.staleWhat}}{{/if}}</p>{{/if}}
     {{#if generate.held}}{{else if generate.older}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOlderRevisionHint"}}</p>{{/if}}
     {{#each generate.notices}}
     {{#if this.items}}
@@ -206,6 +206,12 @@
         <dd class="fwmb-readout">{{this.share}}</dd>
         {{/each}}
     </dl>
+    {{#each generate.results.notices}}
+    <div class="fwmb-generate-notice fwmb-generate-notice--list">
+        <p class="fwmb-hint" data-tooltip="{{this.hint}}">{{this.text}}</p>
+        <ul class="fwmb-hint fwmb-generate-notice-items">{{#each this.items}}<li>{{this}}</li>{{/each}}</ul>
+    </div>
+    {{/each}}
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{/if}}
 

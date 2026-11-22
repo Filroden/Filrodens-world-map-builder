@@ -1,11 +1,12 @@
 import { UNCLAIMED } from "../mesh/Schema.js";
+import { UserFigures } from "./UserFigures.js";
 
 /**
  * Running Generate again, and Remove generated content: what earlier runs made is replaced,
  * except what the reader has made their own.
  *
  * - An item is kept when it is hand-made, or generated and edited (a substantive change; see
- *   GeneratedEdits) or locked.
+ *   GeneratedEdits) or locked, or a generated pin with an entered population (see UserFigures).
  * - A kept region keeps its whole realm: the realm with every duchy and county in it, untouched,
  *   so nesting always holds. The rest of each generated (Political) set is removed with its cells.
  * - A set left with no regions is removed, except, for a run, the latest Political set. A run
@@ -18,7 +19,8 @@ import { UNCLAIMED } from "../mesh/Schema.js";
 
 /** Whether a generated item is the reader's own: edited or locked. */
 export function isKept(item) {
-    return !!item && (!item.generated || item.generated.edited === true || item.generated.locked === true);
+    // A generated pin with an entered population is the reader's, as an edited one is (see UserFigures)
+    return !!item && (!item.generated || item.generated.edited === true || item.generated.locked === true || UserFigures.has(item));
 }
 
 /** What a run made of a region, as written onto a kept one: its figures, not its look, name or rank. */

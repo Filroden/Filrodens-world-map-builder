@@ -184,7 +184,7 @@ test("Out of date shows only for a map with a run, and the notices follow the ma
     assert.ok(GeneratePanel.context(small).notices.includes("FILRODENSWMB.UI.GenerateSmallWorldNotice"));
 });
 
-test("the settlement pins a run could not build on are listed under one heading per reason, its tooltip giving the detail", () => {
+test("the settlement pins a run could not build on are listed in Results under one heading per reason, its tooltip giving the detail", () => {
     const pins = [{ id: "a", name: "Ushaak" }, { id: "b", name: "Tower of the Raathmuarglig" }, { id: "c", name: "Uvamag" }, { id: "d", name: "" }, { id: "e", name: "Seaport" }];
     const unhonoured = [
         { pin: "a", kind: "town", reason: "islet" },
@@ -196,12 +196,37 @@ test("the settlement pins a run could not build on are listed under one heading 
         { pin: "a", kind: "town", reason: "unknown" },
     ];
     const app = studio({ mapPins: pins, modelRun: { run: "mine", stats: {}, seats: { used: 5, unhonoured } } });
-    const groups = GeneratePanel.context(app).notices.filter((notice) => notice.items);
+    assert.ok(!GeneratePanel.context(app).notices.some((notice) => notice.items), "no longer in the Run section (UC, board U3)");
+    const groups = GeneratePanel.results(app).notices;
     assert.deepEqual(groups, [
         { text: "FILRODENSWMB.UI.GenerateSeatWaterHeading", hint: "FILRODENSWMB.UI.GenerateSeatWaterHint", items: ["FILRODENSWMB.UI.GenerateSeatUnnamed"] },
         { text: "FILRODENSWMB.UI.GenerateSeatIsletHeading", hint: "FILRODENSWMB.UI.GenerateSeatIsletHint", items: ["Tower of the Raathmuarglig", "Ushaak", "Uvamag"] },
         { text: "FILRODENSWMB.UI.GenerateSeatDryHeading", hint: "FILRODENSWMB.UI.GenerateSeatDryHint", items: ["Seaport"] },
     ], "by reason, names in order, a deleted pin and an unknown reason left out, a reason with none left giving no notice");
+});
+
+test("Results list the pins the run could not bring to their entered population, and where entered towns' people went", () => {
+    const pins = [{ id: "k", name: "Kingsbridge" }, { id: "h", name: "Harrowgate" }, { id: "o", name: "Oakham" }, { id: "s", name: "Stoneford" }, { id: "b", name: "Brill" }];
+    const seats = {
+        used: 5,
+        unhonoured: [],
+        short: [{ pin: "k", entered: 40000, made: 22140.4 }, { pin: "h", entered: 12000, made: 9600 }, { pin: "gone", entered: 5000, made: 10 }],
+        givenUp: [{ pin: "o", toTowns: 1800, toCountry: 0 }, { pin: "s", toTowns: 0, toCountry: 600 }, { pin: "b", toTowns: 250, toCountry: 50 }],
+    };
+    const app = studio({ mapPins: pins, modelRun: { run: "mine", stats: {}, seats } });
+    const [short, given] = GeneratePanel.results(app).notices;
+    assert.equal(short.text, "FILRODENSWMB.UI.GenerateSeatShortHeading");
+    assert.equal(short.hint, "FILRODENSWMB.UI.GenerateSeatShortHint");
+    assert.equal(short.items.length, 2, "a deleted pin left out");
+    assert.equal(given.text, "FILRODENSWMB.UI.GenerateSeatGivenHeading");
+    assert.deepEqual(
+        given.items.map((item) => item.split(" ")[0]),
+        ["FILRODENSWMB.UI.GenerateSeatGivenBoth", "FILRODENSWMB.UI.GenerateSeatGivenTowns", "FILRODENSWMB.UI.GenerateSeatGivenCountry"],
+        "in name order, each saying where its people went",
+    );
+    assert.match(short.items[0], /"name":"Harrowgate"/, "in name order");
+    assert.match(short.items[1], /"made":"22,140"/, "the figures rounded and grouped");
+    assert.deepEqual(GeneratePanel.results(studio({ mapPins: pins, modelRun: { run: "mine", stats: {}, seats: { used: 1, unhonoured: [] } } })).notices, [], "none without anything to say");
 });
 
 test("the results count what the last run left on the map", () => {

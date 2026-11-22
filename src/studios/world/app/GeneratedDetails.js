@@ -3,6 +3,7 @@ import { platform } from "../../../platform/index.js";
 import { ContentRows } from "./ContentRows.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { Regeneration } from "./Regeneration.js";
+import { UserFigures } from "./UserFigures.js";
 
 /**
  * What a run of Generate recorded about a place or region (its `generated` details), as the rows
@@ -37,6 +38,12 @@ export class GeneratedDetails {
     /**
      * A generated pin's rows, or a hand-placed settlement pin's from what the last run gave it as a
      * seat (`modelled`, see Generation.seats); null for a pin no run made or built on.
+     *
+     * With an entered population (see UserFigures) the inspector's row for what the run made reads
+     * Land and trade support (the entered figure is in the Settlement card above it), and a
+     * journal page gives the entered figure as the population, with what the land and trade
+     * support beside it when that differs. A pin with an entered figure but no run gives a journal
+     * page its population alone.
      * @param {object} app
      * @param {object} pin
      * @param {{journal?: boolean}} [options] - journal: the rows a journal page gives, without the studio's own.
@@ -44,11 +51,16 @@ export class GeneratedDetails {
      */
     static forPin(app, pin, { journal = false } = {}) {
         const generated = pin.generated ?? pin.modelled;
-        if (!generated) return null;
+        const entered = UserFigures.population(pin);
+        if (!generated) return journal && entered !== null ? this.#rows([["FILRODENSWMB.UI.GeneratedPopulation", this.#count(entered)]], { journal }) : null;
         const tierName = TIER_NAMES.get(generated.tier);
+        const made = this.#count(generated.population);
+        let people = [["FILRODENSWMB.UI.GeneratedPopulation", made]];
+        if (entered !== null && !journal) people = [["FILRODENSWMB.UI.GeneratedSupport", made]];
+        else if (entered !== null) people = [["FILRODENSWMB.UI.GeneratedPopulation", this.#count(entered)], ["FILRODENSWMB.UI.GeneratedSupport", Math.round(generated.population) !== entered ? made : null]];
         return this.#rows([
             ["FILRODENSWMB.UI.GeneratedPlace", tierName ? platform.i18n.localize(tierName) : null],
-            ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
+            ...people,
             ["FILRODENSWMB.UI.GeneratedCultures", this.#cultures(app, generated)],
             ["FILRODENSWMB.UI.GeneratedFormerly", this.#formerly(generated)],
             ["FILRODENSWMB.UI.GeneratedHistory", this.#history(generated)],
@@ -163,6 +175,7 @@ export class GeneratedDetails {
 
     /** What Generate again does with an item: keeps it (edited, locked, or with its realm) or replaces it. */
     static #fate(item, place = null) {
+        if (UserFigures.has(item)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptEntered");
         if (item.generated.locked) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptLocked");
         if (item.generated.edited) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptEdited");
         if (place && Regeneration.keptKeys(place.set)[place.depth].has(item.key)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRealm");
