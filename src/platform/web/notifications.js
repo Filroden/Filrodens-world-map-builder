@@ -35,6 +35,7 @@ export function createNotifications(frame, { closeLabel = "Close" } = {}) {
         close.type = "button";
         close.className = "fwmb-notification-close";
         close.setAttribute("aria-label", closeLabel);
+        close.dataset.tooltip = closeLabel;
         close.innerHTML = '<i class="fwmb-icon fwmb-icon--cancel"></i>';
         close.addEventListener("click", () => item.remove());
 

@@ -36,6 +36,8 @@
  * the promise of how it closed.
  */
 
+import { nameFilePickers } from "./aria.js";
+
 /** What Tab moves between: the controls a keyboard user can reach. */
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -263,6 +265,7 @@ export class Overlay {
         close.className = "fwmb-overlay-close";
         close.dataset.overlayAction = "close";
         close.setAttribute("aria-label", closeLabel);
+        close.dataset.tooltip = closeLabel;
         close.innerHTML = '<i class="fwmb-icon fwmb-icon--cancel"></i>';
 
         header.append(heading, close);
@@ -387,6 +390,7 @@ export class Overlay {
         if (!openByHost.has(this.#host)) openByHost.set(this.#host, new Set());
         openByHost.get(this.#host).add(this);
 
+        nameFilePickers(this.#dialog);
         onRender?.(this.#dialog);
         if (focus === "none") {
             this.#dialog.tabIndex = -1;

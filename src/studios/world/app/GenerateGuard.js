@@ -81,7 +81,8 @@ export class GenerateGuard {
         const content = await platform.templates.render(DIALOG_TEMPLATE, this.context({ target, chain, chainTime, onlyTime }));
         const answer = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-guard-dialog"],
-            title: i18n.localize("FILRODENSWMB.UI.GuardTitle"),
+            // Board B4: the dialogue names the map it generates
+            title: i18n.format("FILRODENSWMB.UI.GuardTitle", { map: target }),
             content,
             // Ask each time (the content's .fwmb-start) goes to the footer after Cancel (see Overlay)
             onRender: (element) => GenerateGuard.bindChoices(element),

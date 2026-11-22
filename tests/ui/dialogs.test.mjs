@@ -303,3 +303,12 @@ test("show() returns a dialogue its caller drives: a split footer, a button that
     assert.equal(await overlay.closed, true, "the caller closes it with a value");
     assert.equal(dialog(), null);
 });
+
+test("a file field's text box takes the field's name, and the close button has a tooltip (S0 step 8b)", async () => {
+    const answer = dialogs.prompt({ title: "Add", content: '<file-picker aria-label="Image source"><input type="text"></file-picker>', confirmLabel: "Add" });
+    assert.equal(dialog().querySelector("file-picker input").getAttribute("aria-label"), "Image source");
+    const close = dialog().querySelector(".fwmb-overlay-close");
+    assert.equal(close.dataset.tooltip, close.getAttribute("aria-label"));
+    key(dialog(), "Escape");
+    assert.equal(await answer, null);
+});

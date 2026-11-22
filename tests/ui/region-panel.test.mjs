@@ -220,7 +220,7 @@ test("+ Layer below makes the next layer, named by its tier, with no regions, as
     assert.deepEqual(levelIds(app), ["realms", "counties", "zones"]);
 });
 
-test("a new map starts with one set holding Layer 1", async () => {
+test("a new map starts with one set holding Tier 1", async () => {
     const [set] = RegionPanel.starterLayerSets();
     assert.deepEqual([set.name, set.levels.map((level) => [level.name, level.parentLevelId])], ["FILRODENSWMB.UI.StarterSetName", [['FILRODENSWMB.UI.LayerName {"tier":1}', null]]]);
 });

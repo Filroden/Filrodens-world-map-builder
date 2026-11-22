@@ -20,7 +20,7 @@
         <label>{{localize "FILRODENSWMB.UI.ScaleInterval"}}</label>
         <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10" aria-describedby="fwmb-scale-interval-unit">
+                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10" aria-label="{{localize 'FILRODENSWMB.UI.ScaleInterval'}}" aria-describedby="fwmb-scale-interval-unit">
                 <span class="fwmb-unit" id="fwmb-scale-interval-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
             </div>
         </div>
@@ -30,7 +30,7 @@
         <label>{{localize "FILRODENSWMB.UI.ScaleValue"}}</label>
         <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleValue" value="{{#if uiState.cartographyScaleMatchWorld}}{{scaleBarValue}}{{else}}{{uiState.cartographyScaleValue}}{{/if}}" min="0" step="any" class="fwmb-input-short" {{#if uiState.cartographyScaleMatchWorld}}disabled{{/if}}>
+                <input type="number" name="cartographyScaleValue" value="{{#if uiState.cartographyScaleMatchWorld}}{{scaleBarValue}}{{else}}{{uiState.cartographyScaleValue}}{{/if}}" min="0" step="any" class="fwmb-input-short" aria-label="{{localize 'FILRODENSWMB.UI.ScaleValue'}}" {{#if uiState.cartographyScaleMatchWorld}}disabled{{/if}}>
                 <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.ScaleValueHint" unit=mapUnit}}</span>
             </div>
         </div>
@@ -60,7 +60,7 @@
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.BorderStyle"}}</label>
         <div class="fwmb-form-fields">
-            <select name="cartographyBorderStyle" class="fwmb-flex-1">
+            <select name="cartographyBorderStyle" class="fwmb-flex-1" aria-label="{{localize 'FILRODENSWMB.UI.BorderStyle'}}">
                 <option value="solid" {{#if (eq uiState.cartographyBorderStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderSolid"}}</option>
                 <option value="double" {{#if (eq uiState.cartographyBorderStyle "double")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderDouble"}}</option>
                 <option value="ornate" {{#if (eq uiState.cartographyBorderStyle "ornate")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderOrnate"}}</option>
@@ -71,7 +71,7 @@
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
         <div class="fwmb-form-fields">
-            <input type="color" class="fwmb-swatch fwmb-wide" name="cartographyBorderColor" value="{{uiState.cartographyBorderColor}}" />
+            <input type="color" class="fwmb-swatch fwmb-wide" name="cartographyBorderColor" value="{{uiState.cartographyBorderColor}}" aria-label="{{localize 'FILRODENSWMB.UI.LineColor'}}" />
         </div>
     </div>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

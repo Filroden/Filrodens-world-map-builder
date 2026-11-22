@@ -105,7 +105,8 @@ export class GenerateAll {
         }
         const answer = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-generate-all-dialog"],
-            title: i18n.localize("FILRODENSWMB.UI.GenerateAllTitle"),
+            // Board S2: Generate all names the world it runs
+            title: i18n.format("FILRODENSWMB.UI.GenerateAllTitle", { world: app.world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld") }),
             content,
             buttons,
             dismissed: null,

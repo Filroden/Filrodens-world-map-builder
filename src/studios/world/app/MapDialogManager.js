@@ -77,7 +77,7 @@ export class MapDialogManager {
         const limit = Sanitize.textLimit(kind);
         const answer = await platform.dialogs.prompt({
             title,
-            content: `<label>${Sanitize.escapeHtml(label)}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}" maxlength="${limit}">`,
+            content: `<label for="fwmb-prompt-input">${Sanitize.escapeHtml(label)}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}" maxlength="${limit}">`,
             onSubmit: (form) => form.elements["fwmb-prompt-input"].value,
             confirmLabel,
         });
@@ -110,11 +110,15 @@ export class MapDialogManager {
      */
     static async promptCloseWorld(name, groups = []) {
         const { i18n } = platform;
-        const list = groups.length ? i18n.format("FILRODENSWMB.UI.CloseWorldGroups", { groups: new Intl.ListFormat(i18n.lang, { type: "conjunction" }).format(groups) }) : i18n.localize("FILRODENSWMB.UI.CloseWorldChanges");
+        const escape = (text) => Sanitize.escapeHtml(text);
+        // Board N1: what is unsaved as a list, then what a new world starts with
+        const changes = groups.length
+            ? `<p>${escape(i18n.format("FILRODENSWMB.UI.CloseWorldGroups", { name }))}</p><ul class="fwmb-dialog-list">${groups.map((group) => `<li>${escape(group)}</li>`).join("")}</ul>`
+            : `<p>${escape(i18n.format("FILRODENSWMB.UI.CloseWorldChanges", { name }))}</p>`;
         return platform.dialogs.choose({
             title: i18n.format("FILRODENSWMB.UI.CloseWorldTitle", { name }),
             icon: "fwmb-icon fwmb-icon--save",
-            content: `<p>${Sanitize.escapeHtml(list)}</p><p>${Sanitize.escapeHtml(i18n.localize("FILRODENSWMB.UI.CloseWorldHint"))}</p>`,
+            content: `${changes}<p>${escape(i18n.localize("FILRODENSWMB.UI.CloseWorldHint"))}</p>`,
             buttons: [
                 // Board N1: Save and close the primary; Cancel the default, so Enter never closes
                 { action: "cancel", label: i18n.localize("FILRODENSWMB.UI.Cancel"), default: true },

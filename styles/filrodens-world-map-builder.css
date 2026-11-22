@@ -5972,7 +5972,7 @@ button.fwmb-format {
 
 .fwmb-bulk-actions {
     display: flex;
-    gap: var(--fwmb-size-16);
+    gap: var(--fwmb-size-8);
     margin-block-start: var(--fwmb-size-4);
 }
 
@@ -5981,19 +5981,6 @@ button.fwmb-format {
     align-items: center;
     gap: var(--fwmb-size-16);
     margin-block-end: var(--fwmb-size-8);
-}
-
-.fwmb-bulk-action-button {
-    font-size: var(--fwmb-size-12);
-    background: var(--fwmb-bg-hover);
-    color: var(--fwmb-text-primary);
-    border-radius: var(--fwmb-radius-medium);
-    padding: var(--fwmb-size-4) var(--fwmb-size-10);
-    cursor: pointer;
-}
-
-.fwmb-bulk-action-button:hover {
-    background: var(--fwmb-bg-highlight);
 }
 
 /* Mass edit (see MassEdit): a row the reader has changed is marked in the accent, with its ↺ shown;
@@ -8592,6 +8579,15 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-block: 0 0.5rem;
 }
 :where(.fwmb .fwmb-overlay-body) p:last-child {
+    margin-block-end: 0;
+}
+
+/* A dialogue's list in its text (board N1: what is unsaved), spaced as its paragraphs */
+.fwmb .fwmb-overlay-body .fwmb-dialog-list {
+    margin-block: 0 0.5rem;
+    padding-inline-start: 1.25rem;
+}
+.fwmb .fwmb-overlay-body .fwmb-dialog-list:last-child {
     margin-block-end: 0;
 }
 

@@ -33,6 +33,7 @@
 import { Idiomorph } from "../../vendor/idiomorph/idiomorph.esm.js";
 import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
 import { StudioHold } from "./StudioHold.js";
+import { nameFilePickers } from "./aria.js";
 
 /** Elements carrying this attribute are never changed or removed by a redraw. */
 const MORPH_IGNORE_ATTRIBUTE = "data-morph-ignore";
@@ -192,6 +193,7 @@ export class StudioView {
         this.#drawn = new Set([...this.#drawn, ...ids]);
 
         RangeDisplay.syncAllFills(this.#root);
+        nameFilePickers(this.#root);
         this.#afterRender(ids);
     }
 

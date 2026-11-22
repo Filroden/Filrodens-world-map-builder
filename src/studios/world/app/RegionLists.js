@@ -48,7 +48,7 @@ export class RegionLists {
 
     /**
      * + Layer below (or + Layer in a set with none): the next layer, made at once with its default
-     * name ("Layer <tier>", renamable from its heading) and opened in the inspector, focus going to
+     * name ("Tier <tier>", renamable from its heading) and opened in the inspector, focus going to
      * its heading.
      */
     static async addLayer(app, { setId = null, levelId = null }) {

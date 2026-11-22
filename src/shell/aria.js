@@ -46,3 +46,16 @@ export function setOn(element, on) {
     const attribute = element.getAttribute("role") === "menuitemcheckbox" ? "aria-checked" : "aria-pressed";
     element.setAttribute(attribute, String(Boolean(on)));
 }
+
+/**
+ * Gives each file field's text box the field's name (S0 step 8b). A `<file-picker>` (Foundry's, or
+ * the web host's stand-in) is labelled with `aria-label` in its template, but what takes the focus
+ * is the text box it builds inside itself, which neither host names. Run after a part is drawn.
+ * @param {ParentNode|null|undefined} root
+ */
+export function nameFilePickers(root) {
+    for (const picker of root?.querySelectorAll?.("file-picker[aria-label]") ?? []) {
+        const input = picker.querySelector("input");
+        if (input && !input.hasAttribute("aria-label")) input.setAttribute("aria-label", picker.getAttribute("aria-label"));
+    }
+}

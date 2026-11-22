@@ -28,7 +28,7 @@ const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/world/dialogs
  *
  * Every list ends with an add row: + Set, and + Region in <parent> in a layer (the set, for a top
  * layer; the region chosen above, for a layer below, made with that parent). The chain of lists
- * ends with + Layer below, which makes the next layer ("Layer <tier>") with no regions, so a set's
+ * ends with + Layer below, which makes the next layer ("Tier <tier>") with no regions, so a set's
  * layers can be laid out before they hold any. A new entry is named in a row
  * of its own before it is made (see RegionLists). Nothing is created from a menu: a set's menu has
  * rename, move and delete; a level's heading has its edit button and a menu (rename, edit several
@@ -376,7 +376,7 @@ export class RegionPanel {
 
     /**
      * A new layer set at the end of the map's, named as the reader named it in its row (see
-     * RegionLists), with its first layer ("Layer 1", renamable from its heading), which become
+     * RegionLists), with its first layer ("Tier 1", renamable from its heading), which become
      * the active set and level, its + Region ready. One undo step. Returns the set's id.
      */
     static createSet(app, name) {
@@ -425,7 +425,7 @@ export class RegionPanel {
     }
 
     /**
-     * The layer set a new map starts with (S12): one set holding "Layer 1", so regions can be
+     * The layer set a new map starts with (S12): one set holding "Tier 1", so regions can be
      * added at once.
      */
     static starterLayerSets() {
@@ -486,7 +486,7 @@ export class RegionPanel {
     // ------------------------------------------------------------------ levels
 
     /**
-     * + Layer below: the next layer below a layer (or a set's first layer), named "Layer <n>" by
+     * + Layer below: the next layer below a layer (or a set's first layer), named "Tier <n>" by
      * its tier (renamable from its heading), with no regions yet. It becomes the active level. One
      * undo step. Returns its id, or null when the set or layer has gone.
      */
@@ -506,7 +506,7 @@ export class RegionPanel {
         return level.id;
     }
 
-    /** "Layer <tier>", or the next free name after it in the set. */
+    /** "Tier <tier>", or the next free name after it in the set. */
     static layerName(set, tier) {
         return uniqueName(platform.i18n.format("FILRODENSWMB.UI.LayerName", { tier }), set?.levels ?? []);
     }

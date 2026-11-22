@@ -34,8 +34,9 @@
     <div class="fwmb-hint fwmb-long">{{localize "FILRODENSWMB.UI.BuiltinPinIconsHint"}}</div>
 
     <div class="fwmb-bulk-actions">
-        <a class="fwmb-bulk-action-button" data-action="hideAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.HideAllPinIcons"}}</a>
-        <a class="fwmb-bulk-action-button" data-action="revealAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.RevealAllPinIcons"}}</a>
+        {{!-- Buttons, so the keyboard reaches them (S0 step 8b: they were links with no address) --}}
+        <button type="button" class="fwmb-btn" data-action="hideAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.HideAllPinIcons"}}</button>
+        <button type="button" class="fwmb-btn" data-action="revealAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.RevealAllPinIcons"}}</button>
     </div>
 
     <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">

@@ -1,15 +1,15 @@
 <div class="fwmb-dialog-content">
     <div class="fwmb-form-group fwmb-form-group--stacked">
-        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <label for="fwmb-pin-icon-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="iconName" maxlength="{{fwmbTextLimit 'name'}}" value="{{icon.name}}" required />
+            <input type="text" name="iconName" id="fwmb-pin-icon-name" maxlength="{{fwmbTextLimit 'name'}}" value="{{icon.name}}" required />
         </div>
     </div>
 
     <div class="fwmb-form-group fwmb-form-group--stacked fwmb-space-before">
         <label>{{localize "FILRODENSWMB.UI.PinIconPath"}}</label>
         <div class="fwmb-form-fields">
-            <file-picker name="iconPath" type="image" value="{{icon.path}}"></file-picker>
+            <file-picker name="iconPath" type="image" value="{{icon.path}}" aria-label="{{localize 'FILRODENSWMB.UI.PinIconPath'}}"></file-picker>
         </div>
     </div>
 

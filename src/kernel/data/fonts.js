@@ -382,7 +382,7 @@ export const FONT_FAMILIES = Object.freeze([
         subsets: Object.freeze(["latin",  "latin-ext"]),
         licence: "OFL-1.1",
         copyright: "Copyright 2010 The Josefin Sans Project Authors, with Reserved Font Name \"Josefin Sans\".",
-        source: "https://github.com/ThomasJockin/JosefinSansFont-master",
+        source: "https://github.com/googlefonts/josefinsans",
     }),
     Object.freeze({
         id: "noto-naskh-arabic",

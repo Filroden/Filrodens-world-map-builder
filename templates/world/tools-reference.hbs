@@ -7,7 +7,7 @@
         <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
         <div class="fwmb-form-fields">
             <div class="fwmb-flex-row fwmb-flex-row--centred">
-                <file-picker class="fwmb-flex-1" name="referenceImage" type="image" value="{{uiState.referenceImage}}"></file-picker>
+                <file-picker class="fwmb-flex-1" name="referenceImage" type="image" value="{{uiState.referenceImage}}" aria-label="{{localize 'FILRODENSWMB.UI.ImageSource'}}"></file-picker>
                 <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeReferenceImage" aria-label="{{localize 'FILRODENSWMB.UI.RemoveImage'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
                     <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>

@@ -1,6 +1,6 @@
 <div class="fwmb-dialog-content">
     <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <label for="fwmb-dec-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
             <input type="text" name="fwmb-dec-name" maxlength="{{fwmbTextLimit 'name'}}" id="fwmb-dec-name" value="{{defaultName}}" required />
         </div>
@@ -9,7 +9,7 @@
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
         <div class="fwmb-form-fields">
-            <file-picker name="fwmb-dec-src" id="fwmb-dec-src" type="image" value=""></file-picker>
+            <file-picker name="fwmb-dec-src" id="fwmb-dec-src" type="image" value="" aria-label="{{localize 'FILRODENSWMB.UI.ImageSource'}}"></file-picker>
         </div>
     </div>
-</div>
+</div>
