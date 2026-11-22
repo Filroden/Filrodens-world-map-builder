@@ -95,8 +95,11 @@ export class MeshIntegration {
      *
      * @param {object} app
      * @param {object} overlay - The Studio's processing overlay: { start(text), end(), text(text) }.
+     * @param {{report?: boolean}} [options] - `report`: whether what the load converted or
+     *     rebuilt is said (not for a world opened only to draw its thumbnail, S0 step 8d, which
+     *     says it at its next real opening).
      */
-    static async finishLoad(app, overlay) {
+    static async finishLoad(app, overlay, { report = true } = {}) {
         const state = this.#state(app);
         const load = state.load;
         if (!load || load.token !== state.token) return;
@@ -114,7 +117,7 @@ export class MeshIntegration {
             });
             if (state.token !== load.token) return;
             this.#adopt(app, result);
-            this.#report(result);
+            if (report) this.#report(result);
         } catch (error) {
             console.error("FWMB | The map's mesh could not be prepared:", error);
             state.unavailable = true;

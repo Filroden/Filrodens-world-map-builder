@@ -223,6 +223,26 @@ export class Worlds {
     }
 
     /**
+     * Gives a map's card a thumbnail without saving the map (S0 step 8d): for a world made from a
+     * 4.3 map, whose cards have none until a save draws one. The map's revision and save time
+     * stay; only the world record is written. A map whose card has one keeps it.
+     * @param {string} worldId
+     * @param {string} mapId
+     * @param {string} thumbnail - A data URL (see WorldRecord.mapCard).
+     * @returns {Promise<object|null>} The world record as written, or null when nothing was.
+     */
+    static async setThumbnail(worldId, mapId, thumbnail) {
+        const world = await Worlds.get(worldId);
+        const index = world?.maps?.findIndex((map) => map.id === mapId) ?? -1;
+        if (index < 0 || world.maps[index].thumbnail) return null;
+        const card = WorldRecord.mapCard({ thumbnail });
+        if (!card.thumbnail) return null;
+        const maps = world.maps.map((map, i) => (i === index ? { ...map, thumbnail: card.thumbnail } : map));
+        const record = { ...world, maps };
+        return (await platform.store.saveWorld(record)) ? record : null;
+    }
+
+    /**
      * What deleting a world does to its regional worlds, for the confirmation to name.
      * @param {string} worldId
      * @returns {Promise<{movedUp: object[], released: object[], unlinked: object[]}>} The worlds

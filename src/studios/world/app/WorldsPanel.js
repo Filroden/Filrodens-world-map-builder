@@ -1,5 +1,6 @@
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { Inspector } from "./Inspector.js";
+import { WorldThumbnails } from "./WorldThumbnails.js";
 import { ListQuery } from "./ListQuery.js";
 import { platform } from "../../../platform/index.js";
 
@@ -97,7 +98,11 @@ export class WorldsPanel {
             ...(index.size ? [tree.length === 1 ? i18n.localize("FILRODENSWMB.UI.WorldsCountOne") : i18n.format("FILRODENSWMB.UI.WorldsCount", { count: tree.length })] : []),
             ...(regionalCount ? [regionalCount === 1 ? i18n.localize("FILRODENSWMB.UI.WorldRegionalOne") : i18n.format("FILRODENSWMB.UI.WorldRegionalCount", { count: regionalCount })] : []),
         ].join(" · ");
-        return { query, web, summary, empty: index.size === 0, noMatches: index.size > 0 && cards.length === 0, cards };
+        // Worlds whose Surface map's card has no thumbnail yet (made from 4.3 maps), for Draw
+        // thumbnails in the foot (S0 step 8d), shown only while there are any
+        const missing = WorldThumbnails.missing(tree).length;
+        const thumbnails = missing ? { label: i18n.format("FILRODENSWMB.UI.DrawThumbnails", { count: missing }), hint: i18n.localize("FILRODENSWMB.UI.DrawThumbnailsHint") } : null;
+        return { query, web, summary, empty: index.size === 0, noMatches: index.size > 0 && cards.length === 0, cards, thumbnails };
     }
 
     /**

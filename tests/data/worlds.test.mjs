@@ -121,6 +121,27 @@ test("rename renames the world and its maps", async () => {
     assert.equal((await platform.store.listMaps()).find((map) => map.id === root.maps[0].id).name, "Renamed");
 });
 
+test("setThumbnail gives a map's card a thumbnail without saving the map, and keeps one it has", async () => {
+    const root = await newWorld("Root");
+    const mapId = root.maps[0].id;
+    const before = await platform.store.loadMapMeta(mapId);
+    const picture = "data:image/webp;base64,AAAA";
+    const written = await Worlds.setThumbnail(root.world.id, mapId, picture);
+    assert.equal(written.maps[0].thumbnail, picture);
+    const world = await Worlds.get(root.world.id);
+    assert.deepEqual(world.maps, [{ id: mapId, type: "surface", revision: 1, savedAt: root.world.settingsSavedAt, thumbnail: picture }], "only the card's thumbnail is added");
+    assert.equal(world.settingsRevision, root.world.settingsRevision);
+    assert.deepEqual(await platform.store.loadMapMeta(mapId), before, "the map's revision and save time stay");
+    // A card with a thumbnail keeps it; a picture mapCard refuses, or a map the world does not hold, writes nothing
+    assert.equal(await Worlds.setThumbnail(root.world.id, mapId, "data:image/webp;base64,BBBB"), null);
+    assert.equal((await Worlds.get(root.world.id)).maps[0].thumbnail, picture);
+    const other = await newWorld("Other");
+    assert.equal(await Worlds.setThumbnail(other.world.id, other.maps[0].id, "not a picture"), null);
+    assert.equal(await Worlds.setThumbnail(other.world.id, "nope", picture), null);
+    assert.equal(await Worlds.setThumbnail("nope", other.maps[0].id, picture), null);
+    assert.equal((await Worlds.get(other.world.id)).maps[0].thumbnail, undefined);
+});
+
 test("deleting a top-level world releases its held regional worlds, each keeping its own", async () => {
     const root = await newWorld("Root");
     const kid = { ...WorldRecord.create({ id: "kid", name: "Kid", parentWorldId: root.world.id, held: true, settings: { setup: { seed: "k" } } }) };

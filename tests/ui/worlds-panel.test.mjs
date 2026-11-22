@@ -141,6 +141,20 @@ test("an empty store says so with New world; the foot offers New world, Import w
     assert.equal((await WorldsPanel.context(studio())).summary, "WorldsSavedWeb");
 });
 
+test("Draw thumbnails ends the foot's row of buttons while some worlds have no thumbnail, counting regional worlds (S0 step 8d)", async () => {
+    const { region, coast, old } = await worlds();
+    let box = await draw(studio());
+    const foot = box.querySelector(".fwmb-panel-foot .fwmb-worlds-foot");
+    assert.deepEqual([...foot.children].map((child) => child.className), ["fwmb-worlds-foot-buttons", "fwmb-btn fwmb-worlds-thumbnails", "fwmb-hint"], "after the four buttons, before the web's hint");
+    const button = foot.querySelector('[data-action="drawThumbnails"]');
+    assert.equal(button.textContent, "DrawThumbnails 3");
+    assert.equal(button.dataset.tooltip, "DrawThumbnailsHint");
+    for (const world of [region, coast, old]) await Worlds.setThumbnail(world.id, world.maps[0].id, THUMB);
+    box = await draw(studio());
+    assert.equal(box.querySelector('[data-action="drawThumbnails"]'), null, "gone once every world has one");
+    assert.ok(box.querySelector(".fwmb-worlds-foot .fwmb-hint"), "the hint stays");
+});
+
 test("the summary says where the worlds are kept and how many there are", async () => {
     await worlds();
     assert.equal((await WorldsPanel.context(studio())).summary, "WorldsSavedWeb · WorldsCount 2 · WorldRegionalCount 2");

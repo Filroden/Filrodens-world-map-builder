@@ -89,6 +89,7 @@ import { moveAlongModes } from "../../../shell/BarFold.js";
 import { AppearanceMenu } from "../../../shell/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
+import { WorldThumbnails } from "./WorldThumbnails.js";
 import { MapMarks } from "./MapMarks.js";
 import { WorldEditors } from "./WorldEditors.js";
 import { WorldMapCard, WorldOverview } from "./WorldOverview.js";
@@ -302,6 +303,7 @@ export class MapStudio {
         importMapJson(e, t)             { this._onImportMapJson(e, t); },
         backUpMaps(e, t)                { this._onBackUpMaps(e, t); },
         restoreBackup(e, t)             { this._onRestoreBackup(e, t); },
+        drawThumbnails()                { this._onDrawThumbnails(); },
         importSettings(e, t)            { this._onImportSettings(e, t); },
         selectWorld(e, t)               { this._onSelectWorld(e, t); },
         closeWorlds()                   { this._onCloseWorlds(); },
@@ -4550,7 +4552,7 @@ export class MapStudio {
      * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see platform.store.loadMapOwners).
      * @param {object|null} [modelRun] - The generator's saved outputs (see platform.store.loadMapModelRun).
      */
-    async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null, { generate = true } = {}) {
+    async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null, { generate = true, report = true } = {}) {
         // Deep clone to sever the connection to Foundry's memory cache
         const payload = platform.utils.deepClone(rawPayload);
         // A map loaded is its world's Surface map, made; a world with no maps reads its settings
@@ -4849,7 +4851,7 @@ export class MapStudio {
         this.#showUnmade();
         if (!generate) return;
         await this.generateTerrain();
-        await MeshIntegration.finishLoad(this, this.#processingOverlay());
+        await MeshIntegration.finishLoad(this, this.#processingOverlay(), { report });
         this.#updateGrid();
         this.#updateReferenceLayer({ changed: false });
         this.canvasEngine.resetCamera();
@@ -4930,6 +4932,20 @@ export class MapStudio {
         this.root?.querySelector(".fwmb-processing-cancel")?.classList.toggle("fwmb-hidden", !visible);
     }
 
+    /**
+     * The overlay's line kept while a run of several pieces of work goes on (Draw thumbnails' "world
+     * 3 of 12"), so each piece's own messages do not replace it; null when none is kept.
+     */
+    #heldProcessingText = null;
+
+    /** Keeps the overlay's line (see #heldProcessingText), or lets it go (null). */
+    #holdProcessingText(text) {
+        this.#heldProcessingText = null;
+        if (text === null) return;
+        this.#processingOverlay().text(text);
+        this.#heldProcessingText = text;
+    }
+
     /** The processing overlay, for work done outside this class (see MeshIntegration.finishLoad). */
     #processingOverlay() {
         return {
@@ -4937,7 +4953,7 @@ export class MapStudio {
             end: () => this.#endProcessing(),
             text: (message) => {
                 const textEl = this.root?.querySelector(".fwmb-processing-text");
-                if (textEl) textEl.textContent = message;
+                if (textEl && this.#heldProcessingText === null) textEl.textContent = message;
             },
             detail: (message) => {
                 const detailEl = this.root?.querySelector(".fwmb-processing-detail");
@@ -5290,7 +5306,7 @@ export class MapStudio {
         const overlay = this.root?.querySelector(".fwmb-processing-overlay");
         if (overlay) {
             const textEl = overlay.querySelector(".fwmb-processing-text");
-            if (textEl) textEl.textContent = message;
+            if (textEl && this.#heldProcessingText === null) textEl.textContent = message;
             overlay.classList.remove("fwmb-hidden");
         }
 
@@ -7468,8 +7484,78 @@ export class MapStudio {
         }
     }
 
-    /** Loads a saved map and its world (see #handleMapLoad); true once it is open. */
-    async #loadMap(mapId, name) {
+    /**
+     * The open map's card thumbnail, when its world's record has none (a world made from a 4.3
+     * map; S0 step 8d): drawn from the canvas and written to the world's record only (see
+     * Worlds.setThumbnail), so the map is not saved and nothing is marked unsaved.
+     * @returns {Promise<boolean>} Whether one was written.
+     */
+    async #drawMissingThumbnail() {
+        const world = this.world;
+        const entry = world?.maps?.find((map) => map.id === this.currentSaveId && map.type === MAP_TYPES.SURFACE);
+        if (!entry || entry.thumbnail) return false;
+        const thumbnail = this.canvasEngine?.thumbnail?.();
+        if (!thumbnail) return false;
+        try {
+            const written = await Worlds.setThumbnail(world.id, entry.id, thumbnail);
+            if (!written) return false;
+            // The open world's record as written, so a later write of it (the first-opening
+            // notice's, a save's) keeps the picture
+            if (this.world?.id === written.id) this.world = { ...this.world, maps: written.maps };
+            return true;
+        } catch (error) {
+            console.warn("FWMB | The world's thumbnail could not be written:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Draw thumbnails, in Worlds' foot (S0 step 8d; see WorldThumbnails): each world without a
+     * thumbnail opened in turn to draw one, then the world that was open opened again and Worlds
+     * shown.
+     */
+    async _onDrawThumbnails() {
+        const toolBeforeAside = this.#toolBeforeAside;
+        await WorldThumbnails.run(this, {
+            gate: () => this.#gateUnsavedChanges(),
+            open: () => (this.worldOpen && this.world?.id ? { worldId: this.world.id, mapId: this.surfaceMade ? this.currentSaveId : null, name: this.world.name || this.currentSaveName || "" } : null),
+            drawOpen: () => this.#drawMissingThumbnail(),
+            openQuietly: (mapId, name) => this.#loadMap(mapId, name, { thumbnailOnly: true }),
+            hold: (text) => this.#holdProcessingText(text),
+            restore: async (open, left) => {
+                if (left) {
+                    let reopened = false;
+                    if (open?.mapId) reopened = await this.#loadMap(open.mapId, open.name, { announce: false });
+                    else if (open?.worldId) {
+                        const world = await Worlds.get(open.worldId);
+                        if (world) {
+                            await this.#openMapless(world, { announce: false });
+                            reopened = true;
+                        }
+                    }
+                    if (!reopened) {
+                        this.#clearMap();
+                        this.#closeWorld();
+                    }
+                }
+                await this.switchTool("manage", { force: true });
+                // Worlds' Close goes back where it would have before the run
+                if (this.worldOpen && toolBeforeAside) this.#toolBeforeAside = toolBeforeAside;
+                this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
+            },
+        });
+    }
+
+    /**
+     * Loads a saved map and its world (see #handleMapLoad); true once it is open.
+     * @param {string} mapId
+     * @param {string} name
+     * @param {{thumbnailOnly?: boolean, announce?: boolean}} [options] - `thumbnailOnly`: opened
+     *     only to draw its card's missing thumbnail (Draw thumbnails, see WorldThumbnails), so it
+     *     stops there, true only when one was written; `announce`: whether "map loaded" and what
+     *     the load converted are said (not when Draw thumbnails opens the world open before it again).
+     */
+    async #loadMap(mapId, name, { thumbnailOnly = false, announce = true } = {}) {
         // Opened from Worlds: leave it first, so the load draws on the map in view and not on Worlds
         // and its inspector redrawn at every step (which slowed a load to tens of seconds)
         if (this.activeTool === "manage") {
@@ -7489,14 +7575,23 @@ export class MapStudio {
             this.world = world;
             this.worldSettingsOpened = settings;
             this.#useWorldIcons(settings?.icons ?? WorldMigration.hostIcons());
-            await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
+            await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId), { report: announce && !thumbnailOnly });
             // The settings as loaded (the defaults a load fills in included): a save that leaves
             // them so does not raise their revision. Nothing below changes them.
             this.worldSettingsOpened = this.#worldSettingsNow();
             this.#captureEditorBaseline();
             this.inheritedStrokes = world?.held && RegionalRecord.isCurrent(world.regional) ? (RegionalRecord.forMap(world.regional, mapId)?.inheritedStrokes ?? 0) : undefined;
             await this.#refreshStale();
-            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+            // A world made from a 4.3 map has no thumbnail until its first save in v5: one is drawn
+            // now, from the map as saved, before anything below changes it (S0 step 8d)
+            const drawn = await this.#drawMissingThumbnail();
+            if (thumbnailOnly) {
+                // Nothing of it was changed or is to be asked: what its opening does waits for the
+                // next time it is opened
+                this.isDirty = false;
+                return drawn;
+            }
+            if (announce) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.view?.render(["toolbar", "context"]);
             // A map migrated or given a new mesh as it opened has changes to save
@@ -7671,7 +7766,7 @@ export class MapStudio {
         }
     }
 
-    async #openMapless(world) {
+    async #openMapless(world, { announce = true } = {}) {
         Inspector.close(this);
         const settings = await Worlds.settingsOf(world);
         const frame = settings?.setup?.frame;
@@ -7693,7 +7788,7 @@ export class MapStudio {
         this.#mapToolWorldId = world.id;
         await this.switchTool("worldOverview", { force: true });
         this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
-        platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+        if (announce) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
     }
 
     /**

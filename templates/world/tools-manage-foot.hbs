@@ -3,11 +3,17 @@
     there are: New world and Import world, then the backups, each button an equal share of its row.
     Back up all writes every saved world in one file (MapTransfer): on the web the safeguard against
     cleared browser storage.
+    Draw thumbnails (S0 step 8d; Ken, 2026-11-22) sits at the row's far end, sized to its label,
+    shown only while some worlds have no thumbnail (see WorldThumbnails); it goes under the row
+    only when the panel is too narrow for both.
 --}}
 <div class="fwmb-worlds-foot">
-    <button type="button" class="fwmb-btn" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
-    <button type="button" class="fwmb-btn" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
-    <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.BackUpAllMaps"}}</button>
-    <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.RestoreFromBackup"}}</button>
+    <div class="fwmb-worlds-foot-buttons">
+        <button type="button" class="fwmb-btn" data-action="newWorld"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuNewWorld"}}</button>
+        <button type="button" class="fwmb-btn" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
+        <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.BackUpAllMaps"}}</button>
+        <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}"><span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.RestoreFromBackup"}}</button>
+    </div>
+    {{#if worlds.thumbnails}}<button type="button" class="fwmb-btn fwmb-worlds-thumbnails" data-action="drawThumbnails" data-tooltip="{{worlds.thumbnails.hint}}"><span class="fwmb-icon fwmb-icon--image" aria-hidden="true"></span>{{worlds.thumbnails.label}}</button>{{/if}}
     {{#if worlds.web}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.WorldsBackupHint"}}</p>{{/if}}
 </div>
