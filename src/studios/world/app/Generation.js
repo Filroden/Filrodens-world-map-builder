@@ -7,6 +7,7 @@ import { createPoliticalSet } from "../generator/MaterialiseRegions.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
 import { cleanCultures } from "../generator/RegionCultures.js";
+import { effectiveKmPerPx } from "../mesh/Schema.js";
 import { platform } from "../../../platform/index.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { FieldSpecs } from "./FieldSpecs.js";
@@ -443,7 +444,7 @@ export class Generation {
         const before = VectorHistory.snapshot(app);
         if (output.defaultStyles) this.resetStyles(app);
         this.#ensureLabelStyles(app);
-        const removal = Regeneration.remove(app, { keepLatest: true });
+        const removal = Regeneration.remove(app);
         const session = app.meshSession;
         // The map's own regions the run was built round, as they stand once the rest has gone
         const userRegions = result.realms.some((realm) => realm.user !== undefined) || result.counties.some((county) => county.zone !== undefined) ? this.#userDisplay(app) : null;
@@ -530,7 +531,9 @@ export class Generation {
      */
     static newPoliticalSet(app) {
         this.#ensureLabelStyles(app);
-        return createPoliticalSet({ names: this.#names(), watersPx: this.#watersPx(app.meshSession.mesh.kmPerPx), idFactory: () => platform.utils.randomID() });
+        // A new map's set is made before its mesh is built: its scale from the map's frame
+        const kmPerPx = app.meshSession?.mesh?.kmPerPx ?? effectiveKmPerPx({ mapHeight: app.mapHeight, params: { latTop: app.uiState?.latTop, latBottom: app.uiState?.latBottom }, world: app.uiState?.world });
+        return createPoliticalSet({ names: this.#names(), watersPx: this.#watersPx(kmPerPx), idFactory: () => platform.utils.randomID() });
     }
 
     /** Removes a set and its levels' owner arrays; returns the undo entries that bring them back. */

@@ -33,7 +33,7 @@
                             <button type="button" data-action="renameListEntry"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
                             <button type="button" data-action="moveLayerSetUp" {{#unless this.canMoveUp}}disabled{{/unless}}><i class="fwmb-icon fwmb-icon--arrow-upward"></i> {{localize "FILRODENSWMB.UI.MoveUp"}}</button>
                             <button type="button" data-action="moveLayerSetDown" {{#unless this.canMoveDown}}disabled{{/unless}}><i class="fwmb-icon fwmb-icon--arrow-downward"></i> {{localize "FILRODENSWMB.UI.MoveDown"}}</button>
-                            <button type="button" data-action="deleteLayerSet" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
+                            {{#if this.deletable}}<button type="button" data-action="deleteLayerSet" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>{{/if}}
                         </div>
                     </div>
                 </span>
@@ -79,7 +79,7 @@
                         {{#if this.canMoveToPolitical}}
                         <button type="button" data-action="moveLevelToPolitical" data-tooltip="{{localize 'FILRODENSWMB.UI.MoveLevelToPoliticalHint'}}"><i class="fwmb-icon fwmb-icon--palace"></i> {{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button>
                         {{/if}}
-                        <button type="button" data-action="deleteLevel" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
+                        {{#if this.deletable}}<button type="button" data-action="deleteLevel" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>{{/if}}
                     </div>
                 </div>
             </span>

@@ -1,6 +1,7 @@
 // The Regions panel's controller (RegionPanel): what the panel lists, keeping the set, level and
 // region being edited valid, and the level, set and region commands, each one undo step.
 import assert from "node:assert/strict";
+import { FILRODENSWMB } from "../../src/config.js";
 import { beforeEach, test } from "node:test";
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
@@ -220,9 +221,32 @@ test("+ Layer below makes the next layer, named by its tier, with no regions, as
     assert.deepEqual(levelIds(app), ["realms", "counties", "zones"]);
 });
 
-test("a new map starts with one set holding Tier 1", async () => {
-    const [set] = RegionPanel.starterLayerSets();
-    assert.deepEqual([set.name, set.levels.map((level) => [level.name, level.parentLevelId])], ["FILRODENSWMB.UI.StarterSetName", [['FILRODENSWMB.UI.LayerName {"tier":1}', null]]]);
+test("a new map starts with its one Political set, empty, and the run's label styles", async () => {
+    const app = { mapHeight: 600, uiState: { latTop: 60, latBottom: 20 } };
+    const sets = RegionPanel.starterLayerSets(app);
+    assert.equal(sets.length, 1);
+    const [set] = sets;
+    assert.equal(set.kind, "political");
+    assert.deepEqual(set.levels.map((level) => [level.name, level.regions.length]), [["FILRODENSWMB.UI.GeneratedRealms", 0], ["FILRODENSWMB.UI.GeneratedDuchies", 0], ["FILRODENSWMB.UI.GeneratedCounties", 0]]);
+    assert.equal(set.levels[1].parentLevelId, set.levels[0].id);
+    assert.equal(set.levels[2].parentLevelId, set.levels[1].id);
+    assert.ok(set.levels[0].watersPx > 0, "the realms claim their waters, by the map's scale");
+    const styles = new Set(app.uiState.customLabelStyles.map((style) => style.id));
+    for (const id of Object.values(FILRODENSWMB.GENERATOR.REGION_LABEL_STYLES)) assert.ok(styles.has(id), `the label style ${id}`);
+});
+
+test("the Political set and its levels are never deleted", async () => {
+    const { app } = await studio();
+    app.layerSets[0].kind = "political";
+    answers.confirm = true;
+    RegionPanel.context(app);
+    const rows = RegionPanel.sections(app);
+    assert.equal(rows.sets.rows.find((row) => row.id === "political").deletable, false, "no Delete in its menu");
+    assert.equal(rows.sets.rows.find((row) => row.id === "other").deletable, true);
+    await RegionPanel.deleteSetById(app, "political");
+    await RegionPanel.deleteLevelById(app, "realms");
+    assert.deepEqual(app.layerSets.map((set) => set.id), ["political", "other"]);
+    assert.equal(app.layerSets[0].levels.length, 3);
 });
 
 test("renaming is one undo step, and a new entry's row offers the next free name", async () => {

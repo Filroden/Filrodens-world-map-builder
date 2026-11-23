@@ -198,8 +198,8 @@ export class MeshIntegration {
         state.loadedInfluences = null;
         const token = state.token;
         app.meshSession = null;
-        // A new map starts with one set and its first layer, ready for regions (S12)
-        if (!app.layerSets?.length) app.layerSets = RegionPanel.starterLayerSets();
+        // A new map starts with its one Political set, empty, ready for regions (see RegionPanel.starterLayerSets)
+        if (!app.layerSets?.length) app.layerSets = RegionPanel.starterLayerSets(app);
 
         const mapData = { mapWidth: app.mapWidth, mapHeight: app.mapHeight, seed: app.uiState.mapSeed, params: { latTop: app.uiState.latTop, latBottom: app.uiState.latBottom }, world: app.uiState.world };
         this.#meshLoader()

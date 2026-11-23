@@ -113,7 +113,7 @@ test("an edited county is kept for itself, unassigned once its realm goes; a loc
     assert.equal(plan.removed.realms, realmCount, "no realm is kept for its county");
     const kept = Regeneration.keptKeys(set);
     assert.deepEqual([kept[0].size, kept[1].size, [...kept[2]]], [0, 0, [county.key]], "only the county itself");
-    Regeneration.remove(app, { keepLatest: true });
+    Regeneration.remove(app);
     assert.equal(county.parentKey, null, "left unassigned, for the next run to place");
     Generation.apply(app, run);
 
@@ -311,7 +311,7 @@ test("a run is out of date once the routes, settlement pins, Political regions o
     assert.equal(RunInputs.stale(app), false, "no run, nothing out of date");
 });
 
-test("Remove generated content takes what is not kept, drops a set left empty, and is one undo step", async () => {
+test("Remove generated content takes what is not kept, keeps the Political set though empty, and is one undo step", async () => {
     const app = studio();
     Generation.apply(app, await islandResult());
     const levels = political(app)[0].levels.map((level) => level.id);
@@ -319,7 +319,9 @@ test("Remove generated content takes what is not kept, drops a set left empty, a
     assert.equal(await Generation.removeGenerated(app), false, "a confirmation first");
     confirmAnswer = true;
     assert.equal(await Generation.removeGenerated(app), true);
-    assert.equal(political(app).length, 0, "the empty set goes");
+    assert.equal(political(app).length, 1, "the map's one Political set stays, empty");
+    assert.ok(political(app)[0].levels.every((level) => level.regions.length === 0));
+    assert.deepEqual(political(app)[0].levels.map((level) => level.id), levels, "with its levels");
     assert.deepEqual(app.mapPins.map((pin) => pin.id), ["own-pin"]);
     assert.equal(app.mapRoutes.length, 0);
     assert.equal(app.modelRun, null);

@@ -12,7 +12,7 @@ import { UserFigures } from "./UserFigures.js";
  *   remake. A kept duchy or county whose parent goes is left unassigned, so the next run may take
  *   it into a realm (or duchy) of its own, unless it is ticked Independent. The rest of each
  *   Political set is removed with its cells.
- * - A set left with no regions is removed, except, for a run, the latest Political set. A run
+ * - A set left with no regions is removed, except the latest Political set (the map's one). A run
  *   writes into that set (new regions fill only the cells no kept region holds; one left with
  *   none is dropped), so its levels keep their names and looks, or adds a new one when there is none.
  *   There is only ever the one Political set: a run making fewer levels than it holds (no duchies
@@ -86,12 +86,12 @@ export class Regeneration {
      * Removes every generated item that is not kept. Returns what the undo step needs: each
      * changed level's owners before and after (encoded; after is null for a level removed with its
      * set), and the latest Political set that remains, for a run to write into.
+     * The latest Political set stays even when left empty (the map's one Political set, which
+     * a run writes into and which is never removed); an older one left empty goes.
      * @param {object} app
-     * @param {{keepLatest?: boolean}} [options] - keepLatest: the latest Political set stays even
-     *     when left empty, so a run writes into it (keeping its levels' names and looks).
      * @returns {{owners: {levelId: string, before: string, after: string|null}[], target: object|null}}
      */
-    static remove(app, { keepLatest = false } = {}) {
+    static remove(app) {
         const session = app.meshSession;
         const owners = [];
         const emptied = new Set();
@@ -122,7 +122,7 @@ export class Regeneration {
             });
             if (set.levels.every((level) => level.regions.length === 0)) emptied.add(set);
         }
-        if (keepLatest) emptied.delete(politicalSets(app).at(-1));
+        emptied.delete(politicalSets(app).at(-1));
         // A set left empty goes, with its levels' owner arrays
         for (const set of emptied) {
             for (const level of set.levels) {

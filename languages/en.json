@@ -1006,7 +1006,6 @@
     "FILRODENSWMB.UI.MoreOptions": "More options",
     "FILRODENSWMB.UI.AddSet": "Region set",
     "FILRODENSWMB.UI.LayerName": "Tier {tier}",
-    "FILRODENSWMB.UI.StarterSetName": "Regions",
     "FILRODENSWMB.UI.AddLayerBelow": "Tier below {name}",
     "FILRODENSWMB.UI.AddLayerIn": "Tier in {name}",
     "FILRODENSWMB.UI.AddLayerHint": "A new tier below, named by its depth until you rename it. Its regions sit inside the regions of the tier above.",

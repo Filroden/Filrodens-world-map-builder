@@ -43,7 +43,7 @@ export class LayerSetEditor {
         find: (app, { id }) => (app.layerSets ?? []).find((set) => set.id === id) ?? null,
         opened: (app, set) => RegionPanel.selectSetById(app, set.id),
         header: (_app, set) => ({ title: set.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleSet") }),
-        context: (_app, set) => ({ set: { ...set, opacity: set.opacity ?? 1, waterTint: set.waterTint !== false }, visibilities: RegionPanel.visibilityChoices(set.visibility) }),
+        context: (_app, set) => ({ set: { ...set, opacity: set.opacity ?? 1, waterTint: set.waterTint !== false }, visibilities: RegionPanel.visibilityChoices(set.visibility), deletable: !RegionPanel.isFixedSet(set) }),
         apply: (app, set, _ref, form) => {
             const elements = form.elements;
             // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the set's own
@@ -129,6 +129,7 @@ export class LevelEditor {
     static #context(app, level, set) {
         const style = { ...defaultLevelStyle(), ...level.style };
         return {
+            deletable: !RegionPanel.isFixedSet(set),
             level: { ...level, style, opacity: level.opacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY, watersPx: level.watersPx ?? 0 },
             parents: parentCandidates(set, level.id).map((candidate) => ({ id: candidate.id, name: candidate.name, selected: candidate.id === level.parentLevelId })),
             visibilities: RegionPanel.visibilityChoices(level.visibility),

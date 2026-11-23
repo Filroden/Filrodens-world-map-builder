@@ -89,6 +89,7 @@ export class RegionPanel {
                 inspected: inspected.set === set.id,
                 canMoveUp: index > 0,
                 canMoveDown: index < sets.length - 1,
+                deletable: !this.isFixedSet(set),
                 focusable: true,
             });
         });
@@ -171,6 +172,7 @@ export class RegionPanel {
             hasParent: !!level.parentLevelId,
             isFree: level.nestingMode === "free",
             canMoveToPolitical: set.kind !== "political" && level.regions.length > 0,
+            deletable: !this.isFixedSet(set),
             problems: level.parentLevelId && app.meshSession ? nestingProblems(app.meshSession, level).length : 0,
             unassignedCells: level.parentLevelId && app.meshSession ? unassignedCount(app.meshSession, level) : 0,
             canMassEdit: listed.length + unassigned.length > 0,
@@ -425,13 +427,18 @@ export class RegionPanel {
     }
 
     /**
-     * The layer set a new map starts with (S12): one set holding "Tier 1", so regions can be
-     * added at once.
+     * The region sets a new map starts with (Ken, 2026-11-23): its one Political set, empty, with
+     * the levels and looks a run gives it (Realms, Duchies, Counties) and the run's label styles,
+     * so regions drawn for a setting go straight into it and Generate builds round them.
+     * @param {object} app
      */
-    static starterLayerSets() {
-        const set = createLayerSet({ name: platform.i18n.localize("FILRODENSWMB.UI.StarterSetName"), visibility: "all", waterTint: true, opacity: 1, kind: "custom" }, this.#idFactory);
-        set.levels.push(createLevel({ name: this.layerName(null, 1) }, this.#idFactory));
-        return [set];
+    static starterLayerSets(app) {
+        return [Generation.newPoliticalSet(app)];
+    }
+
+    /** Whether a set is the map's Political set, which is never deleted, nor any of its levels. */
+    static isFixedSet(set) {
+        return set?.kind === "political";
     }
 
     /** Applies a set's changed fields (from its inspector) as one undo step. */
@@ -449,7 +456,7 @@ export class RegionPanel {
     /** Delete Set: after confirming with what it holds, the set and all its levels go. One undo step. */
     static async deleteSetById(app, setId) {
         const set = (app.layerSets ?? []).find((candidate) => candidate.id === setId);
-        if (!set || !app.meshSession) return;
+        if (!set || !app.meshSession || this.isFixedSet(set)) return;
         const regions = set.levels.reduce((sum, level) => sum + level.regions.length, 0);
         const confirmed = await MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.DeleteLayerSetTitle"), platform.i18n.format("FILRODENSWMB.UI.DeleteLayerSetConfirm", { name: set.name, levels: set.levels.length, regions }));
         if (!confirmed) return;
@@ -558,8 +565,9 @@ export class RegionPanel {
 
     /** Delete Level by id: see deleteLevel. */
     static async deleteLevelById(app, levelId) {
-        const level = setOfLevel(app.layerSets ?? [], levelId)?.levels.find((candidate) => candidate.id === levelId);
-        if (!level || !app.meshSession) return;
+        const owner = setOfLevel(app.layerSets ?? [], levelId);
+        const level = owner?.levels.find((candidate) => candidate.id === levelId);
+        if (!level || !app.meshSession || this.isFixedSet(owner)) return;
 
         const counts = levelCounts(app.meshSession, app.layerSets, levelId);
         const confirmed = await MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.DeleteLevelTitle"), platform.i18n.format("FILRODENSWMB.UI.DeleteLevelConfirm", { name: level.name, ...counts }));
