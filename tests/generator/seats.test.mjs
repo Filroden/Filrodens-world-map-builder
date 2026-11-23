@@ -42,7 +42,7 @@ function emptyLand(score, gap = 2) {
 
 test("with no seats the run is the run without them, and revision 1 ignores seats", async () => {
     await setup();
-    const none = await runGenerator({ ...syntheticMap().makePayload(), seats: [] }, quick);
+    const none = await runGenerator({ ...syntheticMap().makePayload(), seats: [], revision: REVISION_2 }, quick);
     assert.deepEqual({ ...none, timings: null }, { ...base, timings: null });
     assert.equal(base.seats, null);
     const [cell] = emptyLand((c) => cells.food[c]);

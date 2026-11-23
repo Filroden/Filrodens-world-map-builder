@@ -240,6 +240,11 @@ test("the results count what the last run left on the map", () => {
     const results = Object.fromEntries(GeneratePanel.results(app).rows.map((row) => [row.label.replace("FILRODENSWMB.UI.GenerateResult", ""), row.value]));
     assert.deepEqual(results, { Realms: "1", Duchies: "1", Counties: "0", Capitals: "1", Cities: "0", Towns: "1", Castles: "1", Roads: "1", RiverTrade: "0", SeaLanes: "1" });
     assert.equal(GeneratePanel.results(app).population, "12,345");
+    assert.equal(GeneratePanel.results(app).density, null, "a run that did not count its land gives no people per km²");
+    app.modelRun.stats.landKm2 = 2000;
+    assert.match(GeneratePanel.results(app).density, /GenerateResultDensityValue.*"6\.2"/, "under 10 with one decimal");
+    app.modelRun.stats.landKm2 = 500;
+    assert.match(GeneratePanel.results(app).density, /"25"/, "else whole");
     assert.deepEqual(Generation.counts(app), { realms: 2, places: 3, routes: 2 });
 });
 

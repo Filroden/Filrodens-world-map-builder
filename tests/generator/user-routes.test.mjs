@@ -91,7 +91,7 @@ test("revision 1 has no such rule; with no routes the run is the run without the
     assert.notEqual(payload.routes[0].cells, given[0].cells);
     assert.deepEqual(buildGeneratorPayload({ mesh, buffers, seaLevel: 0.35, kmPerPx: 2, mapSeed: "SYNTH" }).routes, []);
     const { routes: _routes, ...noField } = syntheticMap().makePayload();
-    const none = await runGenerator(noField, quick);
+    const none = await runGenerator({ ...noField, revision: REVISION_2 }, quick);
     assert.deepEqual({ ...none, timings: null }, { ...base, timings: null });
     const path = unjoinedCities(graphOf());
     const legacy = await run([{ transport: "road", cells: path }], LEGACY);

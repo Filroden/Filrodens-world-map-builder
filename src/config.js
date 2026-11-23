@@ -2356,10 +2356,12 @@ export const FILRODENSWMB = {
         // revision it was last generated with (or made at, before any run), and what is worked out
         // live from the map rather than saved with the run (Travel's network, a regional map's
         // Fill in) follows that map's revision (see GeneratorRevision).
-        REVISION: 2,
+        // v5's one raise is REVISION_3 (the roadmap's decision 32): every v5 change that reaches an
+        // older map's run, Fill in or Travel joins it, rather than raising again
+        REVISION: 3,
         // Each revision by name, so every rule that differs between them is gated on its own
         // name: LEGACY for every map made before maps recorded a revision
-        REVISIONS: Object.freeze({ LEGACY: 1, REVISION_2: 2 }),
+        REVISIONS: Object.freeze({ LEGACY: 1, REVISION_2: 2, REVISION_3: 3 }),
         // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
         // troubled, the world multipliers at 1, Human Generic names.
         DEFAULT_NAME_BASE: "Human Generic",
@@ -2493,7 +2495,9 @@ export const FILRODENSWMB = {
         // fragmentation divides the power exponents, so above 1 a lord's wealth carries him less
         // far and the map breaks into more, smaller duchies and kingdoms.
         WORLD: Object.freeze({
-            density: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+            // 1 farms the best land about as densely as France before the Black Death (about 40
+            // people per km²: PEAK_DENSITY x the era's development); 0.1 a thinly settled world
+            density: Object.freeze({ min: 0.1, max: 4, default: 1 }),
             urbanisation: Object.freeze({ min: 0.25, max: 4, default: 1 }),
             realmSpacing: Object.freeze({ min: 0.4, max: 2.5, default: 1 }),
             fragmentation: Object.freeze({ min: 0.5, max: 2, default: 1 }),

@@ -34,9 +34,9 @@ function islandCells() {
 
 test("revision 1 keeps the old rules, and the legacy settings of revision 2's rules give its run exactly", async () => {
     const old = GeneratorRevision.rules(LEGACY);
-    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false, userRoutes: false, idNames: false, travelCosts: false });
+    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, fishingScales: false, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false, userRoutes: false, idNames: false, travelCosts: false });
     const now = GeneratorRevision.rules(REVISION_2);
-    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true, userRoutes: true, idNames: true, travelCosts: true });
+    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, fishingScales: false, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true, userRoutes: true, idNames: true, travelCosts: true });
 
     const legacy = await runGenerator({ ...syntheticMap().makePayload(), revision: LEGACY }, quick);
     // Every cell wet (a share of 0), fishing as before, no calls, pins on their sites, names from the run's one stream
@@ -68,6 +68,26 @@ test("coastal fishing feeds more from revision 2", () => {
     const coast = after.coastal.findIndex((coastal) => coastal === 1);
     assert.ok(coast >= 0);
     assert.ok(Math.abs(after.food[coast] - before.food[coast] - (30 - 8) * after.landKm2[coast]) < 1e-6);
+});
+
+test("from revision 3 the population density scales fishing as it scales farming; before, fishing fed the same at any density", () => {
+    const { REVISION_3 } = FILRODENSWMB.GENERATOR.REVISIONS;
+    const payload = syntheticMap().makePayload();
+    const input = { ...payload, biome: modelBiomeRaster(payload) };
+    const full = buildModelCells(input, { density: 1 }, GeneratorRevision.rules(REVISION_3));
+    const quarter = buildModelCells(input, { density: 0.25 }, GeneratorRevision.rules(REVISION_3));
+    const before = buildModelCells(input, { density: 0.25 }, GeneratorRevision.rules(REVISION_2));
+    const coast = full.coastal.findIndex((coastal, cell) => coastal === 1 && full.food[cell] > 0);
+    assert.ok(Math.abs(quarter.food[coast] - full.food[coast] / 4) < 1e-6, "a quarter of the people, sea and land alike");
+    assert.ok(before.food[coast] > quarter.food[coast], "revision 2 keeps the whole of the fishing");
+    assert.deepEqual(buildModelCells(input, { density: 1 }, GeneratorRevision.rules(REVISION_2)).food, full.food, "at 1 nothing changes");
+});
+
+test("the run counts the land its people live on, for Results' people per km²", async () => {
+    const run = await current();
+    assert.ok(run.stats.landKm2 > 0);
+    const per = run.stats.population / run.stats.landKm2;
+    assert.ok(per > 5 && per < 60, `about ${per.toFixed(1)} people per km² at density 1`);
 });
 
 test("a long passage by sea puts in at ports of call, making ports of shore towns it would sail past", async () => {

@@ -201,6 +201,10 @@
         {{/each}}
         <dt>{{localize "FILRODENSWMB.UI.GenerateResultPopulation"}}</dt>
         <dd class="fwmb-readout">{{generate.results.population}}</dd>
+        {{#if generate.results.density}}
+        <dt data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateResultDensityHint'}}">{{localize "FILRODENSWMB.UI.GenerateResultDensity"}}</dt>
+        <dd class="fwmb-readout">{{generate.results.density}}</dd>
+        {{/if}}
         {{#each generate.results.cultures}}
         <dt><span class="fwmb-chip-swatch" aria-hidden="true" {{#if this.color}}style="--swatch: {{this.color}}"{{/if}}></span> {{this.name}}</dt>
         <dd class="fwmb-readout">{{this.share}}</dd>

@@ -69,6 +69,8 @@ export class GeneratorRevision {
      * - portWaterShare: the share of a land cell's pixels that must be sea or lake for it to load
      *   ships (see CellGraph.portCost); null for no such rule.
      * - fishingDensity: people fed per km² of a coastal cell's land by fishing.
+     * - fishingScales: whether the world's population density scales fishing as it scales farming
+     *   (see CellValues.buildModelCells); before REVISION_3 it fed the same people at any density.
      * - callKm, callShare: ports of call on long sea passages (see Trade); callKm null for none.
      * - shorePins: whether a port's place stands on its cell's shore, and a town on a navigable
      *   river beside the river, rather than on its cell's site (see CellValues, Materialise).
@@ -83,7 +85,7 @@ export class GeneratorRevision {
      * - travelCosts: whether the Travel tool times climbs, the winds at sea and the seasons (see
      *   TravelTime.travelConditions); a run's own output does not change with it.
      * @param {number} revision
-     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean, userRoutes: boolean, idNames: boolean, travelCosts: boolean}}
+     * @returns {{portWaterShare: number|null, fishingDensity: number, fishingScales: boolean, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean, userRoutes: boolean, idNames: boolean, travelCosts: boolean}}
      */
     static rules(revision) {
         const G = FILRODENSWMB.GENERATOR;
@@ -91,6 +93,7 @@ export class GeneratorRevision {
         return Object.freeze({
             portWaterShare: ports ? G.PORTS.WATER_SHARE : null,
             fishingDensity: ports ? G.VALUES.FISHING_DENSITY : G.VALUES.LEGACY_FISHING_DENSITY,
+            fishingScales: this.follows(revision, G.REVISIONS.REVISION_3),
             callKm: ports ? G.PORTS.CALL_KM : null,
             callShare: G.PORTS.CALL_SHARE,
             shorePins: ports,

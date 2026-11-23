@@ -25,7 +25,7 @@ const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePane
 const { TravelNetwork } = await import("../../src/studios/world/app/TravelNetwork.js");
 const { HEIGHT, WIDTH, syntheticMap } = await import("./synthetic.mjs");
 
-const { LEGACY, REVISION_2 } = FILRODENSWMB.GENERATOR.REVISIONS;
+const { LEGACY, REVISION_2, REVISION_3 } = FILRODENSWMB.GENERATOR.REVISIONS;
 const CURRENT = FILRODENSWMB.GENERATOR.REVISION;
 
 /** A studio stand-in on the synthetic island, its map state a new map's. */
@@ -49,10 +49,10 @@ function studio(uiState = MapStateManager.buildDefaultUiState(WIDTH, HEIGHT)) {
     };
 }
 
-test("the current revision is 2, and every named revision is in order", () => {
-    assert.equal(CURRENT, 2);
+test("the current revision is 3 (v5's one raise), and every named revision is in order", () => {
+    assert.equal(CURRENT, 3);
     assert.equal(GeneratorRevision.CURRENT, CURRENT);
-    assert.ok(LEGACY < REVISION_2 && REVISION_2 <= CURRENT);
+    assert.ok(LEGACY < REVISION_2 && REVISION_2 < REVISION_3 && REVISION_3 <= CURRENT);
     assert.ok(GeneratorRevision.follows(CURRENT, REVISION_2));
     assert.ok(!GeneratorRevision.follows(LEGACY, REVISION_2));
 });

@@ -814,10 +814,17 @@ function statistics(run, { feedback, finalTrade, finalRealms, routes, places }) 
         else km.road += graph.edgeKm[edge];
     }
     let land = 0;
-    for (let cell = 0; cell < cells.count; cell++) if (!cells.water[cell]) land++;
+    let landKm2 = 0;
+    for (let cell = 0; cell < cells.count; cell++) {
+        if (cells.water[cell]) continue;
+        land++;
+        landKm2 += cells.landKm2[cell];
+    }
     return {
         modelCells: cells.count,
         landCells: land,
+        // The land the people live on, for Results' people per km² (see GeneratePanel.results)
+        landKm2: Math.round(landKm2),
         population: Math.round(feedback.totalPop),
         kingdoms: finalRealms.realms.filter((realm) => realm.kind === "kingdom").length,
         independents: finalRealms.realms.filter((realm) => realm.kind === "independent").length,

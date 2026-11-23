@@ -390,10 +390,23 @@ export class GeneratePanel {
         return {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),
             population: population.toLocaleString(platform.i18n.lang),
+            density: this.#density(population, Number(app.modelRun?.stats?.landKm2) || 0),
             cultures: this.#cultureShares(app, regions),
             // What the run did with the settlement pins (moved here from Run: UC, board U3)
             notices: [...this.#seatNotices(app), ...this.#regionNotices(app)],
         };
+    }
+
+    /**
+     * The run's people per km² of land, as an author reads a density (a run saved before the run
+     * counted its land has none): a whole number, or one decimal under 10.
+     * @returns {string|null}
+     */
+    static #density(population, landKm2) {
+        if (!(population > 0 && landKm2 > 0)) return null;
+        const perKm2 = population / landKm2;
+        const digits = perKm2 < 10 ? 1 : 0;
+        return platform.i18n.format("FILRODENSWMB.UI.GenerateResultDensityValue", { value: perKm2.toLocaleString(platform.i18n.lang, { maximumFractionDigits: digits, minimumFractionDigits: digits }) });
     }
 
     /**

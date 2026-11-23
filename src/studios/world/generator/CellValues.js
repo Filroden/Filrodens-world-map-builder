@@ -73,15 +73,19 @@ export function smooth(a, b, value) {
 /**
  * Builds the model cells.
  * @param {import("./GeneratorInput.js").GeneratorInput} input
- * @param {{density?: number}} [world] - The world settings (density scales the peak density).
+ * @param {{density?: number}} [world] - The world settings (density scales the peak density, and
+ *     from REVISION_3 the fishing).
  * @param {object} [rules] - The model's rules (GeneratorRevision.rules); the input's revision's by default.
  * @returns {ModelCells}
  */
 export function buildModelCells(input, world = {}, rules = GeneratorRevision.rules(GeneratorRevision.ofPayload(input))) {
     const raster = rasterContext(input);
     const neighbours = modelNeighbours(input.modelSites);
-    const sums = sumPixels(input, raster, (world.density ?? 1) * FILRODENSWMB.GENERATOR.VALUES.PEAK_DENSITY);
-    const cells = finishCells(input, raster, sums, neighbours, rules);
+    const density = world.density ?? 1;
+    const sums = sumPixels(input, raster, density * FILRODENSWMB.GENERATOR.VALUES.PEAK_DENSITY);
+    // The density scales the sea's people as the land's (REVISION_3; see GeneratorRevision.rules)
+    const fed = rules.fishingScales ? { ...rules, fishingDensity: rules.fishingDensity * density } : rules;
+    const cells = finishCells(input, raster, sums, neighbours, fed);
     if (rules.shorePins) markShorePixels(cells, input, raster);
     return cells;
 }
