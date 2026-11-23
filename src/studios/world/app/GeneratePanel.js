@@ -9,7 +9,7 @@ import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../../../platform/index.js";
 import { Generation } from "./Generation.js";
 import { Inspector } from "./Inspector.js";
-import { isKept } from "./Regeneration.js";
+import { Regeneration, isKept } from "./Regeneration.js";
 import { RunInputs } from "./RunInputs.js";
 import { MapMarks } from "./MapMarks.js";
 
@@ -29,6 +29,7 @@ const CHANGED_KINDS = Object.freeze({
     routes: "FILRODENSWMB.UI.GenerateChangedRoutes",
     seats: "FILRODENSWMB.UI.GenerateChangedSeats",
     regions: "FILRODENSWMB.UI.GenerateChangedRegions",
+    cultures: "FILRODENSWMB.UI.GenerateChangedCultures",
     rivers: "FILRODENSWMB.UI.GenerateChangedRivers",
     features: "FILRODENSWMB.UI.GenerateChangedFeatures",
     influences: "FILRODENSWMB.UI.GenerateChangedInfluences",
@@ -312,6 +313,31 @@ export class GeneratePanel {
     }
 
     /**
+     * The regions whose chosen cultures the run could not make most of their people (UC phase 2;
+     * see generator/RegionCultures): each region of the run's Political set whose first culture
+     * holds under half its people, with that culture and its share, in alphabetical order. Regions
+     * deleted since are left out, and the notice with none left is not given.
+     */
+    static #regionNotices(app) {
+        const minority = app.modelRun?.regionCultures?.minority ?? [];
+        const levels = Regeneration.chain(Regeneration.target(app));
+        if (!minority.length || !levels) return [];
+        const DEPTH = { realm: 0, duchy: 1, county: 2 };
+        const unnamed = platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed");
+        const items = minority
+            .map(({ level, key, culture, share }) => {
+                const region = levels[DEPTH[level]]?.regions.find((candidate) => candidate.key === key);
+                if (!region) return null;
+                const name = region.name || unnamed;
+                return { name, text: platform.i18n.format("FILRODENSWMB.UI.GenerateRegionMinorityItem", { name, culture: GeneratedDetails.cultureName(app, culture) ?? platform.i18n.localize("FILRODENSWMB.UI.RegionCultureDeleted"), share: Math.round(share * 100) }) };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.name.localeCompare(b.name));
+        if (!items.length) return [];
+        return [{ text: platform.i18n.localize("FILRODENSWMB.UI.GenerateRegionMinorityHeading"), hint: platform.i18n.localize("FILRODENSWMB.UI.GenerateRegionMinorityHint"), items: items.map((item) => item.text) }];
+    }
+
+    /**
      * About how many of the map's model cells are land: the model cells whose own display cell is
      * land (a model cell's site is a display site). Null before the map's mesh is ready.
      * @returns {number|null}
@@ -366,7 +392,7 @@ export class GeneratePanel {
             population: population.toLocaleString(platform.i18n.lang),
             cultures: this.#cultureShares(app, regions),
             // What the run did with the settlement pins (moved here from Run: UC, board U3)
-            notices: this.#seatNotices(app),
+            notices: [...this.#seatNotices(app), ...this.#regionNotices(app)],
         };
     }
 

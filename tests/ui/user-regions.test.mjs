@@ -285,3 +285,31 @@ test("a Political region changes rank within its set as one undo step, offered o
     VectorHistory.step(app, true);
     assert.ok(realms.regions.some((each) => each.id === region.id) || political(app).levels[0].regions.some((each) => each.id === region.id), "undo makes it a realm again");
 });
+
+test("a drawn realm's cultures reach the run: its first rules, a minority is reported in Results, and the region keeps them", async () => {
+    const { GeneratePanel } = await import("../../src/studios/world/app/GeneratePanel.js");
+    const app = studio();
+    const land = landDisc(app, 330, 110, 85);
+    const north = sketch(app, "Northreach", land);
+    answers.prompt = "0";
+    await RegionPanel.moveToPolitical(app, "sketch", [north.id]);
+    const realm = political(app).levels[0].regions.find((each) => each.id === north.id);
+    const cultures = [
+        { id: "hill", name: "Hillfolk", color: "#a0522d", openness: 0.2, homelands: [{ x: 215, y: 175 }] },
+        { id: "south", name: "Southrons", color: "#d9a520", openness: 0.8, homelands: [{ x: 300, y: 300 }] },
+        { id: "sand", name: "Sandfolk", color: "#2e9e6b", openness: 0.5, habitat: { temperature: [0.68, 1] }, homelands: [{ x: 390, y: 290 }] },
+    ];
+    app.uiState.cultures = cultures;
+    realm.cultures = typed("region", { cultures: [{ culture: "sand", share: null }] }, realm).cultures;
+    const userRegions = Generation.userRegions(app, {});
+    assert.deepEqual(userRegions.realms[0].cultures, [{ culture: "sand", share: null }], "the payload carries them");
+    const result = await runGenerator({ ...syntheticMap().makePayload({ cultures }), userRegions }, quick);
+    Generation.apply(app, result);
+    assert.equal(result.realms.find((each) => each.user === realm.key).rulingCulture, 2, "the first culture rules");
+    assert.deepEqual(realm.cultures, [{ culture: "sand", share: null }], "the run leaves them on the region");
+    const notice = GeneratePanel.results(app).notices.find((each) => each.text === "FILRODENSWMB.UI.GenerateRegionMinorityHeading");
+    assert.ok(notice, "Results names the minority");
+    assert.equal(notice.items.length, 1);
+    assert.match(notice.items[0], /Northreach/);
+    assert.ok(typeof app.modelRun.inputs.cultures === "string", "the fingerprint keeps them");
+});

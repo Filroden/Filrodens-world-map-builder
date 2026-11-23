@@ -187,7 +187,7 @@ function byShare(a, b) {
  *     (a migrant or colonist finding others' land harder; see AgeEvents).
  * @returns {CultureData}
  */
-export function spreadCultures(graph, cultures, { invader = -1, scales = null } = {}) {
+export function spreadCultures(graph, cultures, { invader = -1, scales = null, regions = null } = {}) {
     const cells = graph.cells;
     const base = graph.costs(travelCost(graph, { portKm: portCost(cells) }));
     const land = landCells(cells);
@@ -196,8 +196,89 @@ export function spreadCultures(graph, cultures, { invader = -1, scales = null } 
     const placed = placeHomelands(graph, cultures, fits, land, base);
     const homelands = placed.map((entry) => entry.cells);
     const homelandNotes = placed.map(({ auto, offLand }) => ({ auto, offLand }));
-    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index], index === invader ? FILRODENSWMB.GENERATOR.AGES.INVASION.SPREAD : 1, scales?.get(index) ?? null));
-    return { cultures, homelands, homelandNotes, ...shareCells(cells, cultures, fits, distances, land) };
+    // The spread starts from the homelands and the seeds in the map's regions; the seeds are not
+    // homelands the run reports (the region, not a point, is what the user chose)
+    const starts = [...homelands];
+    const held = regionCultures(cultures, cells, fits, land, starts, regions);
+    const scaleOf = (index) => combinedScale(scales?.get(index) ?? null, held?.scales.get(index) ?? null);
+    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], starts[index], index === invader ? FILRODENSWMB.GENERATOR.AGES.INVASION.SPREAD : 1, scaleOf(index)));
+    return { cultures, homelands, homelandNotes, ...shareCells(cells, cultures, fits, distances, land, held?.given ?? null) };
+}
+
+/**
+ * The cultures the map's own regions are given (UC phase 2; see Generation.userRegions), as the
+ * spread reads them, for the present age only. `regions` lists them outer first (realms, then
+ * duchies, then counties), each its model cells and its cultures by index in `cultures`, in the
+ * user's order (the first the ruling one), with whole shares (percent) or none.
+ *
+ * - **A seed:** each chosen culture gains one homeland in the region: the region's land cell it
+ *   fits best (a whole region as a homeland swamped its neighbours; see the UC handoff, §3.4).
+ *   `starts` (each culture's starting cells) is added to in place.
+ * - **The border cost:** any other culture spreading into the region pays its step cost times
+ *   1 + REGION_BORDER x the least closedness between it and the region's cultures, so a closed
+ *   people keeps others out of its land more than an open one. Nested regions multiply.
+ * - **Given shares:** the region's land cells take them outright after the spread; a rest the
+ *   shares leave (Unassigned) is filled by the cell's own spread, scaled to it. An inner region's
+ *   shares win over an outer one's. Cultures without shares are left to the spread.
+ *
+ * Returns null when no region has a culture.
+ * @returns {{scales: Map<number, Float64Array>, given: Map<number, [number, number][]>}|null}
+ */
+function regionCultures(cultures, cells, fits, land, starts, regions) {
+    if (!Array.isArray(regions) || !regions.length) return null;
+    const K = FILRODENSWMB.GENERATOR.CULTURES.REGION_BORDER;
+    const isLand = new Uint8Array(cells.count);
+    for (const cell of land) isLand[cell] = 1;
+    const scales = new Map();
+    const given = new Map();
+    let any = false;
+    for (const region of regions) {
+        const inside = (region.cells ?? []).filter((cell) => Number.isInteger(cell) && cell >= 0 && cell < cells.count && isLand[cell]);
+        const chosen = (region.cultures ?? []).filter((entry) => Number.isInteger(entry?.index) && entry.index >= 0 && entry.index < cultures.length);
+        if (!inside.length || !chosen.length) continue;
+        any = true;
+        const indexes = chosen.map((entry) => entry.index);
+        for (const index of indexes) {
+            const seed = inside.reduce((best, cell) => (fits[index][cell] > fits[index][best] ? cell : best), inside[0]);
+            if (!starts[index].includes(seed)) starts[index] = Int32Array.from([...starts[index], seed]);
+        }
+        cultures.forEach((_, other) => {
+            if (indexes.includes(other)) return;
+            const shut = Math.min(...indexes.map((index) => closedness(cultures, other, index)));
+            if (!(shut > 0)) return;
+            let scale = scales.get(other);
+            if (!scale) scales.set(other, (scale = new Float64Array(cells.count).fill(1)));
+            for (const cell of inside) scale[cell] *= 1 + K * shut;
+        });
+        if (chosen.every((entry) => Number.isFinite(entry.share))) {
+            const shares = chosen.map((entry) => [entry.index, Math.max(0, entry.share) / 100]).filter(([, share]) => share > 0);
+            const total = shares.reduce((sum, [, share]) => sum + share, 0);
+            if (total > 0) {
+                const fixed = total > 1 ? shares.map(([index, share]) => [index, share / total]) : shares;
+                for (const cell of inside) given.set(cell, fixed);
+            }
+        }
+    }
+    return any ? { scales, given } : null;
+}
+
+/** Two per-cell cost scales as one (either may be null). */
+function combinedScale(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return Float64Array.from(a, (value, cell) => value * b[cell]);
+}
+
+/**
+ * A cell's shares with a region's given shares set outright (see regionCultures): each given
+ * culture at its share, and the rest the given shares leave (Unassigned) filled by the cell's own
+ * spread, scaled to it, so a given culture the spread also brings gains that part too.
+ */
+function withGiven(spread, fixed) {
+    const rest = Math.max(0, 1 - fixed.reduce((sum, [, share]) => sum + share, 0));
+    const total = new Map(fixed);
+    if (rest > 1e-9) for (const [index, share] of spread) total.set(index, (total.get(index) ?? 0) + rest * share);
+    return [...total].filter(([, share]) => share > 0).sort(byShare);
 }
 
 function landCells(cells) {
@@ -373,7 +454,7 @@ function spreadCost(graph, base, fit, mean, homelands, advantage = 1, scale = nu
 }
 
 /** Shares, dominant culture and population multiplier of every land cell. */
-function shareCells(cells, cultures, fits, distances, land) {
+function shareCells(cells, cultures, fits, distances, land, given = null) {
     const start = new Int32Array(cells.count + 1);
     const cultureList = [];
     const valueList = [];
@@ -383,7 +464,9 @@ function shareCells(cells, cultures, fits, distances, land) {
     for (const cell of land) isLand[cell] = 1;
     for (let cell = 0; cell < cells.count; cell++) {
         if (isLand[cell]) {
-            const shares = cellShares(cultures, fits, distances, cell);
+            const spread = cellShares(cultures, fits, distances, cell);
+            const fixed = given?.get(cell);
+            const shares = fixed ? withGiven(spread, fixed) : spread;
             for (const [culture, share] of shares) {
                 cultureList.push(culture);
                 valueList.push(share);

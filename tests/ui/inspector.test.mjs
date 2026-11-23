@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-pin.hbs", "world/parts/inspector-settlement.hbs", "world/parts/inspector-label.hbs", "world/parts/inspector-region.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-river.hbs", "world/parts/inspector-fault.hbs", "world/parts/inspector-decoration.hbs", "world/parts/inspector-land-mask.hbs", "world/parts/inspector-level.hbs", "world/parts/inspector-set.hbs", "world/parts/inspector-biome.hbs"]);
+await templates.load(["shell/parts/section.hbs", "shell/parts/shared-range.hbs", "world/parts/style-picker.hbs", "world/parts/font-picker.hbs", "world/parts/face-fields.hbs", "world/parts/label-fields.hbs", "world/parts/inspector-generated.hbs", "world/parts/inspector-pin.hbs", "world/parts/inspector-settlement.hbs", "world/parts/inspector-cultures.hbs", "world/parts/inspector-label.hbs", "world/parts/inspector-region.hbs", "world/parts/inspector-route.hbs", "world/parts/inspector-river.hbs", "world/parts/inspector-fault.hbs", "world/parts/inspector-decoration.hbs", "world/parts/inspector-land-mask.hbs", "world/parts/inspector-level.hbs", "world/parts/inspector-set.hbs", "world/parts/inspector-biome.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -1266,4 +1266,127 @@ test("a custom river's label: hidden for a river drawn before, shown as one undo
     assert.ok(form(app).querySelector(".fwmb-inspector-owner").textContent.includes(river().name), "the label's own inspector names its river");
     await commit(app, "labelVisibility", "gm");
     assert.equal(river().label.visibility, "gm");
+});
+
+// ------------------------------------------------------------------ UC phase 2: region cultures
+
+const { RegionCultureCard, rebalance } = await import("../../src/studios/world/app/RegionCultureCard.js");
+const { RunInputs } = await import("../../src/studios/world/app/RunInputs.js");
+
+/** The studio with its set Political (the one a run builds round) and three world cultures. */
+async function cultureStudio() {
+    const made = await studio();
+    made.app.layerSets[0].kind = "political";
+    made.app.uiState.cultures = [
+        { id: "hill", name: "Hillfolk", color: "#a0522d" },
+        { id: "west", name: "Westmen", color: "#3b6fb6" },
+        { id: "south", name: "Southrons", color: "#d9a520" },
+    ];
+    return made;
+}
+const card = (app) => app.root.querySelector("dialog.fwmb-inspector .fwmb-region-cultures");
+const cards = (app) => [...card(app).querySelectorAll(".fwmb-culture-card")];
+async function pressCulture(app, action, culture) {
+    card(app).querySelector(`[data-inspector-action="${action}"][data-culture="${culture}"]`).click();
+    await settle();
+    await settle();
+}
+
+test("the Cultures card adds a region's cultures one undo step each: one rules alone, a second splits the shares", async () => {
+    const { app } = await cultureStudio();
+    await RegionEditor.open(app, "realms", "west");
+    const region = app.layerSets[0].levels[0].regions[0];
+    assert.equal(cards(app).length, 0, "none yet");
+    assert.equal(card(app).querySelectorAll('[data-inspector-action="addCulture"]').length, 3, "Add culture… lists the world's cultures");
+    const before = steps(app);
+    await pressCulture(app, "addCulture", "west");
+    assert.deepEqual(region.cultures, [{ culture: "west", share: null }]);
+    assert.equal(steps(app), before + 1, "one undo step");
+    assert.ok(cards(app)[0].classList.contains("fwmb-culture-card--rules"), "the top card rules a realm");
+    assert.ok(cards(app)[0].querySelector(".fwmb-badge--rules"));
+    assert.equal(card(app).querySelector("[data-reorder-handle]"), null, "no handle for one");
+    assert.equal(card(app).querySelector('input[type="number"]'), null, "and no share");
+    await pressCulture(app, "addCulture", "hill");
+    assert.deepEqual(region.cultures, [{ culture: "west", share: 50 }, { culture: "hill", share: 50 }]);
+    assert.equal(card(app).querySelectorAll("[data-reorder-handle]").length, 2, "handles for two");
+    assert.equal(card(app).querySelectorAll('[data-inspector-action="addCulture"]').length, 1, "only the culture not chosen is offered");
+    assert.ok(isKept({ generated: { run: "r" }, cultures: region.cultures }), "a generated region given cultures is kept");
+});
+
+test("raising a share takes from Unassigned, then from the bottom card up; lowering one leaves the rest Unassigned", async () => {
+    assert.deepEqual(rebalance([50, 50], 0, 70), [70, 30]);
+    assert.deepEqual(rebalance([70, 30], 0, 40), [40, 30], "the rest Unassigned");
+    assert.deepEqual(rebalance([40, 30], 1, 50), [40, 50], "from Unassigned first");
+    assert.deepEqual(rebalance([40, 50], 1, 80), [20, 80], "then from the others");
+    assert.deepEqual(rebalance([20, 30, 50], 0, 80), [80, 20, 0], "the bottom card gives first");
+    assert.deepEqual(rebalance([20, 30, 50], 0, 120), [100, 0, 0], "held to 100");
+    assert.deepEqual(rebalance([20, 30], 0, Number.NaN), [20, 30], "a field emptied changes nothing");
+
+    const { app } = await cultureStudio();
+    const region = app.layerSets[0].levels[0].regions[0];
+    region.cultures = [{ culture: "west", share: 50 }, { culture: "hill", share: 50 }];
+    await RegionEditor.open(app, "realms", "west");
+    const before = steps(app);
+    await commit(app, "regionCultureShare:west", "40");
+    assert.deepEqual(region.cultures, [{ culture: "west", share: 40 }, { culture: "hill", share: 50 }]);
+    assert.equal(steps(app), before + 1);
+    const unassigned = card(app).querySelector(".fwmb-culture-card--unassigned");
+    assert.ok(unassigned, "an Unassigned row");
+    assert.equal(cards(app).at(-1), unassigned, "always the last");
+    assert.equal(unassigned.querySelector(".fwmb-culture-card-readout").textContent, "10");
+    await commit(app, "regionCultureShare:hill", "60");
+    assert.deepEqual(region.cultures.map((entry) => entry.share), [40, 60], "from Unassigned");
+    assert.equal(card(app).querySelector(".fwmb-culture-card--unassigned"), null, "none left");
+});
+
+test("removing a culture leaves its share Unassigned, one left has none; a card moved to the top rules", async () => {
+    const { app } = await cultureStudio();
+    const region = app.layerSets[0].levels[0].regions[0];
+    region.cultures = [{ culture: "west", share: 50 }, { culture: "hill", share: 30 }, { culture: "south", share: 20 }];
+    await RegionEditor.open(app, "realms", "west");
+    RegionEditor.moveCulture(app, "south", 0);
+    await settle();
+    assert.deepEqual(region.cultures.map((entry) => entry.culture), ["south", "west", "hill"]);
+    assert.ok(cards(app)[0].classList.contains("fwmb-culture-card--rules") && cards(app)[0].dataset.id === "south", "the top card rules");
+    await pressCulture(app, "removeCulture", "west");
+    assert.deepEqual(region.cultures, [{ culture: "south", share: 20 }, { culture: "hill", share: 30 }]);
+    assert.ok(card(app).querySelector(".fwmb-culture-card--unassigned"));
+    await pressCulture(app, "removeCulture", "hill");
+    assert.deepEqual(region.cultures, [{ culture: "south", share: null }]);
+    await pressCulture(app, "removeCulture", "south");
+    assert.equal(region.cultures, undefined, "none: the field goes");
+    await undo(app);
+    assert.deepEqual(app.layerSets[0].levels[0].regions[0].cultures, [{ culture: "south", share: null }], "undo brings it back");
+});
+
+test("a culture deleted from the world reads Deleted culture until removed; outside the Political set the card says why", async () => {
+    const { app } = await cultureStudio();
+    const region = app.layerSets[0].levels[0].regions[0];
+    region.cultures = [{ culture: "west", share: 70 }, { culture: "gone", share: 30 }];
+    await RegionEditor.open(app, "realms", "west");
+    assert.ok(cards(app)[1].classList.contains("fwmb-culture-card--gone"));
+    assert.match(cards(app)[1].textContent, /RegionCultureDeleted/);
+
+    app.layerSets[0].kind = "custom";
+    await Inspector.refresh(app);
+    assert.equal(cards(app).length, 0);
+    assert.match(card(app).textContent, /RegionCulturesOutside/);
+});
+
+test("region cultures are what the run's fingerprint reads, and change it only when given", async () => {
+    const { app } = await cultureStudio();
+    const region = app.layerSets[0].levels[0].regions[0];
+    const none = RunInputs.of(app).cultures;
+    assert.deepEqual(Generation.regionCultures(app), []);
+    region.cultures = [{ culture: "west", share: null }];
+    assert.deepEqual(Generation.regionCultures(app), [[0, region.key, [{ culture: "west", share: null }]]]);
+    assert.notEqual(RunInputs.of(app).cultures, none, "a change marks the run out of date");
+    delete region.cultures;
+    assert.equal(RunInputs.of(app).cultures, none);
+});
+
+test("a run saved before region cultures is never marked out of date for them", () => {
+    const app = { modelRun: { inputs: { routes: "a", seats: "b", regions: "c" } }, layerSets: [], mapPins: [], mapRoutes: [], uiState: {} };
+    assert.ok(!RunInputs.changed(app).includes("cultures"));
+    assert.ok(RegionCultureCard.isShareField("regionCultureShare:west") && !RegionCultureCard.isShareField("regionName"));
 });

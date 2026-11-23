@@ -1,0 +1,70 @@
+{{!--
+    The region inspector's Cultures card (UC phase 2; boards U2 and U2b; see RegionCultureCard):
+    the cultures a reader gives a region of the Political set Generate builds round, each a
+    mini-card (a drag handle with two or more, the culture's swatch and name, its whole share with
+    two or more, the delete icon), the top card in the hue with Rules on a realm or an independent
+    duchy or county; Unassigned last when the shares leave a rest, and the share bar; Add culture….
+    Read only on a held regional world; outside the run's Political set, why, with Move to
+    Political set….
+--}}
+<div class="fwmb-group fwmb-region-cultures">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.RegionCultures"}}</div>
+    {{#if cultures.outside}}
+    <div class="fwmb-goto">
+        <p>{{localize "FILRODENSWMB.UI.RegionCulturesOutside"}}</p>
+        {{#if cultures.canMove}}<div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-inspector-action="moveToPolitical">{{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button></div>{{/if}}
+    </div>
+    {{else}}
+    {{#if cultures.held}}
+    <div class="fwmb-held" role="note">
+        <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldHeldTitle"}}</span>
+        <span>{{localize "FILRODENSWMB.UI.RegionCulturesHeld"}}</span>
+    </div>
+    {{/if}}
+    {{#if cultures.count}}
+    <div class="fwmb-culture-cards" data-reorder="regionCultures">
+        {{#each cultures.rows}}
+        <div class="fwmb-culture-card{{#if this.rules}} fwmb-culture-card--rules{{/if}}{{#if this.gone}} fwmb-culture-card--gone{{/if}}" data-reorder-item data-id="{{this.id}}">
+            {{#if @root.cultures.reorderable}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-reorder-handle" data-reorder-handle aria-label="{{localize 'FILRODENSWMB.UI.RegionCultureMove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionCultureMove'}}"><i class="fwmb-icon fwmb-icon--drag-indicator" aria-hidden="true"></i></button>{{/if}}
+            <span class="fwmb-culture-card-name">
+                {{#if this.gone}}<span class="fwmb-culture-swatch fwmb-culture-swatch--gone" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.RegionCultureDeleted"}}{{else}}<span class="fwmb-culture-swatch" style="background-color: {{this.color}};" aria-hidden="true"></span><span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>{{/if}}
+                {{#if this.rules}}<span class="fwmb-badge fwmb-badge--rules" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionCultureRulesHint'}}">{{localize "FILRODENSWMB.UI.RegionCultureRules"}}</span>{{/if}}
+            </span>
+            {{#if @root.cultures.shared}}
+            <input type="number" class="fwmb-input-share" name="{{this.shareField}}" min="0" max="100" step="1" value="{{this.share}}" aria-label="{{localize 'FILRODENSWMB.UI.RegionCultureShare' name=this.name}}" {{#if @root.cultures.held}}disabled{{/if}} />
+            <span class="fwmb-unit">%</span>
+            {{/if}}
+            {{#unless @root.cultures.held}}<button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-inspector-action="removeCulture" data-culture="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.RegionCultureRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionCultureRemove'}}"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i></button>{{/unless}}
+        </div>
+        {{/each}}
+        {{#if cultures.unassigned}}
+        <div class="fwmb-culture-card fwmb-culture-card--unassigned">
+            {{#if cultures.reorderable}}<span class="fwmb-culture-card-gap" aria-hidden="true"></span>{{/if}}
+            <span class="fwmb-culture-card-name"><span class="fwmb-culture-swatch fwmb-culture-swatch--unassigned" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.RegionCultureUnassigned"}} <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionCultureUnassignedNote"}}</span></span>
+            <span class="fwmb-culture-card-readout">{{cultures.unassigned}}</span>
+            <span class="fwmb-unit">%</span>
+            {{#unless cultures.held}}<span class="fwmb-culture-card-gap" aria-hidden="true"></span>{{/unless}}
+        </div>
+        {{/if}}
+    </div>
+    {{#if cultures.bar}}
+    <div class="fwmb-share-bar" aria-hidden="true">{{#each cultures.bar}}<i class="{{#if this.unassigned}}fwmb-share-unassigned{{/if}}{{#if this.gone}}fwmb-share-unassigned{{/if}}" style="width: {{this.share}}%;{{#if this.color}} background-color: {{this.color}};{{/if}}"></i>{{/each}}</div>
+    {{/if}}
+    {{/if}}
+    {{#if cultures.canAdd}}
+    <div class="fwmb-dropdown fwmb-culture-add">
+        <button type="button" class="fwmb-btn"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.RegionCultureAdd"}}</button>
+        <div class="fwmb-dropdown-menu">
+            {{#each cultures.addable}}
+            <button type="button" data-inspector-action="addCulture" data-culture="{{this.id}}"><span class="fwmb-culture-swatch" style="background-color: {{this.color}};" aria-hidden="true"></span>{{this.name}}</button>
+            {{/each}}
+        </div>
+    </div>
+    {{/if}}
+    {{#if cultures.noWorldCultures}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RegionCulturesNoWorld"}}</p>
+    {{else}}{{#unless cultures.held}}
+    <p class="fwmb-hint">{{cultures.hint}}</p>
+    {{/unless}}{{/if}}
+    {{/if}}
+</div>

@@ -468,6 +468,29 @@ test("a pin's entered figures, and the run's report of entered towns, keep to th
     assert.equal(MapImport.read(file).mapData.mapPins[0].userFigures, undefined, "a record that is no record is dropped");
 });
 
+test("a region's cultures, and the run's report of minority regions, keep to their rules", () => {
+    const file = v4Map();
+    const region = () => file.layerSets[0].levels[0].regions[0];
+    region().cultures = [{ culture: "cultureAAAAAAAAA", share: 60 }, { culture: "cultureBBBBBBBBB", share: 30 }];
+    file.modelRun = { ...savedModelRun(), regionCultures: { minority: [{ level: "realm", key: 1, culture: "cultureAAAAAAAAA", share: 0.3 }] } };
+    const kept = MapImport.read(structuredClone(file));
+    const keptRegion = kept.mapData.layerSets[0].levels[0].regions[0];
+    assert.deepEqual(keptRegion.cultures, region().cultures, "kept as given, the rest Unassigned");
+    assert.deepEqual(kept.modelRun.regionCultures, file.modelRun.regionCultures);
+    assert.equal(kept.corrected, 0);
+
+    region().cultures = [{ culture: SCRIPT, share: 10 }, { culture: "cultureAAAAAAAAA", share: 70.5 }, { culture: "cultureAAAAAAAAA", share: 10 }, "x", { culture: "cultureBBBBBBBBB", share: 20, __proto__: { polluted: true } }];
+    file.modelRun.regionCultures.minority = [{ level: "empire", key: -1, culture: SCRIPT, share: 7 }];
+    const { mapData, modelRun } = MapImport.read(structuredClone(file));
+    assert.deepEqual(mapData.layerSets[0].levels[0].regions[0].cultures, [{ culture: "cultureAAAAAAAAA", share: null }, { culture: "cultureBBBBBBBBB", share: null }], "no id, a repeat and no entry dropped; a share that is no whole percent takes the shares away");
+    assert.equal({}.polluted, undefined);
+    assert.deepEqual(modelRun.regionCultures.minority[0], { key: 0, share: 1 }, "a level and culture that break their rules are dropped, figures kept in range");
+    region().cultures = [{ culture: "cultureAAAAAAAAA", share: 80 }, { culture: "cultureBBBBBBBBB", share: 40 }];
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.layerSets[0].levels[0].regions[0].cultures.map((entry) => entry.share), [null, null], "shares over 100 in all are taken away");
+    region().cultures = "Hillfolk";
+    assert.equal(MapImport.read(file).mapData.layerSets[0].levels[0].regions[0].cultures, undefined, "a list that is no list is dropped");
+});
+
 test("a run's fingerprint of the map's own items it read keeps to its rules", () => {
     const file = v4Map();
     const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" };

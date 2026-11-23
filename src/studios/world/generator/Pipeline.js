@@ -12,6 +12,7 @@ import { resolveSettings } from "./GeneratorSettings.js";
 import { modelBiomeRaster } from "./ModelBiomes.js";
 import { nameEverything } from "./Names.js";
 import { buildRealms } from "./Realms.js";
+import { minorityReport, rulerOf, spreadRegions } from "./RegionCultures.js";
 import { buildRealmsAround, userZones } from "./UserRealms.js";
 import { applyUserRivers, uncoveredTraffic, userRoutes } from "./UserRoutes.js";
 import { routeChains } from "./RouteChains.js";
@@ -99,6 +100,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     run.targets = seatTargets(run.cells.seats);
     // The map's own realms, duchies and counties, which the present age's realms are built round
     run.userZones = run.rules.userRegions ? userZones(payload.userRegions, run.cells) : null;
+    // And the cultures they are given (see RegionCultures), read with the zones
+    run.userRegions = run.userZones ? payload.userRegions : null;
     run.graph = new CellGraph(run.cells);
     // The map's own routes, which the run's trade may use in every age (see UserRoutes)
     run.userRoutes = run.rules.userRoutes ? userRoutes(payload.routes, run.graph) : null;
@@ -155,7 +158,10 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const age = events.age;
     const { list: listed, invader } = agePeople(settings, people, ages, index);
     const list = events.people(listed);
-    const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader, scales: events.scales(list) }), run);
+    // The cultures the map's own regions are given hold in the present age only, as the regions
+    const present = index === ages.length - 1;
+    const regions = present && run.userZones ? spreadRegions(run.userRegions, list) : null;
+    const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader, scales: events.scales(list), regions }), run);
     const common = { cultures, world: events.world, rules: run.rules };
     const userBuilt = run.userRoutes?.built ?? null;
     // The map's own regions hold in the present age only: the ages before are its history
@@ -474,7 +480,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
             population: Math.round(people.realm[index]),
             landKm2: Math.round(realm.landKm2),
             cultures: realmMix[index],
-            rulingCulture: rulingCulture(cultures, places, realm.seat),
+            rulingCulture: rulerOf(realm, { userRegions: run.userRegions, cultures: cultures.cultures, duchies: finalRealms.duchies, counties: finalRealms.counties }) ?? rulingCulture(cultures, places, realm.seat),
             ...userFields(realm),
         })),
         // Duchies and counties name their largest culture (-1 for none)
@@ -483,9 +489,20 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         routes,
         stats: statistics(run, { feedback, finalTrade, finalRealms, routes, places }),
         seats: markSeatPlaces(run, places, seats, finalTrade.towns),
+        ...regionReport(run, cultures, finalRealms, { realms: realmMix, duchies: duchyMix, counties: countyMix }),
         timings: run.timings,
         cellCount: cells.count,
     };
+}
+
+/**
+ * What the run says of the cultures the map's own regions were given (see RegionCultures), only
+ * when there is something to say: `regionCultures.minority`, each region whose first culture holds
+ * under half its people.
+ */
+function regionReport(run, cultures, finalRealms, mixes) {
+    const minority = minorityReport(run.userRegions, cultures.cultures, finalRealms, mixes);
+    return minority.length ? { regionCultures: { minority } } : {};
 }
 
 /**

@@ -44,7 +44,10 @@ installPlatform({
     templates,
     settings: { get: () => [] },
     dialogs: {
-        confirm: async () => answers.confirm,
+        confirm: async (options) => {
+            answers.asked = options;
+            return answers.confirm;
+        },
         choose: (options) => answers.choose(options),
         prompt: async () => null,
         dismiss: ({ placement } = {}) => host && Overlay.dismissAll(host, placement),
@@ -520,4 +523,15 @@ test("on a held regional world the cultures are read only: nothing is added, ren
     assert.deepEqual(app.uiState.cultures, before);
     await drawPanel(app);
     assert.ok(app.root.querySelector("fieldset.fwmb-world-editor"), "the editor's fieldset, which a held world disables");
+});
+
+test("deleting a culture regions of the map were given says so; they keep it as Deleted culture", async () => {
+    const app = studio();
+    const id = await addCulture(app, "Hillfolk");
+    const region = { id: "r", key: 1, name: "North", cultures: [{ culture: id, share: null }] };
+    app.layerSets = [{ id: "p", kind: "political", levels: [{ id: "l", regions: [region] }] }];
+    answers.confirm = true;
+    assert.equal(await CultureLists.delete(app, id), true);
+    assert.match(answers.asked.content, /CultureDeleteRegionsOne/);
+    assert.deepEqual(region.cultures, [{ culture: id, share: null }], "the region keeps it, read as deleted");
 });

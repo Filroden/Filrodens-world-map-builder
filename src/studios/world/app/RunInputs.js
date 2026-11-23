@@ -9,11 +9,13 @@ import { Regeneration } from "./Regeneration.js";
  * A short fingerprint of the map's own items a generator run reads, so the run can be shown out of
  * date once any of them changes, by whatever path: drawn, deleted, edited, mass edited or undone.
  *
- * Six kinds, each hashed on its own:
+ * Seven kinds, each hashed on its own:
  * - routes: the routes the run's trade uses (see Generation.userRoutes);
  * - seats: the settlement pins it builds on (see Generation.seats);
  * - regions: the kept regions of the Political set it builds round (see Generation.userRegions),
  *   each level's kept regions by land display cell, with their keys and Independent choice;
+ * - cultures: the cultures those kept regions are given (see Generation.regionCultures); a run
+ *   saved before UC has none, and so is never marked for it;
  * - rivers: the traced rivers it reads (springs, custom rivers and the river settings all end
  *   there; see GeneratorInput.riverList);
  * - features: the drawn features that shape the terrain and rivers it reads: faults, custom
@@ -34,18 +36,19 @@ import { Regeneration } from "./Regeneration.js";
  */
 export class RunInputs {
     /** The kinds, in the order they are listed. */
-    static KINDS = Object.freeze(["routes", "seats", "regions", "rivers", "features", "influences"]);
+    static KINDS = Object.freeze(["routes", "seats", "regions", "cultures", "rivers", "features", "influences"]);
 
     /**
      * The map's fingerprint now.
      * @param {object} app
-     * @returns {{routes: string, seats: string, regions: string, rivers: string, features: string, influences: string}}
+     * @returns {{routes: string, seats: string, regions: string, cultures: string, rivers: string, features: string, influences: string}}
      */
     static of(app) {
         return {
             routes: hashText(JSON.stringify(Generation.userRoutes(app))),
             seats: hashText(JSON.stringify(Generation.seats(app))),
             regions: regionsHash(app),
+            cultures: hashText(JSON.stringify(Generation.regionCultures(app))),
             rivers: riversHash(app.currentRiverData),
             features: hashText(featureText(app)),
             influences: influencesHash(app.meshSession?.influences),

@@ -14,6 +14,7 @@ import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { FillMemory } from "./FillMemory.js";
 import { RandomNames } from "./RandomNames.js";
+import { RegionCultureCard } from "./RegionCultureCard.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -23,7 +24,8 @@ const FILL_FIELDS = Object.freeze({ regionFillColor: true, regionFillTransparent
 
 /**
  * A region in the inspector (see Inspector): its name, description and visibility, its fill (a
- * region style, or its own colour and pattern), its label, and Focus view, Merge into… and Delete.
+ * region style, or its own colour and pattern), its Cultures (see RegionCultureCard), its label,
+ * and Focus view, Merge into… and Delete.
  *
  * Opening it makes its region the one being painted, so the paint goes into the region whose
  * details are showing. A region without a fill of its own is drawn in its level's preset colour,
@@ -56,8 +58,11 @@ export class RegionEditor {
             subtitle: platform.i18n.format("FILRODENSWMB.UI.InspectorSubtitleRegion", { level: app.regionLevels.find((level) => level.id === ref.levelId)?.name ?? "" }),
             swatch: region.fillColor === "transparent" ? null : regionFillColor(region),
         }),
-        context: (app, region, ref) => ({ ...RegionEditor.#context(app, region), canMoveToPolitical: RegionPanel.canMoveToPolitical(app, ref.levelId), canChangeRank: RegionPanel.canChangeRank(app, ref.levelId), independent: RegionEditor.#independentField(app, region, ref.levelId) }),
-        apply: (app, region, ref, form, field) => RegionEditor.#apply(app, region, form, field),
+        context: (app, region, ref) => {
+            const canMoveToPolitical = RegionPanel.canMoveToPolitical(app, ref.levelId);
+            return { ...RegionEditor.#context(app, region), canMoveToPolitical, canChangeRank: RegionPanel.canChangeRank(app, ref.levelId), independent: RegionEditor.#independentField(app, region, ref.levelId), cultures: RegionCultureCard.context(app, region, ref.levelId, { canMoveToPolitical }) };
+        },
+        apply: (app, region, ref, form, field) => (RegionCultureCard.isShareField(field) ? RegionCultureCard.applyShare(app, region, form, field) : RegionEditor.#apply(app, region, form, field)),
         actions: {
             lock: (app, region) => GeneratedEdits.toggleLock(app, region),
             randomName: (app, region, ref) => RandomNames.press(app, "region", region, ref),
@@ -71,6 +76,8 @@ export class RegionEditor {
             delete: (app, _region, ref) => RegionPanel.deleteRegion(app, ref.levelId, ref.id),
             saveStyle: (app, region, ref, button) => RegionEditor.#saveStyle(app, region, button.dataset.styleType),
             placeLabel: (app, region) => InspectorFields.placeLabel(app, region),
+            addCulture: (app, region, _ref, button) => RegionCultureCard.add(app, region, button.dataset.culture),
+            removeCulture: (app, region, _ref, button) => RegionCultureCard.remove(app, region, button.dataset.culture),
         },
     });
 
@@ -147,6 +154,20 @@ export class RegionEditor {
         values.label = InspectorFields.readLabel(form, field, app);
         if (elements.regionIndependent) values.independent = elements.regionIndependent.checked;
         return values;
+    }
+
+    /**
+     * A culture's mini-card moved to its new place in the Cultures card (see ListReorder): the
+     * region the inspector shows, as one undo step.
+     * @param {object} app
+     * @param {string} id - The culture's id.
+     * @param {number} to
+     */
+    static moveCulture(app, id, to) {
+        const current = Inspector.current(app);
+        if (current?.kind !== this.KIND) return;
+        const region = this.#find(app, current.ref);
+        if (region && RegionCultureCard.move(app, region, id, to)) Inspector.refresh(app);
     }
 
     /** Applies the form to the region as one undo step, when anything changed. */

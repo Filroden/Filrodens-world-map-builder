@@ -65,6 +65,7 @@ import { RegionPainter } from "./RegionPainter.js";
 import { InfluencePainter } from "./InfluencePainter.js";
 import { InfluenceView } from "./InfluenceView.js";
 import { Inspector } from "./Inspector.js";
+import { CULTURE_LIST } from "./RegionCultureCard.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
 import { InspectorFields } from "./InspectorFields.js";
@@ -3624,10 +3625,13 @@ export class MapStudio {
     }
 
     /**
-     * Moves an item of a list in order (see ListReorder) to its new place, as one undo step. Only
-     * the land masks are put in order: later masks lie on top, so a move shapes the land again.
+     * Moves an item of a list in order (see ListReorder) to its new place, as one undo step: the
+     * land masks (later masks lie on top, so a move shapes the land again), and a region's cultures
+     * in its inspector.
      */
     #moveListItem(list, id, to) {
+        // A region's cultures in its inspector: the top card rules (see RegionCultureCard)
+        if (list === CULTURE_LIST) return RegionEditor.moveCulture(this, id, to);
         if (list !== "landMasks") return;
         const from = this.landMasks.findIndex((mask) => mask.id === id);
         if (from < 0 || from === to || to < 0 || to >= this.landMasks.length) return;

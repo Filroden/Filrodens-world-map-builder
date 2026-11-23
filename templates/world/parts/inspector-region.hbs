@@ -1,7 +1,7 @@
 {{!--
     The inspector's region (see RegionEditor): its name, description and visibility; its fill (a
-    region style, or its own colour and pattern); for a lone duchy or county of the Political set,
-    Independent; its label; and Focus view, Merge into…, Move to Political set… (outside the
+    region style, or its own colour and pattern); its Cultures (see inspector-cultures.hbs); for a
+    lone duchy or county of the Political set, Independent; its label; and Focus view, Merge into…, Move to Political set… (outside the
     Political set) or Change rank… (inside it) and Delete.
     Every field applies when committed, one undo step each (see Inspector).
 --}}
@@ -60,6 +60,8 @@
         </div>
     </div>
 </div>
+
+{{#if cultures}}{{> "modules/filrodens-world-map-builder/templates/world/parts/inspector-cultures.hbs" cultures=cultures}}{{/if}}
 
 {{#if independent}}
 <div class="fwmb-group">

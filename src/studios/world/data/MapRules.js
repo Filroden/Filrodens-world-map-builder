@@ -345,6 +345,9 @@ const REGION = obj({
     journalPageId: ref(),
     generated: GENERATED,
     modelled: MODELLED_REGION,
+    // The cultures the reader gave the region (UC phase 2; see RegionCultures): in order, the
+    // first the ruling one, with whole shares or none
+    cultures: { t: "regionCultures", nullable: true },
     legacy: REGION_LEGACY,
 });
 
@@ -897,7 +900,7 @@ const MODEL_RUN = obj({
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
     // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
     // A fingerprint of the map's own items the run read, as it left them (see RunInputs)
-    inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key, influences: key }, { nullable: true }),
+    inputs: obj({ routes: key, seats: key, regions: key, cultures: key, rivers: key, features: key, influences: key }, { nullable: true }),
     seats: obj(
         {
             used: int(0, 1e6),
@@ -908,6 +911,8 @@ const MODEL_RUN = obj({
         },
         { nullable: true },
     ),
+    // The cultures the map's regions were given (see RegionCultures): each region whose first culture ended up under half its people
+    regionCultures: obj({ minority: list(obj({ level: enumOf(["realm", "duchy", "county"]), key: int(0), culture: ref(), share: num(RANGE.UNIT) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
     history: list(RUN_AGE),
@@ -1022,6 +1027,7 @@ const CLEANERS = {
     // A map point: finite x and y within the coordinate range, and nothing else
     xy: (value) => (value && typeof value === "object" && !Array.isArray(value) && [value.x, value.y].every((n) => Number.isFinite(n) && Math.abs(n) <= RANGE.COORD.max) ? { x: value.x, y: value.y } : DROP),
     cultureRef: (value) => (Number.isInteger(value) && value >= 0 && value < 1e6 ? value : orDrop(Sanitize.id(value))),
+    regionCultures: (value) => cleanRegionCultures(value),
     band: (value) => (Array.isArray(value) && value.length === 2 && value.every(Number.isFinite) && value[0] <= value[1] ? [value[0], value[1]] : DROP),
     numTree: (value) => cleanNumTree(value, 0),
     obj: (value, rule, context) => cleanObject(value, rule.fields, context),
@@ -1030,6 +1036,29 @@ const CLEANERS = {
 };
 
 const orDrop = (value) => (value === null ? DROP : value);
+
+/**
+ * A region's cultures (see REGION's `cultures`): a list of `{culture, share}`, the culture a world
+ * culture's id (each once, at most the most cultures a world holds), the share a whole percent or
+ * null. Shares are all given or none, and add to 100 at most (the rest is Unassigned): a list
+ * breaking either keeps its cultures without shares. Empty means none.
+ */
+function cleanRegionCultures(value) {
+    if (!Array.isArray(value)) return DROP;
+    const seen = new Set();
+    const out = [];
+    for (const entry of value) {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+        const culture = Sanitize.id(entry.culture);
+        if (culture === null || seen.has(culture) || out.length >= FILRODENSWMB.GENERATOR.CULTURES.MAX) continue;
+        seen.add(culture);
+        const share = Number.isInteger(entry.share) && entry.share >= 0 && entry.share <= 100 ? entry.share : null;
+        out.push({ culture, share });
+    }
+    const total = out.reduce((sum, entry) => sum + (entry.share ?? 0), 0);
+    if (out.some((entry) => entry.share === null) || total > 100) for (const entry of out) entry.share = null;
+    return out.length ? out : DROP;
+}
 
 /** A number written as text ("4") as its number; anything else as it is. */
 const numberFromText = (value) => (typeof value === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(value) ? Number(value) : value);

@@ -6,6 +6,7 @@ import { materialise } from "../generator/Materialise.js";
 import { createPoliticalSet } from "../generator/MaterialiseRegions.js";
 import { panelSettings, resolveOutput } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
+import { cleanCultures } from "../generator/RegionCultures.js";
 import { platform } from "../../../platform/index.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { FieldSpecs } from "./FieldSpecs.js";
@@ -257,6 +258,29 @@ export class Generation {
     }
 
     /**
+     * The cultures the kept regions of the run's Political set are given (UC phase 2), for the
+     * run's fingerprint (see RunInputs): each such region's level, key and cultures, in order. Empty
+     * when none has any, or the set is not the run's.
+     * @param {object} app
+     * @returns {[number, number, {culture: string, share: number|null}[]][]}
+     */
+    static regionCultures(app) {
+        // As the regions' own fingerprint (see RunInputs.regionsHash): the target set's chain
+        const set = Regeneration.target(app);
+        const levels = Regeneration.chain(set);
+        if (!levels) return [];
+        const kept = Regeneration.keptKeys(set);
+        const out = [];
+        levels.forEach((level, depth) => {
+            for (const region of level.regions) {
+                const cultures = kept[depth].has(region.key) ? cleanCultures(region.cultures) : [];
+                if (cultures.length) out.push([depth, region.key, cultures]);
+            }
+        });
+        return out;
+    }
+
+    /**
      * The user regions on the display mesh, for writing the run (see MaterialiseRegions): each
      * level of the target set by depth, its owners and the keys of the regions it keeps. Called
      * once the run's replaced regions are gone, so the target's regions are those it keeps.
@@ -309,7 +333,14 @@ export class Generation {
             if (!cellsOf.has(best)) cellsOf.set(best, []);
             cellsOf.get(best).push(modelCell);
         }
-        return level.regions.filter((region) => keys.has(region.key)).map((region) => ({ key: region.key, cells: (cellsOf.get(region.key) ?? []).sort((a, b) => a - b), independent: region.independent === true }));
+        return level.regions.filter((region) => keys.has(region.key)).map((region) => {
+            const entry = { key: region.key, cells: (cellsOf.get(region.key) ?? []).sort((a, b) => a - b), independent: region.independent === true };
+            // The cultures the user gave the region (UC phase 2), only when it has some, so a map
+            // without them sends what it always sent
+            const cultures = cleanCultures(region.cultures);
+            if (cultures.length) entry.cultures = cultures;
+            return entry;
+        });
     }
 
     /**

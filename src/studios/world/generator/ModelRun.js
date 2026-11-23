@@ -154,6 +154,7 @@ export function encodeModelRun(result, runId) {
         cells,
         ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
         seats: result.seats ? seatReport(result.seats) : null,
+        ...(result.regionCultures?.minority?.length ? { regionCultures: { minority: result.regionCultures.minority.map(({ level, key, culture, share }) => ({ level, key, culture, share })) } } : {}),
         history: (result.history ?? []).map(encodeAge),
     };
 }

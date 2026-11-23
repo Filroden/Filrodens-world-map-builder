@@ -19,8 +19,9 @@ import { UserFigures } from "./UserFigures.js";
 
 /** Whether a generated item is the reader's own: edited or locked. */
 export function isKept(item) {
-    // A generated pin with an entered population is the reader's, as an edited one is (see UserFigures)
-    return !!item && (!item.generated || item.generated.edited === true || item.generated.locked === true || UserFigures.has(item));
+    // A generated pin with an entered population is the reader's, as an edited one is (see
+    // UserFigures); so is a generated region the reader gave cultures (UC phase 2)
+    return !!item && (!item.generated || item.generated.edited === true || item.generated.locked === true || UserFigures.has(item) || (Array.isArray(item.cultures) && item.cultures.length > 0));
 }
 
 /** What a run made of a region, as written onto a kept one: its figures, not its look, name or rank. */

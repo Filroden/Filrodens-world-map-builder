@@ -2619,6 +2619,9 @@ export const FILRODENSWMB = {
             // between different cultures keeps at least AFFINITY_FLOOR; border threat x (1 +
             // HOSTILITY x closedness); towns draw open cultures from further (URBAN_PULL)
             BARRIER: 3,
+            // A culture spreading into a region the map gives other cultures pays its step cost x (1 +
+            // REGION_BORDER x closedness) there (UC; see Cultures.regionCultures)
+            REGION_BORDER: 3,
             AFFINITY_FLOOR: 0.1,
             HOSTILITY: 1,
             URBAN_PULL: 1.5,
