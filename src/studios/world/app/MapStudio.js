@@ -6462,6 +6462,11 @@ export class MapStudio {
         RegionLists.reset(this);
         StyleLists.reset(this);
         CultureLists.reset(this);
+        // A homeland's or an event's place being picked ends with the tool or the layer it was
+        // started in: left running, it would keep the map's clicks, and hide a world page's panel
+        // behind its picking bar, until Done
+        CultureMarkers.stopPick(this);
+        AgeEventRows.stopPick(this);
         // Help closes with the inspector below, and what it covered belongs to the tool being left
         HelpPanel.forget(this);
         // The inspector belongs to the tool its object was opened from
