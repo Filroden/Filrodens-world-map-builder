@@ -4,7 +4,7 @@ import { buildGeneratorPayload } from "../generator/GeneratorInput.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { materialise } from "../generator/Materialise.js";
 import { createPoliticalSet } from "../generator/MaterialiseRegions.js";
-import { panelSettings, resolveOutput } from "../generator/GeneratorSettings.js";
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
 import { cleanCultures } from "../generator/RegionCultures.js";
 import { platform } from "../../../platform/index.js";
@@ -102,7 +102,7 @@ export class Generation {
             }
         };
         try {
-            const result = await generateInBackground(() => this.payload(app, settings, { revision: GeneratorRevision.CURRENT, userRegions: this.userRegions(app, settings.output) }), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
+            const result = await generateInBackground(() => this.payload(app, settings, { revision: GeneratorRevision.CURRENT, userRegions: this.userRegions(app) }), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
                 if (error?.name === "AbortError") return null;
                 throw error;
             });
@@ -235,21 +235,19 @@ export class Generation {
     /**
      * The map's own realms, duchies and counties, which a run builds round (see UserRealms): the
      * regions of the Political set the run writes into (Regeneration.target) that a run keeps
-     * (Regeneration.keptKeys: hand-made, edited or locked, and the rest of a realm holding one), so
+     * (Regeneration.keptKeys: each drawn, edited, locked or given cultures, for itself), so
      * what the model is given is what the map will show. Each level by depth as `{ key, cells,
      * independent }`, its cells the model cells whose land display cells it holds most of
      * (cells outside every such region of the level count too, so a region holding a sliver of a
      * model cell does not take it).
      *
-     * Null when there are none, and when the set's levels are not the chain of levels the run makes
-     * (see Regeneration.chain and GeneratorSettings.resolveOutput), since the run could not then
-     * be written into it.
+     * Null when there are none, and when the set's levels are not a chain (see
+     * Regeneration.chain), since the run could not then be written into it.
      * @param {object} app
-     * @param {object} [output] - The run's output settings.
      * @returns {{realms: object[], duchies: object[], counties: object[]}|null}
      */
-    static userRegions(app, output = {}) {
-        const levels = this.#userLevels(app, output);
+    static userRegions(app) {
+        const levels = this.#userLevels(app);
         if (!levels) return null;
         const session = app.meshSession;
         const kept = Regeneration.keptKeys(Regeneration.target(app));
@@ -285,21 +283,21 @@ export class Generation {
      * level of the target set by depth, its owners and the keys of the regions it keeps. Called
      * once the run's replaced regions are gone, so the target's regions are those it keeps.
      */
-    static #userDisplay(app, output) {
-        const levels = this.#userLevels(app, output);
+    static #userDisplay(app) {
+        const levels = this.#userLevels(app);
         if (!levels) return null;
         return levels.map((level) => ({ owners: app.meshSession.layer(level.id).owners, keys: new Set(level.regions.map((region) => region.key)) }));
     }
 
-    /** The target set's levels by depth, when they are the levels the run makes; null otherwise. */
-    static #userLevels(app, output) {
+    /** The target set's levels by depth, when they are a chain; null otherwise. */
+    static #userLevels(app) {
         const session = app.meshSession;
         const set = Regeneration.target(app);
         const levels = Regeneration.chain(set);
         if (!session?.mesh || !session.aggregates || !levels) return null;
-        const made = resolveOutput(output);
-        const count = 1 + (made.duchies ? 1 : 0) + (made.counties ? 1 : 0);
-        return levels.length === count ? levels : null;
+        // The run writes into the set whatever its levels (see Regeneration.merge), and builds round
+        // every kept region of them, also below the levels it makes
+        return levels.slice(0, 3);
     }
 
     /** A level's kept regions by model cell (see userRegions). */
@@ -448,7 +446,7 @@ export class Generation {
         const removal = Regeneration.remove(app, { keepLatest: true });
         const session = app.meshSession;
         // The map's own regions the run was built round, as they stand once the rest has gone
-        const userRegions = result.realms.some((realm) => realm.user !== undefined) || result.counties.some((county) => county.zone !== undefined) ? this.#userDisplay(app, output) : null;
+        const userRegions = result.realms.some((realm) => realm.user !== undefined) || result.counties.some((county) => county.zone !== undefined) ? this.#userDisplay(app) : null;
         const runId = platform.utils.randomID();
         const made = materialise(session, result, {
             runId,

@@ -1,4 +1,4 @@
-import { UNCLAIMED } from "../mesh/Schema.js";
+import { UNCLAIMED, createLevel } from "../mesh/Schema.js";
 import { UserFigures } from "./UserFigures.js";
 
 /**
@@ -7,11 +7,17 @@ import { UserFigures } from "./UserFigures.js";
  *
  * - An item is kept when it is hand-made, or generated and edited (a substantive change; see
  *   GeneratedEdits) or locked, or a generated pin with an entered population (see UserFigures).
- * - A kept region keeps its whole realm: the realm with every duchy and county in it, untouched,
- *   so nesting always holds. The rest of each generated (Political) set is removed with its cells.
+ * - A region is kept only for itself (Ken, 2026-11-23): one the reader drew, or a generated one
+ *   edited, locked or given cultures. The generated regions above and inside it are the run's to
+ *   remake. A kept duchy or county whose parent goes is left unassigned, so the next run may take
+ *   it into a realm (or duchy) of its own, unless it is ticked Independent. The rest of each
+ *   Political set is removed with its cells.
  * - A set left with no regions is removed, except, for a run, the latest Political set. A run
  *   writes into that set (new regions fill only the cells no kept region holds; one left with
  *   none is dropped), so its levels keep their names and looks, or adds a new one when there is none.
+ *   There is only ever the one Political set: a run making fewer levels than it holds (no duchies
+ *   or counties) writes into its top levels, the levels below keeping only their kept regions;
+ *   a run making more adds the levels it lacks.
  * - New places are not put on a kept pin's cell.
  *
  * Every step records what it changes, so the caller makes the whole of it one undo step.
@@ -103,6 +109,17 @@ export class Regeneration {
                 session.restoreLevelOwners(level.id, array);
                 owners.push({ levelId: level.id, before, after: session.layer(level.id).encode() });
             });
+            // A kept region whose parent went is unassigned, for the next run to place (or not,
+            // when it is ticked Independent)
+            set.levels.forEach((level, depth) => {
+                if (depth === 0) return;
+                const above = new Set(set.levels[depth - 1].regions.map((region) => region.key));
+                for (const region of level.regions) {
+                    if (region.parentKey === null || region.parentKey === undefined || region.parentKey === UNCLAIMED || above.has(region.parentKey)) continue;
+                    region.parentKey = null;
+                    delete region.parentFromRun;
+                }
+            });
             if (set.levels.every((level) => level.regions.length === 0)) emptied.add(set);
         }
         if (keepLatest) emptied.delete(politicalSets(app).at(-1));
@@ -123,33 +140,14 @@ export class Regeneration {
     }
 
     /**
-     * Each level's kept region keys in a Political set: every region of a realm that is kept
-     * because it, or any region in it, is hand-made, edited or locked; and any kept region whose
-     * line does not reach a realm.
+     * Each level's kept region keys in a Political set: each region kept for itself (drawn by the
+     * reader, or generated and edited, locked or given cultures; see isKept). Neither the regions
+     * above a kept one nor those inside it are kept with it (Ken, 2026-11-23): what the reader set
+     * is what stands.
      * @returns {Set<number>[]} One set of keys per level, by depth.
      */
     static keptKeys(set) {
-        // A parent a run gave a lone region (see merge) is no link: that parent is the run's to replace
-        const parentOf = set.levels.map((level) => new Map(level.regions.map((region) => [region.key, region.parentFromRun ? null : region.parentKey])));
-        const realmOf = (depth, key) => {
-            let current = key;
-            for (let up = depth; up > 0; up--) {
-                current = parentOf[up].get(current);
-                if (current === undefined || current === null || current === UNCLAIMED) return null;
-            }
-            return current;
-        };
-        const realms = new Set();
-        const loose = set.levels.map(() => new Set());
-        set.levels.forEach((level, depth) => {
-            for (const region of level.regions) {
-                if (!isKept(region)) continue;
-                const realm = realmOf(depth, region.key);
-                if (realm === null) loose[depth].add(region.key);
-                else realms.add(realm);
-            }
-        });
-        return set.levels.map((level, depth) => new Set(level.regions.filter((region) => loose[depth].has(region.key) || realms.has(realmOf(depth, region.key))).map((region) => region.key)));
+        return (set?.levels ?? []).map((level) => new Set(level.regions.filter(isKept).map((region) => region.key)));
     }
 
     /**
@@ -188,17 +186,27 @@ export class Regeneration {
      * @param {object} app
      * @param {object} target - The set written into (in app.layerSets).
      * @param {object} made - The run's set, installed in the session but not in app.layerSets.
-     * @returns {{levelId: string, before: string, after: string}[]|null} null when the sets' levels differ (the run keeps its own set).
+     * @returns {{levelId: string, before: string|null, after: string}[]} before is null for a level the run added.
      */
     static merge(app, target, made) {
-        if (target.levels.length !== made.levels.length) return null;
         const session = app.meshSession;
         const changes = [];
+        // A run of more levels than the set holds adds the ones it lacks, each as the run made it
+        // (its name and look) under the set's deepest, so the map keeps one Political set
+        const added = new Set();
+        while (target.levels.length < made.levels.length) {
+            const { id: _id, ownersKey: _ownersKey, regions: _regions, nextKey: _nextKey, ...fields } = made.levels[target.levels.length];
+            const level = createLevel({ ...fields, parentLevelId: target.levels.at(-1).id, regions: [] });
+            target.levels.push(level);
+            added.add(level.id);
+        }
+        if (added.size) session.setLayerSets(app.layerSets);
         let parentKeys = null;
-        target.levels.forEach((level, depth) => {
+        // A run of fewer levels (no duchies or counties) writes into the set's top ones
+        target.levels.slice(0, made.levels.length).forEach((level, depth) => {
             const fresh = made.levels[depth];
             const into = session.layer(level.id);
-            const before = into.encode();
+            const before = added.has(level.id) ? null : into.encode();
             const array = into.owners.slice();
             const from = session.layer(fresh.id).owners;
             // New keys after the level's own, so kept regions keep theirs; a region standing for a

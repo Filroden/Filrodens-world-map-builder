@@ -94,10 +94,11 @@ const cellsOf = (app, level, key) => Array.from(app.meshSession.layer(level.id).
 const sorted = (list) => [...list].sort((a, b) => a - b);
 
 /** Generates the island with the map's own regions, as Generate does, and writes the run onto it. */
-async function generate(app) {
-    const userRegions = Generation.userRegions(app, {});
-    const result = await runGenerator({ ...syntheticMap().makePayload(), userRegions }, quick);
-    Generation.apply(app, result);
+async function generate(app, output = {}) {
+    const userRegions = Generation.userRegions(app);
+    const payload = syntheticMap().makePayload();
+    const result = await runGenerator({ ...payload, settings: { ...payload.settings, output }, userRegions }, quick);
+    Generation.apply(app, result, output);
     return { result, userRegions };
 }
 
@@ -301,7 +302,7 @@ test("a drawn realm's cultures reach the run: its first rules, a minority is rep
     ];
     app.uiState.cultures = cultures;
     realm.cultures = typed("region", { cultures: [{ culture: "sand", share: null }] }, realm).cultures;
-    const userRegions = Generation.userRegions(app, {});
+    const userRegions = Generation.userRegions(app);
     assert.deepEqual(userRegions.realms[0].cultures, [{ culture: "sand", share: null }], "the payload carries them");
     const result = await runGenerator({ ...syntheticMap().makePayload({ cultures }), userRegions }, quick);
     Generation.apply(app, result);
@@ -312,4 +313,104 @@ test("a drawn realm's cultures reach the run: its first rules, a minority is rep
     assert.equal(notice.items.length, 1);
     assert.match(notice.items[0], /Northreach/);
     assert.ok(typeof app.modelRun.inputs.cultures === "string", "the fingerprint keeps them");
+});
+
+test("the duchies and counties a run made inside a drawn realm are the run's: Remove generated content takes them, and the next run makes them again", async () => {
+    const app = studio();
+    const land = landDisc(app, 150, 180, 90);
+    const west = sketch(app, "Westmarch", land);
+    answers.prompt = "0";
+    await RegionPanel.moveToPolitical(app, "sketch", [west.id]);
+    await generate(app);
+    const set = political(app);
+    const [realms, duchies] = set.levels;
+    const realm = realms.regions.find((each) => each.id === west.id);
+    const inside = duchies.regions.filter((each) => each.parentKey === realm.key);
+    assert.ok(inside.length > 0 && inside.every((each) => each.generated), "the run's duchies fill the drawn realm");
+    const kept = Regeneration.keptKeys(set);
+    assert.ok(kept[0].has(realm.key), "the drawn realm is kept");
+    assert.ok(inside.every((each) => !kept[1].has(each.key)), "its generated duchies are not");
+    assert.equal(Generation.userRegions(app).duchies.length, 0, "so the next run is not built round them");
+
+    await Generation.removeGenerated(app);
+    assert.ok(political(app).levels[0].regions.some((each) => each.id === west.id), "the drawn realm stays");
+    assert.equal(political(app).levels[1].regions.length, 0, "the run's duchies inside it go");
+    assert.equal(political(app).levels[2].regions.length, 0, "and its counties");
+    assert.deepEqual(sorted(cellsOf(app, political(app).levels[0], realm.key)), sorted(land));
+
+    // A locked generated duchy is kept for itself, not with the duchies beside it
+    await generate(app);
+    const again = political(app);
+    const [duchy, ...beside] = again.levels[1].regions.filter((each) => each.parentKey === realm.key);
+    duchy.generated.locked = true;
+    const lockedKept = Regeneration.keptKeys(again);
+    assert.ok(lockedKept[1].has(duchy.key) && beside.every((each) => !lockedKept[1].has(each.key)), "only the locked duchy");
+    assert.equal(lockedKept[2].size, 0, "and none of the counties inside it");
+});
+
+test("a run without duchies and counties writes its realms into the Political set the map has, round the drawn realms, rather than a set of its own", async () => {
+    const app = studio();
+    const land = landDisc(app, 150, 180, 90);
+    const west = sketch(app, "Westmarch", land);
+    answers.prompt = "0";
+    await RegionPanel.moveToPolitical(app, "sketch", [west.id]);
+    await generate(app);
+    const set = political(app);
+    const realm = set.levels[0].regions.find((each) => each.id === west.id);
+    const output = { duchies: false, counties: false };
+    const { userRegions } = await generate(app, output);
+    assert.deepEqual(userRegions.realms.map((each) => each.key), [realm.key], "the run is built round the drawn realm");
+    assert.equal(app.layerSets.filter((each) => each.kind === "political").length, 1, "no second Political set");
+    assert.equal(political(app), set, "the run wrote into the map's set");
+    assert.equal(set.levels.length, 3, "which keeps its levels");
+    assert.deepEqual(sorted(cellsOf(app, set.levels[0], realm.key)), sorted(land), "the drawn realm keeps exactly its land");
+    assert.ok(set.levels[0].regions.filter((each) => each.generated).length > 0, "the run's realms are beside it");
+    assert.equal(set.levels[1].regions.length + set.levels[2].regions.length, 0, "and no duchies or counties are left from the run before");
+    for (const level of set.levels.slice(1)) assert.equal(nestingProblems(app.meshSession, level).length, 0, `${level.name} nest`);
+});
+
+test("there is only ever one Political set: a run of more levels than it holds adds the levels it lacks, as one undo step", async () => {
+    const app = studio();
+    const land = landDisc(app, 150, 180, 90);
+    const west = sketch(app, "Westmarch", land);
+    answers.prompt = "0";
+    await RegionPanel.moveToPolitical(app, "sketch", [west.id]);
+    await generate(app, { duchies: false, counties: false });
+    const set = political(app);
+    // A set of realms alone, as a run without duchies would have made it
+    for (const level of set.levels.slice(1)) app.meshSession.removeLevelOwners(level.id);
+    set.levels.length = 1;
+    app.meshSession.setLayerSets(app.layerSets);
+    const realmLevel = set.levels[0].id;
+
+    await generate(app);
+    assert.equal(app.layerSets.filter((each) => each.kind === "political").length, 1, "still one Political set");
+    assert.equal(political(app), set);
+    assert.equal(set.levels.length, 3, "with the duchies and counties added");
+    assert.equal(set.levels[0].id, realmLevel, "under its own realms");
+    assert.equal(set.levels[1].parentLevelId, realmLevel);
+    assert.equal(set.levels[2].parentLevelId, set.levels[1].id);
+    const realm = set.levels[0].regions.find((each) => each.id === west.id);
+    assert.deepEqual(sorted(cellsOf(app, set.levels[0], realm.key)), sorted(land), "the drawn realm keeps its land");
+    assert.ok(set.levels[1].regions.some((each) => each.parentKey === realm.key), "and is filled with the run's duchies");
+    for (const level of set.levels.slice(1)) assert.equal(nestingProblems(app.meshSession, level).length, 0, `${level.name} nest`);
+    VectorHistory.step(app, true);
+    assert.equal(political(app).levels.length, 1, "undo takes the added levels away");
+});
+
+test("a kept duchy whose realm a run made is left unassigned when that realm goes, so the next run may take it into another", async () => {
+    const app = studio();
+    const land = landDisc(app, 330, 120, 45);
+    const march = sketch(app, "Eastmarch", land);
+    answers.prompt = "1";
+    await RegionPanel.moveToPolitical(app, "sketch", [march.id]);
+    await generate(app);
+    const duchy = political(app).levels[1].regions.find((each) => each.id === march.id);
+    assert.ok(Number.isInteger(duchy.parentKey) && duchy.parentFromRun, "the run put it in a realm of its own making");
+    assert.ok(!Regeneration.keptKeys(political(app))[0].has(duchy.parentKey), "which is not kept with it");
+    await Generation.removeGenerated(app);
+    assert.equal(duchy.parentKey, null, "unassigned once its realm goes");
+    assert.ok(!("parentFromRun" in duchy));
+    await generate(app);
+    assert.ok(Number.isInteger(duchy.parentKey) && duchy.parentFromRun, "the next run places it again");
 });

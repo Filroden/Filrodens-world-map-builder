@@ -94,32 +94,33 @@ test("Generate again replaces the earlier run's content in the same Political se
     assert.ok(ownersOf(app, restored.levels[0]).some((owner) => owner === restored.levels[0].regions[0].key));
 });
 
-test("an edited county keeps its whole realm; a locked place and an edited route stay; nothing is put on a kept place", async () => {
+test("an edited county is kept for itself, unassigned once its realm goes; a locked place and an edited route stay; nothing is put on a kept place", async () => {
     const app = studio();
     const run = await islandResult();
     Generation.apply(app, run);
     const set = political(app)[0];
     const [realms, duchies, counties] = set.levels;
-    const keptIds = set.levels.flatMap((level) => level.regions.map((region) => region.id));
-    const keptOwners = set.levels.map((level) => ownersOf(app, level));
-    counties.regions[0].generated.edited = true;
+    const county = counties.regions[0];
+    const countyCells = ownersOf(app, counties).reduce((cells, owner, cell) => (owner === county.key ? [...cells, cell] : cells), []);
+    const realmCount = realms.regions.length;
+    county.generated.edited = true;
     const lockedPin = generatedPins(app)[0];
     lockedPin.generated.locked = true;
     const editedRoute = app.mapRoutes[0];
     editedRoute.generated.edited = true;
 
     const plan = Regeneration.plan(app);
-    assert.equal(plan.removed.realms, 0, "the realm is kept");
+    assert.equal(plan.removed.realms, realmCount, "no realm is kept for its county");
+    const kept = Regeneration.keptKeys(set);
+    assert.deepEqual([kept[0].size, kept[1].size, [...kept[2]]], [0, 0, [county.key]], "only the county itself");
+    Regeneration.remove(app, { keepLatest: true });
+    assert.equal(county.parentKey, null, "left unassigned, for the next run to place");
     Generation.apply(app, run);
 
     const after = political(app)[0];
-    assert.deepEqual(after.levels.flatMap((level) => level.regions.map((region) => region.id)).filter((id) => keptIds.includes(id)).sort(), [...keptIds].sort(), "the realm, its duchies and counties are kept");
-    after.levels.forEach((level, depth) => {
-        const now = ownersOf(app, level);
-        keptOwners[depth].forEach((owner, cell) => {
-            if (owner !== UNCLAIMED) assert.equal(now[cell], owner, "a kept region's cells are its own still");
-        });
-    });
+    assert.ok(after.levels[2].regions.includes(county), "the county is kept");
+    const now = ownersOf(app, after.levels[2]);
+    for (const cell of countyCells) assert.equal(now[cell], county.key, "its cells are its own still");
     assert.ok(app.mapPins.includes(lockedPin));
     assert.equal(app.mapPins.filter((pin) => pin.cell === lockedPin.cell).length, 1, "no new place on the kept one's cell");
     assert.ok(app.mapRoutes.includes(editedRoute));
@@ -269,7 +270,8 @@ test("a run is out of date once the routes, settlement pins, Political regions o
     const owners = app.meshSession.layer(political(app)[0].levels[2].id).owners;
     const keptCounties = Regeneration.keptKeys(political(app)[0])[2];
     const land = app.meshSession.aggregates.land;
-    const elsewhere = land.findIndex((value, cell) => value === 1 && !keptCounties.has(owners[cell]));
+    // Away from the city pin drawn above, whose seat reads the land under it
+    const elsewhere = land.findLastIndex((value, cell) => value === 1 && !keptCounties.has(owners[cell]));
     land[elsewhere] = 0;
     assert.deepEqual(RunInputs.changed(app), [], "land changed outside the kept regions");
     land[elsewhere] = 1;

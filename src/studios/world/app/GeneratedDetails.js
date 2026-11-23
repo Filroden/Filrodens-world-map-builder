@@ -173,12 +173,12 @@ export class GeneratedDetails {
         ]);
     }
 
-    /** What Generate again does with an item: keeps it (edited, locked, or with its realm) or replaces it. */
+    /** What Generate again does with an item: keeps it (an entered figure, locked, edited, or given cultures) or replaces it. */
     static #fate(item, place = null) {
         if (UserFigures.has(item)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptEntered");
         if (item.generated.locked) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptLocked");
         if (item.generated.edited) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptEdited");
-        if (place && Regeneration.keptKeys(place.set)[place.depth].has(item.key)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRealm");
+        if (place && Regeneration.keptKeys(place.set)[place.depth].has(item.key)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptCultures");
         return platform.i18n.localize("FILRODENSWMB.UI.GeneratedReplaced");
     }
 
