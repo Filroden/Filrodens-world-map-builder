@@ -1956,6 +1956,17 @@ export const FILRODENSWMB = {
         // kept and drawn at once, how far past the whole frame it zooms out, and its wheel, keys
         // and zoom steps
         CANVAS: Object.freeze({ FINEST_M: 0.4, COARSE_PX: 2048, LINE_DELAY_MS: 500, KEEP_TILES: 160, AT_ONCE: 2, ROOM: 1.25, WHEEL: 0.0015, KEY_PAN_PX: 80, ZOOM_STEP: 1.5 }),
+        // Out of date (step 2b) worked out once the Surface map has been left alone this long (ms),
+        // then when the window is idle, so an edit never waits for it
+        STATES_AFTER_MS: 1500,
+        // Out of date's tolerance on a settlement's supply (step 2b; see SettlementRecord.supplyOf):
+        // a share of its need moved by more than SHARE, or the country's density by more than
+        // DENSITY of itself. A change anywhere moves every place's supply a little
+        SUPPLY_TOLERANCE: Object.freeze({ SHARE: 0.1, DENSITY: 0.25 }),
+        // A re-run's new pin for a place with a settlement map takes the old pin's id (Ken,
+        // 2026-11-24): on its cell, its model cell, or the nearest new settlement within this many
+        // model cells' spacing
+        FOLLOW_CELLS: 1.5,
         // The views a settlement's worker draws (LocalTasks.viewFits): none coarser than the frame's
         // longer side over COARSEST a pixel, nor wider or taller than SPAN times it (a view of a far
         // larger area costs seconds and gigabytes for a picture that shows nothing)

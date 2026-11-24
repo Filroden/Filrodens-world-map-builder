@@ -18,6 +18,7 @@ import { Regeneration, isKept } from "./Regeneration.js";
 import { UserFigures } from "./UserFigures.js";
 import { RunInputs } from "./RunInputs.js";
 import { VectorHistory } from "./VectorHistory.js";
+import { SettlementPins } from "../settlement/SettlementPins.js";
 
 /**
  * Running the generator on the open map and writing what it makes onto it: the input is gathered
@@ -444,7 +445,9 @@ export class Generation {
         const before = VectorHistory.snapshot(app);
         if (output.defaultStyles) this.resetStyles(app);
         this.#ensureLabelStyles(app);
+        const pinsBefore = app.mapPins ?? [];
         const removal = Regeneration.remove(app);
+        const replaced = pinsBefore.filter((pin) => !app.mapPins.includes(pin));
         const session = app.meshSession;
         // The map's own regions the run was built round, as they stand once the rest has gone
         const userRegions = result.realms.some((realm) => realm.user !== undefined) || result.counties.some((county) => county.zone !== undefined) ? this.#userDisplay(app) : null;
@@ -479,7 +482,10 @@ export class Generation {
         }
         app.mapRoutes.push(...made.routes);
         this.#writeSeats(app, made.seated ?? []);
-        app.mapPins.push(...Regeneration.placesBeside(app, made.pins));
+        const placed = Regeneration.placesBeside(app, made.pins);
+        // A settlement map follows its place: the new pin for it takes the old pin's id (L-surface)
+        SettlementPins.follow(app, replaced, placed, app.settlementPinIds?.() ?? new Set());
+        app.mapPins.push(...placed);
         const modelRunBefore = app.modelRun ?? null;
         const revisionBefore = GeneratorRevision.of(app.uiState);
         app.modelRun = encodeModelRun(result, runId);

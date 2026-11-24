@@ -71,13 +71,13 @@ test("input safety: the record round the input takes its defaults, or refuses wi
     assert.equal({}.polluted, undefined);
 });
 
-test("the input's parts: one changes with its fields; the place's name, and the places' names, change none", () => {
+test("the input's parts: one changes with its fields; the place's name, the places' names and what the engine works out from them change none", () => {
     const input = inputs.Grironcairn;
     const parts = SettlementRecord.parts(input);
     assert.deepEqual(Object.keys(parts), Object.keys(PARTS));
     const changes = {
         people: { population: input.population + 100 },
-        style: { walled: !input.walled },
+        style: { tier: input.tier === "town" ? "largeTown" : "town" },
         routes: { roads: [...input.roads, { bearing: 180, class: "main" }] },
         rivers: { river: { from: 10, to: 190, widthM: 12, upstreamKm: 40, rises: false, endsIn: "sea" } },
         ground: { biome: "TAIGA" },
@@ -87,11 +87,27 @@ test("the input's parts: one changes with its fields; the place's name, and the 
     for (const [part, change] of Object.entries(changes)) assert.deepEqual(SettlementRecord.changed(parts, SettlementRecord.parts({ ...input, ...change })), [part], part);
     const renamed = { ...input, name: "Newtown", neighbours: input.neighbours.map((n) => ({ ...n, name: `${n.name}by` })), supply: { ...input.supply, name: "Newtown" } };
     assert.deepEqual(SettlementRecord.changed(parts, SettlementRecord.parts(renamed)), []);
+    // What the engine works out from its people and tier (its plan, walls, frame, own share) is in no part: the cause is named once
+    const derived = { ...input, kind: "city", walled: !input.walled, frame: { ...input.frame, width: input.frame.width * 2 }, frameShare: 0.9, ownShare: 0.9, ownFood: 1 };
+    assert.deepEqual(SettlementRecord.changed(parts, SettlementRecord.parts(derived)), []);
     // A part a saved record has no print of is not counted as changed
     assert.deepEqual(SettlementRecord.changed({ people: parts.people }, SettlementRecord.parts({ ...input, security: 0.1 })), []);
 });
 
 test("a record's card: what the world keeps of it", () => {
     const record = recordOf(inputs.Ambergarde);
-    assert.deepEqual(SettlementRecord.card(record), { id: "s1", pinId: inputs.Ambergarde.id, sourceMapId: "m1", name: "Ambergarde", tier: "port", people: 5975, parts: record.parts, stale: [], revision: 1, savedAt: null });
+    assert.deepEqual(SettlementRecord.card(record), { id: "s1", pinId: inputs.Ambergarde.id, sourceMapId: "m1", name: "Ambergarde", tier: "port", people: 5975, parts: record.parts, stale: [], revision: 1, savedAt: null, supply: SettlementRecord.supplyOf(inputs.Ambergarde) });
+});
+
+test("its supply is compared by its main figures, within the tolerance: a change elsewhere moving it a little marks nothing", () => {
+    const input = inputs.Ambergarde;
+    const saved = SettlementRecord.supplyOf(input);
+    assert.deepEqual(Object.keys(saved), ["density", "country", "bought", "imports", "exports"]);
+    const tolerance = { SHARE: 0.1, DENSITY: 0.25 };
+    const nudged = { ...input, countryDensity: input.countryDensity * 1.1, supply: { ...input.supply, countryTotal: input.supply.countryTotal * 1.05 } };
+    assert.equal(SettlementRecord.supplyChanged(saved, SettlementRecord.supplyOf(nudged), tolerance), false, "moved a little");
+    const moved = { ...input, supply: { ...input.supply, countryTotal: input.supply.countryTotal + input.supply.need * 0.2 } };
+    assert.equal(SettlementRecord.supplyChanged(saved, SettlementRecord.supplyOf(moved), tolerance), true, "a fifth more of its need from its country");
+    assert.equal(SettlementRecord.supplyChanged(saved, SettlementRecord.supplyOf({ ...input, countryDensity: input.countryDensity * 2 + 10 }), tolerance), true, "its country twice as full");
+    assert.equal(SettlementRecord.supplyChanged(null, saved, tolerance), false, "a card kept before its figures were");
 });

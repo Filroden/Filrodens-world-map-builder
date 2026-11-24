@@ -20,7 +20,7 @@
     <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--{{panel.notice.icon}}" aria-hidden="true"></span>{{panel.notice.title}}</span>
     {{#each panel.notice.lines}}<span>{{this}}</span>{{/each}}
     <div class="fwmb-notice-actions">
-        {{#each panel.notice.actions}}<button type="button" class="fwmb-btn"{{#if this.off}} disabled data-tooltip="{{this.off}}"{{else}} data-action="{{this.action}}"{{/if}}{{#if this.data.worldId}} data-world-id="{{this.data.worldId}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</button>{{/each}}
+        {{#each panel.notice.actions}}<button type="button" class="fwmb-btn"{{#if this.off}} disabled data-tooltip="{{this.off}}"{{else}} data-action="{{this.action}}"{{/if}}{{#if this.data.worldId}} data-world-id="{{this.data.worldId}}"{{/if}}{{#if this.data.local}} data-local="{{this.data.local}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</button>{{/each}}
     </div>
 </div>
 {{/if}}

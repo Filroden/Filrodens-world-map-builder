@@ -182,6 +182,7 @@ export class MapStudio {
         // --- SETTLEMENT MAPS (L-surface): the Local studio's own actions, and opening one ---
         local(e, t)                { SettlementMaps.existing(this)?.act(t.dataset.local, t, e); },
         openSettlementMap(_e, t)   { SettlementMaps.open(this, t.dataset.settlementId); },
+        deleteSettlementMap(_e, t) { SettlementMaps.deleteMap(this, t.dataset.settlementId); },
 
         // --- STYLES AND ICONS: the map's styles (see StyleLists) ---
         openCulture(e, t)       { if (!MapStudio.#fromRowControl(e, t)) CultureEditor.open(this, t.dataset.id, MapStudio.#FROM_LIST); },
@@ -326,7 +327,7 @@ export class MapStudio {
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
         nudgeReference(e, t)            { this._onNudgeReference(e, t); },
         randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
-        redoBrush(e, t)                 { if (!this.inSettlement) this._onRedoBrush(e, t); },
+        redoBrush(e, t)                 { if (this.inSettlement) this.#settlementHistory("redo"); else this._onRedoBrush(e, t); },
         removeReferenceImage(e, t)      { this._onRemoveReferenceImage(e, t); },
         resetNoisePan(e, t)             { this._onResetNoisePan(e, t); },
         resetNoiseScale(e, t)           { this._onResetNoiseScale(e, t); },
@@ -384,7 +385,7 @@ export class MapStudio {
         toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
         toggleLock(e, t)                { this._onToggleLock(e, t); },
         toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
-        undoBrush(e, t)                 { if (!this.inSettlement) this._onUndoBrush(e, t); },
+        undoBrush(e, t)                 { if (this.inSettlement) this.#settlementHistory("undo"); else this._onUndoBrush(e, t); },
         updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
         zoomIn(e, t)                    { if (this.inSettlement) SettlementMaps.existing(this).zoomIn(); else this._onZoomIn(e, t); },
         zoomOut(e, t)                   { if (this.inSettlement) SettlementMaps.existing(this).zoomOut(); else this._onZoomOut(e, t); },
@@ -895,6 +896,7 @@ export class MapStudio {
     settlementsChanged() {
         this.#showTitle();
         this.#showDirty();
+        this.#updateHistoryButtons();
         this.view?.render(["worldbar"]);
     }
 
@@ -939,6 +941,43 @@ export class MapStudio {
         this.#applyCanvasInteractivity();
         await this.view?.render(["worldbar", "mapbar", "toolbar", "context", "editToolbar"]);
         return opened;
+    }
+
+    /** The ids of the pins with a settlement map of this world's (a re-run's new pins follow them; see SettlementPins). */
+    settlementPinIds() {
+        return SettlementMaps.linkedPinIds(this);
+    }
+
+    /** Undo or Redo on the open settlement map (its own: its Generate again steps). */
+    async #settlementHistory(direction) {
+        const controller = SettlementMaps.existing(this);
+        if (!controller) return;
+        await (direction === "redo" ? controller.redo() : controller.undo());
+        this.#updateHistoryButtons();
+    }
+
+    /** Whether a key is going into a field. */
+    static #isTyping(target) {
+        return !!target?.closest?.("input, textarea, select, [contenteditable='true']");
+    }
+
+    /**
+     * Opens another world and, there, a pin in its inspector or one of its settlement maps: a held
+     * regional world's Open in <parent world> and Make settlement map in <parent world>… (L-surface
+     * step 2b). The open world's unsaved changes are asked about first, as opening any world does.
+     * @param {string} worldId
+     * @param {{pinId?: string, settlementId?: string}} [where]
+     * @returns {Promise<boolean>} Whether it opened.
+     */
+    async openWorldAt(worldId, { pinId = null, settlementId = null } = {}) {
+        const world = await Worlds.get(worldId);
+        const mapId = world ? Worlds.mapOf(world) : null;
+        if (!mapId) return false;
+        await this.openWorld(mapId, world.name, world.id);
+        if (this.world?.id !== worldId) return false;
+        if (settlementId) await SettlementMaps.open(this, settlementId);
+        else if (pinId) await this.leaveSettlementForPin(pinId);
+        return true;
     }
 
     /** Back to the Surface map from a settlement map: the frame shows the Surface map's tool again. */
@@ -2146,8 +2185,15 @@ export class MapStudio {
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // While an export draws, the map's shortcuts wait with its controls (see #holdForExport)
         if (this.view?.held) return;
-        // A settlement map has its own keys (its canvas's), and nothing of the Surface map's to undo
+        // A settlement map has its own keys (its canvas's) and its own undo (Generate again)
         if (this.inSettlement) {
+            const ctrl = event.ctrlKey || event.metaKey;
+            const key = event.key.toLowerCase();
+            if (ctrl && !event.altKey && (key === "z" || key === "y") && !MapStudio.#isTyping(event.target)) {
+                event.preventDefault();
+                this.#settlementHistory(key === "y" || event.shiftKey ? "redo" : "undo");
+                return;
+            }
             if (AppearanceMenu.handleKey(this.root, event) || ListNav.handleKey(event) || this.#moveAlongRail(event)) event.preventDefault();
             return;
         }
@@ -2413,10 +2459,11 @@ export class MapStudio {
      * icons' page (S0 step 4c-1), which has no canvas but whose changes are undo steps of the map.
      */
     #updateHistoryButtons() {
-        // A settlement map's undo is its own: nothing to undo in L-surface step 2a
+        // A settlement map's undo is its own (its Generate again steps)
         const settlement = this.inSettlement;
-        const undoCount = settlement ? 0 : (this.globalHistoryLedger?.length ?? 0);
-        const redoCount = settlement ? 0 : (this.globalRedoLedger?.length ?? 0);
+        const counts = settlement ? (SettlementMaps.existing(this)?.historyCounts ?? { undo: 0, redo: 0 }) : null;
+        const undoCount = settlement ? counts.undo : (this.globalHistoryLedger?.length ?? 0);
+        const redoCount = settlement ? counts.redo : (this.globalRedoLedger?.length ?? 0);
         // While a route is being placed, Undo takes its last waypoint back (see #processHistoryStep)
         const drafting = !settlement && RouteTool.drafting(this);
         for (const undoBtn of this.root.querySelectorAll('[data-action="undoBrush"]')) {

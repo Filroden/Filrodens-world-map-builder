@@ -66,6 +66,17 @@ export class PinEditor {
                 const card = SettlementMaps.pinCard(app, pin);
                 return card?.id ? SettlementMaps.open(app, card.id) : null;
             },
+            // Deleted (L-surface step 2b), after its confirmation; on a held regional world, its
+            // parent's opened there, or made there
+            deleteSettlementMap: (app, pin) => {
+                const card = SettlementMaps.pinCard(app, pin);
+                return card?.card ? SettlementMaps.deleteMap(app, card.id) : null;
+            },
+            openSettlementMapInOwner: (app, pin) => {
+                const card = SettlementMaps.pinCard(app, pin);
+                return card?.heldOwn ? app.openWorldAt(card.ownerId, { settlementId: card.id }) : null;
+            },
+            makeSettlementMapInOwner: (app, pin) => SettlementMaps.makeInOwner(app, pin.id),
         },
     });
 

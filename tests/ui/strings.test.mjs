@@ -72,6 +72,9 @@ const FAMILIES = [
     // A settlement's lie in Make settlement map's From the pin, by the engine's LIES (CellContext)
     "FILRODENSWMB.UI.FromPinLie.",
     "FILRODENSWMB.UI.FromPinLie",
+    // What changed on an Out of date settlement map, by its input's parts (SettlementRecord.PARTS)
+    { prefix: "FILRODENSWMB.UI.SettlementChanged.", values: readFileSync(join(ROOT, "src/studios/local/data/SettlementRecord.js"), "utf8").replace(/(\w+):/g, '"$1":') },
+    "FILRODENSWMB.UI.SettlementChanged",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
     // The name styles, by the name bases' names with their spaces taken out

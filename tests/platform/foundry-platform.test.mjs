@@ -153,3 +153,28 @@ test("a map's blobs are base64 in a flag on its journal, kept and dropped by has
         delete globalThis.game;
     }
 });
+
+test("a settlement map written again over its page drops its old record with ForcedDeletion, not the deprecated -= key", async () => {
+    const store = await import("../../src/platform/foundry/store.js");
+    const { FILRODENSWMB } = await import("../../src/config.js");
+    const id = FILRODENSWMB.ID;
+    class ForcedDeletion {}
+    const page = { flags: { [id]: { settlement: { id: "s1", old: true } } }, updates: [] };
+    page.update = async (changes) => page.updates.push(changes);
+    const doc = { pages: { contents: [page] }, createEmbeddedDocuments: async () => [] };
+    const pack = { getDocument: async (wanted) => (wanted === "w1" ? doc : null) };
+    globalThis.foundry = { data: { operators: { ForcedDeletion } }, utils: { expandObject: (o) => o }, CONST: { SORT_INTEGER_DENSITY: 100000 } };
+    globalThis.game = { packs: { get: () => pack } };
+    try {
+        assert.deepEqual(await store.saveSettlementMap("w1", { id: "s1", name: "Castford" }, { name: "Castford", html: "<p>Castford</p>" }), { id: "s1" });
+        const [cleared, written] = page.updates;
+        assert.deepEqual(Object.keys(cleared), [`flags.${id}.settlement`]);
+        assert.ok(cleared[`flags.${id}.settlement`] instanceof ForcedDeletion);
+        assert.ok(page.updates.every((update) => Object.keys(update).every((key) => !key.includes("-="))), "no -= key");
+        assert.deepEqual(written[`flags.${id}.settlement`], { id: "s1", name: "Castford" });
+    } finally {
+        delete globalThis.foundry;
+        delete globalThis.game;
+    }
+});
+

@@ -14,7 +14,15 @@ import { SETTLEMENT_FORMAT, SETTLEMENT_VERSION } from "./SettlementRules.js";
  *
  * `parts` is the input's fingerprint by part (PARTS): what Out of date compares with the input the
  * parent would give now, naming what changed. The place's name is in no part, so renaming the pin
- * renames the map without making it Out of date (Ken, 2026-11-24).
+ * renames the map without making it Out of date (Ken, 2026-11-24). The parts hold what the input
+ * is made from, never what the engine works out from it (its plan, walls, frame and own share
+ * follow its people and tier), so a change is named once, by its cause.
+ *
+ * **Its supply** is not fingerprinted: the run's supply plan is worked over every place, so any
+ * place's change moves every other's a little (on the fixture, a town's people raised a fifth moved
+ * each of the others' figures by up to 12%). Its main figures (SUPPLY_FIGURES: the country's people
+ * a km², and what the place needs from its own country, other places, imports and exports, as
+ * shares of its need) are kept on the card and compared within LOCAL.SUPPLY_TOLERANCE.
  *
  * Pure: no host, no DOM.
  */
@@ -22,13 +30,19 @@ import { SETTLEMENT_FORMAT, SETTLEMENT_VERSION } from "./SettlementRules.js";
 /** The input's fields in each part, as Out of date names them. */
 export const PARTS = Object.freeze({
     people: Object.freeze(["population"]),
-    style: Object.freeze(["tier", "kind", "walled", "capital", "fortified", "port", "riverPort"]),
+    style: Object.freeze(["tier", "capital", "fortified", "port", "riverPort"]),
     routes: Object.freeze(["roads", "waterRoutes"]),
     rivers: Object.freeze(["river", "otherRivers", "water", "shore"]),
-    ground: Object.freeze(["relief", "climate", "biome", "kindOfPlace", "frame"]),
+    ground: Object.freeze(["relief", "climate", "biome", "kindOfPlace"]),
     cultures: Object.freeze(["cultures"]),
-    run: Object.freeze(["supply", "countryDensity", "security", "frameShare", "ownShare", "ownFood", "neighbours"]),
+    run: Object.freeze(["security", "neighbours"]),
 });
+
+/** Every part Out of date can name: the fingerprinted ones, then "supply" (compared by its figures). */
+export const OUT_OF_DATE_PARTS = Object.freeze([...Object.keys(PARTS), "supply"]);
+
+/** The supply's main figures, as SettlementRecord.supplyOf gives them. */
+export const SUPPLY_FIGURES = Object.freeze(["density", "country", "bought", "imports", "exports"]);
 
 /** Names inside a part that are the places' own (the supply names its place and its trade partners). */
 const NAME_KEYS = new Set(["name"]);
@@ -65,6 +79,41 @@ export class SettlementRecord {
      */
     static changed(saved, now) {
         return Object.keys(PARTS).filter((part) => saved?.[part] && now?.[part] && saved[part] !== now[part]);
+    }
+
+    /**
+     * Its supply's main figures (see the class comment): the country's people a km², and the
+     * shares of its need it takes from its own country, buys from other places, imports and
+     * exports. Null on an input with no supply.
+     * @param {object} input
+     * @returns {{density: number, country: number, bought: number, imports: number, exports: number}|null}
+     */
+    static supplyOf(input) {
+        const supply = input?.supply;
+        if (!supply || !(supply.need > 0)) return null;
+        const share = (amount) => Math.round(((Number(amount) || 0) / supply.need) * 1000) / 1000;
+        const bought = (supply.fromPlaces ?? []).reduce((sum, from) => sum + (Number(from?.amount) || 0), 0);
+        return { density: Math.round((Number(input.countryDensity) || 0) * 100) / 100, country: share(supply.countryTotal), bought: share(bought), imports: share(supply.imports), exports: share(supply.exports) };
+    }
+
+    /**
+     * Whether its supply changed past the tolerance (a share of its need by more than
+     * SUPPLY_TOLERANCE.SHARE, the country's density by more than SUPPLY_TOLERANCE.DENSITY of
+     * itself). Either missing (a map kept before its figures were kept, a map with no run) counts
+     * as unchanged.
+     * @param {object|null} saved
+     * @param {object|null} now
+     * @param {{SHARE: number, DENSITY: number}} tolerance
+     */
+    static supplyChanged(saved, now, tolerance) {
+        if (!saved || !now) return false;
+        for (const figure of SUPPLY_FIGURES) {
+            if (!Number.isFinite(saved[figure]) || !Number.isFinite(now[figure])) continue;
+            if (figure === "density") {
+                if (Math.abs(now.density - saved.density) > tolerance.DENSITY * Math.max(1, saved.density)) return true;
+            } else if (Math.abs(now[figure] - saved[figure]) > tolerance.SHARE) return true;
+        }
+        return false;
     }
 
     /**
@@ -105,6 +154,9 @@ export class SettlementRecord {
      * @param {string[]} [stale] - The parts Out of date at this save.
      */
     static card(record, stale = []) {
-        return { id: record.id, pinId: record.pinId, sourceMapId: record.sourceMapId, name: record.name, tier: record.input.tier, people: record.input.population, parts: { ...record.parts }, stale: [...stale], revision: record.revision, savedAt: record.savedAt };
+        const card = { id: record.id, pinId: record.pinId, sourceMapId: record.sourceMapId, name: record.name, tier: record.input.tier, people: record.input.population, parts: { ...record.parts }, stale: [...stale], revision: record.revision, savedAt: record.savedAt };
+        const supply = SettlementRecord.supplyOf(record.input);
+        if (supply) card.supply = supply;
+        return card;
     }
 }

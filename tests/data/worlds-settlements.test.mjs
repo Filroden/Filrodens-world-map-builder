@@ -1,6 +1,7 @@
 // A world's settlement maps (L-surface step 2a): part of their world, not saved maps. Over the web
 // host's store in memory, which gives the same results as Foundry's (a page each of the world's
-// journal there).
+// journal there). Step 2b: what is Out of date kept on each card at a save, and Clone as new of a
+// held regional world taking its parents' settlement maps of the pins on its map.
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { installPlatform, platform } from "../../src/platform/index.js";
@@ -104,3 +105,29 @@ test("a settlement card is read safely", () => {
     assert.deepEqual(WorldRecord.settlementCard({ id: "s1", pinId: "../p", name: " Castford ", tier: "town<b>", people: -3, parts: { people: "0123abcd", run: "nope", evil: "0123abcd" }, stale: ["people", "toString"], revision: 0, savedAt: "soon" }), { id: "s1", name: "Castford", parts: { people: "0123abcd" }, stale: ["people"] });
     assert.deepEqual(WorldRecord.settlementCards({ settlements: [{ id: "a" }, { id: "a" }, null, { id: "b" }] }).map((card) => card.id), ["a", "b"]);
 });
+
+test("a save keeps what is Out of date on each card, changed or not; a save that does not say leaves them as they were", async () => {
+    const first = await Worlds.save({ world: null, name: "Aethoria", settings: SETTINGS, maps: [surface()], settlements: { saved: [settlement("sA", "p1", "Castford"), settlement("sB", "p2", "Kingsbridge")] } });
+    const { world } = await Worlds.save({ world: first.world, name: "Aethoria", settings: SETTINGS, maps: [surface({ id: first.maps[0].id, changed: false })], settlements: { saved: [], stale: { sA: ["people", "routes"], sB: [] } } });
+    assert.deepEqual(world.settlements.map((card) => [card.id, card.stale]), [["sA", ["people", "routes"]], ["sB", []]]);
+    const again = await Worlds.save({ world, name: "Aethoria", settings: SETTINGS, maps: [surface({ id: first.maps[0].id, changed: false })], settlements: {} });
+    assert.deepEqual(again.world.settlements.map((card) => card.stale), [["people", "routes"], []]);
+});
+
+test("Clone as new of a held regional world takes its parents' settlement maps of the pins on its map, with its own", async () => {
+    const parent = await Worlds.save({ world: null, name: "Parent", settings: SETTINGS, maps: [surface()], settlements: { saved: [settlement("sA", "p1", "Castford"), settlement("sB", "p2", "Kingsbridge")] } });
+    // A held world cut from it: p1 is on its map (its id kept by the cut), p2 is not; p9 is Fill in's, with its own map
+    const held = WorldRecord.create({ id: "held", name: "Held", parentWorldId: parent.world.id, held: true, settings: { setup: { seed: "h" } } });
+    await platform.store.saveWorld(held);
+    const pins = [{ id: "p1", name: "Castford" }, { id: "p9", name: "Newfield", generated: { infill: true } }];
+    const saved = await Worlds.save({ world: held, name: "Held", settings: { setup: { seed: "h" } }, maps: [surface({ data: { mapWidth: 10, mapHeight: 10, mapPins: pins } })], settlements: { saved: [settlement("sF", "p9", "Newfield")] } });
+    const clone = await Worlds.cloneAsNew(saved.world.id, "Clone");
+    const copies = await platform.store.listSettlementMaps(clone.id);
+    assert.deepEqual(copies.map((record) => record.pinId).sort(), ["p1", "p9"], "its own, and the parent's on its map");
+    assert.ok(copies.every((record) => record.sourceMapId === Worlds.mapOf(clone)), "made from the clone's Surface map");
+    assert.ok(copies.every((record) => !["sA", "sF"].includes(record.id)), "each under a new id");
+    assert.deepEqual(clone.settlements.map((card) => card.pinId).sort(), ["p1", "p9"]);
+    // The parent keeps its own
+    assert.equal((await platform.store.listSettlementMaps(parent.world.id)).length, 2);
+});
+

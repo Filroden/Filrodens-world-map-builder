@@ -110,7 +110,7 @@
             <button type="button" role="menuitem" aria-disabled="true" data-tooltip="{{worldBar.addMap}}"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.AddMap"}}</button>
             {{#if worldBar.settlements.enabled}}
             {{#each worldBar.settlements.rows}}
-            <button type="button" role="menuitemradio" class="{{#if @first}}fwmb-menu-item--separated{{/if}}" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span></button>
+            <button type="button" role="menuitemradio" class="{{#if @first}}fwmb-menu-item--separated{{/if}}" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span>{{#each this.marks}} <span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</button>
             {{/each}}
             {{else}}
             <button type="button" role="menuitem" class="fwmb-menu-item--separated" aria-disabled="true" data-tooltip="{{#if worldBar.settlements.tooltip}}{{worldBar.settlements.tooltip}}{{else}}{{worldBar.settlementMaps}}{{/if}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.SettlementMaps"}}</button>
@@ -132,7 +132,7 @@
         <div class="fwmb-dropdown-menu fwmb-settlement-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.SettlementMaps'}}" data-settlement-list>
             <input type="search" class="fwmb-settlement-search" data-settlement-search data-panel-ui placeholder="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" aria-label="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" />
             {{#each worldBar.settlements.rows}}
-            <button type="button" role="menuitemradio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}" data-settlement-row data-search="{{this.search}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span></button>
+            <button type="button" role="menuitemradio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}" data-settlement-row data-search="{{this.search}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span>{{#each this.marks}} <span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</button>
             {{/each}}
             <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementMapsMenuHint"}}</p>
         </div>

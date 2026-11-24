@@ -51,7 +51,8 @@
         {{/if}}
 
         {{!-- Its settlement maps (L-surface; board L4): a searchable table scrolling past five rows,
-             so the regional worlds below stay in view --}}
+             so the regional worlds below stay in view; each row's Open, and Delete… for the world's
+             own (Ken, 2026-11-24: deleting one by one from each pin took too long) --}}
         <div class="fwmb-overview-group fwmb-overview-settlements" data-settlement-list>
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMaps"}} <span class="fwmb-badge fwmb-badge--count">{{overview.settlements.length}}</span>
                 {{#if overview.settlements.length}}<input type="search" class="fwmb-settlement-search" data-settlement-search data-panel-ui placeholder="{{localize 'FILRODENSWMB.UI.Search'}}" aria-label="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" />{{/if}}
@@ -59,7 +60,7 @@
             {{#if overview.settlements.length}}
             <div class="fwmb-settlement-table-wrap">
                 <table class="fwmb-settlement-table">
-                    <thead><tr><th scope="col">{{localize "FILRODENSWMB.UI.SettlementColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.KindColumn"}}</th><th scope="col" class="fwmb-num">{{localize "FILRODENSWMB.UI.PeopleColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.MadeFromColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.StateColumn"}}</th><th scope="col"><span class="fwmb-visually-hidden">{{localize "FILRODENSWMB.UI.OpenSettlementMap"}}</span></th></tr></thead>
+                    <thead><tr><th scope="col">{{localize "FILRODENSWMB.UI.SettlementColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.KindColumn"}}</th><th scope="col" class="fwmb-num">{{localize "FILRODENSWMB.UI.PeopleColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.MadeFromColumn"}}</th><th scope="col">{{localize "FILRODENSWMB.UI.StateColumn"}}</th><th scope="col"><span class="fwmb-visually-hidden">{{localize "FILRODENSWMB.UI.SettlementActionsColumn"}}</span></th></tr></thead>
                     <tbody>
                         {{#each overview.settlements}}
                         <tr data-settlement-row data-search="{{this.search}}">
@@ -67,8 +68,8 @@
                             <td>{{this.kind}}</td>
                             <td class="fwmb-num">{{this.people}}</td>
                             <td>{{this.from}}</td>
-                            <td></td>
-                            <td class="fwmb-end"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.OpenNamed' name=this.name}}">{{localize "FILRODENSWMB.UI.Open"}}</button></td>
+                            <td>{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</td>
+                            <td class="fwmb-end"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.OpenNamed' name=this.name}}">{{localize "FILRODENSWMB.UI.Open"}}</button>{{#if this.deletable}} <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i></button>{{/if}}</td>
                         </tr>
                         {{/each}}
                     </tbody>

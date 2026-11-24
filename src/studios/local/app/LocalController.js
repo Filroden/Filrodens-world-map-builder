@@ -4,6 +4,7 @@ import { WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { LocalWorkers } from "../LocalWorkers.js";
 import { inputFrom } from "../engine/LocalInput.js";
 import { SettlementRecord } from "../data/SettlementRecord.js";
+import { OutOfDate } from "./OutOfDate.js";
 import { SettlementCanvas } from "./SettlementCanvas.js";
 import { PICTURE_LAYERS, VersionChoice, estimateMs } from "./VersionChoice.js";
 import { drawTown } from "../render/CanvasTown.js";
@@ -26,6 +27,13 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  * (a kept settlement map being built to show), **open**, or none. A version kept makes a record
  * (SettlementRecord) that joins the world unsaved; Save world writes it (`changes`, `saved`).
  *
+ * Keeping it in step (step 2b): each settlement map's **Out of date** state against its pin as it
+ * is now (`states`, see OutOfDate), worked out when the host asks and forgotten when the Surface
+ * map changes (`sourceChanged`); **Generate again** (`generateAgain`, and `regenerate` for Generate
+ * all) takes the input the pin gives now with the kept seed, one undo step on the settlement map
+ * (`undo`, `redo`); **Delete settlement map…** (`deleteMap`). A held regional world's settlement
+ * map is its parent world's, opened read only (`open(id, { owner })`).
+ *
  * The host:
  *   source() → the Surface map's settlement source (kept while the map is unchanged), or null
  *   pin(pinId) → { id, biome } for the engine, or null; pinOf(pinId) → the pin, or null
@@ -33,6 +41,8 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  *   mapName() → the map a settlement map is made from, by name ("the Surface map")
  *   changed() → the world has unsaved changes (the settlement maps'); render(regions)
  *   goToPin(pinId) → the Surface map, the pin in its inspector; leave() → back to the Surface map
+ *   openOwner(owner, id) → the world that owns a held world's settlement map, opening it there
+ *   worldName() → the open world's name, for the deletion's confirmation
  */
 export class LocalController {
     /** "choosing", "building", "open", or null. */
@@ -75,6 +85,12 @@ export class LocalController {
     #lineFrame = null;
     /** The building card's progress (a kept map built to show). */
     #building = null;
+    /** Each settlement map's Out of date state, by id (see OutOfDate), or null until worked out. */
+    #states = null;
+    /** Each settlement map's undo and redo this session, by id: { undo: [], redo: [] } of { input, parts, name }. */
+    #history = new Map();
+    /** The world that owns the open settlement map when it is not this one's (a held world's parent's): { worldId, name }. */
+    #owner = null;
 
     /** The engine's input from a source (LocalInput.inputFrom; a stand-in in tests). */
     #inputFrom;
@@ -127,6 +143,39 @@ export class LocalController {
         return this.cards().find((card) => card.pinId === pinId) ?? null;
     }
 
+    /**
+     * Each of the world's settlement maps' Out of date state against its pin as it is now (see
+     * OutOfDate): worked out when first asked for after the Surface map changed (the source read
+     * again, about half a second on a large map, then a few ms a settlement map), else null when
+     * `compute` is false.
+     * @param {{compute?: boolean}} [options]
+     * @returns {Map<string, {changed: string[], pinGone: boolean, people: object|null}>|null}
+     */
+    states({ compute = true } = {}) {
+        if (!this.#states && compute) {
+            // No source yet (the Surface map's mesh still loading): nothing known, nothing kept
+            const source = this.#host.source();
+            if (!source) return null;
+            this.#states = OutOfDate.of({ source, cards: this.cards(), pinFor: (pinId) => this.#host.pin(pinId), inputFrom: this.#inputFrom });
+        }
+        return this.#states;
+    }
+
+    /** A settlement map's Out of date state, or null when not worked out (or `compute`, worked out now). */
+    stateOf(id, { compute = false } = {}) {
+        return this.states({ compute })?.get(id) ?? null;
+    }
+
+    /** The Surface map changed (or loaded): every state is worked out again when next asked for. */
+    sourceChanged() {
+        this.#states = null;
+    }
+
+    /** A settlement map made from its pin as it is now. */
+    #fresh(id) {
+        this.#states?.set(id, { changed: [], pinGone: false, people: null });
+    }
+
     /** The open settlement map's card, or null. */
     get openCard() {
         return this.#record ? SettlementRecord.card(this.#record) : null;
@@ -137,9 +186,13 @@ export class LocalController {
      * with its card and readable page, and the ids deleted.
      */
     async changes(pageOf) {
+        // What is Out of date at this save, kept on each card for a held regional world's form,
+        // which cannot work it out (its parent's Surface map is not open there)
+        const states = this.cards().length ? this.states() : null;
+        const stale = Object.fromEntries([...(states ?? new Map())].map(([id, state]) => [id, state.changed]));
         const saved = [];
-        for (const record of this.#pending.values()) saved.push({ record: structuredClone(record), card: SettlementRecord.card(record), page: (await pageOf?.(record)) ?? {} });
-        return { saved, deleted: [...this.#deleted] };
+        for (const record of this.#pending.values()) saved.push({ record: structuredClone(record), card: SettlementRecord.card(record, stale[record.id] ?? []), page: (await pageOf?.(record)) ?? {} });
+        return { saved, deleted: [...this.#deleted], stale: states ? stale : null };
     }
 
     /**
@@ -156,10 +209,17 @@ export class LocalController {
                 this.#built.delete(this.#record.id);
                 this.#built.set(id, built);
             }
+            const history = this.#history.get(this.#record.id);
+            if (history) {
+                this.#history.delete(this.#record.id);
+                this.#history.set(id, history);
+            }
             this.#record = { ...this.#record, id };
         }
         this.#pending.clear();
         this.#deleted.clear();
+        // Save as gives every settlement map a new id: their states are worked out again
+        if (renamed.size && [...renamed].some(([from, id]) => from !== id)) this.#states = null;
         // Map setup no longer says the open one is waiting to be saved
         if (this.isOpen) this.#host.render(["context"]);
     }
@@ -168,6 +228,8 @@ export class LocalController {
     forgetChanges() {
         this.#pending.clear();
         this.#deleted.clear();
+        this.#history.clear();
+        this.#states = null;
     }
 
     // ------------------------------------------------------------------ opening and leaving
@@ -201,40 +263,62 @@ export class LocalController {
 
     /**
      * Opens a kept settlement map: built again from its record (or from the version still held,
-     * when it was built this session from the same input) and drawn.
+     * when it was built this session from the same input) and drawn. A held regional world's
+     * settlement map is its parent world's (`owner`), opened read only.
      * @param {string} id - The settlement map's id.
+     * @param {{owner?: {worldId: string, name: string}|null}} [options]
      */
-    async open(id) {
+    async open(id, { owner = null } = {}) {
         this.#leaveCurrent();
-        const record = this.#pending.get(id) ?? (await this.#load(id));
+        const record = owner ? await this.#load(id, owner.worldId) : (this.#pending.get(id) ?? (await this.#load(id)));
         if (!record) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.SettlementMapMissing"));
             return false;
         }
+        this.#owner = owner;
         this.#record = record;
         this.#pinId = record.pinId;
         this.tool = "mapSetup";
+        return this.#showRecord(record, { render: false });
+    }
+
+    /**
+     * Shows a record on the canvas: the version held for it when it was built from the same input,
+     * else built in a worker (its card showing its progress), its households worked out, and drawn.
+     * A newer build asked for meanwhile (Generate again, Undo) wins: this one is dropped.
+     */
+    async #showRecord(record, { render = true } = {}) {
         const key = JSON.stringify(record.input);
         const held = this.#built.get(record.id);
+        this.#canvas?.destroy();
+        this.#canvas = null;
+        this.#shown = null;
         if (held && held.key === key) {
             this.#shown = held;
             this.mode = "open";
             this.#drawStage();
             await this.#showTown();
+            if (render) this.#host.render(["toolbar", "context", "editToolbar", "mapbar"]);
             return true;
         }
         this.mode = "building";
         this.#building = { startedAt: performance.now(), population: record.input.population };
         this.#drawStage();
         this.#tick();
-        const versionId = `open-${record.id}-${Date.now().toString(36)}`;
+        if (render) this.#host.render(["context", "editToolbar"]);
+        const versionId = `open-${record.id}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const current = () => this.#record?.id === record.id && JSON.stringify(this.#record.input) === key;
         try {
             const result = await this.#workersNow().build(versionId, record.input);
-            if (this.#record?.id !== record.id) {
+            if (!current()) {
                 this.#workersNow().release([versionId]).catch(() => {});
                 return false;
             }
             await this.#workersNow().keep(versionId);
+            if (!current()) {
+                this.#workersNow().release([versionId]).catch(() => {});
+                return false;
+            }
             this.#remember(record.id, { versionId, key, result });
             this.#shown = this.#built.get(record.id);
             this.mode = "open";
@@ -244,6 +328,7 @@ export class LocalController {
             this.#host.render(["toolbar", "context", "editToolbar", "mapbar"]);
             return true;
         } catch (error) {
+            if (!current()) return false;
             console.error("FWMB | A settlement map could not be built:", error);
             platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.SettlementMapFailed"));
             this.mode = "open";
@@ -253,12 +338,181 @@ export class LocalController {
         }
     }
 
+    // ------------------------------------------------------------------ keeping it in step (2b)
+
+    /** Whether the open settlement map is this world's to change (not a held world's parent's). */
+    get canChange() {
+        return !!this.#record && !this.#owner && this.mode !== "choosing";
+    }
+
+    /** The world that owns the open settlement map when it is not this one's, or null. */
+    get owner() {
+        return this.#owner;
+    }
+
+    /**
+     * Generate again (step 2b): the open settlement map made again from its pin as it is now,
+     * with its kept seed, one undo step on the settlement map; rebuilt and drawn.
+     */
+    async generateAgain() {
+        if (!this.canChange) return false;
+        const next = this.#inputNow(this.#record);
+        if (!next) return false;
+        this.#step(this.#record.id, next);
+        await this.#showRecord(this.#record);
+        return true;
+    }
+
+    /**
+     * Generate all's part (step 2b): each settlement map given is made again from its pin as it is
+     * now, without being opened (nothing generated is stored, so nothing is built), each one undo
+     * step on its settlement map; the open one is drawn again.
+     * @param {string[]} ids
+     * @returns {Promise<number>} How many were made again.
+     */
+    async regenerate(ids) {
+        let made = 0;
+        for (const id of ids) {
+            const record = this.#pending.get(id) ?? (await this.#load(id));
+            const next = record ? this.#inputNow(record) : null;
+            if (!next) continue;
+            if (this.#record?.id === id && !this.#owner) this.#record = record;
+            this.#step(id, next, record);
+            made++;
+        }
+        if (made && this.#record && !this.#owner && ids.includes(this.#record.id) && this.mode === "open") await this.#showRecord(this.#pending.get(this.#record.id));
+        return made;
+    }
+
+    /** Whether the open settlement map has a step to undo, or to redo. */
+    get canUndo() {
+        return this.canChange && (this.#history.get(this.#record.id)?.undo.length ?? 0) > 0;
+    }
+
+    get canRedo() {
+        return this.canChange && (this.#history.get(this.#record.id)?.redo.length ?? 0) > 0;
+    }
+
+    /** How many steps the open settlement map can undo and redo. */
+    get historyCounts() {
+        const history = this.canChange ? this.#history.get(this.#record.id) : null;
+        return { undo: history?.undo.length ?? 0, redo: history?.redo.length ?? 0 };
+    }
+
+    /** Undo on the open settlement map: its input before its last Generate again, drawn again. */
+    async undo() {
+        return this.#travel("undo", "redo");
+    }
+
+    /** Redo on the open settlement map. */
+    async redo() {
+        return this.#travel("redo", "undo");
+    }
+
+    async #travel(from, to) {
+        if (!this.canChange) return false;
+        const id = this.#record.id;
+        const history = this.#history.get(id);
+        const entry = history?.[from].pop();
+        if (!entry) return false;
+        history[to].push(this.#snapshot(this.#record));
+        this.#apply(id, entry, this.#record);
+        // Its state against the pin: worked out again for it alone
+        this.#states?.delete(id);
+        const state = OutOfDate.of({ source: this.#host.source(), cards: [SettlementRecord.card(this.#record)], pinFor: (pinId) => this.#host.pin(pinId), inputFrom: this.#inputFrom }).get(id);
+        if (state) this.#states?.set(id, state);
+        await this.#showRecord(this.#record);
+        return true;
+    }
+
+    /**
+     * Delete settlement map… (step 2b; board L1b): after its confirmation, the settlement map goes
+     * from the world at the next Save world; the pin stays. Its seed is named, to make it again.
+     * @param {string} id
+     * @returns {Promise<boolean>} Whether it was deleted.
+     */
+    async deleteMap(id) {
+        const { i18n } = platform;
+        const card = this.cards().find((each) => each.id === id);
+        if (!card) return false;
+        const record = this.#pending.get(id) ?? (await this.#load(id));
+        const pin = this.#host.pinOf(card.pinId);
+        const name = pin?.name || card.name || i18n.localize("FILRODENSWMB.UI.UnnamedPin");
+        const world = this.#host.worldName?.() || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const lines = [i18n.format(pin ? "FILRODENSWMB.UI.DeleteSettlementMapBody" : "FILRODENSWMB.UI.DeleteSettlementMapBodyNoPin", { name, world })];
+        if (record?.seed) lines.push(i18n.format("FILRODENSWMB.UI.DeleteSettlementMapSeed", { seed: record.seed }));
+        const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+        const confirmed = await platform.dialogs.confirm({
+            title: i18n.format("FILRODENSWMB.UI.DeleteSettlementMapTitle", { name }),
+            content: `<p>${escape(lines[0])}</p>${lines[1] ? `<p class="fwmb-hint">${escape(lines[1])}</p>` : ""}`,
+            confirmLabel: i18n.localize("FILRODENSWMB.UI.Delete"),
+            confirmIcon: "fwmb-icon fwmb-icon--delete",
+            destructive: true,
+        });
+        if (!confirmed) return false;
+        const saved = WorldRecord.settlementCards(this.#host.world()).some((each) => each.id === id);
+        this.#pending.delete(id);
+        if (saved) this.#deleted.add(id);
+        this.#history.delete(id);
+        this.#states?.delete(id);
+        const built = this.#built.get(id);
+        if (built) {
+            this.#built.delete(id);
+            this.#workersNow().release([built.versionId]).catch(() => {});
+        }
+        if (this.#record?.id === id) this.#host.leave();
+        this.#host.changed();
+        return true;
+    }
+
+    /** Opens the open settlement map in the world that owns it (a held world's parent). */
+    openInOwner() {
+        if (!this.#owner || !this.#record) return null;
+        return this.#host.openOwner?.(this.#owner, this.#record.id);
+    }
+
+    /** The input a record's pin gives now, with its kept seed, or null when its pin has gone. */
+    #inputNow(record) {
+        const source = this.#host.source();
+        const pin = this.#host.pin(record.pinId);
+        if (!source || !pin) return null;
+        try {
+            return this.#inputFrom(source, pin, { seed: record.seed });
+        } catch (error) {
+            console.warn(`FWMB | Settlement map ${record.id} could not be made again from its pin:`, error);
+            return null;
+        }
+    }
+
+    #snapshot(record) {
+        return { input: record.input, parts: record.parts, name: record.name };
+    }
+
+    /** One undo step: the record's input replaced (it joins the world's changes), its state made fresh. */
+    #step(id, input, record = this.#record) {
+        const history = this.#history.get(id) ?? { undo: [], redo: [] };
+        history.undo.push(this.#snapshot(record));
+        history.redo = [];
+        this.#history.set(id, history);
+        const pin = this.#host.pinOf(record.pinId);
+        this.#apply(id, { input: structuredClone(input), parts: SettlementRecord.parts(input), name: pin?.name || record.name }, record);
+        this.#fresh(id);
+    }
+
+    #apply(id, { input, parts, name }, record) {
+        const next = { ...record, input, parts, name, seed: input.seed ?? record.seed };
+        this.#pending.set(id, next);
+        if (this.#record?.id === id && !this.#owner) this.#record = next;
+        this.#host.changed();
+    }
+
     /** Leaves the settlement map (or the choice): the choice's versions released, nothing kept. */
     close() {
         this.#leaveCurrent();
         this.mode = null;
         this.#pinId = null;
         this.#record = null;
+        this.#owner = null;
         this.#stage?.remove();
         this.#stage = null;
     }
@@ -315,7 +569,7 @@ export class LocalController {
             panel: {
                 title: choosing ? i18n.localize("FILRODENSWMB.UI.MakeSettlementMap") : i18n.localize(entry?.label ?? ""),
                 lede: choosing ? i18n.format("FILRODENSWMB.UI.LedeMakeSettlementMap", { name }) : entry?.lede ? i18n.localize(entry.lede) : null,
-                notice: null,
+                notice: this.#notice(),
                 tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
                 meta,
                 state: null,
@@ -326,6 +580,51 @@ export class LocalController {
             panelHeadPartial: null,
             local: this.#mapSetupContext(),
         };
+    }
+
+    /**
+     * The action notice at the head of the settlement map's panel (the shell's rule, decision
+     * record Q6; board L3b), in any of its tools: Out of date naming what changed, with Generate
+     * again; its pin gone, with Delete settlement map…; or a held world's parent's map, read only,
+     * with Open in <parent world>.
+     */
+    #notice() {
+        const { i18n } = platform;
+        if (this.mode === "choosing" || !this.#record) return null;
+        const name = this.#settlementName();
+        const local = (action, label, icon) => ({ action: "local", data: { local: action }, label, icon });
+        if (this.#owner) {
+            const lines = [i18n.format("FILRODENSWMB.UI.SettlementHeldLine", { world: this.#host.worldName?.() ?? "", owner: this.#owner.name })];
+            if (this.#owner.stale?.length) lines.push(i18n.format("FILRODENSWMB.UI.SettlementHeldStale", { owner: this.#owner.name, changes: this.describe({ changed: this.#owner.stale, people: null }) }));
+            return { title: i18n.format("FILRODENSWMB.UI.SettlementHeldTitle", { owner: this.#owner.name }), icon: "lock", lines, actions: [local("openInOwner", i18n.format("FILRODENSWMB.UI.OpenInWorld", { world: this.#owner.name }), "open-in-new")] };
+        }
+        const state = this.stateOf(this.#record.id, { compute: true });
+        if (state?.pinGone) {
+            return { title: i18n.localize("FILRODENSWMB.UI.MarkPinGone"), icon: "warning-mark", lines: [i18n.format("FILRODENSWMB.UI.SettlementPinGoneLine", { name, map: this.#host.mapName() })], actions: [local("deleteMap", i18n.localize("FILRODENSWMB.UI.DeleteSettlementMapEllipsis"), "delete")] };
+        }
+        if (state?.changed.length) {
+            return { title: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate"), icon: "warning-mark", lines: [i18n.format("FILRODENSWMB.UI.SettlementStaleLine", { name, changes: this.describe(state) }), i18n.localize("FILRODENSWMB.UI.SettlementStaleKeeps")], actions: [local("generateAgain", i18n.localize("FILRODENSWMB.UI.GenerateAgain"), "run")] };
+        }
+        return null;
+    }
+
+    /**
+     * What changed, in words: "its population (2,900 to 3,400) and a road".
+     * @param {{changed: string[], people?: {was: number, now: number}|null}} state
+     */
+    describe(state) {
+        const { i18n } = platform;
+        const lang = i18n.lang;
+        const phrases = (state?.changed ?? []).map((part) =>
+            part === "people" && state.people
+                ? i18n.format("FILRODENSWMB.UI.SettlementChangedPeople", { was: state.people.was.toLocaleString(lang), now: state.people.now.toLocaleString(lang) })
+                : i18n.localize(`FILRODENSWMB.UI.SettlementChanged.${part}`),
+        );
+        try {
+            return new Intl.ListFormat(lang, { style: "long", type: "conjunction" }).format(phrases);
+        } catch {
+            return phrases.join(", ");
+        }
     }
 
     /**
@@ -400,6 +699,12 @@ export class LocalController {
                 return this.#host.goToPin(this.#pinId);
             case "backToVersions":
                 return this.#backToVersions();
+            case "generateAgain":
+                return this.generateAgain();
+            case "deleteMap":
+                return this.#record ? this.deleteMap(this.#record.id) : undefined;
+            case "openInOwner":
+                return this.openInOwner();
             default:
                 return undefined;
         }
@@ -437,10 +742,9 @@ export class LocalController {
         return this.#workers;
     }
 
-    async #load(id) {
-        const world = this.#host.world();
-        if (!world?.id) return null;
-        const raw = await platform.store.loadSettlementMap(world.id, id);
+    async #load(id, worldId = this.#host.world()?.id) {
+        if (!worldId) return null;
+        const raw = await platform.store.loadSettlementMap(worldId, id);
         return raw ? this.#shell?.registry?.get("local")?.rules?.check(raw) ?? raw : null;
     }
 
@@ -497,6 +801,8 @@ export class LocalController {
         });
         this.#record = record;
         this.#pending.set(record.id, record);
+        this.#history.delete(record.id);
+        this.#fresh(record.id);
         this.mode = "building";
         this.#building = { startedAt: performance.now(), population: record.input.population, keeping: true };
         this.#drawStage();

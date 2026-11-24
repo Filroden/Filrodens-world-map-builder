@@ -768,7 +768,11 @@ export class MapDialogManager {
         const selection = app.massEditSelection?.[type];
         if (!config || !this.#MASS_DELETE[type] || !selection?.size) return false;
         const count = selection.size.toLocaleString(platform.i18n.lang);
-        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.MassDeleteTitle"), platform.i18n.format(this.#MASS_DELETE[type], { count }));
+        let content = platform.i18n.format(this.#MASS_DELETE[type], { count });
+        // Pins with settlement maps: the maps are kept, without their pins (L-surface)
+        const mapped = type === "pin" ? [...selection].filter((id) => app.settlementPinIds?.().has(id)).length : 0;
+        if (mapped) content = `${content} ${platform.i18n.format("FILRODENSWMB.UI.PinsDeleteKeepSettlementMaps", { count: mapped.toLocaleString(platform.i18n.lang) })}`;
+        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.MassDeleteTitle"), content);
         if (!confirmed) return false;
 
         MapStateManager.pushVectorState(app);
@@ -796,7 +800,9 @@ export class MapDialogManager {
         const config = FILRODENSWMB.ENTITY_CONFIG[entityType];
         if (!config || !app[config.stateKey]?.some((item) => item.id === id)) return false;
 
-        const confirmed = await this._confirmDialog();
+        // A pin with a settlement map: the map is kept, without its pin (L-surface)
+        const mapped = entityType === "pin" && app.settlementPinIds?.().has(id);
+        const confirmed = await this._confirmDialog(undefined, mapped ? `${platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")} ${platform.i18n.localize("FILRODENSWMB.UI.PinDeleteKeepsSettlementMap")}` : undefined);
         if (!confirmed) return false;
 
         MapStateManager.pushVectorState(app);

@@ -16,6 +16,7 @@ import { Regeneration, isKept } from "./Regeneration.js";
 import { RunInputs } from "./RunInputs.js";
 import { TravelView } from "./TravelView.js";
 import { VectorHistory } from "./VectorHistory.js";
+import { SettlementPins } from "../settlement/SettlementPins.js";
 
 /**
  * Fill in (the Generate panel's section on a regional map; see Infill): villages and market towns
@@ -194,7 +195,9 @@ export class Infilling {
      */
     static apply(app, result, grid, { seed = "" } = {}) {
         const before = VectorHistory.snapshot(app);
-        app.mapPins = (app.mapPins ?? []).filter((pin) => !this.isInfill(pin) || isKept(pin));
+        const pinsBefore = app.mapPins ?? [];
+        app.mapPins = pinsBefore.filter((pin) => !this.isInfill(pin) || isKept(pin));
+        const replacedPins = pinsBefore.filter((pin) => !app.mapPins.includes(pin));
         app.mapRoutes = (app.mapRoutes ?? []).filter((route) => !this.isInfill(route) || isKept(route));
         const runId = platform.utils.randomID();
         const idFactory = () => platform.utils.randomID();
@@ -229,6 +232,8 @@ export class Infilling {
         const routes = buildRoutes(app.meshSession, { routes: chains }, { runId, idFactory, styleFor: () => routeStyleFor("lane", "minor"), styleFields: (style) => MapDialogManager.routeStyleFields(style) });
         for (const route of routes) route.generated.infill = true;
         const placed = Regeneration.placesBeside(app, pins);
+        // A settlement map of a Fill in place follows it (L-surface; see SettlementPins)
+        SettlementPins.follow(app, replacedPins, placed, app.settlementPinIds?.() ?? new Set());
         app.mapPins.push(...placed);
         app.mapRoutes.push(...routes);
         // What it read, as the map now stands, for Out of date (the undo snapshot holds the one before)

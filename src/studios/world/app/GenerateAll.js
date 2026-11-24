@@ -1,6 +1,7 @@
 import { platform } from "../../../platform/index.js";
 import { Generation } from "./Generation.js";
 import { RunInputs } from "./RunInputs.js";
+import { SettlementMaps } from "./SettlementMaps.js";
 import { WorldsPanel } from "./WorldsPanel.js";
 
 /**
@@ -48,10 +49,16 @@ export class GenerateAll {
         return { run: ordered.filter((map) => map.state !== "current"), current: ordered.filter((map) => map.state === "current"), held: [...held] };
     }
 
-    /** The open world's maps as Generate all sees them (S0: the Surface map). */
-    static mapsOf(app) {
+    /**
+     * The open world's maps as Generate all sees them: the Surface map, then its settlement maps
+     * that are Out of date (L-surface step 2b; their pin gone, a map has nothing to be made from).
+     * `compute` works Out of date out now (the dialogue); otherwise only what is known is counted.
+     */
+    static mapsOf(app, { compute = false } = {}) {
+        const { i18n } = platform;
         const state = !app.modelRun ? "noRun" : RunInputs.stale(app) ? "stale" : "current";
-        return [{ id: "surface", type: "surface", name: platform.i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), state }];
+        const settlements = SettlementMaps.forGenerateAll(app, { compute }).map((map) => ({ ...map, name: i18n.format("FILRODENSWMB.UI.GenerateAllSettlementName", { name: map.name }) }));
+        return [{ id: "surface", type: "surface", name: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), state }, ...settlements];
     }
 
     /** The names of the regional worlds this world holds, which Generate all leaves out. */
@@ -96,7 +103,7 @@ export class GenerateAll {
             platform.notify.warn(i18n.localize("FILRODENSWMB.UI.GenerateAllHeldWorld"));
             return false;
         }
-        const plan = this.plan({ maps: this.mapsOf(app), held: this.heldOf(app) });
+        const plan = this.plan({ maps: this.mapsOf(app, { compute: true }), held: this.heldOf(app) });
         const context = this.context(plan);
         const content = await platform.templates.render(DIALOG_TEMPLATE, context);
         const buttons = [{ action: "cancel", label: i18n.localize(context.nothing ? "FILRODENSWMB.UI.Close" : "FILRODENSWMB.UI.Cancel"), callback: () => null }];
@@ -114,11 +121,16 @@ export class GenerateAll {
         if (!answer) return false;
         let ran = false;
         for (const map of plan.run) {
-            // S0: the Surface map, the one open; later maps are opened in turn (Layers 1)
+            // The Surface map, the one open; later map types are opened in turn (Layers 1)
             if (map.type !== "surface") continue;
             const done = await Generation.run(app, { confirmed: true });
             if (!done) return ran;
             ran = true;
+        }
+        // Then the settlement maps Out of date now (the Surface map's run may have changed more
+        // of them): each made again from its pin, without being opened (L-surface step 2b)
+        if (plan.run.some((map) => map.type === "settlement") || ran) {
+            if ((await SettlementMaps.regenerateStale(app)) > 0) ran = true;
         }
         app.view?.render(["context", "toolbar"]);
         if (ran && answer.save) await app.saveCurrentMap?.();

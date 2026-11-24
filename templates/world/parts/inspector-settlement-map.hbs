@@ -1,21 +1,42 @@
 {{!--
     A settlement pin's Settlement map card (L-surface; boards L1, L1b), under its Settlement card:
     with none yet, Make settlement map… (which asks for a population first where the pin has none);
-    with one kept, what it is and Open settlement map. A held regional world's form comes with
-    L-surface step 2b. Context: settlementMap (SettlementMaps.pinCard), null on a pin that is not a
-    settlement.
+    with one kept, what it is, Open settlement map and Delete settlement map…, and Out of date
+    naming what changed (it keeps its drawing until Generate again in its Map setup). On a held
+    regional world, its parent world's map opens read only, or Open in <parent world>; a pin with
+    none is made in the parent world. Context: settlementMap (SettlementMaps.pinCard), null on a
+    pin that is not a settlement.
 --}}
 {{#if settlementMap}}
 <div class="fwmb-group fwmb-settlement-map-card">
-    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMap"}}{{#if settlementMap.unsaved}} <span class="fwmb-state-mark fwmb-state-mark--older" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementMapUnsavedHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MarkUnsaved"}}</span>{{/if}}</div>
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMap"}}{{#each settlementMap.marks}} <span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}{{#each settlementMap.stale}} <span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}{{#if settlementMap.unsaved}} <span class="fwmb-state-mark fwmb-state-mark--older" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementMapUnsavedHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MarkUnsaved"}}</span>{{/if}}</div>
     {{#if settlementMap.card}}
-    <p class="fwmb-settlement-map-line"><b>{{settlementMap.name}}</b><span class="fwmb-hint">{{settlementMap.line}}</span></p>
+    <p class="fwmb-settlement-map-line"><b>{{settlementMap.name}}</b><span class="fwmb-hint">{{#if settlementMap.staleLine}}{{settlementMap.staleLine}}{{else}}{{settlementMap.line}}{{/if}}</span></p>
     <div class="fwmb-btn-row">
         <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="openSettlementMap"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenSettlementMap"}}</button>
     </div>
-    {{else if settlementMap.held}}
+    {{#if settlementMap.staleLine}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementCardKeeps"}}</p>{{/if}}
     <div class="fwmb-btn-row">
-        <button type="button" class="fwmb-btn fwmb-btn--wide" aria-disabled="true" data-tooltip="{{settlementMap.later}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MakeSettlementMapEllipsis"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-btn--wide" data-inspector-action="deleteSettlementMap"><span class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DeleteSettlementMapEllipsis"}}</button>
+    </div>
+    {{else if settlementMap.heldOwn}}
+    <div class="fwmb-held" role="note">
+        <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SettlementCardHeldOwnTitle" owner=settlementMap.owner}}</span>
+        <span>{{localize "FILRODENSWMB.UI.SettlementCardHeldOwn"}}</span>
+    </div>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--wide" data-inspector-action="openSettlementMap"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenSettlementMap"}}</button>
+    </div>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--wide" data-inspector-action="openSettlementMapInOwner"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenInWorld" world=settlementMap.owner}}</button>
+    </div>
+    {{else if settlementMap.heldNone}}
+    <div class="fwmb-held" role="note">
+        <span class="fwmb-held-title"><span class="fwmb-icon fwmb-icon--lock" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SettlementCardHeldNoneTitle" owner=settlementMap.owner}}</span>
+        <span>{{localize "FILRODENSWMB.UI.SettlementCardHeldNone"}}</span>
+    </div>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="makeSettlementMapInOwner"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MakeSettlementMapInWorld" world=settlementMap.owner}}</button>
     </div>
     {{else}}
     <p class="fwmb-hint">{{settlementMap.hint}}</p>

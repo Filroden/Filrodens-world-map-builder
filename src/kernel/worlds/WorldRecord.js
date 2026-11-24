@@ -48,7 +48,9 @@ export const MAP_TYPES = Object.freeze({ SURFACE: "surface" });
 export const SETTLEMENT_TYPE = "settlement";
 
 /** The parts of a settlement map's input its card keeps a fingerprint of (see the Local studio's OutOfDate). */
-export const SETTLEMENT_PARTS = Object.freeze(["people", "style", "routes", "rivers", "ground", "cultures", "run"]);
+export const SETTLEMENT_PARTS = Object.freeze(["people", "style", "routes", "rivers", "ground", "cultures", "run", "supply"]);
+/** A settlement map's supply figures on its card (SettlementRecord.supplyOf), each with its bound. */
+const SETTLEMENT_SUPPLY = Object.freeze({ density: 1e6, country: 100, bought: 100, imports: 100, exports: 100 });
 
 /** A record id (Foundry's and the web's random ids, and ids a test gives). */
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -109,6 +111,11 @@ export class WorldRecord {
             if (Object.keys(parts).length) out.parts = parts;
         }
         if (Array.isArray(card.stale)) out.stale = SETTLEMENT_PARTS.filter((part) => card.stale.includes(part));
+        if (card.supply && typeof card.supply === "object" && !Array.isArray(card.supply)) {
+            const supply = {};
+            for (const [figure, most] of Object.entries(SETTLEMENT_SUPPLY)) if (Number.isFinite(card.supply[figure]) && card.supply[figure] >= 0 && card.supply[figure] <= most) supply[figure] = card.supply[figure];
+            if (Object.keys(supply).length) out.supply = supply;
+        }
         if (Number.isInteger(card.revision) && card.revision >= 1) out.revision = card.revision;
         if (typeof card.savedAt === "string" && card.savedAt.length <= 40 && Number.isFinite(Date.parse(card.savedAt))) out.savedAt = card.savedAt;
         return out;

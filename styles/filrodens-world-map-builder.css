@@ -5286,6 +5286,34 @@ button.fwmb-format {
 }
 .fwmb-settlement-table .fwmb-end {
     text-align: end;
+    white-space: nowrap;
+}
+/* Set in full: the host's table rules (its striped rows, borders and head) stay out, as for the
+   world table */
+.fwmb .fwmb-settlement-table {
+    margin: 0;
+    background: none;
+    border: 0;
+}
+.fwmb .fwmb-settlement-table :is(thead, tbody, tr) {
+    background: none;
+    border: 0;
+    border-radius: 0;
+}
+.fwmb .fwmb-settlement-table tbody :is(th, td) {
+    background: none;
+}
+/* One line a row: the name's icon, the marks and the buttons sit on the middle, not the text's
+   baseline (which pushed the name and Open below the other cells) */
+.fwmb .fwmb-settlement-table :is(th, td),
+.fwmb .fwmb-settlement-table tbody :is(th > .fwmb-icon, .fwmb-state-mark, .fwmb-btn) {
+    vertical-align: middle;
+}
+.fwmb .fwmb-settlement-table tbody tr:hover :is(th, td) {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb .fwmb-settlement-table tbody tr:last-child :is(th, td) {
+    border-bottom: 0;
 }
 
 /* v5: touch (a coarse pointer). Targets grow from 1.75rem to 2.75rem where the finger needs it;

@@ -201,6 +201,10 @@ export class Worlds {
     static async #settlementPlan({ world, fresh, settlements, surfaceId, fromSurface, stamp }) {
         const saved = (settlements.saved ?? []).filter((entry) => entry?.record?.id);
         const deleted = new Set(settlements.deleted ?? []);
+        // What is Out of date at this save, by id (null leaves each card's as it was): kept on the
+        // cards for a held regional world's form, which cannot work it out
+        const stale = settlements.stale && typeof settlements.stale === "object" ? settlements.stale : null;
+        const withStale = (card) => (stale && Array.isArray(stale[card.id]) ? { ...card, stale: [...stale[card.id]] } : card);
         const changed = new Map(saved.map((entry) => [entry.record.id, entry]));
         const sourceOf = (id) => (id && fromSurface.has(id) ? fromSurface.get(id) : (id ?? surfaceId));
         const cards = [];
@@ -210,7 +214,8 @@ export class Worlds {
         const put = (entry, { revision, savedAt }) => {
             const id = asCopy ? Worlds.newSettlementId() : entry.record.id;
             const record = { ...structuredClone(entry.record), id, sourceMapId: sourceOf(entry.record.sourceMapId), revision, savedAt };
-            const card = WorldRecord.settlementCard({ ...entry.card, id, pinId: record.pinId, sourceMapId: record.sourceMapId, name: record.name, revision, savedAt });
+            const card = WorldRecord.settlementCard(withStale({ ...entry.card, id: entry.record.id, pinId: record.pinId, sourceMapId: record.sourceMapId, name: record.name, revision, savedAt }));
+            if (card) card.id = id;
             if (!card) return;
             cards.push(card);
             writes.push({ record, page: entry.page ?? {} });
@@ -227,7 +232,7 @@ export class Worlds {
             } else if (asCopy) {
                 const stored = await platform.store.loadSettlementMap(world.id, card.id);
                 if (stored) put({ record: stored, card, page: (await Worlds.pageOf?.(stored)) ?? {} }, { revision: 1, savedAt: stamp });
-            } else cards.push(card);
+            } else cards.push(WorldRecord.settlementCard(withStale(card)) ?? card);
         }
         // Then those new since the last save
         for (const entry of changed.values()) if (!deleted.has(entry.record.id)) put(entry, { revision: 1, savedAt: stamp });
@@ -303,9 +308,36 @@ export class Worlds {
         for (const map of copy.maps) await Worlds.#keepBlobs(copy, map.id);
         copy.settlements = [];
         await platform.store.saveWorld(copy);
-        copy.settlements = await Worlds.#copySettlements(world, copy, Worlds.mapOf(copy));
+        const surfaceId = Worlds.mapOf(copy);
+        copy.settlements = await Worlds.#copySettlements(world, copy, surfaceId);
+        // A held world reached its parents' settlement maps by pin id: the clone takes those of the
+        // pins on its map, as its own (L-surface step 2b)
+        copy.settlements.push(...(await Worlds.#copyHeldSettlements(world, copy, surfaceId, new Set(copy.settlements.map((card) => card.pinId)))));
         if (copy.settlements.length) await platform.store.saveWorld(copy);
         return copy;
+    }
+
+    /**
+     * The settlement maps of the worlds above a held world (as far up as it is held) whose pins are
+     * on the copy's Surface map, copied into it, the nearest world's first for a pin.
+     */
+    static async #copyHeldSettlements(world, copy, surfaceId, taken) {
+        if (!world.held || !world.parentWorldId || !surfaceId) return [];
+        const data = await platform.store.loadMapData(surfaceId);
+        const pins = new Set((Array.isArray(data?.mapPins) ? data.mapPins : []).map((pin) => pin?.id).filter(Boolean));
+        const cards = [];
+        const seen = new Set([world.id]);
+        let at = world;
+        while (at?.held && at.parentWorldId && !seen.has(at.parentWorldId)) {
+            const parent = await Worlds.get(at.parentWorldId);
+            if (!parent) break;
+            seen.add(parent.id);
+            const wanted = WorldRecord.settlementCards(parent).filter((card) => pins.has(card.pinId) && !taken.has(card.pinId));
+            for (const card of wanted) taken.add(card.pinId);
+            if (wanted.length) cards.push(...(await Worlds.#copySettlements({ ...parent, settlements: wanted }, copy, surfaceId)));
+            at = parent;
+        }
+        return cards;
     }
 
     /** Renames a world and its maps. */

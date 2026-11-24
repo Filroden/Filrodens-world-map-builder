@@ -1,4 +1,7 @@
+import { FILRODENSWMB } from "../../../config.js";
 import { platform } from "../../../platform/index.js";
+import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { SettlementSource } from "../settlement/SettlementSource.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { UserFigures } from "./UserFigures.js";
@@ -15,6 +18,13 @@ import { UserFigures } from "./UserFigures.js";
  * unchanged; Make settlement map (with the population question) and opening one; going back to the
  * pin; and what the frame's regions, the world bar's Settlement maps menu, a pin's card and the
  * overview show of the world's settlement maps.
+ *
+ * Keeping them in step (step 2b): **Out of date** is worked out by the Local studio from the
+ * source; here it is asked for once the Surface map has been left alone for a moment
+ * (LOCAL.STATES_AFTER_MS, then when the window is idle), never while it is being edited, and only
+ * when the world has settlement maps; Save world and Generate all ask for it at once. **A held
+ * regional world** reaches its parent world's settlement maps by pin id (its pins keep their
+ * parent's ids): read only here, made in the parent; Fill in's own pins are its own.
  */
 export class SettlementMaps {
     /** Each studio's Local controller and source, by the studio. */
@@ -23,7 +33,7 @@ export class SettlementMaps {
     static #of(app) {
         let state = this.#state.get(app);
         if (!state) {
-            state = { controller: null, source: undefined };
+            state = { controller: null, source: undefined, timer: null, chain: null };
             this.#state.set(app, state);
         }
         return state;
@@ -55,14 +65,210 @@ export class SettlementMaps {
     /** The world closes or another opens: its settlement maps' controller and workers go. */
     static reset(app) {
         const state = this.#state.get(app);
+        if (state?.timer) clearTimeout(state.timer);
         state?.controller?.destroy();
         this.#state.delete(app);
     }
 
-    /** The Surface map changed: the source is read again when next asked for. */
+    /** The Surface map changed: the source is read again when next asked for, and Out of date worked out again once it is left alone. */
     static invalidate(app) {
         const state = this.#state.get(app);
-        if (state) state.source = undefined;
+        if (!state) return;
+        state.source = undefined;
+        state.controller?.sourceChanged();
+        this.#schedule(app);
+    }
+
+    // ------------------------------------------------------------------ Out of date (2b)
+
+    /** The world's own settlement maps' cards (with those kept since), without making a controller. */
+    static #ownCards(app) {
+        const controller = this.existing(app);
+        return controller ? controller.cards() : this.#savedCards(app);
+    }
+
+    /**
+     * Out of date worked out once the Surface map has been left alone (LOCAL.STATES_AFTER_MS, then
+     * when the window is idle), and the lists drawn again if a mark changed. Nothing is done for a
+     * world with no settlement maps.
+     */
+    static #schedule(app) {
+        if (!this.available(app) || !this.#ownCards(app).length) return;
+        const state = this.#of(app);
+        if (state.timer) clearTimeout(state.timer);
+        state.timer = setTimeout(() => {
+            state.timer = null;
+            const idle = globalThis.requestIdleCallback ?? ((fn) => setTimeout(fn, 0));
+            idle(() => this.#refreshStates(app), { timeout: 2000 });
+        }, FILRODENSWMB.LOCAL.STATES_AFTER_MS);
+    }
+
+    /** Asks for Out of date while it is not known (the world just opened). */
+    static #ensureStates(app) {
+        const state = this.#state.get(app);
+        if (state?.timer || this.existing(app)?.states({ compute: false })) return;
+        this.#schedule(app);
+    }
+
+    static #refreshStates(app) {
+        if (!this.#state.has(app)) return;
+        // The Surface map still loading: asked again in a moment
+        if (!app.meshSession?.mesh) {
+            this.#schedule(app);
+            return;
+        }
+        const controller = this.controller(app);
+        if (!controller || controller.states({ compute: false })) return;
+        const before = this.#marksPrint(app);
+        controller.states();
+        if (this.#marksPrint(app) !== before) app.view?.render(["worldbar", "context"]);
+    }
+
+    static #marksPrint(app) {
+        return this.#ownCards(app)
+            .map((card) => `${card.id}:${this.#marksOf(app, card).map((mark) => mark.label).join("+")}`)
+            .join(",");
+    }
+
+    /** Every own settlement map's Out of date state, worked out now (Save world, Generate all). */
+    static statesNow(app) {
+        if (!this.#ownCards(app).length) return new Map();
+        return this.controller(app)?.states() ?? new Map();
+    }
+
+    /**
+     * A card's marks (the StateMarks card's): Out of date, its pin gone; a held world's parent's
+     * map shows what was Out of date at the parent's last save.
+     */
+    static #marksOf(app, card) {
+        const state = card.owner ? { changed: card.stale ?? [], pinGone: false } : this.existing(app)?.stateOf(card.id);
+        if (!state) return [];
+        if (state.pinGone) return [{ kind: "stale", icon: "warning-mark", label: "FILRODENSWMB.UI.MarkPinGone" }];
+        if (state.changed?.length) return [{ kind: "stale", icon: "warning-mark", label: "FILRODENSWMB.UI.MarkOutOfDate" }];
+        return [];
+    }
+
+    static #named(marks) {
+        return marks.map((mark) => ({ ...mark, label: platform.i18n.localize(mark.label) }));
+    }
+
+    /** The settlement maps' Out of date, as Generate all lists them: those it would make again. */
+    static forGenerateAll(app, { compute = false } = {}) {
+        if (!this.available(app) || app.world?.held) return [];
+        const states = compute ? this.statesNow(app) : this.existing(app)?.states({ compute: false });
+        if (!states) return [];
+        return this.#ownCards(app)
+            .filter((card) => states.get(card.id)?.changed.length && !states.get(card.id)?.pinGone)
+            .map((card) => ({ id: card.id, type: "settlement", name: this.#nameOf(app, card), state: "stale" }));
+    }
+
+    /** Generate all's last step: every settlement map Out of date now made again (see LocalController.regenerate). */
+    static async regenerateStale(app) {
+        const ids = this.forGenerateAll(app, { compute: true }).map((map) => map.id);
+        if (!ids.length) return 0;
+        const made = await this.controller(app).regenerate(ids);
+        app.view?.render(["worldbar", "context"]);
+        return made;
+    }
+
+    /** The pins with a settlement map of this world's own (kept since included), by id. */
+    static linkedPinIds(app) {
+        return new Set(this.#ownCards(app).map((card) => card.pinId));
+    }
+
+    /** How many of these pins have a settlement map (a pin's deletion says so). */
+    static mapsOfPins(app, pinIds) {
+        const linked = this.linkedPinIds(app);
+        return [...pinIds].filter((id) => linked.has(id)).length;
+    }
+
+    /** Delete settlement map… (board L1b): after its confirmation, gone at the next Save world. */
+    static async deleteMap(app, id) {
+        const controller = this.controller(app);
+        if (!controller || !(await controller.deleteMap(id))) return false;
+        app.view?.render(["worldbar", "context"]);
+        return true;
+    }
+
+    // ------------------------------------------------------------------ a held regional world's (2b)
+
+    /**
+     * The settlement maps of the worlds above a held regional world whose pins are on its map,
+     * each with the world that owns it ({ owner: { worldId, name } }); loaded once a world is open,
+     * the lists drawn again when they arrive. None for a world that is not held.
+     */
+    static #chainCards(app) {
+        const world = app.world;
+        if (!world?.held || !world.parentWorldId) return [];
+        const state = this.#of(app);
+        if (state.chain?.for === world.id) return state.chain.cards ?? [];
+        state.chain = { for: world.id, cards: null, parentName: null };
+        this.#loadChain(world)
+            .then(({ cards, parentName }) => {
+                if (state.chain?.for !== world.id) return;
+                state.chain.cards = cards;
+                state.chain.parentName = parentName;
+                app.view?.render(["worldbar", "context"]);
+            })
+            .catch((error) => console.warn("FWMB | The parent world's settlement maps could not be read:", error));
+        return [];
+    }
+
+    static async #loadChain(world) {
+        const cards = [];
+        const seen = new Set([world.id]);
+        let parentName = null;
+        let at = world;
+        while (at?.held && at.parentWorldId && !seen.has(at.parentWorldId)) {
+            const parent = await Worlds.get(at.parentWorldId);
+            if (!parent) break;
+            seen.add(parent.id);
+            const owner = { worldId: parent.id, name: parent.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld") };
+            parentName ??= owner.name;
+            for (const card of WorldRecord.settlementCards(parent)) cards.push({ ...card, owner });
+            at = parent;
+        }
+        return { cards, parentName };
+    }
+
+    /** The world's own settlement maps and, on a held world, its parent's for the pins on its map. */
+    static #allCards(app) {
+        const own = this.#ownCards(app);
+        const chain = this.#chainCards(app);
+        if (!chain.length) return own;
+        const pins = new Set((app.mapPins ?? []).map((pin) => pin.id));
+        const taken = new Set(own.map((card) => card.pinId));
+        const inherited = [];
+        for (const card of chain) {
+            if (!pins.has(card.pinId) || taken.has(card.pinId)) continue;
+            taken.add(card.pinId);
+            inherited.push(card);
+        }
+        return [...own, ...inherited];
+    }
+
+    static #nameOf(app, card) {
+        const pin = app.mapPins?.find((each) => each.id === card.pinId);
+        return pin?.name || card.name || "";
+    }
+
+    /**
+     * Make settlement map in <parent world>… (board L1b): the parent world opened on the pin. A pin
+     * the parent's Surface map does not have was added on this one: its map is made here.
+     */
+    static async makeInOwner(app, pinId) {
+        const parentId = app.world?.parentWorldId;
+        const parent = parentId ? await Worlds.get(parentId) : null;
+        const mapId = parent ? Worlds.mapOf(parent) : null;
+        const data = mapId ? await platform.store.loadMapData(mapId) : null;
+        if (!data?.mapPins?.some?.((pin) => pin?.id === pinId)) return this.make(app, pinId);
+        return app.openWorldAt(parent.id, { pinId });
+    }
+
+    /** Whether a pin on a held regional world is its own (Fill in's) rather than its parent's. */
+    static #ownPin(app, pin) {
+        // Infilling.isInfill, read here so this module stays clear of the generator's
+        return !app.world?.held || pin?.generated?.infill === true;
     }
 
     /** The Surface map's settlement source, kept while the map is unchanged (see invalidate). */
@@ -86,6 +292,8 @@ export class SettlementMaps {
             render: (regions) => app.view?.render(regions),
             goToPin: (pinId) => this.goToPin(app, pinId),
             leave: () => this.leave(app),
+            openOwner: (owner, id) => app.openWorldAt(owner.worldId, { settlementId: id }),
+            worldName: () => app.world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld"),
         };
     }
 
@@ -122,7 +330,10 @@ export class SettlementMaps {
     static async open(app, id) {
         const controller = this.controller(app);
         if (!controller) return false;
-        await app.enterSettlement(() => controller.open(id));
+        // A held world's parent's settlement map opens read only (its owner named)
+        const card = this.#allCards(app).find((each) => each.id === id);
+        const owner = card?.owner ? { ...card.owner, stale: card.stale ?? [] } : null;
+        await app.enterSettlement(() => controller.open(id, { owner }));
         return true;
     }
 
@@ -189,17 +400,19 @@ export class SettlementMaps {
     static menuContext(app) {
         const { i18n } = platform;
         const controller = this.existing(app);
-        const cards = controller ? controller.cards() : this.#savedCards(app);
+        this.#ensureStates(app);
+        const cards = this.#allCards(app);
         const open = controller?.isOpen ? (controller.openCard?.id ?? null) : null;
         const lang = i18n.lang;
         const rows = cards
             .map((card) => {
-                const pin = app.mapPins?.find((each) => each.id === card.pinId);
-                const name = pin?.name || card.name || "";
+                const name = this.#nameOf(app, card);
+                const meta = i18n.format("FILRODENSWMB.UI.SettlementMenuMeta", { kind: this.tierLabel(card.tier), people: (card.people ?? 0).toLocaleString(lang) });
                 return {
                     id: card.id,
                     name,
-                    meta: i18n.format("FILRODENSWMB.UI.SettlementMenuMeta", { kind: this.tierLabel(card.tier), people: (card.people ?? 0).toLocaleString(lang) }),
+                    meta: card.owner ? i18n.format("FILRODENSWMB.UI.SettlementMenuOwner", { meta, owner: card.owner.name }) : meta,
+                    marks: this.#named(this.#marksOf(app, card)),
                     current: card.id === open,
                     search: name.toLocaleLowerCase(lang),
                 };
@@ -238,18 +451,31 @@ export class SettlementMaps {
         if (!this.available(app) || !SettlementSource.isSettlement(app, pin)) return null;
         const { i18n } = platform;
         const controller = this.existing(app);
-        const cards = controller ? controller.cards() : this.#savedCards(app);
-        const card = cards.find((each) => each.pinId === pin.id) ?? null;
+        this.#ensureStates(app);
+        const card = this.#allCards(app).find((each) => each.pinId === pin.id) ?? null;
         const name = pin.name || i18n.localize("FILRODENSWMB.UI.UnnamedPin");
-        if (app.world?.held) return { held: true, later: i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name: i18n.localize("FILRODENSWMB.UI.SettlementMapHeld") }) };
+        const lang = i18n.lang;
+        if (card?.owner) {
+            // A held world's parent's settlement map: read only here, or opened in its world
+            return { heldOwn: true, id: card.id, owner: card.owner.name, ownerId: card.owner.worldId, name, stale: card.stale?.length ? this.#named(this.#marksOf(app, card)) : [] };
+        }
         if (card) {
+            const state = controller?.stateOf(card.id) ?? null;
+            const marks = this.#named(this.#marksOf(app, card));
             return {
                 card: true,
                 id: card.id,
                 name,
-                line: i18n.format("FILRODENSWMB.UI.SettlementCardLine", { kind: this.tierLabel(card.tier), people: (card.people ?? 0).toLocaleString(i18n.lang) }),
+                line: i18n.format("FILRODENSWMB.UI.SettlementCardLine", { kind: this.tierLabel(card.tier), people: (card.people ?? 0).toLocaleString(lang) }),
+                marks,
+                staleLine: state?.changed.length ? i18n.format("FILRODENSWMB.UI.SettlementCardStale", { changes: controller.describe(state) }) : null,
                 unsaved: !!controller && !app.world?.settlements?.some?.((saved) => saved.id === card.id),
             };
+        }
+        if (!this.#ownPin(app, pin)) {
+            // Until the parent's name arrives with its settlement maps (see #chainCards)
+            const parent = this.#state.get(app)?.chain?.parentName ?? "";
+            return { heldNone: true, owner: parent };
         }
         // Read lazily: the source is worked out only when a settlement map is made
         const noMesh = !app.meshSession?.mesh;
@@ -266,14 +492,24 @@ export class SettlementMaps {
      */
     static overview(app) {
         const { i18n } = platform;
-        const controller = this.existing(app);
-        const cards = controller ? controller.cards() : this.#savedCards(app);
+        this.#ensureStates(app);
+        const cards = this.#allCards(app);
         const lang = i18n.lang;
+        const surface = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
         return cards
             .map((card) => {
-                const pin = app.mapPins?.find((each) => each.id === card.pinId);
-                const name = pin?.name || card.name || "";
-                return { id: card.id, name, kind: this.tierLabel(card.tier), people: (card.people ?? 0).toLocaleString(lang), from: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), search: name.toLocaleLowerCase(lang) };
+                const name = this.#nameOf(app, card);
+                return {
+                    id: card.id,
+                    name,
+                    kind: this.tierLabel(card.tier),
+                    people: (card.people ?? 0).toLocaleString(lang),
+                    from: card.owner ? i18n.format("FILRODENSWMB.UI.SettlementMadeFromOwner", { owner: card.owner.name, map: surface }) : surface,
+                    marks: this.#named(this.#marksOf(app, card)),
+                    // A held world's parent's map is deleted in its own world (Ken, 2026-11-24: Delete here too)
+                    deletable: !card.owner,
+                    search: name.toLocaleLowerCase(lang),
+                };
             })
             .sort((a, b) => a.name.localeCompare(b.name, lang, { numeric: true, sensitivity: "base" }));
     }

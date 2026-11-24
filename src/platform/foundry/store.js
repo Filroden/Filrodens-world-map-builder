@@ -659,8 +659,9 @@ export async function saveSettlementMap(worldId, record, page = {}) {
     };
     const existing = settlementPage(document, record.id);
     if (existing) {
-        // The record is written whole: a field it no longer has is not kept
-        await existing.update({ [`flags.${FILRODENSWMB.ID}.-=${SETTLEMENT_FLAG}`]: null }, { render: false });
+        // The record is written whole: a field it no longer has is not kept (Foundry's ForcedDeletion,
+        // which replaces the deprecated "-=key" syntax)
+        await existing.update({ [`flags.${FILRODENSWMB.ID}.${SETTLEMENT_FLAG}`]: new foundry.data.operators.ForcedDeletion() }, { render: false });
         await existing.update(data);
     } else {
         const sort = Math.max(0, ...document.pages.contents.map((each) => each.sort ?? 0)) + foundry.CONST.SORT_INTEGER_DENSITY;
