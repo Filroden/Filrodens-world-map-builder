@@ -26,8 +26,8 @@
     6000,
     4500
    ],
-   "households": "542a5b4bb3390a11",
-   "householdsHeads": "2dcaddc8463799dd",
+   "households": "95689428adf7f6fa",
+   "householdsHeads": "f14843311be66c30",
    "headsTotalsUnchanged": false,
    "womenHeadShare": 0.167,
    "houses": 455,
@@ -59,8 +59,8 @@
     6000,
     4500
    ],
-   "households": "848eb48832d193d5",
-   "householdsHeads": "d3a39bf0d66adb6b",
+   "households": "54e8b3e4ad99051d",
+   "householdsHeads": "a71e931db0531e29",
    "headsTotalsUnchanged": true,
    "womenHeadShare": 0.167,
    "houses": 1271,
@@ -92,8 +92,8 @@
     6000,
     4500
    ],
-   "households": "42ba7b693325e0e2",
-   "householdsHeads": "2a5499203c8bcc28",
+   "households": "fc1009f632a20c56",
+   "householdsHeads": "a3e487d34ef87d95",
    "headsTotalsUnchanged": true,
    "womenHeadShare": 0.167,
    "houses": 1086,
@@ -125,8 +125,8 @@
     6000,
     4500
    ],
-   "households": "9be19609506095e0",
-   "householdsHeads": "631dce47e7cdb620",
+   "households": "b416774adb512f6c",
+   "householdsHeads": "55fbc9854970690a",
    "headsTotalsUnchanged": true,
    "womenHeadShare": 0.167,
    "houses": 362,
@@ -158,8 +158,8 @@
     8000,
     6000
    ],
-   "households": "45a6c82f344160b3",
-   "householdsHeads": "f1a081ad41d08198",
+   "households": "a1c06a23c74c0494",
+   "householdsHeads": "65712865a6617ae2",
    "headsTotalsUnchanged": true,
    "womenHeadShare": 0.167,
    "houses": 2658,
@@ -191,8 +191,8 @@
     12000,
     9000
    ],
-   "households": "158aa4551e941f02",
-   "householdsHeads": "b177caf4f640db24",
+   "households": "4ff768c3e2e25a10",
+   "householdsHeads": "b9ecd3e749eda985",
    "headsTotalsUnchanged": true,
    "womenHeadShare": 0.167,
    "houses": 4986,
@@ -256,5 +256,5 @@
   "buildings": 43365,
   "note": "the second largest place: built in a worker with a 0.5 MB stack (a browser worker's), which the prototype's code fails"
  },
- "note": "Recorded 2026-11-23 in the towns prototype against a v4.3.0 checkout (7fb90e1), on the module's P0JBVA fixture run at generator revision 2 (claude/v5-l-surface-step1-plan.md section 1). households: every field but names, before N2b; householdsHeads: after N2b, heads on Automatic, no namer."
+ "note": "Recorded 2026-11-23 in the towns prototype against a v4.3.0 checkout (7fb90e1), on the module's P0JBVA fixture run at generator revision 2 (claude/v5-l-surface-step1-plan.md section 1). households: every field but names (numbers to nine significant figures), before N2b; householdsHeads: after N2b, heads on Automatic, no namer."
 }

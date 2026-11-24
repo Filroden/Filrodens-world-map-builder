@@ -35,7 +35,11 @@ export function townPrint(town) {
 /** Fields of a household that are names (or the namer's marks), left out of its fingerprint. */
 const NAME_KEYS = new Set(["family", "given", "name", "full", "own"]);
 
-/** Households' fingerprint: every field of every household and the totals but their names. */
+/**
+ * Households' fingerprint: every field of every household and the totals but their names, numbers
+ * to nine significant figures. Some fields come through Math.pow and Math.log, whose last bit can
+ * differ between Node versions, as the town's print rounds its points to a tenth of a metre.
+ */
 export function householdPrint(people) {
     const h = createHash("sha256");
     const strip = (v) =>
@@ -43,7 +47,9 @@ export function householdPrint(people) {
             ? v.map(strip)
             : v && typeof v === "object"
               ? Object.fromEntries(Object.entries(v).filter(([k, x]) => !NAME_KEYS.has(k) && typeof x !== "function" && k !== "building" && k !== "house").map(([k, x]) => [k, strip(x)]))
-              : v;
+              : typeof v === "number"
+                ? +v.toPrecision(9)
+                : v;
     for (const hh of [...people.houses, ...people.farms]) h.update(JSON.stringify(strip(hh)));
     h.update(JSON.stringify(people.totals));
     return h.digest("hex").slice(0, 16);
