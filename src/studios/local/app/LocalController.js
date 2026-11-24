@@ -63,7 +63,7 @@ export class LocalController {
     /** The map region's element for the settlement (cards or canvas). */
     #stage = null;
     #canvas = null;
-    /** Which framing the canvas shows ("town", "hinterland"), or null after a pan. */
+    /** Whether the canvas shows the town view ("town"), or null after a pan or zoom. */
     #framing = "town";
     /** The open version's thumbnail, as an object URL, for Map setup. */
     #thumbUrl = null;
@@ -328,23 +328,21 @@ export class LocalController {
         };
     }
 
-    /** The settlement bar (board L3): the way back to the pin, what it is, the framings, Reset view. */
+    /**
+     * The settlement bar (board L3): the way back to the pin and what it is. The view is the
+     * canvas's own controls' (Ken, 2026-11-24: the bar's Town view, Hinterland view and Reset view
+     * only repeated them); Export offers the framings (step 5).
+     */
     barContext() {
         const { i18n } = platform;
         const pin = this.#host.pinOf(this.#pinId);
         const name = this.#settlementName();
         const input = this.#input();
-        const canFrame = this.mode === "open" || !!this.#alone;
         return {
             back: i18n.format("FILRODENSWMB.UI.SettlementBackToPin", { name: pin?.name ?? name }),
             name,
             what: input ? this.#kindLine(input) : "",
             from: i18n.format("FILRODENSWMB.UI.SettlementMadeFrom", { map: this.#host.mapName() }),
-            framings: [
-                { id: "town", icon: "filter-center-focus", label: i18n.localize("FILRODENSWMB.UI.TownView"), pressed: canFrame && this.#framing === "town", disabled: !canFrame },
-                { id: "hinterland", icon: "map", label: i18n.localize("FILRODENSWMB.UI.HinterlandView"), pressed: canFrame && this.#framing === "hinterland", disabled: !canFrame },
-            ],
-            resetDisabled: !canFrame,
             pinGone: !pin,
         };
     }
@@ -360,11 +358,11 @@ export class LocalController {
         const width = view.rect[2] - view.rect[0];
         const height = view.rect[3] - view.rect[1];
         const size = (m) => (m >= 1000 ? i18n.format("FILRODENSWMB.UI.SettlementKm", { km: (m / 1000).toLocaleString(i18n.lang, { maximumFractionDigits: 1 }) }) : i18n.format("FILRODENSWMB.UI.SettlementM", { m: Math.round(m).toLocaleString(i18n.lang) }));
-        const framing = this.#framing === "town" ? i18n.localize("FILRODENSWMB.UI.TownView") : this.#framing === "hinterland" ? i18n.localize("FILRODENSWMB.UI.HinterlandView") : i18n.localize("FILRODENSWMB.UI.SettlementPanned");
+        const shown = i18n.format("FILRODENSWMB.UI.SettlementSize", { width: size(width), height: size(height) });
         const ratio = globalThis.devicePixelRatio || 1;
         const detail = Math.max(FILRODENSWMB.LOCAL.CANVAS.FINEST_M, view.mPerPx / ratio);
         return {
-            lead: i18n.format("FILRODENSWMB.UI.SettlementViewing", { framing, size: i18n.format("FILRODENSWMB.UI.SettlementSize", { width: size(width), height: size(height) }) }),
+            lead: this.#framing === "town" ? i18n.format("FILRODENSWMB.UI.SettlementViewingTown", { size: shown }) : i18n.format("FILRODENSWMB.UI.SettlementViewing", { size: shown }),
             hint: i18n.format("FILRODENSWMB.UI.SettlementDetail", { m: detail.toLocaleString(i18n.lang, { maximumFractionDigits: 1 }) }),
             back: this.#alone ? i18n.localize("FILRODENSWMB.UI.BackToVersions") : null,
         };
@@ -400,10 +398,6 @@ export class LocalController {
                 return this.#host.goToPin(this.#pinId);
             case "backToPin":
                 return this.#host.goToPin(this.#pinId);
-            case "framing":
-                return this.#frame(target.dataset.framing);
-            case "resetView":
-                return this.resetView();
             case "backToVersions":
                 return this.#backToVersions();
             default:
@@ -427,8 +421,13 @@ export class LocalController {
         this.#canvas?.zoom(1 / FILRODENSWMB.LOCAL.CANVAS.ZOOM_STEP);
     }
 
+    /** The canvas's own Reset view (and the 0 key): back to the town view. */
     resetView() {
-        this.#frame("town");
+        const result = this.#shown?.result;
+        if (!result || !this.#canvas) return;
+        this.#canvas.show(result.townView.rect);
+        this.#framing = "town";
+        this.#host.render(["editToolbar"]);
     }
 
     // ------------------------------------------------------------------ inside
@@ -555,10 +554,7 @@ export class LocalController {
             // labels layer, from what the build said of the settlement (the pin's name as it is now)
             decorate: (ctx, view) => this.#decorate(ctx, view, shown),
             onView: ({ moved }) => {
-                if (moved && this.#framing !== null) {
-                    this.#framing = null;
-                    this.#host.render(["mapbar"]);
-                }
+                if (moved) this.#framing = null;
                 this.#lineLater();
             },
         });
@@ -642,15 +638,6 @@ export class LocalController {
         } catch (error) {
             console.warn("FWMB | The settlement's picture for Map setup could not be drawn:", error);
         }
-    }
-
-    #frame(framing) {
-        const result = this.#shown?.result;
-        if (!result || !this.#canvas) return;
-        const view = framing === "hinterland" ? result.hinterlandView : result.townView;
-        this.#canvas.show(view.rect);
-        this.#framing = framing === "hinterland" ? "hinterland" : "town";
-        this.#host.render(["mapbar", "editToolbar"]);
     }
 
     #choiceChanged() {

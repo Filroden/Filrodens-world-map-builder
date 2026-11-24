@@ -1,17 +1,10 @@
 {{!--
     A settlement map's bar (board L3), under the world bar: the way back to its pin on the Surface
-    map; the settlement, what it is and the map it is made from; its framings (Town view, Hinterland
-    view: pressed while shown, neither after a pan) and Reset view (the town view). Context: mapBar
-    (LocalController.barContext). Its buttons are the Local studio's (data-action="local").
+    map, and the settlement, what it is and the map it is made from. Its view is the canvas's own
+    controls' (zoom, and the town view); the framings come back in Export (Ken, 2026-11-24). Context:
+    mapBar (LocalController.barContext). Its button is the Local studio's (data-action="local").
 --}}
 <div class="fwmb-settlement-bar" role="toolbar" aria-label="{{mapBar.name}}">
     <button type="button" class="fwmb-btn fwmb-settlement-back" data-action="local" data-local="backToPin"{{#if mapBar.pinGone}} disabled{{/if}}><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>{{mapBar.back}}</button>
     <span class="fwmb-settlement-what"><b>{{mapBar.name}}</b>{{#if mapBar.what}} · {{mapBar.what}}{{/if}} · {{mapBar.from}}</span>
-    <span class="fwmb-grow"></span>
-    <span class="fwmb-framings" role="group" aria-label="{{localize 'FILRODENSWMB.UI.Framings'}}">
-        {{#each mapBar.framings}}
-        <button type="button" class="fwmb-framing" data-action="local" data-local="framing" data-framing="{{this.id}}" aria-pressed="{{#if this.pressed}}true{{else}}false{{/if}}"{{#if this.disabled}} disabled{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</button>
-        {{/each}}
-    </span>
-    <button type="button" class="fwmb-btn" data-action="local" data-local="resetView"{{#if mapBar.resetDisabled}} disabled{{/if}}><span class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ResetView"}}</button>
 </div>

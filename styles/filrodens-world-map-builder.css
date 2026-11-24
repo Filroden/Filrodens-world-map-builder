@@ -4993,52 +4993,6 @@ button.fwmb-format {
     justify-content: flex-end;
 }
 
-/* The settlement map's framings (L-surface's). Town view and Hinterland view are framing buttons in
-   the settlement bar, not a switch: each moves the camera; one is pressed (the selected surface and
-   a bar in the secondary accent, as the current layer: "you are here") while the camera is on its
-   framing, neither after a pan or zoom. */
-.fwmb-framings {
-    display: inline-grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    gap: 0.25rem;
-}
-.fwmb-framing {
-    height: 1.875rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    padding: 0 0.75rem;
-    border-radius: 6px;
-    border: 1px solid var(--fwmb-border-strong);
-    background: var(--fwmb-bg-raised);
-    color: var(--fwmb-text-primary);
-    font: 700 0.75rem/1 var(--fwmb-font-ui);
-    cursor: pointer;
-    white-space: nowrap;
-}
-.fwmb-framing .fwmb-icon {
-    width: 1rem;
-    height: 1rem;
-    color: var(--fwmb-accent-main);
-}
-.fwmb-framing:hover {
-    background: var(--fwmb-bg-hover);
-}
-.fwmb-framing:focus-visible {
-    outline: 2px solid var(--fwmb-border-focus);
-    outline-offset: 2px;
-}
-.fwmb-framing[aria-pressed="true"] {
-    background: var(--fwmb-bg-selected);
-    border-color: var(--fwmb-accent-secondary);
-    box-shadow: inset 0 -3px 0 var(--fwmb-accent-secondary);
-}
-.fwmb-framing[aria-pressed="true"] .fwmb-icon {
-    color: var(--fwmb-accent-secondary);
-}
-
 /* Drawing on screen: a thin line along the canvas's top while a redraw takes longer than about half
    a second */
 .fwmb-drawline {
@@ -5077,9 +5031,6 @@ button.fwmb-format {
 .fwmb-settlement-bar b {
     color: var(--fwmb-text-primary);
 }
-.fwmb-settlement-bar .fwmb-grow {
-    flex: 1;
-}
 .fwmb-settlement-what {
     min-width: 0;
     overflow: hidden;
@@ -5088,10 +5039,6 @@ button.fwmb-format {
 }
 .fwmb-settlement-back .fwmb-icon {
     color: var(--fwmb-accent-main);
-}
-.fwmb-framing:disabled {
-    opacity: 0.45;
-    cursor: default;
 }
 .fwmb-studio.fwmb-is-settlement .fwmb-map-preview > canvas,
 .fwmb-studio.fwmb-is-settlement .fwmb-map-preview > .fwmb-unmade,
@@ -5438,10 +5385,6 @@ button.fwmb-format {
     }
     .fwmb-format {
         min-height: 2.75rem;
-    }
-    .fwmb-framing {
-        height: 2.75rem;
-        padding: 0 1rem;
     }
     .fwmb-subbar {
         height: 3.25rem;
