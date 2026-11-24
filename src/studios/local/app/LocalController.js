@@ -579,30 +579,40 @@ export class LocalController {
     }
 
     /**
-     * The map's own title, scale bar and north arrow over the canvas, kept clear of the map
-     * controls along the canvas's foot: drawn on a canvas that much shorter, then laid over. Drawn
-     * again only when the view, the canvas's size or the name changes: the canvas is painted again
-     * as each tile arrives, and a canvas the size of the view for each would be tens of MB each.
+     * The map's own title, scale bar and north arrow over the canvas: on the part of the frame in
+     * view (zoomed out, they stay on the map rather than the surround), kept clear of the map
+     * controls along the canvas's foot. Drawn on a canvas that size, then laid over; drawn again
+     * only when the view, the canvas's size or the name changes: the canvas is painted again as
+     * each tile arrives, and a canvas the size of the view for each would be tens of MB each.
      */
     #decorate(ctx, view, shown) {
         const controls = this.#container?.querySelector(".fwmb-map-controls");
         const ratio = view.widthPx / Math.max(1, this.#container?.clientWidth ?? view.widthPx);
         const foot = controls ? Math.round((controls.offsetHeight + 8) * ratio) : 0;
-        const height = Math.max(1, view.heightPx - foot);
-        const rect = [view.rect[0], view.rect[1], view.rect[2], view.rect[1] + height * view.mPerPx];
+        // The frame's part in view, in canvas pixels
+        const { width: fw, height: fh } = shown.result.frame;
+        const m = view.mPerPx;
+        const left = Math.max(0, Math.round((-fw / 2 - view.rect[0]) / m));
+        const top = Math.max(0, Math.round((-fh / 2 - view.rect[1]) / m));
+        const right = Math.min(view.widthPx, Math.round((fw / 2 - view.rect[0]) / m));
+        const bottom = Math.min(view.heightPx - foot, Math.round((fh / 2 - view.rect[1]) / m));
+        const widthPx = right - left;
+        const heightPx = bottom - top;
+        if (widthPx < 1 || heightPx < 1) return;
+        const rect = [view.rect[0] + left * m, view.rect[1] + top * m, view.rect[0] + right * m, view.rect[1] + bottom * m];
         const town = this.#labelTown(shown);
-        const key = [shown.versionId, town.name, view.widthPx, height, view.mPerPx, ...rect].join("|");
+        const key = [shown.versionId, town.name, widthPx, heightPx, m, ...rect].join("|");
         if (this.#labels?.key !== key) {
-            const same = this.#labels?.canvas.width === view.widthPx && this.#labels.canvas.height === height;
-            const layer = same ? this.#labels.canvas : typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(view.widthPx, height) : Object.assign(globalThis.document.createElement("canvas"), { width: view.widthPx, height });
+            const same = this.#labels?.canvas.width === widthPx && this.#labels.canvas.height === heightPx;
+            const layer = same ? this.#labels.canvas : typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(widthPx, heightPx) : Object.assign(globalThis.document.createElement("canvas"), { width: widthPx, height: heightPx });
             const layerCtx = layer.getContext("2d");
             layerCtx.setTransform(1, 0, 0, 1, 0, 0);
-            layerCtx.clearRect(0, 0, view.widthPx, height);
-            drawTown(layerCtx, town, { rect, mPerPx: view.mPerPx, widthPx: view.widthPx, heightPx: height }, ATLAS, { layers: ["labels"] });
-            this.#labels = { key, canvas: layer };
+            layerCtx.clearRect(0, 0, widthPx, heightPx);
+            drawTown(layerCtx, town, { rect, mPerPx: m, widthPx, heightPx }, ATLAS, { layers: ["labels"] });
+            this.#labels = { key, canvas: layer, left, top };
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(this.#labels.canvas, 0, 0);
+        ctx.drawImage(this.#labels.canvas, this.#labels.left, this.#labels.top);
     }
 
     /** What the renderer's labels layer reads of a settlement: its name, kind, input, wall and shore. */

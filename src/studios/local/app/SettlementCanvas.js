@@ -13,6 +13,8 @@ import { FILRODENSWMB } from "../../../config.js";
  * - **Before it is shown:** while its element has no size (the frame not yet showing settlement
  *   maps), it draws nothing and asks for no tiles, and the framing it is asked to show waits until
  *   it has a size. Measured as one pixel, it would ask for tiles thousands of km a side.
+ * - **Only the frame:** the pictures are clipped to the frame, since a tile at its edge runs past it
+ *   and is drawn whole.
  * - **The drawing line:** a thin line along the canvas's top while visible tiles are still missing
  *   past CANVAS.LINE_DELAY_MS.
  * - **Moved by** a drag, the wheel (round the pointer), two fingers (pinch and pan), and the keys
@@ -260,11 +262,17 @@ export class SettlementCanvas {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
         ctx.imageSmoothingEnabled = true;
+        // Only the frame: a tile at its edge runs past it, drawn whole (the wild land filling it)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(...place(...this.#frameRect()));
+        ctx.clip();
         if (this.#coarse) ctx.drawImage(this.#coarse.bitmap, ...place(...this.#coarse.rect));
         const want = this.#levelFor(mPerPx / ratio);
         // The tiles held, coarse to fine, so the sharpest of what is held lies on top
         const held = [...this.#tiles.values()].filter((tile) => tile.level >= want && this.#overlaps(tile, rect)).sort((a, b) => b.level - a.level);
         for (const tile of held) ctx.drawImage(tile.bitmap, ...place(...tile.rect));
+        ctx.restore();
         // The map's own title, scale bar and north arrow, once over the whole view
         if (this.#decorate) {
             ctx.save();
@@ -277,6 +285,12 @@ export class SettlementCanvas {
         const missing = sharper ? this.#visibleTiles(want, rect).filter((tile) => !this.#tiles.has(tile.key)) : [];
         this.#showLine(missing.length > 0);
         this.#ask(missing);
+    }
+
+    /** The frame's rectangle in metres, round the centre. */
+    #frameRect() {
+        const { width, height } = this.#frame;
+        return [-width / 2, -height / 2, width / 2, height / 2];
     }
 
     /** The coarse picture's metres a pixel. */

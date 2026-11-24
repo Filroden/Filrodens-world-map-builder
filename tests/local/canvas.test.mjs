@@ -1,8 +1,9 @@
 // The settlement map's canvas (SettlementCanvas) on a page without layout (happy-dom), its
 // element's size and its resize stood in for: before it is shown it draws nothing and asks for no
 // tiles, and the framing asked for waits until it has a size (measured as one pixel, it asked for
-// tiles thousands of km a side, and the reopened map crashed the page); and no tile is asked for at
-// a level no sharper than the coarse picture.
+// tiles thousands of km a side, and the reopened map crashed the page); no tile is asked for at a
+// level no sharper than the coarse picture; and its pictures are clipped to the frame (a tile at
+// its edge runs past it).
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { Window } from "happy-dom";
@@ -25,9 +26,10 @@ Object.assign(globalThis, {
     },
 });
 after(() => window.happyDOM.close());
-// A 2D context that draws nothing
+// A 2D context that draws nothing and records its rectangles, clips and pictures
+const drawn = [];
 window.HTMLCanvasElement.prototype.getContext = function () {
-    return new Proxy({}, { get: (target, key) => (key in target ? target[key] : () => {}), set: (target, key, value) => ((target[key] = value), true) });
+    return new Proxy({}, { get: (target, key) => (key in target ? target[key] : (...args) => ["rect", "clip", "drawImage", "restore"].includes(key) && drawn.push([key, ...args])), set: (target, key, value) => ((target[key] = value), true) });
 };
 
 const { FILRODENSWMB } = await import("../../src/config.js");
@@ -91,3 +93,30 @@ test("zoomed out past the coarse picture's detail, it asks for no tiles", async 
         canvas.destroy();
     }
 });
+
+test("its pictures are clipped to the frame: a tile at its edge runs past it", async () => {
+    const { element } = host(1200, 900);
+    const { canvas, asked } = canvasOver(element);
+    try {
+        // The frame's bottom right corner, at a tile level
+        canvas.show([2400, 1800, 3600, 2700]);
+        await frames();
+        assert.ok(asked.some((view) => view.rect[2] > FRAME.width / 2 || view.rect[3] > FRAME.height / 2), "a tile runs past the frame's edge");
+        drawn.length = 0;
+        canvas.zoom(1.0001);
+        await frames();
+        const { rect, mPerPx } = canvas.view;
+        const clip = drawn.findIndex(([key]) => key === "clip");
+        const frameRect = drawn[clip - 1];
+        assert.equal(frameRect[0], "rect");
+        // The frame's right and bottom edges, in canvas pixels
+        assert.ok(Math.abs(frameRect[1] + frameRect[3] - (FRAME.width / 2 - rect[0]) / mPerPx) < 1e-6);
+        assert.ok(Math.abs(frameRect[2] + frameRect[4] - (FRAME.height / 2 - rect[1]) / mPerPx) < 1e-6);
+        const images = drawn.map(([key], i) => (key === "drawImage" ? i : -1)).filter((i) => i >= 0);
+        const restore = drawn.findIndex(([key], i) => key === "restore" && i > clip);
+        assert.ok(images.length > 0 && images.every((i) => i > clip && i < restore), "every picture drawn inside the clip");
+    } finally {
+        canvas.destroy();
+    }
+});
+
