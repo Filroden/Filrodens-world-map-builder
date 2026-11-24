@@ -1,13 +1,14 @@
 // The Local studio's workers (LocalWorkers, LocalWorker, LocalTasks) run in Node worker threads
 // through the browser-style Worker shim: versions built side by side and kept there, framed as the
-// engine frames them; the kept version's households worked out in its worker and its town and
-// households copied back once; a cancelled version ending its worker; the same answers on the main
-// thread where workers cannot be used. Node has no OffscreenCanvas, so the workers here say they
+// engine frames them; the kept version's households worked out in its worker and copied back once,
+// with its town where the worker cannot draw it; a view far outside the frame refused; a cancelled
+// version ending its worker; the same answers on the main thread where workers cannot be used. Node has no OffscreenCanvas, so the workers here say they
 // cannot draw, and the drawing falls back to the main thread from the kept copy (a recording
 // context stands in for a canvas); drawing in a worker is checked in a browser.
 import "../support/web-worker-shim.mjs";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { TASKS, viewFits } from "../../src/studios/local/LocalTasks.js";
 import { LocalWorkers } from "../../src/studios/local/LocalWorkers.js";
 import { PRINTS, inputOf, townPrint } from "./helpers.mjs";
 
@@ -65,6 +66,35 @@ test("a worker that cannot draw: the kept version is drawn here, a version not k
         await assert.rejects(workers.tile("alt-1", view), /only be drawn here once it is kept/);
     } finally {
         delete globalThis.OffscreenCanvas;
+    }
+});
+
+test("a view far outside the frame is refused before it is drawn (a canvas measured before it was shown asked for one)", async () => {
+    const frame = { frame: { width: 6000, height: 4500 } };
+    // The coarse picture, a tile at the finest detail, a card and Map setup's picture all fit
+    assert.ok(viewFits(frame, { rect: [-3000, -2250, 3000, 2250], mPerPx: 6000 / 2048 }));
+    assert.ok(viewFits(frame, { rect: [0, 0, 204.8, 204.8], mPerPx: 0.4 }));
+    assert.ok(viewFits(frame, { rect: [-1200, -900, 1200, 900], mPerPx: 3.75 }));
+    // The tile the one-pixel canvas asked for: 3,355 km a side at 6.5 km a pixel
+    const huge = { rect: [-3000, -2250, 3355443 - 3000, 3355443 - 2250], mPerPx: 6553.6, widthPx: 512, heightPx: 512 };
+    assert.equal(viewFits(frame, huge), false);
+    assert.equal(viewFits(frame, { rect: [-30000, -2250, 30000, 2250], mPerPx: 20 }), false, "wider than four frames");
+    globalThis.OffscreenCanvas = RecordingCanvas;
+    try {
+        await assert.rejects(workers.tile("default", huge), RangeError);
+    } finally {
+        delete globalThis.OffscreenCanvas;
+    }
+});
+
+test("a thread that can draw keeps the town to itself: only the households come back", () => {
+    TASKS.build({ id: "keep-alone", input });
+    try {
+        const kept = TASKS.keep({ id: "keep-alone", town: false });
+        assert.equal(kept.value.town, undefined);
+        assert.equal(kept.value.households.totals.people, input.population);
+    } finally {
+        TASKS.release({ ids: ["keep-alone"] });
     }
 });
 

@@ -69,6 +69,9 @@ const FAMILIES = [
     { prefix: "FILRODENSWMB.UI.GenerateEventHint", values: CONFIG },
     { prefix: "FILRODENSWMB.UI.GenerateEventGroup", values: CONFIG.replace(/(\w+):/g, '"$1":') },
     "FILRODENSWMB.BIOMES.",
+    // A settlement's lie in Make settlement map's From the pin, by the engine's LIES (CellContext)
+    "FILRODENSWMB.UI.FromPinLie.",
+    "FILRODENSWMB.UI.FromPinLie",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
     // The name styles, by the name bases' names with their spaces taken out

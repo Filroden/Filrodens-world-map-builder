@@ -1,0 +1,12 @@
+{{!--
+    The line over a settlement map's canvas, in the edit toolbar's place (board L3): what is shown
+    (the framing, or Panned), its size, and the detail drawn; while choosing, how to choose; a
+    version opened alone from the choice has the way back to the four. Context: settlementLine
+    (LocalController.toolbarContext).
+--}}
+<div class="fwmb-toolbar-row fwmb-settlement-line">
+    {{#if settlementLine.back}}<button type="button" class="fwmb-btn" data-action="local" data-local="backToVersions"><span class="fwmb-icon fwmb-icon--grid-on" aria-hidden="true"></span>{{settlementLine.back}}</button>{{/if}}
+    <span class="fwmb-settlement-lead">{{settlementLine.lead}}</span>
+    <span class="fwmb-grow"></span>
+    {{#if settlementLine.hint}}<span class="fwmb-hint">{{settlementLine.hint}}</span>{{/if}}
+</div>

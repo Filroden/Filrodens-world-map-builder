@@ -6,8 +6,9 @@
  * - **How many:** one a core less one, between VERSION_WORKERS.MIN and MAX (FILRODENSWMB.LOCAL), so a
  *   core is always left for the window; versions are given to the least busy worker in the order
  *   asked for, so the Default, asked for first, starts first.
- * - **Kept:** the version the user keeps has its households worked out in its worker and its town
- *   and households copied back once (keep); the others never come to the main thread.
+ * - **Kept:** the version the user keeps has its households worked out in its worker and its
+ *   households copied back once (keep), with its town only where its worker cannot draw it; the
+ *   others never come to the main thread.
  * - **Cancelled:** a build cannot pause, so a version cancelled while building ends its worker if
  *   nothing else on that worker is still wanted, and is otherwise dropped when it finishes; a new
  *   worker starts when next needed.
@@ -17,7 +18,7 @@
  */
 import { FILRODENSWMB } from "../../config.js";
 import { JobWorker } from "../../kernel/workers/JobWorker.js";
-import { TASKS, drawView } from "./LocalTasks.js";
+import { TASKS, checkView, drawView } from "./LocalTasks.js";
 
 /** The worker's module. */
 const WORKER_URL = new URL("./LocalWorker.js", import.meta.url);
@@ -79,7 +80,7 @@ export class LocalWorkers {
      * @param {string} id - The version's id, unique among those held.
      * @param {object} input - The engine's input (with the version's seed).
      * @param {object} [options]
-     * @param {{widthPx: number, heightPx: number, style?: object}} [options.thumbnail]
+     * @param {{widthPx: number, heightPx: number, style?: object, layers?: string[]}} [options.thumbnail]
      */
     async build(id, input, { thumbnail = null } = {}) {
         const slot = this.#slots.reduce((best, s) => (s.busy < best.busy ? s : best));
@@ -106,16 +107,21 @@ export class LocalWorkers {
             const cx = (view.rect[0] + view.rect[2]) / 2;
             const cy = (view.rect[1] + view.rect[3]) / 2;
             const rect = [cx - (thumbnail.widthPx * mPerPx) / 2, cy - (thumbnail.heightPx * mPerPx) / 2, cx + (thumbnail.widthPx * mPerPx) / 2, cy + (thumbnail.heightPx * mPerPx) / 2];
-            result.thumbnail = pictureOf(drawView(result.town, { rect, mPerPx, widthPx: thumbnail.widthPx, heightPx: thumbnail.heightPx }, { style: thumbnail.style, makeCanvas: mainCanvas }));
+            result.thumbnail = pictureOf(drawView(result.town, { rect, mPerPx, widthPx: thumbnail.widthPx, heightPx: thumbnail.heightPx }, { style: thumbnail.style, layers: thumbnail.layers, makeCanvas: mainCanvas }));
             delete result.town;
         }
         return result;
     }
 
-    /** The version kept: its households worked out, and its town and households, plain. */
+    /**
+     * The version kept: its households worked out, and its households, plain; its town too where
+     * its worker cannot draw it (its tiles are then drawn here). A worker that can draw keeps the
+     * town to itself: it is tens of MB, and copying it pauses the window.
+     */
     async keep(id) {
-        const result = await this.#run(this.#slotOf(id), "keep", { id });
-        this.#kept.set(id, result.town);
+        const slot = this.#slotOf(id);
+        const result = await this.#run(slot, "keep", { id, town: slot.canDraw !== true });
+        if (result.town) this.#kept.set(id, result.town);
         return result;
     }
 
@@ -130,6 +136,7 @@ export class LocalWorkers {
         if (slot.canDraw === false) {
             const town = this.#kept.get(id);
             if (!town) throw new Error(`version ${id} can only be drawn here once it is kept`);
+            checkView(town, view);
             return pictureOf(drawView(town, view, { ...options, makeCanvas: mainCanvas }));
         }
         return (await this.#run(slot, "tile", { id, view, ...options })).bitmap;

@@ -3,6 +3,7 @@ import { platform } from "../../../platform/index.js";
 import { Inspector } from "./Inspector.js";
 import { MapMarks } from "./MapMarks.js";
 import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
+import { SettlementMaps } from "./SettlementMaps.js";
 
 /** The engines' short names, as World setup and Worlds name them. */
 const ENGINES = Object.freeze({
@@ -15,7 +16,7 @@ const ENGINES = Object.freeze({
 /**
  * The world overview (v5, S0 step 4; board W1): the open world at a glance, the world's rail's
  * first tool. It fills the map's place beside that rail and the inspector: the world's maps (S0:
- * the Surface map, Add a map drawn for Layers 1), its settlement maps (drawn for L-surface) and
+ * the Surface map, Add a map drawn for Layers 1), its settlement maps (a table, L-surface) and
  * its regional worlds (Cut regional world… drawn for step 5) as cards. A card is chosen as in
  * Worlds: one click shows it in the inspector (a map in WorldMapCard, a regional world in
  * WorldEditor), a second goes to the map or opens the world.
@@ -60,6 +61,9 @@ export class WorldOverview {
             cutOff: app.cutOff?.() ?? null,
             // A held regional world: what it was cut from, at what zoom, why it is Out of date, Cut again…
             cutFrom: node?.held && node.parentId ? WorldOverview.#cutFrom(app, node) : null,
+            // Its settlement maps (L-surface; board L4), a searchable table
+            settlements: SettlementMaps.overview(app),
+            settlementsHere: SettlementMaps.available(app),
         };
     }
 

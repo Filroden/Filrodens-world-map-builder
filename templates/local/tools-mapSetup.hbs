@@ -1,0 +1,53 @@
+{{!--
+    A settlement map's Map setup (L-surface step 2a; boards L2 and L3). While choosing (Make
+    settlement map): what the settlement is drawn from, then the four versions (the Default's seed,
+    Three new alternatives); Keep and Cancel are its foot (tools-mapSetup-foot.hbs). Once open: the
+    version kept (its picture, seed and when it was kept), what it was drawn from, and on a map with
+    no run that its supply is a stand-in. Walls, the look, Choose another version… and Generate again
+    come with step 4. Context: local (LocalController's Map setup context).
+--}}
+{{#if local.standIn}}
+<div class="fwmb-goto fwmb-settlement-standin" role="note">
+    <p><b>{{localize "FILRODENSWMB.UI.SettlementStandInTitle"}}</b> {{localize "FILRODENSWMB.UI.SettlementStandIn" map=local.mapName}}</p>
+</div>
+{{/if}}
+
+{{#if local.version}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementVersion" title="FILRODENSWMB.UI.SectionSettlementVersion"}}
+    <div class="fwmb-settlement-version">
+        <span class="fwmb-settlement-version-picture">{{#if local.version.picture}}<img src="{{local.version.picture}}" alt="">{{/if}}</span>
+        <span class="fwmb-settlement-version-text">
+            <b>{{local.version.name}}</b>
+            <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementSeedLine" seed=local.version.seed}}</span>
+            {{#if local.version.unsaved}}<span class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementKeptUnsaved"}}</span>{{else if local.version.kept}}<span class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementKeptOn" date=local.version.kept}}</span>{{/if}}
+        </span>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+
+{{#if local.from}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementFrom" title="FILRODENSWMB.UI.SectionSettlementFrom"}}
+    <dl class="fwmb-generate-results fwmb-settlement-from">
+        <dt>{{localize "FILRODENSWMB.UI.FromPinSettlementLabel"}}</dt><dd>{{local.from.settlement}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FromPinCulturesLabel"}}</dt><dd>{{local.from.cultures}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FromPinWaterLabel"}}</dt><dd>{{local.from.water}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FromPinRoadsLabel"}}</dt><dd>{{local.from.roads}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FromPinLandLabel"}}</dt><dd>{{local.from.land}}</dd>
+    </dl>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FromPinHint" map=local.mapName frame=local.from.frame}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+
+{{#if local.choosing}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementVersions" title="FILRODENSWMB.UI.FourVersions" badge=local.readyLine}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FourVersionsHint"}}</p>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-settlement-seed">{{localize "FILRODENSWMB.UI.SettlementDefaultSeed"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-settlement-seed" name="settlementSeed" value="{{local.seed}}" maxlength="200" spellcheck="false" autocomplete="off" aria-describedby="fwmb-settlement-seed-hint" />
+        </div>
+    </div>
+    <p class="fwmb-hint" id="fwmb-settlement-seed-hint">{{localize "FILRODENSWMB.UI.SettlementDefaultSeedHint"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="local" data-local="newAlternatives"><span class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ThreeNewAlternatives"}}</button>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}

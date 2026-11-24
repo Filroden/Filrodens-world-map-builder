@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../../../config.js";
 import { ImportRefusal, Sanitize } from "../../../kernel/data/Sanitize.js";
 import { MAP_TYPES, WORLD_FORMAT } from "../../../kernel/worlds/WorldRecord.js";
 import { BLOB_HASH, RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
@@ -15,6 +16,7 @@ import { WorldSettings } from "./WorldSettings.js";
  *         held,                                 // a held regional world
  *         cutFrom?: { name, worldId, mapId },   // the world and map it was cut from
  *         regional?, blobs?,                    // its regional record, and the blobs it names (base64 by hash)
+ *         settlements?,                         // its settlement maps (L-surface; the Local studio's records)
  *       },
  *       maps: [{ id, type, file }],             // each a map file (see MapJson) without the world's settings
  *     }
@@ -51,11 +53,12 @@ export class WorldFile {
      * @param {boolean} [options.held] - Whether it is a held regional world.
      * @param {object|null} [options.regional] - Its regional record.
      * @param {Map<string, Uint8Array>} [options.blobs] - The blobs its record names, by hash.
+     * @param {object[]} [options.settlements] - Its settlement maps' records.
      * @param {string} options.version - The module's version.
      * @param {Date} [options.exportedAt]
      * @returns {object}
      */
-    static write({ name, mapId, file, disabledIcons = [], cutFrom = null, held = false, regional = null, blobs = new Map(), version, exportedAt = new Date() }) {
+    static write({ name, mapId, file, disabledIcons = [], cutFrom = null, held = false, regional = null, blobs = new Map(), settlements = [], version, exportedAt = new Date() }) {
         const { pinIcons = [], name: _mapName, owners, modelRun, ...data } = file;
         const { settings, mapData } = WorldSettings.split(data);
         settings.icons = { custom: pinIcons, disabled: [...disabledIcons] };
@@ -70,6 +73,7 @@ export class WorldFile {
             world.regional = regional;
             if (blobs.size) world.blobs = Object.fromEntries([...blobs].map(([hash, bytes]) => [hash, Blobs.toBase64(bytes)]));
         }
+        if (settlements.length) world.settlements = settlements;
         return { format: WORLD_FILE_FORMAT, formatVersion: WORLD_FORMAT, exportedAt: exportedAt.toISOString(), module: { version }, world, maps: [{ id: mapId, type: MAP_TYPES.SURFACE, file: mapFile }] };
     }
 
@@ -80,7 +84,9 @@ export class WorldFile {
      * each map file's `parentId`, the map it was cut from, so an import can go back under it.
      * Refused when the file is not a world file this version can read.
      * @param {object} parsed - The file's JSON.
-     * @returns {{name: string|null, disabledIcons: string[], maps: Array<{id: string|null, type: string, file: object}>, world: {id: string, held: boolean, parentWorldId: string|null, maps: Array<{id: string, type: string}>, regional: object|null}, blobBytes: (hash: string) => Uint8Array|null}}
+     * And its settlement maps as the file holds them (`settlements`, unchecked: the Local studio's
+     * rules check each as they arrive), at most LOCAL.MAX_SETTLEMENTS.
+     * @returns {{name: string|null, disabledIcons: string[], maps: Array<{id: string|null, type: string, file: object}>, world: {id: string, held: boolean, parentWorldId: string|null, maps: Array<{id: string, type: string}>, regional: object|null}, blobBytes: (hash: string) => Uint8Array|null, settlements: object[]}}
      * @throws {ImportRefusal}
      */
     static read(parsed) {
@@ -122,6 +128,7 @@ export class WorldFile {
         };
         const blobs = world.blobs && typeof world.blobs === "object" && !Array.isArray(world.blobs) ? world.blobs : {};
         const blobBytes = (hash) => (typeof hash === "string" && BLOB_HASH.test(hash) && typeof blobs[hash] === "string" ? Blobs.fromBase64(blobs[hash]) : null);
-        return { name, disabledIcons, maps, world: record, blobBytes };
+        const settlements = Array.isArray(world.settlements) ? world.settlements.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS) : [];
+        return { name, disabledIcons, maps, world: record, blobBytes, settlements };
     }
 }

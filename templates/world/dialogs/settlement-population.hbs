@@ -1,0 +1,14 @@
+{{!--
+    Make settlement map's population question (L-surface; board L1b), for a settlement pin with no
+    population: how many people live there. The answer is entered on the pin's Settlement card, so it
+    is given once. Context: name, max.
+--}}
+<p>{{localize "FILRODENSWMB.UI.SettlementPopulationQuestion" name=name}}</p>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-settlement-population">{{localize "FILRODENSWMB.UI.InspectorPopulation"}}</label>
+    <div class="fwmb-form-fields">
+        <input type="number" id="fwmb-settlement-population" name="settlementPopulation" class="fwmb-input-population" min="1" max="{{max}}" step="1" required autofocus aria-describedby="fwmb-settlement-population-hint" />
+        <span class="fwmb-unit">{{localize "FILRODENSWMB.UI.UnitPeople"}}</span>
+    </div>
+</div>
+<p class="fwmb-hint" id="fwmb-settlement-population-hint">{{localize "FILRODENSWMB.UI.SettlementPopulationHint"}}</p>

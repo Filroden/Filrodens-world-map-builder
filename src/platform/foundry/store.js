@@ -546,10 +546,12 @@ export async function saveWorld(record) {
     const document = await pack.getDocument(id);
     const page = { name: game.i18n.localize("FILRODENSWMB.JOURNAL.WorldTitle"), type: "text", text: { content: await worldSummary(record, pack), format: 1 } };
     if (document) {
-        // The summary page is written over, as a map journal's is
-        const existingPage = document.pages.contents[0];
-        if (existingPage) page._id = existingPage.id;
-        await document.update({ name, [WORLD_PATH]: withStaleKeysDeleted(document.flags?.[FILRODENSWMB.ID]?.world, rest), pages: [page] });
+        await document.update({ name, [WORLD_PATH]: withStaleKeysDeleted(document.flags?.[FILRODENSWMB.ID]?.world, rest) });
+        // The summary page is written over, alone: the world's settlement maps are pages of its
+        // journal too, each written by its own call (see saveSettlementMap)
+        const existingPage = document.pages.contents.find((each) => !settlementOf(each));
+        if (existingPage) await existingPage.update({ name: page.name, text: page.text });
+        else await document.createEmbeddedDocuments("JournalEntryPage", [{ ...page, sort: 0 }]);
         return { id, name };
     }
     await JournalEntry.create({ _id: id, name, [WORLD_PATH]: rest, pages: [page] }, { pack: pack.collection, keepId: true });
@@ -605,6 +607,80 @@ export async function deleteWorld(id) {
     const document = await worldsPack()?.getDocument(id);
     if (!document) return false;
     await document.delete();
+    return true;
+}
+
+// ---------------------------------------------------------------- v5: a world's settlement maps
+
+/** The flag a settlement map's page keeps its record in (the Local studio's; see Worlds). */
+const SETTLEMENT_FLAG = "settlement";
+
+/** A page's settlement map record, or null for a page that is not one (the world's summary). */
+function settlementOf(page) {
+    const record = page?.flags?.[FILRODENSWMB.ID]?.[SETTLEMENT_FLAG];
+    return record && typeof record === "object" && typeof record.id === "string" ? record : null;
+}
+
+/** A world journal's page holding a settlement map, or null. */
+function settlementPage(document, id) {
+    return document?.pages?.contents.find((page) => settlementOf(page)?.id === id) ?? null;
+}
+
+/**
+ * A world's settlement maps: each a page of its world's journal (L-surface; Ken, 2026-11-24), so
+ * the maps compendium keeps one journal a world map, however many settlement maps a world has.
+ */
+export async function listSettlementMaps(worldId) {
+    const document = await worldsPack()?.getDocument(worldId);
+    return (document?.pages?.contents ?? []).map(settlementOf).filter(Boolean).map((record) => foundry.utils.deepClone(record));
+}
+
+export async function loadSettlementMap(worldId, id) {
+    const record = settlementOf(settlementPage(await worldsPack()?.getDocument(worldId), id));
+    return record ? foundry.utils.deepClone(record) : null;
+}
+
+/**
+ * Writes a world's settlement map as a page of its world's journal, alone: its readable page (the
+ * Local studio's words, given as `page`) and its record in the page's flags. The world's journal
+ * must exist (Worlds saves the world first).
+ * @param {string} worldId
+ * @param {object} record - The settlement map's record (its id names it).
+ * @param {{name?: string, html?: string}} [page]
+ */
+export async function saveSettlementMap(worldId, record, page = {}) {
+    const document = await worldsPack()?.getDocument(worldId);
+    if (!document || !record?.id) return null;
+    const data = {
+        name: page.name || record.name || record.id,
+        type: "text",
+        text: { content: page.html ?? "", format: 1 },
+        [`flags.${FILRODENSWMB.ID}.${SETTLEMENT_FLAG}`]: record,
+    };
+    const existing = settlementPage(document, record.id);
+    if (existing) {
+        // The record is written whole: a field it no longer has is not kept
+        await existing.update({ [`flags.${FILRODENSWMB.ID}.-=${SETTLEMENT_FLAG}`]: null }, { render: false });
+        await existing.update(data);
+    } else {
+        const sort = Math.max(0, ...document.pages.contents.map((each) => each.sort ?? 0)) + foundry.CONST.SORT_INTEGER_DENSITY;
+        await document.createEmbeddedDocuments("JournalEntryPage", [{ ...foundry.utils.expandObject(data), sort }]);
+    }
+    return { id: record.id };
+}
+
+export async function deleteSettlementMap(worldId, id) {
+    const page = settlementPage(await worldsPack()?.getDocument(worldId), id);
+    if (!page) return false;
+    await page.delete();
+    return true;
+}
+
+/** Deletes every settlement map of a world; deleting its journal does too. */
+export async function deleteSettlementMaps(worldId) {
+    const document = await worldsPack()?.getDocument(worldId);
+    const ids = (document?.pages?.contents ?? []).filter((page) => settlementOf(page)).map((page) => page.id);
+    if (ids.length) await document.deleteEmbeddedDocuments("JournalEntryPage", ids);
     return true;
 }
 

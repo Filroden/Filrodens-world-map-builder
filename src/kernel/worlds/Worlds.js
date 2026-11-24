@@ -19,6 +19,11 @@ import { RegionalRecord } from "./RegionalRecord.js";
  *   still held, when it is held itself (they read the same settings); otherwise they are released
  *   as worlds of their own with a copy of the settings they read. Each keeps its own regional
  *   worlds under it. A regional world only cut from it (not held) loses the link.
+ * - **Settlement maps** (the Local studio's, L-surface) are part of their world, not saved maps:
+ *   the store keeps each beside its world (a page of its journal in Foundry), written and deleted
+ *   one at a time, and the world's record keeps a card for each (WorldRecord.settlementCard). A
+ *   copy, Save as and Clone as new take them along, each under a new id, made from the copy's
+ *   Surface map; deleting a world deletes them.
  * - **Blobs** (a regional world's `cutBase`, see RegionalRecord) are kept with the map whose part of
  *   the record names them. Each save drops the blobs a map's record no longer names; a copy takes
  *   them along with its record; Clone as new and a release drop the record, and the blobs with it.
@@ -92,6 +97,8 @@ export class Worlds {
                         // World setup in brief, and when anything of the world was last saved changed
                         setup: { engine: typeof setup.engine === "string" ? setup.engine : null, seed: setup.seed ?? null, frame: setup.frame ?? null },
                         settingsSavedAt: world.settingsSavedAt ?? null,
+                        // How many settlement maps it keeps (Worlds' family tree)
+                        settlements: WorldRecord.settlementCards(world).length,
                         children: [],
                     },
                 ];
@@ -122,9 +129,13 @@ export class Worlds {
      * @param {boolean} [options.settingsChanged] - Whether the settings changed since the world was
      *     opened, when the caller knows better than a comparison with the saved record can (a map's
      *     load fills in defaults the record never held, which are not a change of the user's).
-     * @returns {Promise<{world: object, maps: Array<{id: string, type: string}>}|null>}
+     * @param {{saved?: Array<{record: object, card: object, page?: object}>, deleted?: string[]}} [options.settlements]
+     *     The settlement maps kept or changed since the last save (each its record, its card and,
+     *     for Foundry, its readable page `{name, html}`), and the ids of those deleted. The others
+     *     are left as they are (Save as copies them).
+     * @returns {Promise<{world: object, maps: Array<{id: string, type: string}>, settlements: Array<{from: string, id: string}>}|null>}
      */
-    static async save({ world, name, settings, maps, asNew = false, settingsChanged = undefined, regional = undefined }) {
+    static async save({ world, name, settings, maps, asNew = false, settingsChanged = undefined, regional = undefined, settlements = {} }) {
         const stamp = Worlds.now();
         const fresh = !world || asNew;
         const record = fresh
@@ -170,8 +181,84 @@ export class Worlds {
         const held = new Map((record.maps ?? []).map((entry) => [entry.type, entry]));
         record.maps = mergeMaps(record.maps, savedMaps.map(({ id, type, card, revision, savedAt }) => ({ ...WorldRecord.mapCard({ ...(card ?? held.get(type)), revision, savedAt }), id, type })));
 
+        // The settlement maps: those changed written, those deleted dropped; Save as copies the rest
+        const surfaceId = savedMaps.find((map) => map.type === MAP_TYPES.SURFACE)?.id ?? Worlds.mapOf(record);
+        const fromSurface = new Map(savedMaps.filter((map) => map.from).map((map) => [map.from, map.id]));
+        const plan = await Worlds.#settlementPlan({ world, fresh, settlements, surfaceId, fromSurface, stamp });
+        record.settlements = plan.cards;
+
         if (!(await platform.store.saveWorld(record))) return null;
-        return { world: record, maps: savedMaps.map(({ id, type }) => ({ id, type })) };
+        for (const { record: entry, page } of plan.writes) if (!(await platform.store.saveSettlementMap(record.id, entry, page))) return null;
+        if (!fresh) for (const id of plan.deletes) await platform.store.deleteSettlementMap(record.id, id);
+        return { world: record, maps: savedMaps.map(({ id, type }) => ({ id, type })), settlements: plan.ids };
+    }
+
+    /**
+     * What a save does to a world's settlement maps: the cards the record keeps, the records to
+     * write (with their pages) and the ids to delete, and each map's id before and after (Save as
+     * gives every one a new id). A record made from the world's Surface map follows it to its id.
+     */
+    static async #settlementPlan({ world, fresh, settlements, surfaceId, fromSurface, stamp }) {
+        const saved = (settlements.saved ?? []).filter((entry) => entry?.record?.id);
+        const deleted = new Set(settlements.deleted ?? []);
+        const changed = new Map(saved.map((entry) => [entry.record.id, entry]));
+        const sourceOf = (id) => (id && fromSurface.has(id) ? fromSurface.get(id) : (id ?? surfaceId));
+        const cards = [];
+        const writes = [];
+        const ids = [];
+        const asCopy = fresh && !!world;
+        const put = (entry, { revision, savedAt }) => {
+            const id = asCopy ? Worlds.newSettlementId() : entry.record.id;
+            const record = { ...structuredClone(entry.record), id, sourceMapId: sourceOf(entry.record.sourceMapId), revision, savedAt };
+            const card = WorldRecord.settlementCard({ ...entry.card, id, pinId: record.pinId, sourceMapId: record.sourceMapId, name: record.name, revision, savedAt });
+            if (!card) return;
+            cards.push(card);
+            writes.push({ record, page: entry.page ?? {} });
+            ids.push({ from: entry.record.id, id });
+        };
+        // Those the world keeps already, in their order: changed ones written, the rest kept (or copied by Save as)
+        const kept = world ? WorldRecord.settlementCards(world) : [];
+        for (const card of kept) {
+            if (deleted.has(card.id)) continue;
+            const entry = changed.get(card.id);
+            if (entry) {
+                put(entry, { revision: asCopy ? 1 : (card.revision ?? 1) + 1, savedAt: stamp });
+                changed.delete(card.id);
+            } else if (asCopy) {
+                const stored = await platform.store.loadSettlementMap(world.id, card.id);
+                if (stored) put({ record: stored, card, page: (await Worlds.pageOf?.(stored)) ?? {} }, { revision: 1, savedAt: stamp });
+            } else cards.push(card);
+        }
+        // Then those new since the last save
+        for (const entry of changed.values()) if (!deleted.has(entry.record.id)) put(entry, { revision: 1, savedAt: stamp });
+        return { cards, writes, deletes: [...deleted].filter((id) => kept.some((card) => card.id === id)), ids };
+    }
+
+    /** A new settlement map's id. */
+    static newSettlementId = () => platform.utils.randomID();
+
+    /**
+     * A settlement map's readable page as the Local studio writes it (Foundry keeps it in the
+     * world's journal), for a copy made without the studio open; set by the Local studio as the
+     * hosts start (its prepare). Absent, a copy's page has its record alone.
+     * @type {((record: object) => Promise<{name: string, html: string}>)|null}
+     */
+    static pageOf = null;
+
+    /** Copies a world's settlement maps into another world, each under a new id, made from `surfaceId`. */
+    static async #copySettlements(from, to, surfaceId) {
+        const cards = [];
+        const stamp = Worlds.now();
+        for (const card of WorldRecord.settlementCards(from)) {
+            const stored = await platform.store.loadSettlementMap(from.id, card.id);
+            if (!stored) continue;
+            const id = Worlds.newSettlementId();
+            const record = { ...stored, id, sourceMapId: surfaceId ?? stored.sourceMapId ?? null, revision: 1, savedAt: stamp };
+            if (!(await platform.store.saveSettlementMap(to.id, record, (await Worlds.pageOf?.(record)) ?? {}))) continue;
+            const copy = WorldRecord.settlementCard({ ...card, id, sourceMapId: record.sourceMapId, revision: 1, savedAt: stamp });
+            if (copy) cards.push(copy);
+        }
+        return cards;
     }
 
     /**
@@ -190,7 +277,11 @@ export class Worlds {
         copy.maps = await Worlds.#copyMaps(world, copy, name, renamed);
         // The copied maps carry their blobs (the store copies a map whole); the record follows them
         copy.regional = RegionalRecord.remap(copy.regional ?? null, renamed);
+        copy.settlements = [];
         await platform.store.saveWorld(copy);
+        // Its settlement maps, once its journal exists to hold them
+        copy.settlements = await Worlds.#copySettlements(world, copy, Worlds.mapOf(copy));
+        if (copy.settlements.length) await platform.store.saveWorld(copy);
         return copy;
     }
 
@@ -210,7 +301,10 @@ export class Worlds {
         copy.maps = await Worlds.#copyMaps(world, copy, name);
         // No record, so no blobs
         for (const map of copy.maps) await Worlds.#keepBlobs(copy, map.id);
+        copy.settlements = [];
         await platform.store.saveWorld(copy);
+        copy.settlements = await Worlds.#copySettlements(world, copy, Worlds.mapOf(copy));
+        if (copy.settlements.length) await platform.store.saveWorld(copy);
         return copy;
     }
 
@@ -282,6 +376,7 @@ export class Worlds {
         }
         for (const child of plan.unlinked) await platform.store.saveWorld({ ...child, parentWorldId: null });
         for (const map of world.maps ?? []) await platform.store.deleteSavedMap(map.id);
+        await platform.store.deleteSettlementMaps(worldId);
         return platform.store.deleteWorld(worldId);
     }
 

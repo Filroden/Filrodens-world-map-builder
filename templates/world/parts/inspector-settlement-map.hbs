@@ -1,0 +1,27 @@
+{{!--
+    A settlement pin's Settlement map card (L-surface; boards L1, L1b), under its Settlement card:
+    with none yet, Make settlement map… (which asks for a population first where the pin has none);
+    with one kept, what it is and Open settlement map. A held regional world's form comes with
+    L-surface step 2b. Context: settlementMap (SettlementMaps.pinCard), null on a pin that is not a
+    settlement.
+--}}
+{{#if settlementMap}}
+<div class="fwmb-group fwmb-settlement-map-card">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMap"}}{{#if settlementMap.unsaved}} <span class="fwmb-state-mark fwmb-state-mark--older" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementMapUnsavedHint'}}"><span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MarkUnsaved"}}</span>{{/if}}</div>
+    {{#if settlementMap.card}}
+    <p class="fwmb-settlement-map-line"><b>{{settlementMap.name}}</b><span class="fwmb-hint">{{settlementMap.line}}</span></p>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-inspector-action="openSettlementMap"><span class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenSettlementMap"}}</button>
+    </div>
+    {{else if settlementMap.held}}
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--wide" aria-disabled="true" data-tooltip="{{settlementMap.later}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MakeSettlementMapEllipsis"}}</button>
+    </div>
+    {{else}}
+    <p class="fwmb-hint">{{settlementMap.hint}}</p>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide"{{#if settlementMap.off}} aria-disabled="true" data-tooltip="{{settlementMap.off}}"{{else}} data-inspector-action="makeSettlementMap"{{/if}}><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.MakeSettlementMapEllipsis"}}</button>
+    </div>
+    {{/if}}
+</div>
+{{/if}}

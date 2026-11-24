@@ -12,6 +12,9 @@ import { RegionalRecord } from "./RegionalRecord.js";
  *       settings: { setup, cultures, ages, nameStyle, styles, biomes, climate, icons },
  *       settingsRevision, settingsSavedAt,   // raised and set by each save that changes the settings
  *       maps: [{ id, type }],                // the world's maps; in S0 its Surface map only
+ *       settlements: [card],                 // its settlement maps (L-surface; see settlementCard),
+ *                                            // each kept by the store as part of the world (a
+ *                                            // page of its journal in Foundry), never a saved map
  *       parentWorldId,                       // the world it was cut from, or null
  *       held,                                // a regional world still held by its parent: its
  *                                            // settings, all but its World setup, are read from
@@ -41,6 +44,21 @@ export const LINKED_GROUPS = Object.freeze(WORLD_GROUPS.filter((group) => group 
 /** The map types a world can hold; S0 makes only the Surface map. */
 export const MAP_TYPES = Object.freeze({ SURFACE: "surface" });
 
+/** A settlement map's type (the Local studio's): part of its world, not one of its `maps`. */
+export const SETTLEMENT_TYPE = "settlement";
+
+/** The parts of a settlement map's input its card keeps a fingerprint of (see the Local studio's OutOfDate). */
+export const SETTLEMENT_PARTS = Object.freeze(["people", "style", "routes", "rivers", "ground", "cultures", "run"]);
+
+/** A record id (Foundry's and the web's random ids, and ids a test gives). */
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** An 8-hex fingerprint. */
+const PRINT = /^[0-9a-f]{8}$/;
+/** The longest name a card keeps. */
+const MAX_NAME = 200;
+/** The most people a card shows (well past any settlement). */
+const MAX_PEOPLE = 1e8;
+
 const copy = (value) => (value === undefined ? undefined : structuredClone(value));
 
 /** The largest thumbnail a map's card keeps (a data URL), well past the 320px images the studio makes. */
@@ -66,6 +84,47 @@ export class WorldRecord {
         if (Number.isInteger(card.revision) && card.revision >= 1) out.revision = card.revision;
         if (typeof card.savedAt === "string" && card.savedAt.length <= 40 && Number.isFinite(Date.parse(card.savedAt))) out.savedAt = card.savedAt;
         return out;
+    }
+
+    /**
+     * What a world keeps of each of its settlement maps (L-surface), on its record's `settlements`:
+     * enough to list it (its name, its pin's tier and people), to find its pin and the map it was
+     * made from, and to tell whether it is Out of date without loading it (its input's
+     * fingerprint by part, and the parts that differed at the last save). Read safely: a field
+     * that is not one is left out, and a card without a usable id is null.
+     * @param {*} card
+     * @returns {object|null}
+     */
+    static settlementCard(card) {
+        if (!card || typeof card !== "object" || !ID.test(card.id ?? "")) return null;
+        const out = { id: card.id };
+        if (ID.test(card.pinId ?? "")) out.pinId = card.pinId;
+        if (ID.test(card.sourceMapId ?? "")) out.sourceMapId = card.sourceMapId;
+        if (typeof card.name === "string") out.name = card.name.trim().slice(0, MAX_NAME);
+        if (typeof card.tier === "string" && /^[A-Za-z]{1,40}$/.test(card.tier)) out.tier = card.tier;
+        if (Number.isFinite(card.people) && card.people >= 0) out.people = Math.min(MAX_PEOPLE, Math.round(card.people));
+        if (card.parts && typeof card.parts === "object" && !Array.isArray(card.parts)) {
+            const parts = {};
+            for (const part of SETTLEMENT_PARTS) if (PRINT.test(card.parts[part] ?? "")) parts[part] = card.parts[part];
+            if (Object.keys(parts).length) out.parts = parts;
+        }
+        if (Array.isArray(card.stale)) out.stale = SETTLEMENT_PARTS.filter((part) => card.stale.includes(part));
+        if (Number.isInteger(card.revision) && card.revision >= 1) out.revision = card.revision;
+        if (typeof card.savedAt === "string" && card.savedAt.length <= 40 && Number.isFinite(Date.parse(card.savedAt))) out.savedAt = card.savedAt;
+        return out;
+    }
+
+    /** A world's settlement map cards, read safely (each once). */
+    static settlementCards(world) {
+        const seen = new Set();
+        const cards = [];
+        for (const raw of Array.isArray(world?.settlements) ? world.settlements : []) {
+            const card = WorldRecord.settlementCard(raw);
+            if (!card || seen.has(card.id)) continue;
+            seen.add(card.id);
+            cards.push(card);
+        }
+        return cards;
     }
 
     /**
@@ -113,6 +172,7 @@ export class WorldRecord {
             settingsSavedAt: null,
             // Each map's card (what Worlds shows of it) as checked, with its id and type
             maps: maps.map((map) => ({ ...WorldRecord.mapCard(map), id: map.id, type: map.type })),
+            settlements: [],
             parentWorldId,
             held: held === true,
             regional: null,

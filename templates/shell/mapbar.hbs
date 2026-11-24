@@ -1,0 +1,7 @@
+{{!--
+    The bar under the world bar of the map open, when its map type has one: a settlement map's
+    (L-surface; the Local studio's templates/local/settlement-bar.hbs). Empty and hidden otherwise.
+--}}
+<div{{#unless mapBar}} hidden{{/unless}}>
+    {{#if mapBar}}{{> "modules/filrodens-world-map-builder/templates/local/settlement-bar.hbs"}}{{/if}}
+</div>

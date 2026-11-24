@@ -173,9 +173,12 @@ export class WorldsPanel {
         const saved = WorldsPanel.lastSaved(node);
         // A world with no maps yet (board N3) has no engine to name: its Surface map is not made
         if (!count) return [i18n.localize("FILRODENSWMB.UI.WorldNoMapsYet"), saved ? WorldsPanel.savedLabel(saved) : null].filter(Boolean).join(" · ");
+        // Its settlement maps (L-surface), counted where it has any
+        const settlements = node.settlements ?? 0;
         return [
             engine ? i18n.localize(engine) : null,
             count === 1 ? i18n.localize("FILRODENSWMB.UI.WorldMapsOne") : i18n.format("FILRODENSWMB.UI.WorldMapsCount", { count }),
+            settlements ? (settlements === 1 ? i18n.localize("FILRODENSWMB.UI.WorldSettlementsOne") : i18n.format("FILRODENSWMB.UI.WorldSettlementsCount", { count: settlements })) : null,
             saved ? WorldsPanel.savedLabel(saved) : null,
         ]
             .filter(Boolean)

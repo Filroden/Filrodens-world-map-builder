@@ -15,9 +15,9 @@
     Beside the name: Out of date on a held regional world whose parent changed what it shows, and
     Back to while a regional world's parent is open for its settings (S0 step 5).
 
-    Save world never folds. Parts later tracks fill (Geology, Add a map,
-    Settlement maps) are drawn in their places and disabled, with a tooltip saying they are not
-    built yet (aria-disabled, so the tooltip still shows).
+    Save world never folds. Parts later tracks fill (Geology, Add a map) are drawn in their places
+    and disabled, with a tooltip saying they are not built yet (aria-disabled, so the tooltip still
+    shows). Settlement maps (L-surface) is off, with why, until the world has one.
     With no world open (board N5) the name reads No world open, New world sits beside Open world,
     and Save world, Save as and the switcher are off; while a world is being made (N2)
     the same, but for World; a world with no Surface map shows it as a dashed + Surface map (N3)
@@ -108,16 +108,42 @@
             <button type="button" role="menuitemradio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}"{{#if this.disabled}} aria-disabled="true"{{/if}}{{#if this.action}} data-action="{{this.action}}"{{/if}} data-tooltip="{{this.tooltip}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{this.full}}{{#if this.markWords}}<span class="fwmb-menu-note"> · {{this.markWords}}</span>{{/if}}</button>
             {{/each}}
             <button type="button" role="menuitem" aria-disabled="true" data-tooltip="{{worldBar.addMap}}"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.AddMap"}}</button>
-            <button type="button" role="menuitem" class="fwmb-menu-item--separated" aria-disabled="true" data-tooltip="{{worldBar.settlementMaps}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.SettlementMaps"}}</button>
+            {{#if worldBar.settlements.enabled}}
+            {{#each worldBar.settlements.rows}}
+            <button type="button" role="menuitemradio" class="{{#if @first}}fwmb-menu-item--separated{{/if}}" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span></button>
+            {{/each}}
+            {{else}}
+            <button type="button" role="menuitem" class="fwmb-menu-item--separated" aria-disabled="true" data-tooltip="{{#if worldBar.settlements.tooltip}}{{worldBar.settlements.tooltip}}{{else}}{{worldBar.settlementMaps}}{{/if}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.SettlementMaps"}}</button>
+            {{/if}}
         </div>
     </div>
 
-    {{!-- Settlement maps (leaves the bar at fold 2, for the layer menu) --}}
-    <button type="button" class="fwmb-barbtn fwmb-worldbar-settlements" aria-disabled="true" aria-label="{{worldBar.settlementMaps}}" data-tooltip="{{worldBar.settlementMaps}}">
+    {{!-- Settlement maps (L-surface; board L3; leaves the bar at fold 3, for the layer menu): a
+         searchable menu of the world's settlement maps, naming the one open; off, with why, while
+         the world has none --}}
+    {{#if worldBar.settlements.enabled}}
+    <div class="fwmb-dropdown fwmb-worldbar-settlements" tabindex="-1">
+        <button type="button" class="fwmb-barbtn{{#if worldBar.settlements.open}} fwmb-is-current{{/if}}" aria-haspopup="menu" aria-label="{{worldBar.settlements.label}}" data-tooltip="{{worldBar.settlements.tooltip}}">
+            <span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>
+            {{worldBar.settlements.label}}
+            {{#unless worldBar.settlements.open}}<span class="fwmb-badge fwmb-badge--count">{{worldBar.settlements.count}}</span>{{/unless}}
+            <span class="fwmb-caret" aria-hidden="true"></span>
+        </button>
+        <div class="fwmb-dropdown-menu fwmb-settlement-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.SettlementMaps'}}" data-settlement-list>
+            <input type="search" class="fwmb-settlement-search" data-settlement-search data-panel-ui placeholder="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" aria-label="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" />
+            {{#each worldBar.settlements.rows}}
+            <button type="button" role="menuitemradio" aria-checked="{{#if this.current}}true{{else}}false{{/if}}" data-action="openSettlementMap" data-settlement-id="{{this.id}}" data-settlement-row data-search="{{this.search}}"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}<span class="fwmb-menu-note"> · {{this.meta}}</span></button>
+            {{/each}}
+            <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementMapsMenuHint"}}</p>
+        </div>
+    </div>
+    {{else}}
+    <button type="button" class="fwmb-barbtn fwmb-worldbar-settlements" aria-disabled="true" aria-label="{{localize 'FILRODENSWMB.UI.SettlementMaps'}}" data-tooltip="{{#if worldBar.settlements.tooltip}}{{worldBar.settlements.tooltip}}{{else}}{{worldBar.settlementMaps}}{{/if}}">
         <span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span>
         {{localize "FILRODENSWMB.UI.SettlementMaps"}}
         <span class="fwmb-caret" aria-hidden="true"></span>
     </button>
+    {{/if}}
 
     <span class="fwmb-grow"></span>
 </header>

@@ -78,6 +78,20 @@ export class SettlementSource {
     }
 
     /**
+     * Whether a pin is a settlement a settlement map can be made of: one the source reads as a
+     * settlement (its style's tier, or a run's town), with people of its own.
+     * @param {object} app
+     * @param {object} pin
+     * @returns {boolean}
+     */
+    static isSettlement(app, pin) {
+        const styles = new Map((app.uiState?.customPinStyles ?? []).map((style) => [style.id, style]));
+        const tier = styles.get(pin?.pinStyle)?.tier ?? pin?.generated?.tier ?? null;
+        // A castle's or a ruin's has no people of its own, so no settlement map (Ken, board L1)
+        return !!pin && !!placeOf(pin, styles, { cellAt: () => 0 }) && UserFigures.takes(tier);
+    }
+
+    /**
      * A settlement pin as the Local studio asks for it: its id and the built-in biome the map shows
      * at it (a painted biome, a custom rule's, or the climate's; a custom biome as the built-in one
      * it behaves like). Null for a pin that is not one of the source's settlements.

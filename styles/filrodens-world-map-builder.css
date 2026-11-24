@@ -59,6 +59,9 @@
 .fwmb-icon--elevation {
     --fwmb-mask: url("../assets/icons/elevation.svg");
 }
+.fwmb-icon--check {
+    --fwmb-mask: url("../assets/icons/check.svg");
+}
 .fwmb-icon--shuffle {
     --fwmb-mask: url("../assets/icons/shuffle.svg");
 }
@@ -5047,6 +5050,295 @@ button.fwmb-format {
     width: var(--p, 40%);
     background: var(--fwmb-overlay-accent);
     border-radius: 0 2px 2px 0;
+}
+
+/* ==========================================================================
+   The Local studio (L-surface): a settlement map in the world's frame. Its bar under the world bar,
+   its stage in the map's place (the four versions' cards, or its canvas), Map setup's version line,
+   the world bar's Settlement maps menu and the overview's table. The Surface map's canvas, readout
+   values, unmade frame and its Visibility, Show and Thematic views menus give way while one is open
+   (fwmb-is-settlement on the studio).
+   ========================================================================== */
+.fwmb-mapbar[hidden] {
+    display: none;
+}
+.fwmb-settlement-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0 0.625rem;
+    background: var(--fwmb-bg-raised);
+    border-bottom: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-secondary);
+    font: 400 0.8125rem/1.25rem var(--fwmb-font-ui);
+    min-width: 0;
+}
+.fwmb-settlement-bar b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-settlement-bar .fwmb-grow {
+    flex: 1;
+}
+.fwmb-settlement-what {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-settlement-back .fwmb-icon {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-framing:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.fwmb-studio.fwmb-is-settlement .fwmb-map-preview > canvas,
+.fwmb-studio.fwmb-is-settlement .fwmb-map-preview > .fwmb-unmade,
+.fwmb-studio.fwmb-is-settlement .fwmb-canvas-readout,
+.fwmb-studio.fwmb-is-settlement .fwmb-map-hint,
+.fwmb-studio.fwmb-is-settlement .fwmb-map-controls .fwmb-layer-group {
+    display: none;
+}
+.fwmb-settlement-stage {
+    display: none;
+}
+.fwmb-studio.fwmb-is-settlement .fwmb-settlement-stage {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: var(--fwmb-canvas-surround);
+}
+.fwmb-settlement-surface {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+.fwmb-settlement-canvas {
+    display: block;
+    touch-action: none;
+    cursor: grab;
+}
+.fwmb-settlement-canvas:active {
+    cursor: grabbing;
+}
+.fwmb-settlement-canvas:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: -2px;
+}
+.fwmb-settlement-surface .fwmb-drawline.fwmb-hidden {
+    display: none;
+}
+
+/* The four versions (board L2): a 2 by 2 grid of cards, each its name and radio, then its picture
+   or its progress */
+.fwmb-versions {
+    position: absolute;
+    inset: 0.875rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 0.75rem;
+}
+.fwmb-version {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 10px;
+    background: repeating-linear-gradient(135deg, #24221b 0 0.625rem, #1f1d17 0.625rem 1.25rem);
+    cursor: pointer;
+}
+.fwmb-version[data-state="ready"] {
+    background: #1c1b16;
+}
+.fwmb-version.fwmb-is-selected {
+    outline: 4px solid var(--fwmb-accent-secondary);
+    outline-offset: -4px;
+}
+.fwmb-version-picture {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-version-label {
+    position: absolute;
+    inset-inline-start: 0.5rem;
+    top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3125rem 0.625rem 0.3125rem 0.375rem;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(11, 10, 7, 0.86);
+    color: #f3f2ef;
+    font: 700 0.75rem/1rem var(--fwmb-font-ui);
+    cursor: pointer;
+}
+.fwmb-version-label:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-version-meta {
+    font-weight: 400;
+    color: #cfccbf;
+}
+.fwmb-version-radio {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 2px solid #f3f2ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.fwmb-version.fwmb-is-selected .fwmb-version-radio::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #f3f2ef;
+}
+.fwmb-version-progress {
+    position: absolute;
+    inset-inline: 0.5rem;
+    bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 8px;
+    background: rgba(11, 10, 7, 0.86);
+    color: #f3f2ef;
+    font: 400 0.75rem/1rem var(--fwmb-font-ui);
+}
+.fwmb-version[data-state="ready"] .fwmb-version-progress,
+.fwmb-version[data-state="released"] .fwmb-version-progress {
+    display: none;
+}
+.fwmb-version-bar {
+    height: 0.25rem;
+    border-radius: 2px;
+    background: #4a473c;
+    overflow: hidden;
+}
+.fwmb-version-bar b {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: #e8c35a;
+}
+.fwmb-version--building {
+    position: absolute;
+    inset: 25% 25%;
+    cursor: default;
+}
+
+/* Map setup's version (its picture of the town view, seed and when it was kept) and From the pin */
+.fwmb-settlement-version {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+.fwmb-settlement-version-picture {
+    flex: none;
+    width: 6rem;
+    height: 4.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-base);
+    overflow: hidden;
+}
+.fwmb-settlement-version-picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.fwmb-settlement-version-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+.fwmb-settlement-version-text b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-settlement-map-line {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0 0 0.5rem;
+}
+
+/* The world bar's Settlement maps menu (board L3): a search over the world's settlement maps */
+.fwmb-worldbar-settlements .fwmb-is-current {
+    background: var(--fwmb-bg-selected);
+    box-shadow: inset 0 -3px 0 var(--fwmb-accent-secondary);
+}
+.fwmb-settlement-menu {
+    min-width: 18rem;
+    max-height: 24rem;
+    overflow-y: auto;
+}
+.fwmb-settlement-search {
+    width: 100%;
+    margin: 0 0 0.375rem;
+}
+.fwmb-settlement-menu .fwmb-hint {
+    padding: 0.25rem 0.5rem;
+    margin: 0;
+}
+
+/* The overview's settlement maps (board L4): a table scrolling past five rows */
+.fwmb-overview-settlements .fwmb-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-overview-settlements .fwmb-settlement-search {
+    width: auto;
+    margin: 0 0 0 auto;
+}
+.fwmb-settlement-table-wrap {
+    max-height: 13.5rem;
+    overflow-y: auto;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 10px;
+}
+.fwmb-settlement-table {
+    width: 100%;
+    border-collapse: collapse;
+    font: 400 0.8125rem/1.25rem var(--fwmb-font-ui);
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-settlement-table th,
+.fwmb-settlement-table td {
+    padding: 0.375rem 0.625rem;
+    text-align: start;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-settlement-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-muted);
+    font-weight: 700;
+}
+.fwmb-settlement-table tbody th {
+    color: var(--fwmb-text-primary);
+    font-weight: 700;
+}
+.fwmb-settlement-table .fwmb-num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-settlement-table .fwmb-end {
+    text-align: end;
 }
 
 /* v5: touch (a coarse pointer). Targets grow from 1.75rem to 2.75rem where the finger needs it;

@@ -36,6 +36,12 @@ const BYTES_PER_MEGABYTE = 1048576;
  * belongs to MapStudio.
  */
 export class MapTransfer {
+    /**
+     * The Local studio's registration (its `rules` and `card` for settlement maps), set by the
+     * studio as it opens from the shell's registry; null where it is not registered (some tests).
+     */
+    static local = null;
+
     // ------------------------------------------------------------------ one map as JSON
 
     /**
@@ -65,7 +71,9 @@ export class MapTransfer {
             const bytes = await platform.store.loadMapBlob(mapId, hash);
             if (bytes) blobs.set(hash, bytes);
         }
-        const worldFile = WorldFile.write({ name: world?.name ?? name, mapId, file, disabledIcons: loaded.settings?.icons?.disabled ?? [], cutFrom, held: world?.held === true, regional: world?.regional ?? null, blobs, version: platform.module.version });
+        // Its settlement maps, as saved (L-surface)
+        const settlements = world?.id ? await platform.store.listSettlementMaps(world.id) : [];
+        const worldFile = WorldFile.write({ name: world?.name ?? name, mapId, file, disabledIcons: loaded.settings?.icons?.disabled ?? [], cutFrom, held: world?.held === true, regional: world?.regional ?? null, blobs, settlements, version: platform.module.version });
         const safeName = name.replaceAll(/[^a-z0-9]/gi, "_").toLowerCase();
         MapTransfer.download(new Blob([JSON.stringify(worldFile, null, 2)], { type: "application/json" }), `fwmb_${safeName}.json`);
     }
@@ -93,7 +101,7 @@ export class MapTransfer {
         const result = await MapTransfer.#bringIn(mapFile, { fallback, taken, parentId: (id) => (id && saved.has(id) ? id : null), disabledIcons: worldFile?.disabledIcons ?? [] });
         let released = false;
         if (worldFile) {
-            const settled = await MapTransfer.#settleWorlds({ worlds: [worldFile.world], blobBytes: worldFile.blobBytes }, new Map([[first.id, result.id]]));
+            const settled = await MapTransfer.#settleWorlds({ worlds: [worldFile.world], blobBytes: worldFile.blobBytes, settlementsOf: () => worldFile.settlements }, new Map([[first.id, result.id]]));
             released = settled.length > 0;
         }
         return { ...result, released };
@@ -124,7 +132,7 @@ export class MapTransfer {
             if (!backup) return;
             await overlay.start(platform.i18n.localize("FILRODENSWMB.UI.BackupZipping"));
             try {
-                const bytes = Backup.pack({ maps: backup.maps, assets: backup.assets, worlds: backup.worlds, blobs: backup.blobs, app: platform.module.host, version: platform.module.version });
+                const bytes = Backup.pack({ maps: backup.maps, assets: backup.assets, worlds: backup.worlds, blobs: backup.blobs, settlements: backup.settlements, app: platform.module.host, version: platform.module.version });
                 MapTransfer.download(new Blob([bytes], { type: "application/zip" }), Backup.fileName());
             } finally {
                 overlay.end();
@@ -222,6 +230,8 @@ export class MapTransfer {
         const tooLong = [];
         const worlds = new Map();
         const blobs = new Map();
+        // Each world's settlement maps (L-surface), once a world
+        const settlements = new Map();
         let missing = 0;
         for (const [index, entry] of entries.entries()) {
             overlay.text(platform.i18n.format("FILRODENSWMB.UI.BackupPacking", { index: index + 1, count: entries.length }));
@@ -244,6 +254,8 @@ export class MapTransfer {
                 if (!worlds.has(world.id)) {
                     const { migration: _migration, ...record } = structuredClone(world);
                     worlds.set(world.id, record);
+                    const kept = await platform.store.listSettlementMaps(world.id);
+                    if (kept.length) settlements.set(world.id, kept);
                 }
                 for (const hash of RegionalRecord.blobsOf(world.regional, entry.id)) {
                     const bytes = blobs.has(hash) ? null : await platform.store.loadMapBlob(entry.id, hash);
@@ -253,7 +265,7 @@ export class MapTransfer {
             maps.push({ id: entry.id, name: entry.name, parentId: entry.parentId, file });
         }
         // A map without a world (not migrated, which the studio's opening prevents) keeps its settings
-        return { maps, assets, missing, tooLong, worlds: [...worlds.values()], blobs };
+        return { maps, assets, missing, tooLong, worlds: [...worlds.values()], blobs, settlements };
     }
 
     /**
@@ -379,8 +391,35 @@ export class MapTransfer {
             }
             await platform.store.saveWorld(record);
             if (!held) for (const map of record.maps ?? []) await platform.store.keepMapBlobs?.(map.id, []);
+            // Its settlement maps (L-surface), each checked, under new ids, made from its restored Surface map
+            const settlements = await MapTransfer.#bringSettlements(record, backup.settlementsOf?.(world.id) ?? []);
+            if (settlements.length) await platform.store.saveWorld({ ...record, settlements });
         }
         return released;
+    }
+
+    /**
+     * A world's settlement maps arriving from a file or backup: each read through the Local
+     * studio's rules (one that cannot be trusted is left out), given a new id, made from the world's
+     * Surface map (its pins keep their ids, so each still finds its pin), and written into the
+     * world. Returns their cards for the world's record.
+     * @param {object} world - The world record as written.
+     * @param {object[]} raws
+     */
+    static async #bringSettlements(world, raws) {
+        const local = MapTransfer.local;
+        if (!local?.rules || !raws?.length) return [];
+        const surfaceId = Worlds.mapOf(world);
+        const cards = [];
+        for (const raw of raws.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS)) {
+            const checked = local.rules.check(raw);
+            if (!checked) continue;
+            const record = { ...checked, id: Worlds.newSettlementId(), sourceMapId: surfaceId, revision: 1, savedAt: Worlds.now() };
+            if (!(await platform.store.saveSettlementMap(world.id, record, (await local.page?.(record)) ?? {}))) continue;
+            const card = WorldRecord.settlementCard(local.card(record));
+            if (card) cards.push(card);
+        }
+        return cards;
     }
 
     /**

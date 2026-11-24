@@ -1,8 +1,8 @@
 /**
  * The Local studio's jobs: a settlement's versions built, framed, drawn and kept. Each version is
  * built once and kept here, by id, until it is released, so its tiles can be drawn from it as the
- * canvas pans and zooms; only the version the user keeps is copied back to the main thread, once,
- * with its households (for the households card).
+ * canvas pans and zooms; of the version the user keeps, its households are copied back to the main
+ * thread once (for the households card), and its town only where this thread cannot draw it.
  *
  * The worker (LocalWorker.js) serves these tasks; where workers cannot be used, LocalWorkers runs
  * the same tasks on the main thread. Each takes its payload and returns `{ value, transfer }`.
@@ -11,6 +11,7 @@
  * versions are built here and the thumbnails and tiles are drawn on the main thread from the plain
  * copies instead (`canDraw` false).
  */
+import { FILRODENSWMB } from "../../config.js";
 import { createNamer } from "../../kernel/names/PersonNames.js";
 import { hinterlandView, townView } from "./engine/Framing.js";
 import { householdsOf } from "./engine/Households.js";
@@ -69,6 +70,27 @@ function markBuildings(town, households) {
 }
 
 /**
+ * Whether a view is one a settlement map's canvas, cards and pictures ask for: no coarser than
+ * VIEW_LIMITS.COARSEST of the frame's longer side a pixel, and no wider or taller than
+ * VIEW_LIMITS.SPAN times it. The drawing's widths have floors in pixels, so a view of a far larger
+ * area (a canvas that measured itself before it was shown asked for one 3,355 km a side) costs
+ * seconds and gigabytes for a picture that shows nothing.
+ * @param {object} town - Its frame, in metres.
+ * @param {{rect: number[], mPerPx: number}} view
+ */
+export function viewFits(town, view) {
+    const { COARSEST, SPAN } = FILRODENSWMB.LOCAL.VIEW_LIMITS;
+    const side = Math.max(town.frame.width, town.frame.height);
+    const [x0, y0, x1, y1] = view.rect;
+    return view.mPerPx > 0 && view.mPerPx <= side / COARSEST && x1 - x0 <= side * SPAN && y1 - y0 <= side * SPAN;
+}
+
+/** Throws where a view does not fit (see viewFits). */
+export function checkView(town, view) {
+    if (!viewFits(town, view)) throw new RangeError(`a view of ${Math.round(view.rect[2] - view.rect[0])} m at ${view.mPerPx} m a pixel is outside the settlement's frame`);
+}
+
+/**
  * Draws a rectangle of a town onto a new canvas.
  * @param {object} town
  * @param {{rect: number[], mPerPx: number, widthPx: number, heightPx: number}} view
@@ -108,7 +130,7 @@ export const TASKS = {
      * Builds a version and keeps it: its framings, figures and timings back, with the thumbnail
      * of its town view where a size is asked for and this thread can draw (else the plain town, for
      * the main thread to draw it).
-     * @param {{id: string, input: object, thumbnail?: {widthPx: number, heightPx: number, style?: object}}} payload
+     * @param {{id: string, input: object, thumbnail?: {widthPx: number, heightPx: number, style?: object, layers?: string[]}}} payload
      */
     build({ id, input, thumbnail = null }) {
         const started = now();
@@ -118,11 +140,14 @@ export const TASKS = {
         const view = townView(town);
         const framingMs = now() - framed;
         versions.set(id, { input, town, households: null, view });
-        const value = { id, frame: { ...town.frame }, kind: town.kind, townView: view, hinterlandView: hinterlandView(town), stats: town.stats, engineRevision: town.engineRevision, timings: { buildMs: builtMs, framingMs } };
+        // What the map's own title, scale bar and north arrow read (the renderer's labels layer),
+        // so the canvas can draw them once over its tiles
+        const label = { name: town.name, kind: town.kind, wall: !!town.wall, shore: !!town.shore };
+        const value = { id, frame: { ...town.frame }, kind: town.kind, label, townView: view, hinterlandView: hinterlandView(town), stats: town.stats, engineRevision: town.engineRevision, timings: { buildMs: builtMs, framingMs } };
         const transfer = [];
         if (thumbnail && canDraw()) {
             const drawn = now();
-            const bitmap = picture(thumbnailOf(town, view, thumbnail, { style: thumbnail.style }));
+            const bitmap = picture(thumbnailOf(town, view, thumbnail, { style: thumbnail.style, layers: thumbnail.layers }));
             value.timings.thumbnailMs = now() - drawn;
             value.thumbnail = bitmap;
             transfer.push(bitmap);
@@ -134,9 +159,10 @@ export const TASKS = {
 
     /**
      * The version kept: its households worked out (named by its cultures), its houses marked for
-     * the drawing, and its town and households copied back once.
+     * the drawing, and its households copied back once, with its town where it is asked for (a
+     * thread that cannot draw it; the town is tens of MB, most of it its terrain).
      */
-    keep({ id }) {
+    keep({ id, town = true }) {
         const version = versionOf(id);
         const started = now();
         if (!version.households) {
@@ -144,7 +170,9 @@ export const TASKS = {
             version.households = householdsOf(version.town, { cultures: householdCultures(version.input, namer), namer });
             markBuildings(version.town, version.households);
         }
-        return { value: { id, town: plain(version.town), households: plain(version.households), ms: now() - started } };
+        const value = { id, households: plain(version.households), ms: now() - started };
+        if (town) value.town = plain(version.town);
+        return { value };
     },
 
     /**
@@ -153,6 +181,7 @@ export const TASKS = {
      */
     tile({ id, view, style = null, cultures = {}, theme = null, layers }) {
         const version = versionOf(id);
+        checkView(version.town, view);
         const started = now();
         const bitmap = picture(drawView(version.town, view, { style, cultures, theme, layers }));
         return { value: { id, bitmap, ms: now() - started }, transfer: [bitmap] };

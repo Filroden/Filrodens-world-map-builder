@@ -12,6 +12,7 @@ import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { RandomNames } from "./RandomNames.js";
 import { UserFigures } from "./UserFigures.js";
+import { SettlementMaps } from "./SettlementMaps.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
@@ -19,7 +20,8 @@ const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
 /**
  * A pin in the inspector (see Inspector): its name, description and visibility; its look (a pin
  * style, or its own icon, colour and scale); its Settlement card (its entered population, see
- * UserFigures; not on a castle's or a ruin's); its label; and Focus view and Delete.
+ * UserFigures; not on a castle's or a ruin's) and Settlement map card (SettlementMaps); its label;
+ * and Focus view and Delete.
  *
  * A pin follows a pin style (its `pinStyle`) as other objects follow theirs: picking one writes
  * the style's icon, scale, colour and label fields onto the pin (PinStyles.apply); choosing an
@@ -58,6 +60,12 @@ export class PinEditor {
             randomName: (app, pin) => RandomNames.press(app, "pin", pin),
             saveStyle: (app, pin, _ref, button) => PinEditor.#saveStyle(app, pin, button.dataset.styleType),
             placeLabel: (app, pin) => InspectorFields.placeLabel(app, pin),
+            // Its settlement map (L-surface): made (asking for a population first), or opened
+            makeSettlementMap: (app, pin) => SettlementMaps.make(app, pin.id),
+            openSettlementMap: (app, pin) => {
+                const card = SettlementMaps.pinCard(app, pin);
+                return card?.id ? SettlementMaps.open(app, card.id) : null;
+            },
         },
     });
 
@@ -78,6 +86,8 @@ export class PinEditor {
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
             settlement: this.#settlement(pin, pinStyle),
+            // Its Settlement map card (L-surface), under the Settlement card
+            settlementMap: SettlementMaps.pinCard(app, pin),
             generated: GeneratedDetails.forPin(app, pin),
             generatedLocked: pin.generated?.locked === true,
             // An entered population keeps a generated pin: Lock ticked and held (see UserFigures)

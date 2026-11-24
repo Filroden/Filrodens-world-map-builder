@@ -1941,6 +1941,25 @@ export const FILRODENSWMB = {
         // below PALISADE_BELOW, stone from there; capitals and cities always stone (castles are
         // always drawn in stone)
         WALLS: Object.freeze({ PALISADE_BELOW: 3000, STONE_TIERS: Object.freeze(["capital", "city"]) }),
+        // A version's card: its thumbnail's size in pixels (the frames' shape, 4 by 3)
+        THUMBNAIL: Object.freeze({ widthPx: 640, heightPx: 480 }),
+        // A version's build time as its card's progress bar guesses it (the engine reports none):
+        // measured in step 1 at about 2.3 s and a further 0.09 ms a person (2,500 people 2.5 s,
+        // 30,000 5 s, 325,000 32 s); the bar stops short of full until the version is ready
+        BUILD_ESTIMATE: Object.freeze({ BASE_MS: 2300, MS_PER_PERSON: 0.09, MOST: 0.95 }),
+        // Settlement maps built this session kept in their workers, so going back to one costs nothing
+        KEEP_BUILT: 3,
+        // The most settlement maps a world file or backup may hold for one world
+        MAX_SETTLEMENTS: 10000,
+        // The canvas (SettlementCanvas): its finest detail in metres a pixel, the whole frame's
+        // coarse picture's longer side, the delay before the drawing line shows, how many tiles are
+        // kept and drawn at once, how far past the whole frame it zooms out, and its wheel, keys
+        // and zoom steps
+        CANVAS: Object.freeze({ FINEST_M: 0.4, COARSE_PX: 2048, LINE_DELAY_MS: 500, KEEP_TILES: 160, AT_ONCE: 2, ROOM: 1.25, WHEEL: 0.0015, KEY_PAN_PX: 80, ZOOM_STEP: 1.5 }),
+        // The views a settlement's worker draws (LocalTasks.viewFits): none coarser than the frame's
+        // longer side over COARSEST a pixel, nor wider or taller than SPAN times it (a view of a far
+        // larger area costs seconds and gigabytes for a picture that shows nothing)
+        VIEW_LIMITS: Object.freeze({ COARSEST: 64, SPAN: 4 }),
     }),
     // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the
     // guide read every COURSE_STEP_PX and each point moved onto the traced river within SNAP_PX;

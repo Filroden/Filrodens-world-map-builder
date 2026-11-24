@@ -90,24 +90,24 @@ test("a registration that does not hold together is refused", () => {
     assert.throws(() => registry.register(LocalStudio), /twice/);
 });
 
-test("the Local studio registers beside the World studio and opens, empty", async () => {
+test("the Local studio registers beside the World studio, its rail Map setup, Export and Households and supply (L-surface)", () => {
     const world = { definition: WORLD_DEFINITION, create: () => ({ mount() {}, canClose: async () => true, destroy() {} }) };
-    const shell = new Shell({ studios: [world, LocalStudio], studio: "local" });
+    const shell = new Shell({ studios: [world, LocalStudio] });
     assert.deepEqual(shell.registry.ids(), ["world", "local"]);
-    assert.equal(shell.definition.id, "local");
-    assert.deepEqual(shell.definition.tools, []);
-    assert.deepEqual(shell.definition.railStages("settlement"), []);
-
-    const root = document.createElement("div");
-    shell.mount(root);
-    assert.equal(root.dataset.fwmbStudio, "local");
-    assert.equal(shell.studio.root, root, "its controller is mounted in the frame");
-    assert.deepEqual(attached, [root], "the shell draws dialogues in the frame");
-    assert.equal(shell.isDirty, false);
-    assert.equal(await shell.canClose(), true);
-    shell.destroy();
-    assert.deepEqual(attached, [], "and stops when it closes");
-    assert.equal(shell.studio, null);
+    const local = shell.registry.get("local");
+    assert.equal(local.definition.id, "local");
+    assert.deepEqual(
+        local.definition.railStages("settlement").map((stage) => [stage.id, stage.tools.map((tool) => tool.id)]),
+        [["shape", ["mapSetup"]], ["finish", ["export"]], ["explore", ["households"]]],
+    );
+    // Export and Households and supply are later steps': drawn in their places, off
+    assert.ok(local.definition.tool("export").later && local.definition.tool("households").later);
+    assert.equal(local.definition.tool("households").mode, "explore");
+    // The World studio mounts its controller (the open world is its host): it is made with one
+    const controller = local.create(shell, { world: () => null });
+    assert.equal(controller.isOpen, false);
+    assert.equal(controller.isDirty, false);
+    assert.equal(typeof local.rules.check, "function");
 });
 
 test("the shell opens the first studio unless told otherwise, and refuses one it does not have", () => {

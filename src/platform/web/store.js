@@ -8,7 +8,9 @@
  * Foundry and the web through the studio's JSON export and import, and the load-time upgrades run
  * on maps saved here as they do on maps saved in Foundry. From v5 a map's record also keeps its
  * `meta` (its world, map type, revision and the time of its last changed save; see Worlds), and
- * each world is a record of its own in a second object store (see Worlds for its fields).
+ * each world is a record of its own in a second object store (see Worlds for its fields), and each
+ * settlement map (the Local studio's) a record of its own in a third, with its world's id: a
+ * settlement map is part of its world, never a saved map.
  *
  * The records go through a small store interface (get, put, delete, all) so the service can be
  * tested without a browser: MemoryRecords keeps them in a Map, IndexedDbRecords in IndexedDB. Each
@@ -20,18 +22,26 @@ import { deepClone, randomID } from "./utils.js";
 const DATABASE = "fwmb-maps";
 const STORE = "maps";
 const WORLDS = "worlds";
-/** 2 adds the world records (v5). */
-const DATABASE_VERSION = 2;
+const SETTLEMENTS = "settlements";
+/** 2 adds the world records (v5), 3 the settlement maps (v5, L-surface). */
+const DATABASE_VERSION = 3;
 
 /** Records kept in memory (tests, and browsers where IndexedDB is refused). */
 export class MemoryRecords {
     #records = new Map();
     #worlds = null;
+    #settlements = null;
 
     /** The world records kept beside these (made when first asked for). */
     get worlds() {
         this.#worlds ??= new MemoryRecords();
         return this.#worlds;
+    }
+
+    /** The settlement maps kept beside these (made when first asked for). */
+    get settlements() {
+        this.#settlements ??= new MemoryRecords();
+        return this.#settlements;
     }
 
     async get(id) {
@@ -56,6 +66,7 @@ export class IndexedDbRecords {
     #db;
     #store;
     #worlds = null;
+    #settlements = null;
 
     constructor(db, store = STORE) {
         this.#db = db;
@@ -66,6 +77,12 @@ export class IndexedDbRecords {
     get worlds() {
         this.#worlds ??= new IndexedDbRecords(this.#db, WORLDS);
         return this.#worlds;
+    }
+
+    /** The settlement maps, in the same database. */
+    get settlements() {
+        this.#settlements ??= new IndexedDbRecords(this.#db, SETTLEMENTS);
+        return this.#settlements;
     }
 
     /**
@@ -82,7 +99,7 @@ export class IndexedDbRecords {
             }
             const request = factory.open(DATABASE, DATABASE_VERSION);
             request.onupgradeneeded = () => {
-                for (const name of [STORE, WORLDS]) {
+                for (const name of [STORE, WORLDS, SETTLEMENTS]) {
                     if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name, { keyPath: "id" });
                 }
             };
@@ -133,6 +150,8 @@ const summary = (record) => ({ id: record.id, name: record.name });
  */
 export function createWebStore(records, { newId = randomID } = {}) {
     const worlds = records.worlds;
+    const settlements = records.settlements;
+    const ofWorld = async (worldId) => (await settlements.all()).filter((entry) => entry.worldId === worldId);
     return {
         /** Nothing to prepare: the database is created when it is opened. */
         async initializeCompendium() {},
@@ -307,6 +326,42 @@ export function createWebStore(records, { newId = randomID } = {}) {
         async deleteWorld(id) {
             if (!(await worlds.get(id))) return false;
             await worlds.delete(id);
+            return true;
+        },
+
+        // ------------------------------------------------------------ v5: a world's settlement maps
+
+        /** A world's settlement maps (the Local studio's records), in no order. */
+        async listSettlementMaps(worldId) {
+            return (await ofWorld(worldId)).map((entry) => deepClone(entry.record));
+        },
+
+        /** A world's settlement map, or null. */
+        async loadSettlementMap(worldId, id) {
+            const entry = await settlements.get(id);
+            return entry?.worldId === worldId ? deepClone(entry.record) : null;
+        },
+
+        /**
+         * Writes a world's settlement map (its record's id names it), alone: the world's other
+         * settlement maps are left as they are. The page (Foundry's readable page) is not kept here.
+         */
+        async saveSettlementMap(worldId, record) {
+            if (!worldId || !record?.id) return null;
+            await settlements.put({ id: record.id, worldId, record: deepClone(record) });
+            return { id: record.id };
+        },
+
+        async deleteSettlementMap(worldId, id) {
+            const entry = await settlements.get(id);
+            if (entry?.worldId !== worldId) return false;
+            await settlements.delete(id);
+            return true;
+        },
+
+        /** Deletes every settlement map of a world (as the world is deleted). */
+        async deleteSettlementMaps(worldId) {
+            for (const entry of await ofWorld(worldId)) await settlements.delete(entry.id);
             return true;
         },
     };

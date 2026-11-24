@@ -1,0 +1,8 @@
+{{!--
+    Make settlement map's foot (board L2): Keep <the version chosen>, enabled once it is drawn, over
+    Cancel, which keeps nothing and goes back to the pin. Stacked so neither wraps in a narrow panel.
+--}}
+<div class="fwmb-make-foot fwmb-make-foot--stack">
+    <button type="button" class="fwmb-btn" data-action="local" data-local="cancel"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.Cancel"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--primary"{{#if local.keep.off}} aria-disabled="true" data-tooltip="{{local.keep.off}}"{{else}} data-action="local" data-local="keep"{{/if}}><span class="fwmb-icon fwmb-icon--check" aria-hidden="true"></span>{{local.keep.label}}</button>
+</div>

@@ -93,7 +93,8 @@ test("Foundry preloads every template drawn as a partial", () => {
     // registers them all); the dialogues and the window's frame are rendered by path instead
     const main = readFileSync(join(ROOT, "main.js"), "utf8");
     const preloaded = new Set([...main.matchAll(/"modules\/filrodens-world-map-builder\/templates\/([^"]+)"/g)].map((match) => match[1]));
-    const missing = templates.filter((path) => !/^(shell|world)\/dialogs\//.test(path) && path !== "shell/studio.hbs" && !preloaded.has(path));
+    // A settlement map's journal page (local/journal-page.hbs) is rendered by path too
+    const missing = templates.filter((path) => !/^(shell|world)\/dialogs\//.test(path) && path !== "shell/studio.hbs" && path !== "local/journal-page.hbs" && !preloaded.has(path));
     assert.deepEqual(missing, []);
     const gone = [...preloaded].filter((path) => !templates.includes(path));
     assert.deepEqual(gone, [], "preloaded templates that no longer exist");

@@ -15,6 +15,8 @@ import { WorldSettings } from "./WorldSettings.js";
  *     maps/<id>.json       each map as MapPackage writes it (`assets` mode)
  *     assets/<hash>.<ext>  each image once, named by its content hash
  *     blobs/<hash>.gz      each blob once (see Blobs), named by its content hash
+ *     settlements/<worldId>.json  a world's settlement maps (L-surface; the Local studio's records),
+ *                          the manifest's `settlements` naming the worlds that have them
  *
  * Format 2 (v5) holds the world records, and each map without its world's settings; format 1 (4.3,
  * and the migration's JSON backup) holds maps only, each with its settings. Both are read: a map is
@@ -49,12 +51,13 @@ export class Backup {
      * @param {Map<string, {type: string, bytes: Uint8Array}>} options.assets - By content hash.
      * @param {object[]} [options.worlds] - The world records the maps belong to.
      * @param {Map<string, Uint8Array>} [options.blobs] - The blobs their records name, by hash.
+     * @param {Map<string, object[]>} [options.settlements] - Each world's settlement maps, by its id.
      * @param {"foundry"|"web"} options.app
      * @param {string} options.version - The module's version.
      * @param {Date} [options.exportedAt]
      * @returns {Uint8Array}
      */
-    static pack({ maps, assets, worlds = [], blobs = new Map(), app, version, exportedAt = new Date() }) {
+    static pack({ maps, assets, worlds = [], blobs = new Map(), settlements = new Map(), app, version, exportedAt = new Date() }) {
         const manifest = {
             format: Backup.FORMAT,
             exportedAt: exportedAt.toISOString(),
@@ -64,8 +67,10 @@ export class Backup {
             worlds,
             blobs: [...blobs.keys()],
             assets: [...assets].map(([hash, { type }]) => ({ hash, type })),
+            settlements: [...settlements.keys()],
         };
         const entries = { [MANIFEST]: strToU8(JSON.stringify(manifest, null, 2)) };
+        for (const [worldId, records] of settlements) entries[`${SETTLEMENTS}${worldId}.json`] = strToU8(JSON.stringify(records));
         for (const { id, file } of maps) entries[`${MAPS}${id}.json`] = strToU8(JSON.stringify(file));
         // Images and blobs are already compressed, so they are stored as they are
         for (const [hash, { type, bytes }] of assets) entries[`${ASSETS}${hash}.${IMAGE_TYPES[type].extension}`] = [bytes, { level: 0 }];
@@ -128,6 +133,13 @@ export class Backup {
                 return asset ? (entries[`${ASSETS}${hash}.${IMAGE_TYPES[asset.type].extension}`] ?? null) : null;
             },
             blobBytes: (hash) => (typeof hash === "string" && BLOB_HASH.test(hash) && manifest.blobs.includes(hash) ? (entries[`${BLOBS}${hash}.gz`] ?? null) : null),
+            // A world's settlement maps as the backup holds them, unchecked (the Local studio's rules check each)
+            settlementsOf: (worldId) => {
+                const file = Sanitize.isId(worldId) && manifest.settlements.includes(worldId) ? entries[`${SETTLEMENTS}${worldId}.json`] : null;
+                if (!file) return [];
+                const list = parseJson(file, "damaged");
+                return Array.isArray(list) ? list.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS) : [];
+            },
         };
     }
 }
@@ -136,13 +148,14 @@ const MANIFEST = "manifest.json";
 const MAPS = "maps/";
 const ASSETS = "assets/";
 const BLOBS = "blobs/";
+const SETTLEMENTS = "settlements/";
 const DATE_LENGTH = 10;
 /** Map JSON compresses well; this is fflate's default level. */
 const JSON_LEVEL = 6;
 const ASSET_EXTENSIONS = Object.values(IMAGE_TYPES).map((type) => type.extension);
 /** The only entry names a backup may hold (folders' own entries aside). */
-const ENTRY_NAMES = [new RegExp(`^${MANIFEST.replace(".", "\\.")}$`), /^maps\/[A-Za-z0-9_-]{1,64}\.json$/, new RegExp(`^assets\\/[0-9a-f]{32}\\.(?:${ASSET_EXTENSIONS.join("|")})$`), /^blobs\/[0-9a-f]{32}\.gz$/];
-const FOLDER_ENTRIES = new Set([MAPS, ASSETS, BLOBS]);
+const ENTRY_NAMES = [new RegExp(`^${MANIFEST.replace(".", "\\.")}$`), /^maps\/[A-Za-z0-9_-]{1,64}\.json$/, new RegExp(`^assets\\/[0-9a-f]{32}\\.(?:${ASSET_EXTENSIONS.join("|")})$`), /^blobs\/[0-9a-f]{32}\.gz$/, /^settlements\/[A-Za-z0-9_-]{1,64}\.json$/];
+const FOLDER_ENTRIES = new Set([MAPS, ASSETS, BLOBS, SETTLEMENTS]);
 
 /** Every entry looked at before any is inflated; the zip is refused if any breaks the rules. */
 function unpack(bytes, limits) {
@@ -222,6 +235,7 @@ function readJson(bytes) {
         },
         assetBytes: () => null,
         blobBytes: () => null,
+        settlementsOf: () => [],
     };
 }
 
@@ -243,7 +257,8 @@ function readManifest(bytes) {
     const assets = (Array.isArray(tree.assets) ? tree.assets : []).filter((asset) => typeof asset?.hash === "string" && /^[0-9a-f]{32}$/.test(asset.hash) && Object.hasOwn(IMAGE_TYPES, asset.type));
     const worlds = tree.format === Backup.FORMAT ? readWorlds(tree.worlds, ids) : [];
     const blobs = tree.format === Backup.FORMAT && Array.isArray(tree.blobs) ? tree.blobs.filter((hash) => typeof hash === "string" && BLOB_HASH.test(hash)) : [];
-    return { ...tree, maps, worlds, blobs, assets };
+    const settlements = tree.format === Backup.FORMAT && Array.isArray(tree.settlements) ? tree.settlements.filter((id) => Sanitize.isId(id)) : [];
+    return { ...tree, maps, worlds, blobs, assets, settlements };
 }
 
 /**
