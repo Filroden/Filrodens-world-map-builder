@@ -1,6 +1,6 @@
 import { FILRODENSWMB } from "../../../config.js";
 import { EDGE } from "../generator/CellGraph.js";
-import { MinHeap } from "../mesh/MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 
 /**
  * Travel times over the generator's travel network (see TravelGraph), for the Travel tool. The

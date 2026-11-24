@@ -1,0 +1,166 @@
+{
+ "id": "fx00000000005815",
+ "name": "Lostshearmi",
+ "seed": "P0JBVA:fx00000000005815",
+ "population": 1990,
+ "tier": "fortifiedTown",
+ "kind": "town",
+ "walled": true,
+ "capital": false,
+ "fortified": true,
+ "port": false,
+ "riverPort": false,
+ "shore": null,
+ "roads": [
+  {
+   "bearing": 134,
+   "class": "minor"
+  },
+  {
+   "bearing": 282,
+   "class": "minor"
+  }
+ ],
+ "waterRoutes": [],
+ "river": null,
+ "otherRivers": [],
+ "water": null,
+ "kindOfPlace": "inland",
+ "relief": {
+  "heightM": 1046,
+  "slopeMPerKm": 12.4,
+  "downhill": 101,
+  "lie": "slope"
+ },
+ "climate": {
+  "temperature": 0.9450980424880981,
+  "moisture": 0.4941176474094391
+ },
+ "biome": "DECIDUOUS_FOREST",
+ "neighbours": [
+  {
+   "name": "Littwatch",
+   "tier": "fortifiedTown",
+   "km": 30.74445861413122,
+   "bearing": 123
+  },
+  {
+   "name": "Oxlight",
+   "tier": "city",
+   "km": 63.4896153798706,
+   "bearing": 126
+  },
+  {
+   "name": "Litkep Tower",
+   "tier": "castle",
+   "km": 63.4896153798706,
+   "bearing": 126
+  },
+  {
+   "name": "Elledenmove",
+   "tier": "town",
+   "km": 65.45709146439103,
+   "bearing": 303
+  },
+  {
+   "name": "Steamermi",
+   "tier": "town",
+   "km": 69.01218602138914,
+   "bearing": 43
+  },
+  {
+   "name": "Eaglepeak",
+   "tier": "largeTown",
+   "km": 75.23301264813489,
+   "bearing": 255
+  }
+ ],
+ "frame": {
+  "width": 6000,
+  "height": 4500,
+  "widthPx": 4800,
+  "heightPx": 3600
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.5,
+ "ownFood": 1144.25,
+ "supply": {
+  "name": "Lostshearmi",
+  "tier": "fortifiedTown",
+  "need": 2288.5,
+  "eaten": 1990,
+  "reserve": 298.5,
+  "own": 1144.25,
+  "ownShare": 0.5,
+  "country": [
+   {
+    "sector": "here",
+    "amount": 3507.2700662471248,
+    "cells": 1,
+    "nearestKm": 0.07725171757983265,
+    "farthestKm": 0.07725171757983265,
+    "cost": 0
+   },
+   {
+    "sector": "NW",
+    "amount": 2507.3786000935306,
+    "cells": 1,
+    "nearestKm": 29.79211890969505,
+    "farthestKm": 29.79211890969505,
+    "cost": 14.864553676447773
+   }
+  ],
+  "countryTotal": 6014.648666340656,
+  "fromPlaces": [],
+  "out": {
+   "name": "Littwatch",
+   "tier": "fortifiedTown",
+   "amount": 4870.398666340656,
+   "km": 30.757907939259976,
+   "modes": {
+    "land": 0,
+    "road": 30.757907939259976,
+    "river": 0,
+    "sea": 0,
+    "km": 30.757907939259976,
+    "onRouteKm": 30.757907939259976
+   },
+   "way": [
+    [
+     1316.7,
+     601.3
+    ],
+    [
+     1328.6,
+     609.2
+    ]
+   ]
+  },
+  "countryCells": [
+   {
+    "x": 1316.7,
+    "y": 601.3,
+    "amount": 3507.2700662471248
+   },
+   {
+    "x": 1305.9,
+    "y": 592.7,
+    "amount": 2507.3786000935306
+   }
+  ],
+  "imports": 0,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 13.852871736500214,
+ "security": 0.702,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

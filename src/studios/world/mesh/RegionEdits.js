@@ -1,4 +1,4 @@
-import { MinHeap } from "./MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 import { nestingViolations, parentAssignments } from "./OwnerLayer.js";
 import { floodOwners, ownedCells } from "./Territory.js";
 import { UNCLAIMED } from "./Schema.js";

@@ -1,0 +1,183 @@
+{
+ "id": "fx00000000004789",
+ "name": "Ambergarde",
+ "seed": "P0JBVA:fx00000000004789",
+ "population": 5975,
+ "tier": "port",
+ "kind": "town",
+ "walled": false,
+ "capital": false,
+ "fortified": false,
+ "port": true,
+ "riverPort": false,
+ "shore": {
+  "body": "sea",
+  "side": 328,
+  "stretches": [
+   {
+    "from": 304,
+    "to": 356,
+    "share": 0.2
+   }
+  ],
+  "island": false
+ },
+ "roads": [],
+ "waterRoutes": [],
+ "river": null,
+ "otherRivers": [],
+ "water": {
+  "body": "sea",
+  "chosenBy": "only water",
+  "side": 328
+ },
+ "kindOfPlace": "coastal",
+ "relief": {
+  "heightM": 3,
+  "slopeMPerKm": 1.3,
+  "downhill": 255,
+  "lie": "level"
+ },
+ "climate": {
+  "temperature": 0.95686274766922,
+  "moisture": 0.21568627655506134
+ },
+ "biome": "SAVANNA",
+ "neighbours": [
+  {
+   "name": "Fayard",
+   "tier": "largeTown",
+   "km": 45.01779466656778,
+   "bearing": 117
+  },
+  {
+   "name": "Sirepond",
+   "tier": "town",
+   "km": 72.53833488248571,
+   "bearing": 284
+  },
+  {
+   "name": "Demouthill",
+   "tier": "fortifiedTown",
+   "km": 74.80835543857404,
+   "bearing": 315
+  }
+ ],
+ "frame": {
+  "width": 6000,
+  "height": 4500,
+  "widthPx": 4800,
+  "heightPx": 3600
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.3,
+ "ownFood": 2061.3749999999995,
+ "supply": {
+  "name": "Ambergarde",
+  "tier": "port",
+  "need": 6871.249999999999,
+  "eaten": 5975,
+  "reserve": 896.25,
+  "own": 2061.3749999999995,
+  "ownShare": 0.3,
+  "country": [
+   {
+    "sector": "here",
+    "amount": 5003.95729236182,
+    "cells": 1,
+    "nearestKm": 0.081180014865753,
+    "farthestKm": 0.081180014865753,
+    "cost": 0
+   }
+  ],
+  "countryTotal": 5003.95729236182,
+  "fromPlaces": [
+   {
+    "name": "Sirepond",
+    "tier": "town",
+    "people": 3948,
+    "amount": 3809.356701576323,
+    "km": 79.46289490847245,
+    "modes": {
+     "land": 0,
+     "road": 0,
+     "river": 0,
+     "sea": 79.46289490847245,
+     "km": 79.46289490847245,
+     "onRouteKm": 79.46289490847245
+    },
+    "way": [
+     [
+      108,
+      618.9
+     ],
+     [
+      119.7,
+      621.9
+     ],
+     [
+      129,
+      630.6
+     ],
+     [
+      140.6,
+      627.2
+     ]
+    ]
+   }
+  ],
+  "out": {
+   "name": "Fayard",
+   "tier": "largeTown",
+   "amount": 4003.4389939381444,
+   "km": 94.81850929956204,
+   "modes": {
+    "land": 0,
+    "road": 27.136844370707518,
+    "river": 0,
+    "sea": 67.68166492885452,
+    "km": 94.81850929956204,
+    "onRouteKm": 94.81850929956204
+   },
+   "way": [
+    [
+     140.6,
+     627.2
+    ],
+    [
+     129,
+     630.6
+    ],
+    [
+     146.7,
+     638.4
+    ],
+    [
+     159.2,
+     636.8
+    ]
+   ]
+  },
+  "countryCells": [
+   {
+    "x": 140.6,
+    "y": 627.2,
+    "amount": 5003.95729236182
+   }
+  ],
+  "imports": 0,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 32.89912749744786,
+ "security": 0.957,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

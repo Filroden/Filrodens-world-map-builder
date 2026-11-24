@@ -1,0 +1,167 @@
+{
+ "id": "fx00000000005547",
+ "name": "Grironcairn",
+ "seed": "P0JBVA:fx00000000005547",
+ "population": 2500,
+ "tier": "town",
+ "kind": "town",
+ "walled": false,
+ "capital": false,
+ "fortified": false,
+ "port": false,
+ "riverPort": false,
+ "shore": null,
+ "roads": [
+  {
+   "bearing": 75,
+   "class": "minor"
+  },
+  {
+   "bearing": 315,
+   "class": "minor"
+  }
+ ],
+ "waterRoutes": [],
+ "river": null,
+ "otherRivers": [],
+ "water": null,
+ "kindOfPlace": "inland",
+ "relief": {
+  "heightM": 1598,
+  "slopeMPerKm": 3.9,
+  "downhill": 121,
+  "lie": "slope"
+ },
+ "climate": {
+  "temperature": 0.9333333373069763,
+  "moisture": 0.5490196347236633
+ },
+ "biome": "DECIDUOUS_FOREST",
+ "neighbours": [
+  {
+   "name": "Mosstar",
+   "tier": "town",
+   "km": 30.036315329401347,
+   "bearing": 56
+  },
+  {
+   "name": "Lastshand",
+   "tier": "largeTown",
+   "km": 44.55964559689348,
+   "bearing": 321
+  },
+  {
+   "name": "Bearhadow",
+   "tier": "largeTown",
+   "km": 64.60879816754817,
+   "bearing": 242
+  },
+  {
+   "name": "Westhgrove",
+   "tier": "town",
+   "km": 70.28896916385774,
+   "bearing": 284
+  }
+ ],
+ "frame": {
+  "width": 6000,
+  "height": 4500,
+  "widthPx": 4800,
+  "heightPx": 3600
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.5,
+ "ownFood": 1437.5,
+ "supply": {
+  "name": "Grironcairn",
+  "tier": "town",
+  "need": 2875,
+  "eaten": 2500,
+  "reserve": 375,
+  "own": 1437.5,
+  "ownShare": 0.5,
+  "country": [
+   {
+    "sector": "here",
+    "amount": 4447.042045506874,
+    "cells": 1,
+    "nearestKm": 0.06619691130674882,
+    "farthestKm": 0.06619691130674882,
+    "cost": 0
+   }
+  ],
+  "countryTotal": 4447.042045506874,
+  "fromPlaces": [
+   {
+    "name": "Mosstar",
+    "tier": "town",
+    "people": 1913,
+    "amount": 3650.9044523236635,
+    "km": 29.92266788907695,
+    "modes": {
+     "land": 0,
+     "road": 29.92266788907695,
+     "river": 0,
+     "sea": 0,
+     "km": 29.92266788907695,
+     "onRouteKm": 29.92266788907695
+    },
+    "way": [
+     [
+      1288.6,
+      644
+     ],
+     [
+      1277.1,
+      651.8
+     ]
+    ]
+   }
+  ],
+  "out": {
+   "name": "Lastshand",
+   "tier": "largeTown",
+   "amount": 6660.446497830537,
+   "km": 44.59366102934332,
+   "modes": {
+    "land": 0,
+    "road": 44.59366102934332,
+    "river": 0,
+    "sea": 0,
+    "km": 44.59366102934332,
+    "onRouteKm": 44.59366102934332
+   },
+   "way": [
+    [
+     1277.1,
+     651.8
+    ],
+    [
+     1264.2,
+     635.6
+    ]
+   ]
+  },
+  "countryCells": [
+   {
+    "x": 1277.1,
+    "y": 651.8,
+    "amount": 4447.042045506874
+   }
+  ],
+  "imports": 0,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 17.373972673491462,
+ "security": 0.918,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

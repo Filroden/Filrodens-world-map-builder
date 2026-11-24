@@ -1,0 +1,118 @@
+{
+ "id": "fx00000000004708",
+ "name": "Sprinbell",
+ "seed": "P0JBVA:fx00000000004708",
+ "population": 6990,
+ "tier": "largeTown",
+ "kind": "town",
+ "walled": false,
+ "capital": false,
+ "fortified": false,
+ "port": false,
+ "riverPort": false,
+ "shore": null,
+ "roads": [
+  {
+   "bearing": 11,
+   "class": "main"
+  },
+  {
+   "bearing": 214,
+   "class": "trunk"
+  }
+ ],
+ "waterRoutes": [],
+ "river": null,
+ "otherRivers": [],
+ "water": null,
+ "kindOfPlace": "inland",
+ "relief": {
+  "heightM": 982,
+  "slopeMPerKm": 4.4,
+  "downhill": 107,
+  "lie": "slope"
+ },
+ "climate": {
+  "temperature": 0.6823529601097107,
+  "moisture": 0.2980392277240753
+ },
+ "biome": "GRASSLAND",
+ "neighbours": [
+  {
+   "name": "Flalere",
+   "tier": "city",
+   "km": 47.22051769007973,
+   "bearing": 161
+  },
+  {
+   "name": "Littglenfo",
+   "tier": "largeTown",
+   "km": 64.01368731708466,
+   "bearing": 304
+  },
+  {
+   "name": "Heartmeater",
+   "tier": "largeTown",
+   "km": 72.8630479064671,
+   "bearing": 8
+  },
+  {
+   "name": "Drywaken",
+   "tier": "largeTown",
+   "km": 72.99828512187567,
+   "bearing": 247
+  }
+ ],
+ "frame": {
+  "width": 6000,
+  "height": 4500,
+  "widthPx": 4800,
+  "heightPx": 3600
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.3,
+ "ownFood": 2411.5499999999997,
+ "supply": {
+  "name": "Sprinbell",
+  "tier": "largeTown",
+  "need": 8038.499999999999,
+  "eaten": 6990,
+  "reserve": 1048.5,
+  "own": 2411.5499999999997,
+  "ownShare": 0.3,
+  "country": [
+   {
+    "sector": "here",
+    "amount": 4178.844334513381,
+    "cells": 1,
+    "nearestKm": 0.06177613172384379,
+    "farthestKm": 0.06177613172384379,
+    "cost": 0
+   }
+  ],
+  "countryTotal": 4178.844334513381,
+  "fromPlaces": [],
+  "out": null,
+  "countryCells": [
+   {
+    "x": 1035.3,
+    "y": 1243.5,
+    "amount": 4178.844334513381
+   }
+  ],
+  "imports": 1448.105665486618,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 19.505434720469477,
+ "security": 0.988,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

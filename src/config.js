@@ -1910,6 +1910,38 @@ export const FILRODENSWMB = {
         NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
         NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
     }),
+    // Personal names for the Local studio's households (personal names N2, `PersonNames`): the
+    // namer's own defaults, not a culture's
+    PERSON_NAMES: Object.freeze({
+        REAL_SHARE: 0.8, // mix: the share of given names taken from the list as they are
+        RETRIES: 8, // a generated name that fails the checks is drawn again this many times
+        PLACE_RETRIES: 6,
+        // How a household's family name is drawn, by convention (renormalised over what the base has)
+        INHERITED: Object.freeze({ list: 0.6, trade: 0.12, place: 0.12, feature: 0.08, father: 0.08 }),
+        BYNAME: Object.freeze({ trade: 0.35, place: 0.25, feature: 0.2, father: 0.2 }),
+        OWN_TRADE: 0.25, // inherited: the chance an occupational name is the household's own trade
+        KIN_OWN: 0.5, // kin with a name of their own (married in, or cousins)
+        SINGLE_BYNAME: 0.3, // single names: the share of heads with a byname
+        IBERIAN_PLACE: 0.25, // patronymic Iberian: the share of households adding "de {place}"
+        ALSO_FAMILY: Object.freeze({ Ruthenian: 0.5 }), // patronymic bases where some households also carry a family name
+        ARABIC_LAQAB: 0.4, // patronymic Arabic: the share of households with a trade name or nisba
+        NEARBY: 0.5, // toponymic names: the share from places on the map near the household's place
+        LIST_MAX: 2000, // a culture's own lists (N3, later): most names kept, and longest name
+        NAME_MAX: 40,
+    }),
+    // The Local studio (settlement maps; `claude/v5-l-surface-handoff.md`). The engine and renderer
+    // read none of it: the studio passes what they need
+    LOCAL: Object.freeze({
+        // Workers building a settlement's four versions: one a core less one, between one and four,
+        // so a core is always left for the window
+        VERSION_WORKERS: Object.freeze({ MIN: 1, MAX: 4, RESERVED_CORES: 1 }),
+        // The canvas's tiles, in pixels a side
+        TILE_PX: 512,
+        // A town wall's material by the people of the place (Ken, 2026-11-23): earth and palisade
+        // below PALISADE_BELOW, stone from there; capitals and cities always stone (castles are
+        // always drawn in stone)
+        WALLS: Object.freeze({ PALISADE_BELOW: 3000, STONE_TIERS: Object.freeze(["capital", "city"]) }),
+    }),
     // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the
     // guide read every COURSE_STEP_PX and each point moved onto the traced river within SNAP_PX;
     // Name natural features leaves a river to a custom river whose name is shown when at least

@@ -1,6 +1,6 @@
 import { FILRODENSWMB } from "../../../config.js";
 import { chaikin } from "./BorderArcs.js";
-import { MinHeap } from "./MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 
 /**
  * Routes on the display mesh. A route is a list of waypoint cells; each leg between consecutive

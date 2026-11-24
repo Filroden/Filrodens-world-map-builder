@@ -1,0 +1,403 @@
+{
+ "id": "fx00000000004289",
+ "name": "Graymoutht",
+ "seed": "P0JBVA:fx00000000004289",
+ "population": 29914,
+ "tier": "city",
+ "kind": "city",
+ "walled": true,
+ "capital": false,
+ "fortified": false,
+ "port": false,
+ "riverPort": true,
+ "shore": {
+  "body": "lake",
+  "side": 354,
+  "stretches": null,
+  "island": false
+ },
+ "roads": [
+  {
+   "bearing": 267,
+   "class": "minor"
+  },
+  {
+   "bearing": 330,
+   "class": "minor"
+  }
+ ],
+ "waterRoutes": [
+  {
+   "bearing": 7,
+   "transport": "river",
+   "class": "minor"
+  },
+  {
+   "bearing": 83,
+   "transport": "river",
+   "class": "main"
+  }
+ ],
+ "river": {
+  "from": 350,
+  "to": 81,
+  "widthM": 55,
+  "upstreamKm": 524,
+  "rises": false,
+  "endsIn": null
+ },
+ "otherRivers": [],
+ "water": {
+  "body": "lake",
+  "chosenBy": "only water",
+  "side": 354
+ },
+ "kindOfPlace": "riverMouth",
+ "relief": {
+  "heightM": 1336,
+  "slopeMPerKm": 3.8,
+  "downhill": 196,
+  "lie": "slope"
+ },
+ "climate": {
+  "temperature": 0.7372549176216125,
+  "moisture": 0.43529412150382996
+ },
+ "biome": "GRASSLAND",
+ "neighbours": [
+  {
+   "name": "Littlefair",
+   "tier": "town",
+   "km": 38.31015359520916,
+   "bearing": 262
+  },
+  {
+   "name": "Deadhollows",
+   "tier": "town",
+   "km": 47.681857949156736,
+   "bearing": 317
+  },
+  {
+   "name": "Ghostford",
+   "tier": "town",
+   "km": 79.19937651882124,
+   "bearing": 339
+  }
+ ],
+ "frame": {
+  "width": 12000,
+  "height": 9000,
+  "widthPx": 9600,
+  "heightPx": 7200
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.05,
+ "ownFood": 1720.055,
+ "supply": {
+  "name": "Graymoutht",
+  "tier": "city",
+  "need": 34401.1,
+  "eaten": 29914,
+  "reserve": 4487.099999999999,
+  "own": 1720.055,
+  "ownShare": 0.05,
+  "country": [
+   {
+    "sector": "N",
+    "amount": 10365.03153681162,
+    "cells": 2,
+    "nearestKm": 15.14611467790844,
+    "farthestKm": 39.963543024668795,
+    "cost": 8.89377354951205
+   },
+   {
+    "sector": "E",
+    "amount": 3883.646853956785,
+    "cells": 1,
+    "nearestKm": 41.63856126883125,
+    "farthestKm": 41.63856126883125,
+    "cost": 12.859953679387841
+   }
+  ],
+  "countryTotal": 14248.678390768406,
+  "fromPlaces": [
+   {
+    "name": "Oldcrest",
+    "tier": "largeTown",
+    "people": 11182,
+    "amount": 15958.013122764532,
+    "km": 104.12296363740909,
+    "modes": {
+     "land": 0,
+     "road": 104.12296363740909,
+     "river": 0,
+     "sea": 0,
+     "km": 104.12296363740909,
+     "onRouteKm": 104.12296363740909
+    },
+    "way": [
+     [
+      227.9,
+      328.6
+     ],
+     [
+      237.2,
+      321.4
+     ],
+     [
+      247.9,
+      331.3
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   },
+   {
+    "name": "Scorcremea",
+    "tier": "town",
+    "people": 2231,
+    "amount": 6458.0089337417285,
+    "km": 99.61218304661088,
+    "modes": {
+     "land": 0,
+     "road": 29.978404267071976,
+     "river": 69.63377877953891,
+     "sea": 0,
+     "km": 99.61218304661088,
+     "onRouteKm": 99.61218304661088
+    },
+    "way": [
+     [
+      308.8,
+      339.9
+     ],
+     [
+      295.3,
+      336.5
+     ],
+     [
+      284.6,
+      325.6
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   },
+   {
+    "name": "Ghostford",
+    "tier": "town",
+    "people": 2062,
+    "amount": 6045.788281317846,
+    "km": 87.72157869442559,
+    "modes": {
+     "land": 0,
+     "road": 29.32471769685083,
+     "river": 58.39686099757475,
+     "sea": 0,
+     "km": 87.72157869442559,
+     "onRouteKm": 87.72157869442559
+    },
+    "way": [
+     [
+      252.3,
+      294.4
+     ],
+     [
+      265.9,
+      295.1
+     ],
+     [
+      267.8,
+      310.3
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   },
+   {
+    "name": "Deadhollows",
+    "tier": "town",
+    "people": 1305,
+    "amount": 5009.395841664959,
+    "km": 42.89766105512049,
+    "modes": {
+     "land": 0,
+     "road": 42.89766105512049,
+     "river": 0,
+     "sea": 0,
+     "km": 42.89766105512049,
+     "onRouteKm": 42.89766105512049
+    },
+    "way": [
+     [
+      250.5,
+      312.4
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   },
+   {
+    "name": "Littlefair",
+    "tier": "town",
+    "people": 3613,
+    "amount": 3281.86216696458,
+    "km": 47.40564381590016,
+    "modes": {
+     "land": 0,
+     "road": 47.40564381590016,
+     "river": 0,
+     "sea": 0,
+     "km": 47.40564381590016,
+     "onRouteKm": 47.40564381590016
+    },
+    "way": [
+     [
+      247.9,
+      331.3
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   },
+   {
+    "name": "Smootwell",
+    "tier": "city",
+    "people": 23824,
+    "amount": 1181.2026170382087,
+    "km": 217.7273180095016,
+    "modes": {
+     "land": 0,
+     "road": 63.689721697825846,
+     "river": 154.03759631167577,
+     "sea": 0,
+     "km": 217.7273180095016,
+     "onRouteKm": 217.7273180095016
+    },
+    "way": [
+     [
+      322.2,
+      264.7
+     ],
+     [
+      312.9,
+      273.3
+     ],
+     [
+      296.6,
+      268.8
+     ],
+     [
+      292.8,
+      283.2
+     ],
+     [
+      280.3,
+      290.1
+     ],
+     [
+      265.9,
+      295.1
+     ],
+     [
+      267.8,
+      310.3
+     ],
+     [
+      267.9,
+      322.1
+     ]
+    ]
+   }
+  ],
+  "out": {
+   "name": "Roseguard",
+   "tier": "city",
+   "amount": 19501.904354260267,
+   "km": 241.07563661810525,
+   "modes": {
+    "land": 0,
+    "road": 126.04845011453668,
+    "river": 115.02718650356856,
+    "sea": 0,
+    "km": 241.07563661810525,
+    "onRouteKm": 241.07563661810525
+   },
+   "way": [
+    [
+     267.9,
+     322.1
+    ],
+    [
+     284.6,
+     325.6
+    ],
+    [
+     295.3,
+     336.5
+    ],
+    [
+     307.2,
+     353.9
+    ],
+    [
+     315.1,
+     363.3
+    ],
+    [
+     321.7,
+     373.2
+    ],
+    [
+     327.5,
+     388
+    ],
+    [
+     324.4,
+     406.2
+    ]
+   ]
+  },
+  "countryCells": [
+   {
+    "x": 267.8,
+    "y": 310.3,
+    "amount": 4278.023488041848
+   },
+   {
+    "x": 284.6,
+    "y": 325.6,
+    "amount": 3883.646853956785
+   },
+   {
+    "x": 267.9,
+    "y": 322.1,
+    "amount": 6087.008048769772
+   }
+  ],
+  "imports": 0,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 28.170159425998573,
+ "security": 0.824,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

@@ -1,0 +1,112 @@
+{
+ "id": "fx00000000004365",
+ "name": "Bellde",
+ "seed": "P0JBVA:fx00000000004365",
+ "population": 15947,
+ "tier": "capital",
+ "kind": "city",
+ "walled": true,
+ "capital": true,
+ "fortified": false,
+ "port": true,
+ "riverPort": false,
+ "shore": {
+  "body": "sea",
+  "side": 265,
+  "stretches": [
+   {
+    "from": 214,
+    "to": 328,
+    "share": 0.314
+   }
+  ],
+  "island": false
+ },
+ "roads": [],
+ "waterRoutes": [
+  {
+   "bearing": 246,
+   "transport": "sea",
+   "class": "main"
+  }
+ ],
+ "river": null,
+ "otherRivers": [],
+ "water": {
+  "body": "sea",
+  "chosenBy": "only water",
+  "side": 265
+ },
+ "kindOfPlace": "coastal",
+ "relief": {
+  "heightM": 1,
+  "slopeMPerKm": 1.2,
+  "downhill": 264,
+  "lie": "valley"
+ },
+ "climate": {
+  "temperature": 1,
+  "moisture": 0.09019608050584793
+ },
+ "biome": "SUBTROPICAL_DESERT",
+ "neighbours": [
+  {
+   "name": "Bearhagon",
+   "tier": "fortifiedTown",
+   "km": 76.76164888428464,
+   "bearing": 34
+  }
+ ],
+ "frame": {
+  "width": 8000,
+  "height": 6000,
+  "widthPx": 6400,
+  "heightPx": 4800
+ },
+ "frameShare": 0.4,
+ "ownShare": 0.05,
+ "ownFood": 916.9525,
+ "supply": {
+  "name": "Bellde",
+  "tier": "capital",
+  "need": 18339.05,
+  "eaten": 15947,
+  "reserve": 2392.0499999999997,
+  "own": 916.9525,
+  "ownShare": 0.05,
+  "country": [
+   {
+    "sector": "W",
+    "amount": 1972.063168889068,
+    "cells": 1,
+    "nearestKm": 10.254473363874423,
+    "farthestKm": 10.254473363874423,
+    "cost": 0
+   }
+  ],
+  "countryTotal": 1972.063168889068,
+  "fromPlaces": [],
+  "out": null,
+  "countryCells": [
+   {
+    "x": 1971.6,
+    "y": 752.7,
+    "amount": 1972.063168889068
+   }
+  ],
+  "imports": 15450.034331110932,
+  "exports": 0,
+  "balanceError": 0
+ },
+ "countryDensity": 20.061680253194996,
+ "security": 1,
+ "cultures": [
+  {
+   "name": "Local",
+   "colour": "#9a8f7a",
+   "openness": 0.5,
+   "nameBase": "Human Generic",
+   "share": 1
+  }
+ ]
+}

@@ -1,5 +1,5 @@
 import { FILRODENSWMB } from "../../../config.js";
-import { MinHeap } from "../mesh/MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 import { transportCost } from "../mesh/RouteEdits.js";
 import { createRoute } from "../mesh/Schema.js";
 

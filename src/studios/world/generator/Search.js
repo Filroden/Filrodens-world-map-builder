@@ -1,4 +1,4 @@
-import { MinHeap } from "../mesh/MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 
 /**
  * Least-cost searches over the cell graph: plain, multi-source (each cell goes to the source that

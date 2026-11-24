@@ -19,6 +19,8 @@
  * so SharedArrayBuffer is unavailable), so each band's inputs are copied to its worker and its
  * results transferred back. Callers keep those copies small by sending only what a band reads.
  */
+import { JobWorker, abortError } from "../../../kernel/workers/JobWorker.js";
+import { WorkerPool } from "../../../kernel/workers/WorkerPool.js";
 
 /** At most this many workers, however many cores the machine has (beyond this, memory for the copied inputs outweighs the gain). */
 const MAX_WORKERS = 8;
@@ -39,189 +41,8 @@ const BANDS_PER_WORKER = 3;
 /** Passes over fewer pixels than this run on the main thread: handing them over would cost more than it saves. */
 const MIN_SHARED_PIXELS = 500_000;
 
-/** The worker's module, next to the engine it runs. */
+/** The worker's module, next to the engine it runs (its tasks in GenerationWorker.js). */
 const WORKER_URL = new URL("../generation/GenerationWorker.js", import.meta.url);
-
-/**
- * A fixed set of module workers, each running one task at a time; tasks wait in order for the
- * next free worker.
- */
-class WorkerPool {
-    #workers = [];
-    #idle = [];
-    #queue = [];
-    #pending = new Map();
-    #nextId = 1;
-    #failure = null;
-
-    constructor(size) {
-        for (let i = 0; i < size; i++) {
-            const worker = new Worker(WORKER_URL, { type: "module" });
-            worker.addEventListener("message", (event) => this.#onMessage(worker, event.data));
-            worker.addEventListener("error", (event) => this.#fail(new Error(event.message || "A generation worker could not start or crashed.")));
-            worker.addEventListener("messageerror", () => this.#fail(new Error("A generation worker's message could not be read.")));
-            this.#workers.push(worker);
-            this.#idle.push(worker);
-        }
-    }
-
-    get size() {
-        return this.#workers.length;
-    }
-
-    /**
-     * Runs a task on the next free worker.
-     *
-     * @param {string} task - The task's name (see GenerationWorker.js).
-     * @param {object} payload - The task's inputs (copied to the worker).
-     * @returns {Promise<*>} The task's result.
-     */
-    run(task, payload) {
-        if (this.#failure) return Promise.reject(this.#failure);
-
-        return new Promise((resolve, reject) => {
-            this.#queue.push({ id: this.#nextId++, task, payload, resolve, reject });
-            this.#dispatch();
-        });
-    }
-
-    #dispatch() {
-        while (this.#idle.length > 0 && this.#queue.length > 0) {
-            const worker = this.#idle.pop();
-            const job = this.#queue.shift();
-            this.#pending.set(job.id, { ...job, worker });
-            try {
-                worker.postMessage({ id: job.id, task: job.task, payload: job.payload });
-            } catch (error) {
-                // The payload could not be copied (it holds something a worker cannot receive)
-                this.#pending.delete(job.id);
-                this.#idle.push(worker);
-                job.reject(error);
-            }
-        }
-    }
-
-    #onMessage(worker, { id, result, error }) {
-        const job = this.#pending.get(id);
-        if (!job) return;
-
-        this.#pending.delete(id);
-        this.#idle.push(worker);
-        if (error) {
-            job.reject(new Error(error));
-        } else {
-            job.resolve(result);
-        }
-        this.#dispatch();
-    }
-
-    /** A worker failed outside any task: every task waiting or under way fails, and so will every later one. */
-    #fail(error) {
-        this.#failure = error;
-        for (const job of [...this.#pending.values(), ...this.#queue]) job.reject(error);
-        this.#pending.clear();
-        this.#queue = [];
-        for (const worker of this.#workers) worker.terminate();
-    }
-}
-
-/**
- * One module worker for whole jobs (see GenerationWorkers.runOne), kept apart from the band pool so
- * a job of a second or more never holds up the bands of a generation running meanwhile. Jobs are
- * told apart by id; each may report progress before its result, and may be cancelled.
- */
-class JobWorker {
-    #worker;
-    #pending = new Map();
-    #nextId = 1;
-    #failure = null;
-
-    constructor() {
-        this.#worker = new Worker(WORKER_URL, { type: "module" });
-        this.#worker.addEventListener("message", (event) => this.#onMessage(event.data));
-        this.#worker.addEventListener("error", (event) => this.#fail(new Error(event.message || "The job worker could not start or crashed.")));
-        this.#worker.addEventListener("messageerror", () => this.#fail(new Error("A job worker message could not be read.")));
-    }
-
-    get failed() {
-        return this.#failure !== null;
-    }
-
-    /**
-     * @param {string} task
-     * @param {object} payload
-     * @param {object} options
-     * @param {function(object): void} [options.onProgress]
-     * @param {AbortSignal} [options.signal]
-     * @param {AbortSignal} [options.stopSignal] - Aborting asks the job to end early with what it
-     *     has (a job that can, such as a generator run between its ages); it still resolves.
-     * @param {Transferable[]} [options.transfer] - Buffers of the payload to move to the worker
-     *     rather than copy (they are unusable here afterwards).
-     * @returns {Promise<*>}
-     */
-    run(task, payload, { onProgress = null, signal = null, stopSignal = null, transfer = [] } = {}) {
-        if (this.#failure) return Promise.reject(this.#failure);
-
-        const id = this.#nextId++;
-        return new Promise((resolve, reject) => {
-            const job = { resolve, reject, onProgress, signal, onAbort: null };
-            if (signal) {
-                job.onAbort = () => this.#cancel(id);
-                signal.addEventListener("abort", job.onAbort, { once: true });
-            }
-            this.#pending.set(id, job);
-            this.#worker.postMessage({ id, task, payload }, transfer);
-            const stop = () => this.#pending.has(id) && this.#worker.postMessage({ id, stop: true });
-            if (stopSignal?.aborted) stop();
-            else stopSignal?.addEventListener("abort", stop, { once: true });
-        });
-    }
-
-    terminate() {
-        this.#fail(new Error("The job worker was stopped."));
-    }
-
-    /**
-     * Asks the worker to stop job `id` and rejects it at once: the worker's eventual reply (a
-     * cancelled error, or the result if it was already on its way) is ignored.
-     */
-    #cancel(id) {
-        const job = this.#pending.get(id);
-        if (!job) return;
-        this.#pending.delete(id);
-        this.#worker.postMessage({ id, cancel: true });
-        job.reject(abortError(job.signal));
-    }
-
-    #onMessage({ id, result, error, progress }) {
-        const job = this.#pending.get(id);
-        if (!job) return;
-
-        if (progress) {
-            job.onProgress?.(progress);
-            return;
-        }
-        this.#pending.delete(id);
-        job.signal?.removeEventListener("abort", job.onAbort);
-        if (error) job.reject(new Error(error));
-        else job.resolve(result);
-    }
-
-    #fail(error) {
-        this.#failure = error;
-        for (const job of this.#pending.values()) job.reject(error);
-        this.#pending.clear();
-        this.#worker.terminate();
-    }
-}
-
-/** The error a cancelled job rejects with: the signal's own reason, or a standard AbortError. */
-function abortError(signal) {
-    if (signal?.reason) return signal.reason;
-    const error = new Error("The job was cancelled.");
-    error.name = "AbortError";
-    return error;
-}
 
 export class GenerationWorkers {
     static #pool = null;
@@ -353,7 +174,7 @@ export class GenerationWorkers {
         if (this.#jobsDisabled || typeof Worker === "undefined") return null;
         if (this.#jobWorker?.failed) this.#jobWorker = null;
         try {
-            this.#jobWorker ??= new JobWorker();
+            this.#jobWorker ??= new JobWorker(WORKER_URL);
         } catch (error) {
             this.#disableJobs(error);
             return null;
@@ -367,7 +188,7 @@ export class GenerationWorkers {
     }
 
     static #ensurePool() {
-        this.#pool ??= new WorkerPool(this.#workerCount());
+        this.#pool ??= new WorkerPool(WORKER_URL, this.#workerCount());
         return this.#pool;
     }
 

@@ -1,7 +1,7 @@
 import { NamesGenerator } from "../../../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { nameStream } from "../../../kernel/names/PlaceNames.js";
-import { MinHeap } from "../mesh/MinHeap.js";
+import { MinHeap } from "../../../kernel/util/MinHeap.js";
 import { EDGE } from "./CellGraph.js";
 import { stageRandom } from "../../../kernel/random/Random.js";
 import { routeChains } from "./RouteChains.js";

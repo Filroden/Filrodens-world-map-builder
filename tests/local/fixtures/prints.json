@@ -1,0 +1,260 @@
+{
+ "map": "p0jbva-module",
+ "engineRevision": 2,
+ "recordedAt": "2026-11-23T20:09:53.367Z",
+ "places": {
+  "Grironcairn": {
+   "id": "fx00000000005547",
+   "role": "market town",
+   "tier": "town",
+   "population": 2500,
+   "kind": "town",
+   "seed": "P0JBVA:fx00000000005547",
+   "town": "a1c9c86245ec90fb",
+   "townView": {
+    "rect": [
+     -634.277,
+     -496.957,
+     608.277,
+     434.957
+    ],
+    "mPerPx": 0.4,
+    "widthPx": 3106,
+    "heightPx": 2330
+   },
+   "frame": [
+    6000,
+    4500
+   ],
+   "households": "542a5b4bb3390a11",
+   "householdsHeads": "2dcaddc8463799dd",
+   "headsTotalsUnchanged": false,
+   "womenHeadShare": 0.167,
+   "houses": 455,
+   "buildings": 1200,
+   "inputBytes": 2040,
+   "inputBytesGz": 944,
+   "buildMs": 1881
+  },
+  "Sprinbell": {
+   "id": "fx00000000004708",
+   "role": "large town",
+   "tier": "largeTown",
+   "population": 6990,
+   "kind": "town",
+   "seed": "P0JBVA:fx00000000004708",
+   "town": "22041c9d40cdb927",
+   "townView": {
+    "rect": [
+     -1034.809,
+     -788.106,
+     1058.809,
+     782.106
+    ],
+    "mPerPx": 0.43617,
+    "widthPx": 4800,
+    "heightPx": 3600
+   },
+   "frame": [
+    6000,
+    4500
+   ],
+   "households": "848eb48832d193d5",
+   "householdsHeads": "d3a39bf0d66adb6b",
+   "headsTotalsUnchanged": true,
+   "womenHeadShare": 0.167,
+   "houses": 1271,
+   "buildings": 3089,
+   "inputBytes": 1611,
+   "inputBytesGz": 816,
+   "buildMs": 3414
+  },
+  "Ambergarde": {
+   "id": "fx00000000004789",
+   "role": "port",
+   "tier": "port",
+   "population": 5975,
+   "kind": "town",
+   "seed": "P0JBVA:fx00000000004789",
+   "town": "a583c13b6e86f015",
+   "townView": {
+    "rect": [
+     -818.716,
+     -571.787,
+     860.716,
+     687.787
+    ],
+    "mPerPx": 0.4,
+    "widthPx": 4199,
+    "heightPx": 3149
+   },
+   "frame": [
+    6000,
+    4500
+   ],
+   "households": "42ba7b693325e0e2",
+   "householdsHeads": "2a5499203c8bcc28",
+   "headsTotalsUnchanged": true,
+   "womenHeadShare": 0.167,
+   "houses": 1086,
+   "buildings": 2564,
+   "inputBytes": 2116,
+   "inputBytesGz": 1014,
+   "buildMs": 2944
+  },
+  "Lostshearmi": {
+   "id": "fx00000000005815",
+   "role": "fortified town",
+   "tier": "fortifiedTown",
+   "population": 1990,
+   "kind": "town",
+   "seed": "P0JBVA:fx00000000005815",
+   "town": "d8c89fbdbb4532f5",
+   "townView": {
+    "rect": [
+     -473.596,
+     -351.447,
+     479.596,
+     363.447
+    ],
+    "mPerPx": 0.4,
+    "widthPx": 2383,
+    "heightPx": 1787
+   },
+   "frame": [
+    6000,
+    4500
+   ],
+   "households": "9be19609506095e0",
+   "householdsHeads": "631dce47e7cdb620",
+   "headsTotalsUnchanged": true,
+   "womenHeadShare": 0.167,
+   "houses": 362,
+   "buildings": 680,
+   "inputBytes": 2169,
+   "inputBytesGz": 1013,
+   "buildMs": 1958
+  },
+  "Bellde": {
+   "id": "fx00000000004365",
+   "role": "smallest capital",
+   "tier": "capital",
+   "population": 15947,
+   "kind": "city",
+   "seed": "P0JBVA:fx00000000004365",
+   "town": "8b5ad6a9dcbe36f6",
+   "townView": {
+    "rect": [
+     -1228.809,
+     -967.106,
+     1664.809,
+     1203.106
+    ],
+    "mPerPx": 0.602837,
+    "widthPx": 4800,
+    "heightPx": 3600
+   },
+   "frame": [
+    8000,
+    6000
+   ],
+   "households": "45a6c82f344160b3",
+   "householdsHeads": "f1a081ad41d08198",
+   "headsTotalsUnchanged": true,
+   "womenHeadShare": 0.167,
+   "houses": 2658,
+   "buildings": 3520,
+   "inputBytes": 1467,
+   "inputBytesGz": 789,
+   "buildMs": 3039
+  },
+  "Graymoutht": {
+   "id": "fx00000000004289",
+   "role": "city",
+   "tier": "city",
+   "population": 29914,
+   "kind": "city",
+   "seed": "P0JBVA:fx00000000004289",
+   "town": "a7b0ed6215160968",
+   "townView": {
+    "rect": [
+     -1648.085,
+     -930.064,
+     1688.085,
+     1572.064
+    ],
+    "mPerPx": 0.695035,
+    "widthPx": 4800,
+    "heightPx": 3600
+   },
+   "frame": [
+    12000,
+    9000
+   ],
+   "households": "158aa4551e941f02",
+   "householdsHeads": "b177caf4f640db24",
+   "headsTotalsUnchanged": true,
+   "womenHeadShare": 0.167,
+   "houses": 4986,
+   "buildings": 6442,
+   "inputBytes": 4085,
+   "inputBytesGz": 1677,
+   "buildMs": 4040
+  }
+ },
+ "largest": {
+  "name": "Grasshovefo",
+  "id": "fx00000000004207",
+  "tier": "capital",
+  "population": 324835,
+  "kind": "city",
+  "town": "f71768f4e15cb167",
+  "houses": 54139,
+  "buildings": 70722,
+  "inputBytes": 3799,
+  "inputBytesPretty": 6040,
+  "inputBytesGz": 1543,
+  "buildMs": 26703,
+  "bytesByField": {
+   "supply": 2598,
+   "neighbours": 149,
+   "roads": 94,
+   "shore": 89,
+   "cultures": 89,
+   "climate": 65,
+   "frame": 63,
+   "relief": 60,
+   "waterRoutes": 51,
+   "water": 49,
+   "seed": 25,
+   "id": 18,
+   "countryDensity": 18,
+   "name": 13,
+   "biome": 11,
+   "ownFood": 10,
+   "tier": 9,
+   "kindOfPlace": 9,
+   "population": 6,
+   "kind": 6,
+   "fortified": 5,
+   "riverPort": 5,
+   "walled": 4,
+   "capital": 4,
+   "port": 4,
+   "river": 4,
+   "ownShare": 4,
+   "frameShare": 3,
+   "otherRivers": 2,
+   "security": 1
+  }
+ },
+ "stack": {
+  "name": "Quickward",
+  "id": "fx00000000004208",
+  "population": 249025,
+  "town": "91115c2d9785de7e",
+  "buildings": 43365,
+  "note": "the second largest place: built in a worker with a 0.5 MB stack (a browser worker's), which the prototype's code fails"
+ },
+ "note": "Recorded 2026-11-23 in the towns prototype against a v4.3.0 checkout (7fb90e1), on the module's P0JBVA fixture run at generator revision 2 (claude/v5-l-surface-step1-plan.md section 1). households: every field but names, before N2b; householdsHeads: after N2b, heads on Automatic, no namer."
+}
