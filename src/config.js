@@ -325,6 +325,12 @@ export const FILRODENSWMB = {
     //       TerrainVersion.usesCentripetalLines). Nothing else differs from revision 2, so a
     //       revision 2 map with neither is moved to revision 3 as it opens (see
     //       TerrainVersion.settlesOnLoad); one with either is offered the update.
+    //   4 - a regional map draws its rivers as a map symbol: as wide as the same river would be on
+    //       a top map of its pixel size, rather than its parent's width magnified by the zoom (see
+    //       TerrainVersion.usesSymbolRivers and RiverNetwork). Nothing else differs from revision
+    //       3, and nothing at all on a top map, so a revision 3 top map is moved to revision 4 as it
+    //       opens (see TerrainVersion.settledVersion); a revision 3 regional map is offered the
+    //       update, and a regional map cut from a revision 3 map is made at revision 4.
     // Each rule is gated on the revision that brought it (REVISION_2, REVISION_3), never on
     // CURRENT, so a later revision cannot move an older rule; CURRENT is only what a new map gets.
     TERRAIN_VERSION: {
@@ -334,8 +340,9 @@ export const FILRODENSWMB = {
         // banks (see TerrainVersion.usesCurrentRivers)
         REVISION_2: 2,
         REVISION_3: 3,
+        REVISION_4: 4,
         // The revision a new map, or a regional map of a map at it, is made with
-        CURRENT: 3,
+        CURRENT: 4,
         // Engines that build their terrain outward from a coastline, and so use the coastline
         // rules of revision 2 on: settings measured in pixels of a map BASELINE_DIMENSION
         // pixels across and scaled to the actual map (before, they were fixed pixel counts, so

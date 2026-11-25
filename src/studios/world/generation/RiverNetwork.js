@@ -91,7 +91,19 @@ const SHAPE = Object.freeze({
  *    field, so the shader can draw a sharp edge at any zoom) and whether that river is frozen.
  *
  * All lengths are worked out in pixels of a BASELINE_DIMENSION map (see #scale), so the same
- * river is as wide and meanders as much in the world on a larger map or a regional crop.
+ * river runs, pools and meanders alike in the world on a larger map or a regional crop. Its width
+ * too, up to terrain revision 4. From revision 4 (`SYMBOL_WIDTHS`, see
+ * TerrainVersion.usesSymbolRivers) a regional map draws a river as a map symbol instead: as wide as
+ * the same river would be on a top map of this map's pixel size (see #widthScale), so it keeps its
+ * parent's line weights rather than magnifying them with the zoom. A river has to be a few pixels
+ * wide to be seen on a world map, which is many km in the world; magnified 1:1 on a ×16 crop it
+ * read as a river 15 km across. Only the width, and what is a share of it (the mouth's widening,
+ * a delta's branches, the drawn bank field), follows the symbol width; the meanders are worked
+ * from the width at `scale`, so a regional map's rivers bend where their parent's do.
+ *
+ * The river's real width (the Local studio's rule, 2.4 m x sqrt(upstream km)) is not a floor
+ * here: inside the regional crop limit (LIMITS.MIN_KM_PER_PX) even the largest river's real width
+ * is under a pixel or two, narrower than its symbol width, and narrower than MIN_RADIUS allows.
  */
 export class RiverNetwork {
     /** How far either side of a river's edge the distance field reaches, in map pixels. */
@@ -117,6 +129,7 @@ export class RiverNetwork {
     static build(rivers, map, options = {}, reuse = null) {
         const settings = { ...FILRODENSWMB.HYDROLOGY.CHANNELS, ...options };
         const scale = RiverNetwork.#scale(map);
+        const widthScale = settings.SYMBOL_WIDTHS === true ? RiverNetwork.#widthScale(map, scale) : scale;
         const byId = new Map(rivers.map((river) => [river.id, river]));
 
         const pools = RiverNetwork.#pools(map, scale, reuse?.pools);
@@ -127,7 +140,7 @@ export class RiverNetwork {
 
         for (const river of rivers) {
             const flow = flows.get(river.id);
-            const radii = RiverNetwork.#radii(river, flow, map, scale, settings);
+            const radii = RiverNetwork.#radii(river, flow, map, scale, widthScale / scale, settings);
             const positions = new Map();
             placed.set(river.id, positions);
 
@@ -174,7 +187,9 @@ export class RiverNetwork {
     }
 
     /**
-     * The map's river settings as options for build: River Width and River Meander.
+     * The map's river settings as options for build: River Width and River Meander, and whether
+     * its rivers are drawn as a map symbol (`SYMBOL_WIDTHS`, from terrain revision 4; see
+     * TerrainVersion.usesSymbolRivers).
      * @param {object} params - The map's derived parameters.
      * @returns {object}
      */
@@ -183,6 +198,7 @@ export class RiverNetwork {
         return {
             WIDTH: params?.hydrology?.riverWidthScale ?? channels.WIDTH,
             MEANDER: params?.hydrology?.riverMeander ?? channels.MEANDER,
+            SYMBOL_WIDTHS: params?.terrain?.symbolRivers === true,
         };
     }
 
@@ -373,6 +389,17 @@ export class RiverNetwork {
     }
 
     /**
+     * The scale a river's drawn width is worked out at, from terrain revision 4 (see the class
+     * description): this map's longer side over the baseline, as on a top map of this map's pixel
+     * size. That is `scale` over the map's magnification against its whole world (see
+     * SymbolScale.magnification). A top map is its own top map, so it keeps `scale` exactly.
+     */
+    static #widthScale({ width, height, world }, scale) {
+        if (!((world?.zoom ?? 1) > 1)) return scale;
+        return Math.max(width, height) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+    }
+
+    /**
      * The flow at every point of every river: river upstream of it, in baseline pixels. A guided
      * custom river (see ProceduralEngine#traceGuided) also gathers its `lateral` flow (in all) along
      * its first `guided` steps, so it rises as a headwater and widens to its Width along its line.
@@ -412,10 +439,12 @@ export class RiverNetwork {
 
     /**
      * The half-width, in map pixels, at every point of a river, and how flat the ground is there
-     * (see #slopeShares).
-     * @returns {{radius: Float32Array, flatness: Float32Array, lowland: Float32Array}}
+     * (see #slopeShares). `bendRadius` is the half-width at `scale`, which the meanders are worked
+     * from; `radius`, the one drawn, is it times `share` (the width scale's share of `scale`, see
+     * #widthScale), so the two are the same array wherever `share` is 1.
+     * @returns {{radius: Float32Array, bendRadius: Float32Array, flatness: Float32Array, lowland: Float32Array}}
      */
-    static #radii(river, flow, map, scale, settings) {
+    static #radii(river, flow, map, scale, share, settings) {
         const { path } = river;
         const n = path.length;
         const cumulative = new Float32Array(n);
@@ -431,8 +460,16 @@ export class RiverNetwork {
         }
 
         RiverNetwork.#widenMouth(radius, path, cumulative, flatness, map, scale, settings);
-        for (let i = 0; i < n; i++) radius[i] = Math.max(radius[i], settings.MIN_RADIUS);
-        return { radius, flatness, lowland };
+        if (share === 1) {
+            for (let i = 0; i < n; i++) radius[i] = Math.max(radius[i], settings.MIN_RADIUS);
+            return { radius, bendRadius: radius, flatness, lowland };
+        }
+        const drawn = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            drawn[i] = Math.max(radius[i] * share, settings.MIN_RADIUS);
+            radius[i] = Math.max(radius[i], settings.MIN_RADIUS);
+        }
+        return { radius: drawn, bendRadius: radius, flatness, lowland };
     }
 
     /**
@@ -612,15 +649,19 @@ export class RiverNetwork {
 
     /**
      * One reach's drawn points: pixel centres, smoothed, wandering and meandering, with the
-     * width, flatness and frozen state carried along.
+     * width, flatness and frozen state carried along. Where the width drawn is not the one the
+     * bends are worked from (see #radii), each point also carries the latter (`rb`).
      */
-    static #centreline(river, reach, { radius, lowland }, map, scale, settings, byId, placed) {
+    static #centreline(river, reach, { radius, bendRadius, lowland }, map, scale, settings, byId, placed) {
         const { path } = river;
         const points = [];
+        const apart = bendRadius !== radius;
         for (let i = reach.start; i <= reach.end; i++) {
             const p = path[i];
             const authored = i < (river.authored ?? 0);
-            points.push({ x: p.x + 0.5, y: p.y + 0.5, r: radius[i], flat: authored ? 0 : lowland[i], ice: RiverNetwork.#frozen(path, i) ? 1 : 0, index: i, authored });
+            const point = { x: p.x + 0.5, y: p.y + 0.5, r: radius[i], flat: authored ? 0 : lowland[i], ice: RiverNetwork.#frozen(path, i) ? 1 : 0, index: i, authored };
+            if (apart) point.rb = bendRadius[i];
+            points.push(point);
         }
 
         // Where this reach ends by joining another river, it ends on that river's drawn line
@@ -633,6 +674,7 @@ export class RiverNetwork {
                 tail.y = joined.y;
             }
             tail.r = Math.min(tail.r, points[points.length - 2]?.r ?? tail.r);
+            if (apart) tail.rb = Math.min(tail.rb, points[points.length - 2]?.rb ?? tail.rb);
             tail.index = undefined; // not a point others can join
         }
 
@@ -788,7 +830,7 @@ export class RiverNetwork {
      * curve, the usual model of a meandering river), up to MEANDER_ANGLE on flat ground, so
      * strong meanders close into loops. Its progress along the reach and its distance to one
      * side are laid out along the reach's smoothed line. The swing's wavelength grows with the
-     * river's width, and both it and the angle drift a little so bends are not all alike. Bends
+     * river's width (the one the bends are worked from, `rb` where a point has it), and both it and the angle drift a little so bends are not all alike. Bends
      * fade in and out at the reach's ends, so joins stay where they are. Where a bend would reach
      * into the sea or a lake, or up onto ground much higher than the river's own, the bends
      * around there are made gentler (the reach is drawn twice: once to find those places).
@@ -816,7 +858,7 @@ export class RiverNetwork {
 
         // Find where the bends reach into water or up hills, and calm them there. Calming one
         // place can shift the bends just past it, so this is repeated a few times.
-        const spread = Math.max(MIN_CALM_SPREAD, Math.round((settings.MEANDER_WAVELENGTH * 2 * points[0].r) / settings.SPACING / 2));
+        const spread = Math.max(MIN_CALM_SPREAD, Math.round((settings.MEANDER_WAVELENGTH * 2 * (points[0].rb ?? points[0].r)) / settings.SPACING / 2));
         for (let pass = 0; pass < CALM_PASSES && RiverNetwork.#calmBlocked(drawn, allowed, map, settings); pass++) {
             RiverNetwork.#minFilter(allowed, spread);
             RiverNetwork.#smoothArray(allowed, Math.round(spread / 2));
@@ -878,6 +920,7 @@ export class RiverNetwork {
         const n = points.length;
         const total = base[n - 1];
         const step = settings.SPACING;
+        const bendKey = points[0].rb === undefined ? "r" : "rb";
         const wanderLength = settings.WANDER_WAVELENGTH * scale;
         const out = [];
 
@@ -899,7 +942,7 @@ export class RiverNetwork {
         while (along < total && out.length < n * SHAPE.MAX_STEER_POINTS) {
             while (i < n - 2 && base[i + 1] <= along) i++;
             const t = Math.min(1, Math.max(0, (along - base[i]) / (base[i + 1] - base[i] || 1)));
-            const r = at(i, t, "r");
+            const r = at(i, t, bendKey);
             const flat = at(i, t, "flat");
             const wavelength = Math.max(settings.MEANDER_MIN_WAVELENGTH * scale, settings.MEANDER_WAVELENGTH * 2 * r);
             const wobble = bend.length;
@@ -928,6 +971,7 @@ export class RiverNetwork {
             const ny = normals[i].y + (normals[Math.min(n - 1, i + 1)].y - normals[i].y) * u;
             const offset = (side * fade + wander) * (allowed[i] + (allowed[Math.min(n - 1, i + 1)] - allowed[i]) * u);
             const point = { x: baseX + nx * offset, y: baseY + ny * offset, r: at(i, u, "r"), ice: at(i, u, "ice"), flat: at(i, u, "flat"), baseIndex: u < 0.5 ? i : Math.min(n - 1, i + 1), baseX, baseY, offset };
+            if (bendKey === "rb") point.rb = at(i, u, "rb");
             while (nextIndexed < n && base[nextIndexed] <= k) {
                 if (points[nextIndexed].index !== undefined && point.index === undefined) point.index = points[nextIndexed].index;
                 nextIndexed++;
@@ -979,6 +1023,7 @@ export class RiverNetwork {
             for (let k = 1; k <= steps; k++) {
                 const t = k / steps;
                 const point = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, r: a.r + (b.r - a.r) * t, ice: a.ice + (b.ice - a.ice) * t, flat: a.flat + (b.flat - a.flat) * t, authored: a.authored && b.authored };
+                if (a.rb !== undefined) point.rb = a.rb + (b.rb - a.rb) * t;
                 if (k === steps) point.index = b.index;
                 out.push(point);
             }

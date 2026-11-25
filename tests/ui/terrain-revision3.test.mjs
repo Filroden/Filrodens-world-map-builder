@@ -2,7 +2,7 @@
 // 2 brought stays gated at 2, so a revision 2 map regenerates as it did; a revision 2 map with
 // neither a tectonic feature it would rebuild nor a custom river moves to revision 3 as it opens,
 // and one with either is offered the update; a regional map takes its parent's revision from
-// revision 2 on.
+// revision 2 on (revision 4, which follows, in terrain-revision4.test.mjs).
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { installPlatform, platform } from "../../src/platform/index.js";
@@ -21,9 +21,9 @@ const BENT_RANGE = { ...RANGE, id: 4, points: [{ x: 0, y: 0 }, { x: 50, y: 20 },
 const STRAIGHT_RANGE = { ...RANGE, id: 5, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] };
 const map = (terrainVersion, engine = "guided") => ({ terrainVersion, generationEngine: engine, mapWidth: 1000, mapHeight: 1000, windDistance: FILRODENSWMB.CLIMATE.WIND_DISTANCE, world: null });
 
-test("a new map is made at revision 3", () => {
+test("revision 3 is numbered 3, and a new map is made at it or later", () => {
     assert.equal(REVISION_3, 3);
-    assert.equal(CURRENT, REVISION_3);
+    assert.ok(CURRENT >= REVISION_3);
 });
 
 test("revision 2's rules hold at revisions 2 and 3, and revision 3's only at 3", () => {
@@ -49,9 +49,9 @@ test("a revision 2 map with no tectonic feature to rebuild and no custom river s
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [BENT_RANGE], []), false);
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [HOTSPOT], []), false);
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [], [RIVER]), false);
-    // Only revision 2 settles: a legacy map is offered its own update, a current one has none to make
+    // A legacy map is offered its own update, a current one has none to make
     assert.equal(TerrainVersion.settlesOnLoad(map(LEGACY), [], []), false);
-    assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_3), [], []), false);
+    assert.equal(TerrainVersion.settlesOnLoad(map(CURRENT), [], []), false);
 });
 
 test("a revision 2 map with a tectonic feature or a custom river is offered the update", () => {
@@ -72,16 +72,16 @@ test("a revision 2 map with a tectonic feature or a custom river is offered the 
     assert.equal(impact.tightensLines, true);
     assert.equal(impact.guidesRivers, true);
     assert.equal(impact.changesTerrain, false);
-    assert.equal(impact.plan.terrainVersion, REVISION_3);
+    assert.equal(impact.plan.terrainVersion, CURRENT);
     // The update changes the revision and nothing else
     assert.equal(impact.plan.windDistance, app.uiState.windDistance);
     assert.equal(impact.plan.coastlineFracture, undefined);
     assert.equal(impact.plan.world, null);
 });
 
-test("a regional map takes its parent's revision from revision 2 on, and the current one under a legacy parent", () => {
+test("a regional map takes its parent's revision from revision 2 on (revision 4 under revision 3), and the current one under a legacy parent", () => {
     assert.equal(TerrainVersion.getRegionalVersion(map(REVISION_2)), REVISION_2);
-    assert.equal(TerrainVersion.getRegionalVersion(map(REVISION_3)), REVISION_3);
+    assert.equal(TerrainVersion.getRegionalVersion(map(REVISION_3)), FILRODENSWMB.TERRAIN_VERSION.REVISION_4);
     assert.equal(TerrainVersion.getRegionalVersion(map(LEGACY, "standard")), CURRENT);
     assert.equal(TerrainVersion.getRegionalVersion({}), CURRENT);
 });

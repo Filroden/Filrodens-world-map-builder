@@ -1,4 +1,5 @@
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { INFLUENCE_KINDS } from "../mesh/Influences.js";
 import { routeMarkedLine } from "../mesh/Resample.js";
 
@@ -20,7 +21,10 @@ import { routeMarkedLine } from "../mesh/Resample.js";
  * Left out, because they are not the parent's content in the crop: the world settings (the style
  * lists, the cultures but their homelands, the Generate settings but the events' places), which a
  * changed settingsRevision covers (rule 2); the detail level, which is how the map is viewed; the
- * parent's id; and whether the cut was asked to fill in.
+ * parent's id; and whether the cut was asked to fill in. The terrain revision the cut is made at
+ * is recorded as the revision whose rules decide what it takes (see
+ * TerrainVersion.cutContentRevision), so revision 4, which changes only how a regional map draws
+ * its own rivers, marks no held regional world Out of date.
  */
 export class CropFingerprint {
     /** Payload fields that are not the parent's content in the crop (see the class comment). */
@@ -46,6 +50,7 @@ export class CropFingerprint {
     static #content(payload) {
         const content = {};
         for (const [key, value] of Object.entries(payload)) if (!this.#LEFT_OUT.has(key)) content[key] = value;
+        if ("terrainVersion" in content) content.terrainVersion = TerrainVersion.cutContentRevision(content.terrainVersion);
         content.homelands = (payload.cultures ?? []).map((culture) => [culture.id, culture.homelands]);
         content.eventPlaces = (payload.generatorSettings?.ages ?? []).map((age) => (age.events ?? []).map((event) => [event.kind, event.place ?? null]));
         return content;

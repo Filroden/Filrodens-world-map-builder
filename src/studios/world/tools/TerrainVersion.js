@@ -142,12 +142,15 @@ export class TerrainVersion {
      * `centripetalLines` builds tectonic features along the centripetal curve through their points
      * (see usesCentripetalLines).
      *
+     * `symbolRivers` draws a regional map's rivers as a map symbol, at its own pixel size rather
+     * than magnified by the zoom (see usesSymbolRivers).
+     *
      * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from
      * revision 2 on; a legacy map keeps the jump flood, whose rare near misses are part of
      * its terrain.
      *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, currentHotspots: boolean, guidedRivers: boolean, centripetalLines: boolean, exactDistances: boolean}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, currentHotspots: boolean, guidedRivers: boolean, centripetalLines: boolean, symbolRivers: boolean, exactDistances: boolean}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
@@ -172,6 +175,7 @@ export class TerrainVersion {
             currentHotspots: this.usesCurrentHotspots(state),
             guidedRivers: this.usesGuidedRivers(state),
             centripetalLines: this.usesCentripetalLines(state),
+            symbolRivers: this.usesSymbolRivers(state),
             exactDistances: isCurrent,
         };
     }
@@ -209,7 +213,8 @@ export class TerrainVersion {
      * tectonic features (see hasLegacyFaults), or a map made before the current river rules
      * (see isLegacyRivers; whether it actually has rivers to change is measured on the open map,
      * see TerrainUpgrade.assess), or a revision 2 map with a tectonic feature or a custom river
-     * (see hasRevision3Changes). No other map can change, so no other map is offered an update.
+     * (see hasRevision3Changes), or a revision 3 regional map (see hasRevision4Changes). No other
+     * map can change, so no other map is offered an update.
      *
      * @param {object} state - A uiState object.
      * @param {object[]} [faults] - The map's fault lines and tectonic features.
@@ -217,7 +222,7 @@ export class TerrainVersion {
      * @returns {boolean}
      */
     static isUpgradeCandidate(state, faults = [], rivers = []) {
-        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults) || this.isLegacyRivers(state) || this.hasRevision3Changes(state, faults, rivers);
+        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults) || this.isLegacyRivers(state) || this.hasRevision3Changes(state, faults, rivers) || this.hasRevision4Changes(state);
     }
 
     /**
@@ -258,27 +263,107 @@ export class TerrainVersion {
     }
 
     /**
+     * Whether a map draws its rivers as a map symbol (from revision 4 on): a regional map's river
+     * is as wide as the same river would be on a top map of its pixel size, rather than its
+     * parent's width magnified by the zoom (see RiverNetwork). A top map draws its rivers exactly
+     * as before. A regional map from an earlier revision keeps its wider rivers until it is
+     * updated or cut again.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static usesSymbolRivers(state) {
+        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_4;
+    }
+
+    /**
+     * What revision 4 changes on a revision 3 map: its rivers' drawn widths (`rivers`), on a
+     * regional map only (see usesSymbolRivers); whether it has any rivers to change is measured on
+     * the open map (see TerrainUpgrade.assess). False on a map at any other revision, and on a top
+     * map, which revision 4 does not change at all.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {{rivers: boolean}}
+     */
+    static revision4Changes(state) {
+        if (this.getVersion(state) !== FILRODENSWMB.TERRAIN_VERSION.REVISION_3) return { rivers: false };
+        return { rivers: this.resolveWorld(state).zoom > 1 };
+    }
+
+    /**
+     * Whether updating a revision 3 map to revision 4 could change it (see revision4Changes).
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static hasRevision4Changes(state) {
+        return this.revision4Changes(state).rivers;
+    }
+
+    /**
      * The revision a regional map cut from this map is made with: from revision 2 on, its
      * parent's, so its tectonic features and custom rivers are built as its parent's are. A legacy
      * parent's regional map gets the current revision, since revision 1's rules cannot make a
      * regional map match its parent anyway (see canCreateRegionalMap). A parent still at
      * revision 2 has a tectonic feature or a custom river (any other moved to revision 3 as it
-     * opened, see settlesOnLoad), so its regional map is offered the update too, or moves to
+     * opened, see settledVersion), so its regional map is offered the update too, or moves to
      * revision 3 as it opens if the crop leaves none in it.
+     *
+     * A revision 3 parent's regional map is made at revision 4: revision 4 changes only how a
+     * regional map draws its own rivers, nothing a regional map must match its parent in, so a
+     * cut from a revision 3 regional map that was never updated draws its rivers as a map symbol
+     * too.
      *
      * @param {object} parentState - The parent map's uiState.
      * @returns {number}
      */
     static getRegionalVersion(parentState) {
+        const { REVISION_2, REVISION_3, REVISION_4, CURRENT } = FILRODENSWMB.TERRAIN_VERSION;
         const version = this.getVersion(parentState);
-        return version >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2 ? version : FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        if (version === REVISION_3) return REVISION_4;
+        return version >= REVISION_2 ? version : CURRENT;
     }
 
     /**
-     * Whether a map moves to revision 3 as it opens, without being asked: a revision 2 map that
-     * revision 3 does not change (see hasRevision3Changes), so it looks exactly as it did. The
-     * move is kept with the map's next save, and from then on a tectonic feature or a custom
-     * river added to it is built by the revision 3 rules.
+     * The revision whose rules decide what a regional map cut at `version` takes from its parent,
+     * which the crop fingerprint records (see CropFingerprint): `version` itself, but for
+     * revision 4, which changes only how a regional map draws its own rivers, so it reads as
+     * revision 3. A held regional world cut at revision 3 is then not marked Out of date only
+     * because its parent's cut is now made at revision 4 (see getRegionalVersion).
+     *
+     * @param {number} version - The revision a cut is made at.
+     * @returns {number}
+     */
+    static cutContentRevision(version) {
+        const { REVISION_3, REVISION_4 } = FILRODENSWMB.TERRAIN_VERSION;
+        return version === REVISION_4 ? REVISION_3 : version;
+    }
+
+    /**
+     * The revision a map moves to as it opens, without being asked, or null if it stays where it
+     * is: the latest revision that changes nothing about it, so it looks exactly as it did. A
+     * revision 2 map that revision 3 does not change (see hasRevision3Changes) moves to revision 3,
+     * and a revision 3 map that revision 4 does not change (a top map, see hasRevision4Changes) on
+     * to revision 4. The move is kept with the map's next save, and from then on anything added to
+     * it is built by the rules of the revision it moved to.
+     *
+     * @param {object} state - A uiState object.
+     * @param {object[]} [faults] - The map's tectonic features.
+     * @param {object[]} [rivers] - The map's custom rivers.
+     * @returns {number|null}
+     */
+    static settledVersion(state, faults = [], rivers = []) {
+        const { REVISION_2, REVISION_3, REVISION_4 } = FILRODENSWMB.TERRAIN_VERSION;
+        const version = this.getVersion(state);
+        let settled = version;
+        if (settled === REVISION_2 && !this.hasRevision3Changes(state, faults, rivers)) settled = REVISION_3;
+        if (settled === REVISION_3 && !this.hasRevision4Changes({ ...state, terrainVersion: REVISION_3 })) settled = REVISION_4;
+        return settled === version ? null : settled;
+    }
+
+    /**
+     * Whether a map moves to a later revision as it opens, without being asked (see
+     * settledVersion).
      *
      * @param {object} state - A uiState object.
      * @param {object[]} [faults] - The map's tectonic features.
@@ -286,7 +371,7 @@ export class TerrainVersion {
      * @returns {boolean}
      */
     static settlesOnLoad(state, faults = [], rivers = []) {
-        return this.getVersion(state) === FILRODENSWMB.TERRAIN_VERSION.REVISION_2 && !this.hasRevision3Changes(state, faults, rivers);
+        return this.settledVersion(state, faults, rivers) !== null;
     }
 
     /**
@@ -531,7 +616,9 @@ export class TerrainVersion {
      * keeps its familiar shape (see #equivalentFracture). A legacy map that is none of these
      * (a standard or flat map that was never cropped) only changes revision, which is what moves
      * it to the current river rules (see usesCurrentRivers). A revision 2 map also only changes
-     * revision, which is what moves its tectonic features and custom rivers to the revision 3 rules.
+     * revision, which is what moves its tectonic features and custom rivers to the revision 3 rules,
+     * and a revision 3 regional map, which is what draws its rivers as a map symbol (see
+     * usesSymbolRivers).
      *
      * @param {object} state - The legacy map's uiState.
      * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found.

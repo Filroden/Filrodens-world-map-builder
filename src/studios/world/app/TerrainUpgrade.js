@@ -5,6 +5,7 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { platform } from "../../../platform/index.js";
 import { WorldMaps } from "../data/WorldMaps.js";
+import { RiverRelay } from "./RiverRelay.js";
 
 /**
  * Offers a map built with an older revision of the terrain generation rules the chance to be
@@ -14,10 +15,10 @@ import { WorldMaps } from "../data/WorldMaps.js";
  * opened. A map built with legacy rules keeps regenerating with them (see TerrainVersion) until
  * its owner chooses to update it. Only legacy regional maps, legacy guided and tectonic maps,
  * legacy maps with fault lines (which become tectonic features), maps with rivers made before
- * the current river rules, and revision 2 maps with hotspot chains or custom rivers can change
- * under the current rules; everything else regenerates identically, so nothing is offered for it
- * (a revision 2 map of that kind is simply moved to the current revision as it opens, see
- * TerrainVersion.settlesOnLoad).
+ * the current river rules, revision 2 maps with hotspot chains or custom rivers, and revision 3
+ * regional maps with rivers can change under the current rules; everything else regenerates
+ * identically, so nothing is offered for it (a map of that kind is simply moved to the latest
+ * revision that leaves it as it is as it opens, see TerrainVersion.settledVersion).
  *
  * The update is applied to the open map only. It becomes permanent when the map is saved, and
  * reloading the map without saving restores the original.
@@ -83,7 +84,7 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how. Six kinds of map can change, for different reasons, and the update is
+     * it, and how. Seven kinds of map can change, for different reasons, and the update is
      * described to the user differently for each (`kind`):
      *
      * - "tectonics": a legacy tectonic map. The current revision replaces its engine outright, so
@@ -124,26 +125,49 @@ export class TerrainUpgrade {
      *   else changes. A revision 1 map moves to revision 3 too, but its other changes are what it is
      *   told about: its fault lines become tectonic features and its custom rivers are recarved.
      *
+     * - "revision4": a revision 3 regional map with rivers, the only thing revision 4 draws
+     *   differently (see TerrainVersion.revision4Changes): its rivers are drawn as a map symbol, at
+     *   its own pixel size rather than magnified by the zoom (`narrowsRivers`); nothing else
+     *   changes.
+     *
+     * Whatever the kind, an update that brings a regional map with rivers to revision 4 for the
+     * first time narrows its rivers too, and says so (`narrowsRivers`, see #narrowsRivers).
+     *
      * Whatever the kind, a legacy map's original fault lines are replaced by the tectonic features
      * a current map draws (`convertsFaults`; see TectonicFeatureEngine.convertLegacyFault), and
      * slip faults, which have no equivalent, are removed (`removesSlip`).
      *
      * @param {object} app - The MapStudio instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean, narrowsRivers: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
+        const narrowsRivers = this.#narrowsRivers(app);
         const revision3 = TerrainVersion.revision3Changes(app.uiState, app.tectonicFaults, app.manualRivers);
         if (revision3.hotspots || revision3.features || revision3.rivers) {
-            return { kind: "revision3", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, rebuildsHotspots: revision3.hotspots, tightensLines: revision3.features, guidesRivers: revision3.rivers };
+            return { kind: "revision3", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, rebuildsHotspots: revision3.hotspots, tightensLines: revision3.features, guidesRivers: revision3.rivers, narrowsRivers };
+        }
+        if (TerrainVersion.hasRevision4Changes(app.uiState)) {
+            return narrowsRivers ? { kind: "revision4", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, narrowsRivers } : null;
         }
         const faults = this.#faultConversion(app);
         const rivers = this.#riverChanges(app);
         const impact = this.#assessTerrain(app);
-        if (impact) return { ...impact, ...faults, ...rivers };
-        if (faults.convertsFaults) return { kind: "faults", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers };
-        if (rivers.changesRivers) return { kind: "rivers", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers };
+        if (impact) return { ...impact, ...faults, ...rivers, narrowsRivers };
+        if (faults.convertsFaults) return { kind: "faults", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers, narrowsRivers };
+        if (rivers.changesRivers) return { kind: "rivers", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers, narrowsRivers };
         return null;
+    }
+
+    /**
+     * Whether the update draws the open map's rivers as a map symbol for the first time (see
+     * TerrainVersion.usesSymbolRivers): a regional map from before revision 4 that has rivers.
+     * A top map's rivers are drawn the same at every revision.
+     */
+    static #narrowsRivers(app) {
+        if (TerrainVersion.usesSymbolRivers(app.uiState)) return false;
+        if (!(TerrainVersion.resolveWorld(app.uiState).zoom > 1)) return false;
+        return (app.currentRiverData?.vectors?.length ?? 0) > 0;
     }
 
     /**
@@ -266,10 +290,15 @@ export class TerrainUpgrade {
      * the panel's inputs first (see MapStateManager.getMapParameters), so a slider still showing
      * the old Coastline Fracture would otherwise put it straight back.
      *
+     * A regional map whose rivers the update narrows (see #narrowsRivers) has its inherited river
+     * trade routes laid again over them (see RiverRelay): they were laid over the wider rivers, and
+     * most of their cells would lie off the narrower ones.
+     *
      * @param {object} app - The MapStudio instance.
      * @param {object} plan - The settings to apply, from assess().
      */
     static async apply(app, plan) {
+        const relays = !TerrainVersion.usesSymbolRivers(app.uiState) && TerrainVersion.usesSymbolRivers(plan) && TerrainVersion.resolveWorld({ ...app.uiState, ...plan }).zoom > 1;
         app.uiState.terrainVersion = plan.terrainVersion;
         app.uiState.windDistance = plan.windDistance;
         app.uiState.world = plan.world;
@@ -280,7 +309,20 @@ export class TerrainUpgrade {
 
         await app.view?.render(["context"]);
         await app.generateTerrain();
+        if (relays) this.#relayRiverRoutes(app);
         app.markDirty();
+    }
+
+    /**
+     * Lays the open regional map's river trade routes again over its rivers as now drawn (see
+     * RiverRelay), whether or not its parent is saved here (RiverRelay.needed asks for one only to
+     * tell a regional map on opening; the update already knows it is one).
+     */
+    static #relayRiverRoutes(app) {
+        if (!app.meshSession?.aggregates) return;
+        app.riverRoutesLaid = true;
+        const { laid, removed } = RiverRelay.run(app);
+        if (laid + removed) app._repaintVectors?.();
     }
 
     /**

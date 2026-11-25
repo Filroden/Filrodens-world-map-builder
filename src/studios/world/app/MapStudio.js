@@ -4968,11 +4968,13 @@ export class MapStudio {
                 }
             });
         }
-        // A revision 2 map that revision 3 would not change (no hotspot chain, no custom river)
-        // moves to it now, so anything of either kind added from here on is built by the current
+        // A map that a later revision would not change moves to it now (a revision 2 map with no
+        // hotspot chain or custom river to revision 3, a revision 3 top map to revision 4; see
+        // TerrainVersion.settledVersion), so anything added from here on is built by the current
         // rules. It looks exactly as it did, so the map is not marked as changed: the move is kept
         // with its next save, and until then it is made again on every load.
-        if (TerrainVersion.settlesOnLoad(this.uiState, this.tectonicFaults, this.manualRivers)) this.uiState.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        const settled = TerrainVersion.settledVersion(this.uiState, this.tectonicFaults, this.manualRivers);
+        if (settled !== null) this.uiState.terrainVersion = settled;
 
         // Guarantee every pin has a valid `color` property, defaulting to white for legacy maps
         this.mapPins = (payload.mapPins || []).map((pin) => {

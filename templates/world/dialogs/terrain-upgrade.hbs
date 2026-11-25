@@ -24,6 +24,9 @@
             {{#if changesChannels}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
             {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
+            {{/if}}
         </ul>
     {{else if isRevision3}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRevision3"}}</p>
@@ -38,6 +41,15 @@
             {{#if guidesRivers}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateGuidedRivers"}}</li>
             {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isRevision4}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRevision4"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
         </ul>
     {{else if isRivers}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRivers"}}</p>
@@ -46,6 +58,9 @@
             <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
             {{#if changesChannels}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
             {{/if}}
         </ul>
     {{else if isFaults}}
@@ -61,6 +76,9 @@
             {{/if}}
             {{#if changesChannels}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
             {{/if}}
         </ul>
     {{else if isTectonics}}
@@ -80,6 +98,9 @@
             {{/if}}
             {{#if changesChannels}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
             {{/if}}
         </ul>
     {{else}}
@@ -104,6 +125,9 @@
             {{/if}}
             {{#if changesChannels}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+            {{#if narrowsRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRiverWidths"}}</li>
             {{/if}}
         </ul>
     {{/if}}

@@ -219,7 +219,7 @@ export class MapDialogManager {
      * until the map is, and (when opened automatically on load) lets the user stop being asked
      * for this map. Closing the dialog counts as keeping the original.
      *
-     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean}} impact - What the
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean, narrowsRivers?: boolean}} impact - What the
      *   update changes, and why (see TerrainUpgrade.assess).
      * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
@@ -231,6 +231,8 @@ export class MapDialogManager {
             isFaults: impact.kind === "faults",
             isRivers: impact.kind === "rivers",
             isRevision3: impact.kind === "revision3",
+            isRevision4: impact.kind === "revision4",
+            narrowsRivers: impact.narrowsRivers === true,
             rebuildsHotspots: impact.rebuildsHotspots === true,
             tightensLines: impact.tightensLines === true,
             guidesRivers: impact.guidesRivers === true,
