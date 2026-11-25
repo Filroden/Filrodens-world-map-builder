@@ -1,8 +1,17 @@
 {{!--
-    Make settlement map's foot (board L2): Keep <the version chosen>, enabled once it is drawn, over
-    Cancel, which keeps nothing and goes back to the pin. Stacked so neither wraps in a narrow panel.
+    Map setup's foot. Make settlement map (board L2) and Choose another version… (board L2b): Keep
+    <the version chosen>, enabled once it is drawn, over Cancel, which keeps nothing (going back to
+    the pin, or to the map as it was). Stacked so neither wraps in a narrow panel. Once open (step 4,
+    board L3): Generate again, the primary button while the map is Out of date, off on a held
+    world's map.
 --}}
+{{#if local.choosing}}
 <div class="fwmb-make-foot fwmb-make-foot--stack">
     <button type="button" class="fwmb-btn" data-action="local" data-local="cancel"><span class="fwmb-icon fwmb-icon--cancel" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.Cancel"}}</button>
     <button type="button" class="fwmb-btn fwmb-btn--primary"{{#if local.keep.off}} aria-disabled="true" data-tooltip="{{local.keep.off}}"{{else}} data-action="local" data-local="keep"{{/if}}><span class="fwmb-icon fwmb-icon--check" aria-hidden="true"></span>{{local.keep.label}}</button>
 </div>
+{{else if local.settings}}
+<div class="fwmb-make-foot fwmb-make-foot--stack">
+    <button type="button" class="fwmb-btn{{#if local.settings.stale}} fwmb-btn--primary{{/if}}"{{#if local.settings.off}} aria-disabled="true" data-tooltip="{{local.settings.off}}"{{else}} data-action="local" data-local="generateAgain" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementGenerateAgainHint'}}"{{/if}}><span class="fwmb-icon fwmb-icon--run" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.GenerateAgain"}}</button>
+</div>
+{{/if}}

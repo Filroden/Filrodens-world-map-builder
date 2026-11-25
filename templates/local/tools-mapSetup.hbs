@@ -2,9 +2,11 @@
     A settlement map's Map setup (L-surface step 2a; boards L2 and L3). While choosing (Make
     settlement map): what the settlement is drawn from, then the four versions (the Default's seed,
     Three new alternatives); Keep and Cancel are its foot (tools-mapSetup-foot.hbs). Once open: the
-    version kept (its picture, seed and when it was kept), what it was drawn from, and on a map with
-    no run that its supply is a stand-in. Walls, the look, Choose another version… and Generate again
-    come with step 4. Context: local (LocalController's Map setup context).
+    version kept (its picture, seed and when it was kept) with Choose another version…, its Walls and
+    its look (step 4; boards L3, L3b), what it was drawn from, a line back to its pin, and on a map
+    with no run that its supply is a stand-in; Generate again is its foot. Choose another version…
+    is the choice again, over the kept version (board L2b). On a held world's map every control is
+    off. Context: local (LocalController's Map setup context).
 --}}
 {{#if local.standIn}}
 <div class="fwmb-goto fwmb-settlement-standin" role="note">
@@ -13,7 +15,7 @@
 {{/if}}
 
 {{#if local.version}}
-{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementVersion" title="FILRODENSWMB.UI.SectionSettlementVersion"}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementVersion" title="FILRODENSWMB.UI.SectionSettlementVersion" badge=local.settings.redraws}}
     <div class="fwmb-settlement-version">
         <span class="fwmb-settlement-version-picture">{{#if local.version.picture}}<img src="{{local.version.picture}}" alt="">{{/if}}</span>
         <span class="fwmb-settlement-version-text">
@@ -22,7 +24,30 @@
             {{#if local.version.unsaved}}<span class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementKeptUnsaved"}}</span>{{else if local.version.kept}}<span class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementKeptOn" date=local.version.kept}}</span>{{/if}}
         </span>
     </div>
+    <button type="button" class="fwmb-btn fwmb-btn--wide"{{#if local.settings.off}} aria-disabled="true" data-tooltip="{{local.settings.off}}"{{else}} data-action="local" data-local="chooseAnother"{{/if}}><span class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ChooseAnotherVersion"}}</button>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ChooseAnotherVersionHint"}}</p>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+
+{{#if local.settings}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementWalls" title="FILRODENSWMB.UI.SectionSettlementWalls" badge=local.settings.redraws}}
+    <div class="fwmb-seg fwmb-seg--equal fwmb-settlement-seg" role="group" aria-label="{{localize 'FILRODENSWMB.UI.SectionSettlementWalls'}}" style="--n: 3">
+        {{#each local.settings.walls}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true"{{else}} data-action="local" data-local="setWalls" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
+    </div>
+    <p class="fwmb-hint">{{local.settings.wallsHint}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementLook" title="FILRODENSWMB.UI.SectionSettlementLook"}}
+    <div class="fwmb-seg fwmb-seg--equal fwmb-settlement-seg" role="group" aria-label="{{localize 'FILRODENSWMB.UI.SectionSettlementLook'}}" style="--n: 2">
+        {{#each local.settings.looks}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true"{{else}} data-action="local" data-local="setLook" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
+    </div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementLookHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+<div class="fwmb-goto">
+    <p>{{localize "FILRODENSWMB.UI.SettlementFromPinGo" map=local.mapName}} <b>{{local.settings.pinPath}}</b></p>
+    <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="local" data-local="backToPin">{{localize "FILRODENSWMB.UI.Go"}}</button></div>
+</div>
 {{/if}}
 
 {{#if local.from}}

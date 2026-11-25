@@ -4,7 +4,9 @@
 // every version. Keeping it in step (2b): Out of date in the panel's notice and at Save world;
 // Generate again as one undo step on the settlement map, Undo and Redo; Generate all's part on a
 // map not open; Delete settlement map… after its confirmation; a pin gone; a held world's parent's
-// map, read only.
+// map, read only. Map setup (step 4): Walls redraw it from its own input, its seed kept, and Look
+// only its pictures, each one undo step; Choose another version… beside the version kept, Cancel
+// and Keep; the foot's Generate again.
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { Window } from "happy-dom";
@@ -12,6 +14,10 @@ import { Window } from "happy-dom";
 const window = new Window({ url: "http://localhost/" });
 Object.assign(globalThis, { window, document: window.document, requestAnimationFrame: (fn) => setTimeout(fn, 0), cancelAnimationFrame: (id) => clearTimeout(id) });
 after(() => window.happyDOM.close());
+// A 2D context that draws nothing, for the settlement map's canvas once a test mounts it
+window.HTMLCanvasElement.prototype.getContext = function () {
+    return new Proxy({}, { get: (target, key) => (key in target ? target[key] : () => undefined), set: (target, key, value) => ((target[key] = value), true) });
+};
 
 const { installPlatform } = await import("../../src/platform/index.js");
 const confirmations = [];
@@ -28,6 +34,7 @@ installPlatform({
 });
 const { LocalController } = await import("../../src/studios/local/app/LocalController.js");
 const { LOCAL_DEFINITION } = await import("../../src/studios/local/LocalStudio.js");
+const { withWalls } = await import("../../src/studios/local/app/LocalController.js");
 
 /** Workers stood in for: each build waits to be finished by the test. */
 function fakeWorkers(size = 1) {
@@ -90,7 +97,7 @@ function setup() {
     host.pinOf = (pinId) => pins.get(pinId) ?? null;
     host.worldName = () => "Tutorial world";
     host.openOwner = (owner, id) => went.push(`${owner.worldId}/${id}`);
-    const input = (_source, pin, { seed }) => ({ id: pin.id, name: pins.get(pin.id)?.name ?? "Castford", seed, population: pins.get(pin.id)?.population ?? 2900, tier: "town", kind: "town", roads: [], cultures: [{ name: "Local", share: 1 }], relief: { lie: "level" }, biome: "GRASSLAND", frame: { width: 6000, height: 4500 } });
+    const input = (_source, pin, { seed }) => ({ id: pin.id, name: pins.get(pin.id)?.name ?? "Castford", seed, population: pins.get(pin.id)?.population ?? 2900, tier: "town", kind: "town", walled: false, roads: [], cultures: [{ name: "Local", share: 1 }], relief: { lie: "level" }, biome: "GRASSLAND", frame: { width: 6000, height: 4500 } });
     const controller = new LocalController({ registry: null }, host, LOCAL_DEFINITION, { workers, inputFrom: input });
     return { controller, workers, rendered, went, world, pins, changes: () => changed };
 }
@@ -311,3 +318,118 @@ test("a held regional world's parent's settlement map opens read only: the held 
     controller.destroy();
 });
 
+
+// ------------------------------------------------------------------ Map setup (step 4)
+
+test("withWalls: On and Off force the map's walls; Automatic walls a city, a capital or a Fortified town", () => {
+    const town = { kind: "town", tier: "town", walled: false };
+    assert.equal(withWalls(town, "on").walled, true);
+    assert.equal(withWalls({ ...town, walled: true }, "off").walled, false);
+    assert.equal(withWalls(town, "auto").walled, false);
+    assert.equal(withWalls({ ...town, tier: "fortifiedTown" }, "auto").walled, true);
+    assert.equal(withWalls({ kind: "city", tier: "city", walled: false }, "auto").walled, true);
+    assert.equal(withWalls({ kind: "town", tier: "capital", walled: false }, "auto").walled, true);
+    assert.equal(town.walled, false, "the input given is left as it was");
+});
+
+test("Walls: On draws the map again from its own input, walled, its seed kept, as one undo step; Undo and Redo", async () => {
+    const { controller, workers } = await kept();
+    const before = (await controller.changes()).saved[0].record;
+    const context = controller.panelContext().local.settings;
+    assert.deepEqual(context.walls.map((each) => [each.id, each.on]), [["auto", true], ["on", false], ["off", false]]);
+    assert.equal(controller.panelContext().panelFootPartial.endsWith("tools-mapSetup-foot.hbs"), true, "Generate again in the foot once open");
+    const builds = workers.builds.length;
+    const on = controller.act("setWalls", { dataset: { value: "on" } });
+    await new Promise((done) => setTimeout(done, 5));
+    assert.equal(workers.builds.length, builds + 1, "drawn again in its worker");
+    const build = workers.builds.at(-1);
+    assert.equal(build.input.walled, true);
+    assert.equal(build.input.seed, before.seed, "its seed kept");
+    assert.equal(build.input.population, before.input.population, "its own input, not the pin's");
+    await finishLast(workers);
+    await on;
+    let record = (await controller.changes()).saved[0].record;
+    assert.deepEqual([record.settings.walls, record.input.walled, controller.walls], ["on", true, "on"]);
+    assert.deepEqual(controller.historyCounts, { undo: 1, redo: 0 });
+    assert.equal(await controller.act("setWalls", { dataset: { value: "on" } }), false, "the walls as they are: nothing to do");
+    const undone = controller.undo();
+    await new Promise((done) => setTimeout(done, 5));
+    await finishLast(workers);
+    await undone;
+    record = (await controller.changes()).saved[0].record;
+    assert.deepEqual([record.settings?.walls ?? "auto", record.input.walled, controller.walls], ["auto", false, "auto"]);
+    const redone = controller.redo();
+    await new Promise((done) => setTimeout(done, 5));
+    await finishLast(workers);
+    await redone;
+    assert.equal(controller.walls, "on");
+    controller.destroy();
+});
+
+test("Look: Studio theme redraws only the pictures (no build), as one undo step; the record keeps it", async () => {
+    const { controller, workers } = await kept();
+    assert.equal(controller.look, "atlas");
+    const builds = workers.builds.length;
+    assert.equal(await controller.act("setLook", { dataset: { value: "theme" } }), true);
+    assert.equal(workers.builds.length, builds, "the map is not drawn again");
+    assert.equal(controller.look, "theme");
+    assert.equal((await controller.changes()).saved[0].record.look, "theme");
+    assert.deepEqual(controller.panelContext().local.settings.looks.map((each) => [each.id, each.on]), [["atlas", false], ["theme", true]]);
+    assert.deepEqual(controller.historyCounts, { undo: 1, redo: 0 });
+    await controller.undo();
+    assert.equal(workers.builds.length, builds, "nor on Undo");
+    assert.equal(controller.look, "atlas");
+    await controller.redo();
+    assert.equal(controller.look, "theme");
+    controller.destroy();
+});
+
+test("Generate again in the foot: the primary button while the map is Out of date", async () => {
+    const { controller, pins } = await kept();
+    assert.equal(controller.panelContext().local.settings.stale, false);
+    pins.get("pin1").population = 3400;
+    controller.sourceChanged();
+    assert.equal(controller.panelContext().local.settings.stale, true);
+    controller.destroy();
+});
+
+test("Choose another version…: the version kept beside three new alternatives; Cancel goes back as it was, Keep makes another the default as one undo step", async () => {
+    const { controller, workers } = await kept();
+    const container = document.createElement("div");
+    document.body.append(container);
+    controller.mountCanvas(container);
+    const seed = (await controller.changes()).saved[0].record.seed;
+    const builds = workers.builds.length;
+    assert.equal(await controller.act("chooseAnother", { dataset: {} }), true);
+    assert.equal(controller.mode, "choosing");
+    assert.equal(workers.builds.length, builds + 3, "the version kept is not drawn again; the three alternatives are");
+    assert.ok(workers.builds.slice(-3).every((build) => build.input.seed !== seed));
+    let local = controller.panelContext().local;
+    assert.equal(local.version, null, "the cards are the versions while choosing");
+    assert.equal(local.keep.off, null, "the default, kept already, is ready to keep");
+    assert.equal(container.querySelectorAll(".fwmb-version").length, 4);
+    // Cancel: back as it was, nothing kept, no undo step
+    await controller.act("cancel", { dataset: {} });
+    assert.equal(controller.mode, "open");
+    assert.equal((await controller.changes()).saved[0].record.seed, seed);
+    assert.deepEqual(controller.historyCounts, { undo: 0, redo: 0 });
+    // Again: Alt. version 1 drawn and kept
+    await controller.act("chooseAnother", { dataset: {} });
+    const alt = workers.builds.at(-3);
+    await finish(alt);
+    container.querySelector('.fwmb-version-label[data-index="1"]').click();
+    assert.equal(controller.panelContext().local.keep.label, 'FILRODENSWMB.UI.KeepAltVersion{"n":1}');
+    await controller.act("keep", { dataset: {} });
+    assert.equal(controller.mode, "open");
+    const record = (await controller.changes()).saved[0].record;
+    assert.equal(record.seed, alt.input.seed, "its seed is the map's");
+    assert.ok(workers.log.some((entry) => entry[0] === "keep" && entry[1] === alt.id), "its households worked out in its worker");
+    assert.deepEqual(controller.historyCounts, { undo: 1, redo: 0 });
+    const undone = controller.undo();
+    await new Promise((done) => setTimeout(done, 5));
+    await finishLast(workers);
+    await undone;
+    assert.equal((await controller.changes()).saved[0].record.seed, seed, "Undo: the seed kept before");
+    controller.destroy();
+    container.remove();
+});

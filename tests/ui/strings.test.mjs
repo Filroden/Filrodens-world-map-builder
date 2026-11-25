@@ -95,6 +95,11 @@ const FAMILIES = [
     "FILRODENSWMB.UI.SupplyBy",
     "FILRODENSWMB.UI.SettlementView.",
     "FILRODENSWMB.UI.SettlementView",
+    // Map setup's Walls and Look (L-surface step 4), by the record's own values
+    "FILRODENSWMB.UI.SettlementWalls.",
+    "FILRODENSWMB.UI.SettlementWalls",
+    "FILRODENSWMB.UI.SettlementLook.",
+    "FILRODENSWMB.UI.SettlementLook",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
     // The name styles, by the name bases' names with their spaces taken out

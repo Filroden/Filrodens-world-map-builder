@@ -18,13 +18,14 @@ export const LAYERS = Object.freeze(["ground", "fields", "trees", "built", "wate
  * @param options {cultures: {[name]: {roof, wall, wallMaterial}}, theme: null (the base appearance:
  *     roofs by their material) or a household view (Styles.js HOUSEHOLD_VIEWS: each home's roof in
  *     its household's colour, every other roof muted; "culture" colours the walls too), layers:
- *     names to draw, now: () => ms}
+ *     names to draw, now: () => ms, wallMaterial: "stone" or "palisade" (the place's own, by its
+ *     size; else the ruling culture's)}
  * @returns the milliseconds each layer took
  */
-export function drawTown(ctx, town, view, style, { cultures = {}, theme = null, layers = LAYERS, now = () => 0, outside = null, outsideStyle = ATLAS, links = null, levelIndex = null, level = null } = {}) {
+export function drawTown(ctx, town, view, style, { cultures = {}, theme = null, layers = LAYERS, now = () => 0, outside = null, outsideStyle = ATLAS, links = null, levelIndex = null, level = null, wallMaterial = null } = {}) {
     const m = view.mPerPx;
     const [x0, y0, x1, y1] = view.rect;
-    const D = makeDrawing(ctx, town, view, style, cultures, theme);
+    const D = makeDrawing(ctx, town, view, style, cultures, theme, wallMaterial);
     D.links = links;
     D.levelIndex = levelIndex;
     D.level = level;
@@ -65,7 +66,7 @@ export function drawTown(ctx, town, view, style, { cultures = {}, theme = null, 
 }
 
 // ---------------------------------------------------------------- the drawing's shared state
-function makeDrawing(ctx, town, view, style, cultures, theme = null) {
+function makeDrawing(ctx, town, view, style, cultures, theme = null, wallMaterial = null) {
     const m = view.mPerPx;
     const [x0, y0, x1, y1] = view.rect;
     const pad = 40;
@@ -84,11 +85,12 @@ function makeDrawing(ctx, town, view, style, cultures, theme = null) {
     // Towards the light, in the drawing's axes (y grows southwards)
     const a = (style.lightBearing * Math.PI) / 180;
     const toLight = [Math.sin(a), -Math.cos(a)];
-    // The ruling culture (the largest share) sets the walls' material; their colour only in the
+    // The walls' material is the place's size's (options.wallMaterial: LocalTasks.wallMaterialOf,
+    // Ken 2026-11-23), else the ruling culture's (the largest share); their colour only in the
     // culture view
     const mixList = [...(town.input.cultures ?? [])].sort((p, q) => q.share - p.share);
     const rulingStyle = cultures[mixList[0]?.name] ?? {};
-    const ruling = { ...CULTURE_DEFAULT, wallMaterial: rulingStyle.wallMaterial ?? CULTURE_DEFAULT.wallMaterial, ...(theme === "culture" ? { wall: rulingStyle.wall ?? null } : {}) };
+    const ruling = { ...CULTURE_DEFAULT, wallMaterial: wallMaterial ?? rulingStyle.wallMaterial ?? CULTURE_DEFAULT.wallMaterial, ...(theme === "culture" ? { wall: rulingStyle.wall ?? null } : {}) };
     // Underground (V5b): a carved level's cave, and its open floor (chambers, halls, galleries,
     // side caverns, tunnels and the ways between); or an open cavern floor
     const cave = town.shore?.cave ?? null;

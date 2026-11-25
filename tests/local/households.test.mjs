@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { inputOf } from "./helpers.mjs";
-import { TASKS, footprintsOf } from "../../src/studios/local/LocalTasks.js";
+import { TASKS, footprintsOf, wallMaterialOf } from "../../src/studios/local/LocalTasks.js";
 import { HouseIndex } from "../../src/studios/local/app/HouseIndex.js";
 import { allTrades, cardOf, cultureRoofs, figuresOf, houseName, legendOf, panelOf, placeOfHouse, supplyOf, tradeLine, wordKey } from "../../src/studios/local/app/Households.js";
 import { drawTown } from "../../src/studios/local/render/CanvasTown.js";
@@ -178,4 +178,12 @@ test("each household view colours the homes' roofs and mutes the rest; None draw
     }
     assert.deepEqual(legendOf(t, "people", households).items.map((i) => i.label), ["1 to 3", "4 to 5", "6 to 7", "8 to 10", "11 or more"]);
     assert.deepEqual(legendOf(t, "age", households).items.map((i) => i.label), ["under 30", "30 to 39", "40 to 49", "50 to 59", "60 or more"]);
+});
+
+test("wall material (step 4): earth and palisade under 3,000 people, stone from there; a city or a capital always stone", () => {
+    assert.equal(wallMaterialOf({ kind: "town", tier: "town", population: 2899 }), "palisade");
+    assert.equal(wallMaterialOf({ kind: "town", tier: "town", population: 3000 }), "stone");
+    assert.equal(wallMaterialOf({ kind: "town", tier: "capital", population: 1200 }), "stone");
+    assert.equal(wallMaterialOf({ kind: "city", tier: "city", population: 2500 }), "stone");
+    assert.equal(wallMaterialOf({ kind: "village", tier: "village", population: 300 }), "palisade");
 });

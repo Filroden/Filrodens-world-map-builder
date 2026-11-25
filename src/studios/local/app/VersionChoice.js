@@ -16,6 +16,10 @@ export const PICTURE_LAYERS = Object.freeze(LAYERS.filter((name) => name !== "la
  *
  * Nothing is kept until `keep`: the versions not kept are released from their workers, and
  * `destroy` releases them all (Cancel, or leaving the choice any other way).
+ *
+ * Choose another version… (step 4, board L2b) opens it over a kept settlement map with its version
+ * as the Default, already built (`prebuilt`): ready at once, and never released by the choice,
+ * since the map still shows it if nothing else is kept.
  */
 
 /** A version's id among those the workers hold: unique for the session. */
@@ -51,6 +55,8 @@ export class VersionChoice {
     #destroyed = false;
     /** Builds asked for and not yet back, in the order asked (the workers take them so). */
     #queue = [];
+    /** The cards' look. */
+    #style;
 
     /**
      * @param {object} options
@@ -59,16 +65,24 @@ export class VersionChoice {
      * @param {string} options.pinId
      * @param {string} options.defaultSeed
      * @param {string[]} [options.alternatives] - The alternatives' seeds (random by default).
+     * @param {{id: string, input: object, result: object, thumbnail?: object, kept?: string}|null} [options.prebuilt] -
+     *     The Default already built (Choose another version…: the kept version, its worker's id, its
+     *     build and its card's picture): ready at once, never released here.
+     * @param {object} [options.style] - The cards' look (LocalTasks.styleOf's description).
      * @param {() => void} options.onChange - Told when a card changes.
      */
-    constructor({ workers, inputFor, pinId, defaultSeed, alternatives = null, onChange }) {
+    constructor({ workers, inputFor, pinId, defaultSeed, alternatives = null, prebuilt = null, style = null, onChange }) {
         this.#workers = workers;
         this.#inputFor = inputFor;
         this.#pinId = pinId;
         this.#onChange = onChange;
+        this.#style = style ?? { name: "atlas" };
         const seeds = [defaultSeed, ...(alternatives ?? [1, 2, 3].map(() => randomSeed(pinId)))];
         this.slots = seeds.map((seed, index) => ({ index, seed }));
-        for (const slot of this.slots) this.#start(slot);
+        for (const slot of this.slots) {
+            if (slot.index === 0 && prebuilt) Object.assign(slot, { id: prebuilt.id, input: prebuilt.input, result: prebuilt.result, thumbnail: prebuilt.thumbnail ?? null, kept: prebuilt.kept ?? null, owned: true, state: "ready" });
+            else this.#start(slot);
+        }
     }
 
     /** The chosen card, when it is ready to keep. */
@@ -148,6 +162,12 @@ export class VersionChoice {
         const ids = [];
         for (const slot of slots) {
             if (!slot?.id) continue;
+            // The kept version shown behind the choice is the map's, not the choice's
+            if (slot.owned) {
+                slot.thumbnail?.close?.();
+                slot.state = "released";
+                continue;
+            }
             this.#queue = this.#queue.filter((entry) => entry !== slot);
             slot.thumbnail?.close?.();
             if (slot.state === "ready") ids.push(slot.id);
@@ -176,7 +196,7 @@ export class VersionChoice {
         this.#markStarted();
         const { widthPx, heightPx } = FILRODENSWMB.LOCAL.THUMBNAIL;
         this.#workers
-            .build(slot.id, slot.input, { thumbnail: { widthPx, heightPx, style: { name: "atlas" }, layers: PICTURE_LAYERS } })
+            .build(slot.id, slot.input, { thumbnail: { widthPx, heightPx, style: this.#style, layers: PICTURE_LAYERS } })
             .then((result) => {
                 if (slot.state === "released" || this.#destroyed) {
                     result.thumbnail?.close?.();

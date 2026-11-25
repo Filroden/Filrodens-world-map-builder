@@ -26,6 +26,15 @@ const VILLAGE_MAX = 800;
 const CITY_MIN = 8000;
 
 /**
+ * Whether a place is walled when its settlement map's Walls are Automatic: a city, a capital or a
+ * Fortified town (Map setup's Walls On and Off force it either way).
+ * @param {{kind?: string, tier?: string}} place
+ */
+export function autoWalled({ kind, tier } = {}) {
+    return kind === "city" || tier === "fortifiedTown" || tier === "capital";
+}
+
+/**
  * @param {object} source
  * @param {string} source.mapSeed
  * @param {{id: string, name: string, tier: string, population: number|null, x: number, y: number}} source.place
@@ -59,7 +68,7 @@ export function localInput({ mapSeed, place, context, climate, neighbours = [], 
         population,
         tier: place.tier,
         kind,
-        walled: kind === "city" || place.tier === "fortifiedTown" || place.tier === "capital",
+        walled: autoWalled({ kind, tier: place.tier }),
         capital: place.tier === "capital",
         fortified: place.tier === "fortifiedTown",
         // A port trades by sea or lake: its tier says so, or a water route leaves its cell over the water

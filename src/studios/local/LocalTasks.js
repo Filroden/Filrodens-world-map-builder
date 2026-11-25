@@ -120,6 +120,20 @@ export function checkView(town, view) {
 }
 
 /**
+ * A town wall's material by the place's size (Ken, 2026-11-23; LOCAL.WALLS): stone for a capital
+ * or a city whatever its people, or for a place of PALISADE_BELOW people or more; earth bank and
+ * palisade below that. A castle is always stone (the renderer's own rule). Only the drawing reads
+ * it, so no fingerprint moves.
+ * @param {{population?: number, tier?: string, kind?: string}} input - The settlement's input.
+ * @returns {"stone"|"palisade"}
+ */
+export function wallMaterialOf(input) {
+    const { PALISADE_BELOW, STONE_TIERS } = FILRODENSWMB.LOCAL.WALLS;
+    if (STONE_TIERS.includes(input?.tier) || input?.kind === "city") return "stone";
+    return (input?.population ?? 0) >= PALISADE_BELOW ? "stone" : "palisade";
+}
+
+/**
  * Draws a rectangle of a town onto a new canvas.
  * @param {object} town
  * @param {{rect: number[], mPerPx: number, widthPx: number, heightPx: number}} view
@@ -129,7 +143,7 @@ export function checkView(town, view) {
  */
 export function drawView(town, view, { style = null, cultures = {}, theme = null, layers, makeCanvas = (w, h) => new OffscreenCanvas(w, h) } = {}) {
     const canvas = makeCanvas(view.widthPx, view.heightPx);
-    const options = { cultures, theme, now };
+    const options = { cultures, theme, now, wallMaterial: wallMaterialOf(town.input) };
     if (layers) options.layers = layers;
     drawTown(canvas.getContext("2d"), town, view, styleOf(style), options);
     return canvas;

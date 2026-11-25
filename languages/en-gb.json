@@ -37,5 +37,6 @@
     "FILRODENSWMB.UI.HouseholdTrade.armourer": "armourer",
     "FILRODENSWMB.UI.HouseholdTrade.labourer": "labourer",
     "FILRODENSWMB.UI.HouseholdTrade.tunneller": "tunneller",
-    "FILRODENSWMB.UI.SettlementViewsHint": "Each house coloured by its household: how many live there, their trade, culture and wealth, and the age of its head."
+    "FILRODENSWMB.UI.SettlementViewsHint": "Each house coloured by its household: how many live there, their trade, culture and wealth, and the age of its head.",
+    "FILRODENSWMB.UI.SettlementLookHint": "How the map is drawn here and in its exports. Studio theme follows the studio's colours as you change them."
 }

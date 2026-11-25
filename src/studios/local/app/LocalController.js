@@ -2,7 +2,7 @@ import { FILRODENSWMB } from "../../../config.js";
 import { platform } from "../../../platform/index.js";
 import { WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { LocalWorkers } from "../LocalWorkers.js";
-import { inputFrom } from "../engine/LocalInput.js";
+import { autoWalled, inputFrom } from "../engine/LocalInput.js";
 import { SettlementRecord } from "../data/SettlementRecord.js";
 import { OutOfDate } from "./OutOfDate.js";
 import { SettlementCanvas } from "./SettlementCanvas.js";
@@ -10,7 +10,7 @@ import { HouseholdsView } from "./HouseholdsView.js";
 import { cultureRoofs, figuresOf, panelOf } from "./Households.js";
 import { PICTURE_LAYERS, VersionChoice, estimateMs } from "./VersionChoice.js";
 import { drawTown } from "../render/CanvasTown.js";
-import { ATLAS } from "../render/Styles.js";
+import { styleOf } from "../LocalTasks.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/local/";
 
@@ -51,6 +51,13 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  * Keep); Explore's tool shows its figures (Households.js), the card over its canvas
  * (HouseholdsView), and the map controls' Thematic views colour its houses (`setView`, for the
  * session: a settlement map opens with none, Ken 2026-11-24).
+ *
+ * Map setup (step 4; boards L3, L3b, L2b): the map's Walls (Automatic, On, Off: the map built
+ * again from its own input with its walls forced, keeping its seed) and its look (the atlas or the
+ * studio's theme, followed as the theme changes: only the pictures are drawn again), each one undo
+ * step; Choose another version… (the kept version as the Default beside three new alternatives,
+ * built from the map's own input: keeping one changes only its seed, Ken 2026-11-25); and
+ * Generate again in the panel's foot.
  */
 export class LocalController {
     /** "choosing", "building", "open", or null. */
@@ -103,6 +110,12 @@ export class LocalController {
     #view = null;
     /** Who lives where over the canvas (HouseholdsView), once the shown version's households are in. */
     #people = null;
+    /** Choose another version… open over this kept record (step 4), or null. */
+    #another = null;
+    /** The studio theme's colours as last read, by their key (the theme look). */
+    #themes = new Map();
+    /** Watching the studio's theme while a map in the theme look is shown. */
+    #themeWatch = null;
 
     /** The engine's input from a source (LocalInput.inputFrom; a stand-in in tests). */
     #inputFrom;
@@ -428,7 +441,14 @@ export class LocalController {
         const entry = history?.[from].pop();
         if (!entry) return false;
         history[to].push(this.#snapshot(this.#record));
+        const sameInput = JSON.stringify(entry.input) === JSON.stringify(this.#record.input);
         this.#apply(id, entry, this.#record);
+        // A look undone or redone: only the pictures are drawn again (the view stays where it is)
+        if (sameInput && this.#shown) {
+            await this.#showLook();
+            this.#host.render(["context", "editToolbar"]);
+            return true;
+        }
         // Its state against the pin: worked out again for it alone
         this.#states?.delete(id);
         const state = OutOfDate.of({ source: this.#host.source(), cards: [SettlementRecord.card(this.#record)], pinFor: (pinId) => this.#host.pin(pinId), inputFrom: this.#inputFrom }).get(id);
@@ -483,13 +503,13 @@ export class LocalController {
         return this.#host.openOwner?.(this.#owner, this.#record.id);
     }
 
-    /** The input a record's pin gives now, with its kept seed, or null when its pin has gone. */
+    /** The input a record's pin gives now, with its kept seed and its own walls, or null when its pin has gone. */
     #inputNow(record) {
         const source = this.#host.source();
         const pin = this.#host.pin(record.pinId);
         if (!source || !pin) return null;
         try {
-            return this.#inputFrom(source, pin, { seed: record.seed });
+            return withWalls(this.#inputFrom(source, pin, { seed: record.seed }), record.settings?.walls);
         } catch (error) {
             console.warn(`FWMB | Settlement map ${record.id} could not be made again from its pin:`, error);
             return null;
@@ -497,22 +517,25 @@ export class LocalController {
     }
 
     #snapshot(record) {
-        return { input: record.input, parts: record.parts, name: record.name };
+        return { input: record.input, parts: record.parts, name: record.name, settings: record.settings, look: record.look, keptAt: record.keptAt };
     }
 
-    /** One undo step: the record's input replaced (it joins the world's changes), its state made fresh. */
-    #step(id, input, record = this.#record) {
+    /**
+     * One undo step: the record's input replaced (it joins the world's changes), and its settings,
+     * look or keeping time where given (step 4); its state made fresh where the input came from its pin.
+     */
+    #step(id, input, record = this.#record, { settings = record.settings, look = record.look, keptAt = record.keptAt, fresh = true } = {}) {
         const history = this.#history.get(id) ?? { undo: [], redo: [] };
         history.undo.push(this.#snapshot(record));
         history.redo = [];
         this.#history.set(id, history);
         const pin = this.#host.pinOf(record.pinId);
-        this.#apply(id, { input: structuredClone(input), parts: SettlementRecord.parts(input), name: pin?.name || record.name }, record);
-        this.#fresh(id);
+        this.#apply(id, { input: structuredClone(input), parts: SettlementRecord.parts(input), name: pin?.name || record.name, settings, look, keptAt }, record);
+        if (fresh) this.#fresh(id);
     }
 
-    #apply(id, { input, parts, name }, record) {
-        const next = { ...record, input, parts, name, seed: input.seed ?? record.seed };
+    #apply(id, { input, parts, name, settings = record.settings, look = record.look, keptAt = record.keptAt }, record) {
+        const next = { ...record, input, parts, name, settings, look, keptAt, seed: input.seed ?? record.seed };
         this.#pending.set(id, next);
         if (this.#record?.id === id && !this.#owner) this.#record = next;
         this.#host.changed();
@@ -532,6 +555,7 @@ export class LocalController {
     /** The studio closes, or another world opens: every worker ended. */
     destroy() {
         this.close();
+        this.#watchTheme(false);
         this.#workers?.close();
         this.#workers = null;
         this.#built.clear();
@@ -579,8 +603,8 @@ export class LocalController {
         const name = this.#settlementName();
         return {
             panel: {
-                title: choosing ? i18n.localize("FILRODENSWMB.UI.MakeSettlementMap") : i18n.localize(entry?.label ?? ""),
-                lede: choosing ? i18n.format("FILRODENSWMB.UI.LedeMakeSettlementMap", { name }) : entry?.lede ? i18n.format(entry.lede, { name }) : null,
+                title: choosing ? i18n.localize(this.#another ? "FILRODENSWMB.UI.ChooseAnotherVersionTitle" : "FILRODENSWMB.UI.MakeSettlementMap") : i18n.localize(entry?.label ?? ""),
+                lede: choosing ? i18n.format(this.#another ? "FILRODENSWMB.UI.LedeChooseAnotherVersion" : "FILRODENSWMB.UI.LedeMakeSettlementMap", { name }) : entry?.lede ? i18n.format(entry.lede, { name }) : null,
                 notice: this.#notice(),
                 tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
                 meta,
@@ -588,7 +612,8 @@ export class LocalController {
                 next: null,
             },
             toolPartial: `${TEMPLATES}tools-${this.tool}.hbs`,
-            panelFootPartial: choosing ? `${TEMPLATES}tools-mapSetup-foot.hbs` : null,
+            // Keep and Cancel while choosing; Generate again once open (step 4, board L3)
+            panelFootPartial: choosing || (this.tool === "mapSetup" && this.mode === "open" && this.#record) ? `${TEMPLATES}tools-mapSetup-foot.hbs` : null,
             panelHeadPartial: null,
             local: { ...this.#mapSetupContext(), households: this.tool === "households" ? this.#householdsContext() : null },
         };
@@ -734,8 +759,243 @@ export class LocalController {
         this.#people?.showLegend(view);
         this.#syncViews();
         this.#host.render(["editToolbar"]);
-        await this.#canvas?.setVariant(view);
+        await this.#canvas?.setVariant(this.#variant());
         return true;
+    }
+
+    // ------------------------------------------------------------------ Map setup (step 4)
+
+    /** The open map's Walls: "auto", "on" or "off". */
+    get walls() {
+        return this.#record?.settings?.walls ?? "auto";
+    }
+
+    /** The open map's look: "atlas" or "theme". */
+    get look() {
+        return this.#record?.look ?? "atlas";
+    }
+
+    /**
+     * Walls (board L3): Automatic, On or Off. The map is built again from its own input with its
+     * walls forced (or the engine's rule), keeping its seed, as one undo step; a parent's changes
+     * still come only through Generate again.
+     */
+    async setWalls(value) {
+        if (!this.canChange || !["auto", "on", "off"].includes(value) || value === this.walls) return false;
+        const record = this.#record;
+        this.#step(record.id, withWalls(record.input, value), record, { settings: { ...record.settings, walls: value }, fresh: false });
+        await this.#showRecord(this.#record);
+        return true;
+    }
+
+    /**
+     * Look (board L3): the atlas or the studio's theme. Only the pictures are drawn again (the
+     * map's tiles are kept by look), as one undo step.
+     */
+    async setLook(value) {
+        if (!this.canChange || !["atlas", "theme"].includes(value) || value === this.look) return false;
+        const record = this.#record;
+        this.#step(record.id, record.input, record, { look: value, fresh: false });
+        await this.#showLook();
+        this.#host.render(["context", "editToolbar"]);
+        return true;
+    }
+
+    /** The open map's pictures in its look as it is now: the canvas's, its labels', Map setup's picture; the theme watched. */
+    async #showLook() {
+        this.#watchTheme(this.look === "theme");
+        this.#labels = null;
+        await this.#canvas?.setVariant(this.#variant());
+        this.#thumbnailOfShown();
+    }
+
+    /** The canvas's pictures' key: the household view and the look ("theme:" with the theme's colours). */
+    #variant() {
+        return `${this.#view ?? ""}|${this.#lookKey()}`;
+    }
+
+    #lookKey() {
+        if (this.look !== "theme") return "atlas";
+        const theme = this.#readTheme();
+        return theme ? theme.key : "atlas";
+    }
+
+    /** A picture's style, from its key's look part (LocalTasks.styleOf's description). */
+    #styleFor(lookKey) {
+        if (!lookKey || lookKey === "atlas") return { name: "atlas" };
+        const theme = this.#themes.get(lookKey) ?? this.#readTheme();
+        return theme ? { name: "theme", tokens: theme.tokens, mode: theme.mode } : { name: "atlas" };
+    }
+
+    /** The look's style now (for the labels, the cards and Map setup's picture). */
+    #lookStyle() {
+        return this.#styleFor(this.#lookKey());
+    }
+
+    /**
+     * The studio's theme as it stands on the settlement map's stage: the colours the theme style
+     * reads, light or dark by its base surface, and a key naming them. Null with no stage.
+     */
+    #readTheme() {
+        const element = this.#stage ?? this.#container;
+        const view = element?.ownerDocument?.defaultView;
+        if (!element || !view) return null;
+        const computed = view.getComputedStyle(element);
+        const tokens = {};
+        for (const name of THEME_TOKENS) tokens[name] = computed.getPropertyValue(name).trim();
+        if (!/^#[0-9a-f]{6}$/i.test(tokens["--fwmb-bg-base"] ?? "")) return null;
+        const mode = luminance(tokens["--fwmb-bg-base"]) < 0.5 ? "dark" : "light";
+        const key = `theme:${mode}:${THEME_TOKENS.map((name) => tokens[name]).join(",")}`;
+        if (!this.#themes.has(key)) this.#themes.set(key, { key, tokens, mode });
+        return this.#themes.get(key);
+    }
+
+    /**
+     * While the map is in the theme look, a change of theme (Appearance's light or dark, gold or
+     * blue; Foundry's own theme, or the system's while the theme is Automatic) draws it again in
+     * the new colours (Ken, 2026-11-25).
+     */
+    #watchTheme(on) {
+        if (!on) {
+            this.#themeWatch?.stop();
+            this.#themeWatch = null;
+            return;
+        }
+        if (this.#themeWatch) return;
+        const doc = (this.#stage ?? this.#container)?.ownerDocument;
+        const view = doc?.defaultView;
+        if (!doc || !view) return;
+        let frame = null;
+        const changed = () => {
+            if (frame !== null) return;
+            frame = view.requestAnimationFrame(() => {
+                frame = null;
+                if (this.look !== "theme" || !this.#canvas) return;
+                const variant = this.#variant();
+                if (variant === this.#canvas.variant) return;
+                this.#labels = null;
+                this.#canvas.setVariant(variant);
+                this.#thumbnailOfShown();
+            });
+        };
+        const observer = new view.MutationObserver(changed);
+        const frameElement = (this.#stage ?? this.#container)?.closest?.("[data-fwmb-hue]");
+        for (const element of new Set([doc.documentElement, doc.body, frameElement].filter(Boolean))) observer.observe(element, { attributes: true, attributeFilter: ["class", "data-fwmb-theme", "data-fwmb-hue"] });
+        const media = view.matchMedia?.("(prefers-color-scheme: dark)");
+        media?.addEventListener?.("change", changed);
+        this.#themeWatch = {
+            stop: () => {
+                observer.disconnect();
+                media?.removeEventListener?.("change", changed);
+                if (frame !== null) view.cancelAnimationFrame(frame);
+            },
+        };
+    }
+
+    /**
+     * Choose another version… (board L2b): the kept version as the Default, ready at once, beside
+     * three new alternatives, each built from the map's own input (its walls too): keeping one
+     * changes only the map's seed (Ken, 2026-11-25). Cancel goes back to the map as it was.
+     */
+    async chooseAnother() {
+        if (!this.canChange || this.mode !== "open") return false;
+        const record = this.#record;
+        const built = this.#built.get(record.id);
+        const held = built && built.key === JSON.stringify(record.input) ? built : null;
+        const style = this.#lookStyle();
+        // The Default's card: the kept version's picture, drawn from the version its worker holds
+        let thumbnail = null;
+        if (held) {
+            try {
+                thumbnail = await this.#cardPicture(held, style);
+            } catch (error) {
+                console.warn("FWMB | The kept version's card could not be drawn:", error);
+            }
+        }
+        const view = this.#view;
+        this.#leaveCurrent();
+        this.#view = view;
+        this.#record = record;
+        this.#another = { record };
+        this.#pinId = record.pinId;
+        this.mode = "choosing";
+        this.tool = "mapSetup";
+        const kept = record.keptAt ? new Date(record.keptAt).toLocaleDateString(platform.i18n.lang, { day: "numeric", month: "short" }) : null;
+        this.#choice = new VersionChoice({
+            workers: this.#workersNow(),
+            inputFor: (seed) => ({ ...structuredClone(record.input), seed }),
+            pinId: record.pinId,
+            defaultSeed: record.seed,
+            prebuilt: held ? { id: held.versionId, input: record.input, result: held.result, thumbnail, kept } : null,
+            style,
+            onChange: () => this.#choiceChanged(),
+        });
+        this.#drawStage();
+        this.#tick();
+        this.#host.render(["toolbar", "context", "editToolbar", "mapbar"]);
+        return true;
+    }
+
+    /** A version's card picture: its town view at the card's size, in the look given. */
+    async #cardPicture(built, style) {
+        const { widthPx, heightPx } = FILRODENSWMB.LOCAL.THUMBNAIL;
+        const view = built.result.townView;
+        const mPerPx = Math.max(view.width / widthPx, view.height / heightPx);
+        const cx = (view.rect[0] + view.rect[2]) / 2;
+        const cy = (view.rect[1] + view.rect[3]) / 2;
+        const rect = [cx - (widthPx * mPerPx) / 2, cy - (heightPx * mPerPx) / 2, cx + (widthPx * mPerPx) / 2, cy + (heightPx * mPerPx) / 2];
+        return this.#workersNow().tile(built.versionId, { rect, mPerPx, widthPx, heightPx }, { style, layers: PICTURE_LAYERS });
+    }
+
+    /**
+     * Keep <version> in Choose another version…: the Default with its seed unchanged goes back to
+     * the map; another version's seed becomes the map's, as one undo step, its households worked
+     * out in its worker.
+     */
+    async #keepAnother() {
+        const slot = this.#choice?.chosen;
+        if (!slot) return;
+        const { record } = this.#another;
+        const choice = this.#choice;
+        this.#choice = null;
+        this.#another = null;
+        choice.keep();
+        this.#alone = null;
+        this.#canvas?.destroy();
+        this.#canvas = null;
+        if (slot.owned) {
+            // The version kept already, still held: nothing changes
+            await this.#showRecord(record);
+            return;
+        }
+        // Another seed becomes the map's (one undo step); the kept seed drawn again changes nothing
+        if (slot.seed !== record.seed) this.#step(record.id, slot.input, record, { keptAt: new Date().toISOString(), fresh: false });
+        const next = this.#record;
+        this.mode = "building";
+        this.#building = { startedAt: performance.now(), population: next.input.population, keeping: true };
+        this.#drawStage();
+        this.#host.render(["context", "editToolbar"]);
+        let kept = null;
+        try {
+            kept = await this.#workersNow().keep(slot.id);
+        } catch (error) {
+            console.error("FWMB | A settlement's households could not be worked out:", error);
+        }
+        if (this.#record !== next) return;
+        this.#remember(next.id, { versionId: slot.id, key: JSON.stringify(next.input), result: slot.result, kept });
+        await this.#showRecord(next);
+    }
+
+    /** Cancel in Choose another version…: back to the map as it was (its version still held). */
+    async #cancelAnother() {
+        const { record } = this.#another;
+        this.#choice?.destroy();
+        this.#choice = null;
+        this.#another = null;
+        this.#alone = null;
+        this.#canvas?.destroy();
+        this.#canvas = null;
+        await this.#showRecord(record);
     }
 
     /**
@@ -773,9 +1033,9 @@ export class LocalController {
                 this.#tick();
                 return;
             case "keep":
-                return this.#keep();
+                return this.#another ? this.#keepAnother() : this.#keep();
             case "cancel":
-                return this.#host.goToPin(this.#pinId);
+                return this.#another ? this.#cancelAnother() : this.#host.goToPin(this.#pinId);
             case "backToPin":
                 return this.#host.goToPin(this.#pinId);
             case "backToVersions":
@@ -788,6 +1048,12 @@ export class LocalController {
                 return this.openInOwner();
             case "setView":
                 return this.setView(target.dataset.view);
+            case "setWalls":
+                return this.setWalls(target.dataset.value);
+            case "setLook":
+                return this.setLook(target.dataset.value);
+            case "chooseAnother":
+                return this.chooseAnother();
             default:
                 return undefined;
         }
@@ -836,6 +1102,8 @@ export class LocalController {
         this.#people?.destroy();
         this.#people = null;
         this.#view = null;
+        this.#another = null;
+        this.#watchTheme(false);
         this.#choice?.destroy();
         this.#choice = null;
         this.#alone = null;
@@ -946,8 +1214,12 @@ export class LocalController {
         this.#canvas = new SettlementCanvas(surface, {
             frame: result.frame,
             label: platform.i18n.format("FILRODENSWMB.UI.SettlementCanvasLabel", { name: this.#settlementName() }),
-            variant: this.#view,
-            draw: (view, variant) => this.#workersNow().tile(versionId, view, { style: { name: "atlas" }, layers: PICTURE_LAYERS, theme: variant ?? null, cultures: variant === "culture" ? this.#roofsOf(shown) : {} }),
+            variant: this.#variant(),
+            // A picture's key holds its household view and its look (see #variant)
+            draw: (view, variant) => {
+                const [household, lookKey] = String(variant ?? "|atlas").split("|");
+                return this.#workersNow().tile(versionId, view, { style: this.#styleFor(lookKey), layers: PICTURE_LAYERS, theme: household || null, cultures: household === "culture" ? this.#roofsOf(shown) : {} });
+            },
             // The map's own title, scale bar and north arrow, once over the tiles: the renderer's
             // labels layer, from what the build said of the settlement (the pin's name as it is now)
             decorate: (ctx, view) => this.#decorate(ctx, view, shown),
@@ -972,6 +1244,7 @@ export class LocalController {
             this.#people.showLegend(this.#view);
         }
         this.#syncViews();
+        this.#watchTheme(this.look === "theme" && !this.#alone && this.mode === "open");
         this.#canvas.show(result.townView.rect, { home: true });
         this.#framing = "town";
         await this.#canvas.drawCoarse().catch((error) => console.warn("FWMB | The settlement's picture could not be drawn:", error));
@@ -1011,14 +1284,15 @@ export class LocalController {
         if (widthPx < 1 || heightPx < 1) return;
         const rect = [view.rect[0] + left * m, view.rect[1] + top * m, view.rect[0] + right * m, view.rect[1] + bottom * m];
         const town = this.#labelTown(shown);
-        const key = [shown.versionId, town.name, widthPx, heightPx, m, ...rect].join("|");
+        const lookKey = this.#alone ? "atlas" : this.#lookKey();
+        const key = [shown.versionId, town.name, lookKey, widthPx, heightPx, m, ...rect].join("|");
         if (this.#labels?.key !== key) {
             const same = this.#labels?.canvas.width === widthPx && this.#labels.canvas.height === heightPx;
             const layer = same ? this.#labels.canvas : typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(widthPx, heightPx) : Object.assign(globalThis.document.createElement("canvas"), { width: widthPx, height: heightPx });
             const layerCtx = layer.getContext("2d");
             layerCtx.setTransform(1, 0, 0, 1, 0, 0);
             layerCtx.clearRect(0, 0, widthPx, heightPx);
-            drawTown(layerCtx, town, { rect, mPerPx: m, widthPx, heightPx }, ATLAS, { layers: ["labels"] });
+            drawTown(layerCtx, town, { rect, mPerPx: m, widthPx, heightPx }, styleOf(this.#styleFor(lookKey)), { layers: ["labels"] });
             this.#labels = { key, canvas: layer, left, top };
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1044,7 +1318,7 @@ export class LocalController {
         const cy = (view.rect[1] + view.rect[3]) / 2;
         const rect = [cx - (widthPx * mPerPx) / 2, cy - (heightPx * mPerPx) / 2, cx + (widthPx * mPerPx) / 2, cy + (heightPx * mPerPx) / 2];
         try {
-            const bitmap = await this.#workersNow().tile(versionId, { rect, mPerPx, widthPx, heightPx }, { style: { name: "atlas" }, layers: PICTURE_LAYERS });
+            const bitmap = await this.#workersNow().tile(versionId, { rect, mPerPx, widthPx, heightPx }, { style: this.#lookStyle(), layers: PICTURE_LAYERS });
             const url = await toUrl(bitmap, widthPx, heightPx);
             if (this.#thumbUrl) URL.revokeObjectURL(this.#thumbUrl);
             this.#thumbUrl = url;
@@ -1152,7 +1426,9 @@ export class LocalController {
             const label = card.querySelector(".fwmb-version-label");
             label.setAttribute("aria-checked", String(selected));
             label.querySelector("b").textContent = versionName(slot.index);
-            label.querySelector(".fwmb-version-meta").textContent = ` · ${slot.index === 0 ? i18n.localize("FILRODENSWMB.UI.VersionMapSeed") : i18n.localize("FILRODENSWMB.UI.VersionRandomSeed")}`;
+            // The Default: the kept version in Choose another version… (its date), else the map's seed
+            const meta = slot.index !== 0 ? i18n.localize("FILRODENSWMB.UI.VersionRandomSeed") : slot.owned && slot.kept ? i18n.format("FILRODENSWMB.UI.VersionKept", { date: slot.kept }) : this.#another ? i18n.localize("FILRODENSWMB.UI.VersionItsSeed") : i18n.localize("FILRODENSWMB.UI.VersionMapSeed");
+            label.querySelector(".fwmb-version-meta").textContent = ` · ${meta}`;
             label.dataset.tooltip = i18n.format("FILRODENSWMB.UI.VersionSeedHint", { seed: slot.seed });
             const picture = card.querySelector(".fwmb-version-picture");
             if (slot.state === "ready" && slot.thumbnail && picture.dataset.version !== slot.id) {
@@ -1234,7 +1510,8 @@ export class LocalController {
             seed: choice?.slots[0]?.seed ?? this.#record?.seed ?? "",
             readyLine: choice ? i18n.format("FILRODENSWMB.UI.VersionsReady", { ready, count: choice.slots.length }) : "",
             keep: { label: keepName, off: !choice?.chosen ? i18n.localize("FILRODENSWMB.UI.KeepWhenReady") : null },
-            version: this.#record
+            // While choosing, the cards are the versions: the version kept shows again once one is kept or the choice cancelled.
+            version: this.#record && this.mode !== "choosing"
                 ? {
                       name: i18n.localize("FILRODENSWMB.UI.VersionDefault"),
                       seed: this.#record.seed,
@@ -1244,6 +1521,29 @@ export class LocalController {
                   }
                 : null,
             mapName: this.#host.mapName(),
+            settings: this.#settingsContext(),
+        };
+    }
+
+    /**
+     * Map setup's Walls and Look, its Choose another version… and Generate again (step 4, board
+     * L3): once a map is open, off on a held world's (board L3b).
+     */
+    #settingsContext() {
+        if (this.mode !== "open" || !this.#record || this.#alone) return null;
+        const { i18n } = platform;
+        const { PALISADE_BELOW } = FILRODENSWMB.LOCAL.WALLS;
+        const walls = this.walls;
+        const look = this.look;
+        const state = this.#owner ? null : this.stateOf(this.#record.id);
+        return {
+            off: this.#owner ? i18n.format("FILRODENSWMB.UI.SettlementHeldOff", { owner: this.#owner.name }) : null,
+            stale: !!state && (state.changed.length > 0 || state.pinGone),
+            redraws: i18n.localize("FILRODENSWMB.UI.SettlementRedraws"),
+            walls: ["auto", "on", "off"].map((id) => ({ id, on: id === walls, label: i18n.localize(`FILRODENSWMB.UI.SettlementWalls.${id}`) })),
+            wallsHint: i18n.format("FILRODENSWMB.UI.SettlementWallsHint", { people: PALISADE_BELOW.toLocaleString(i18n.lang) }),
+            looks: ["atlas", "theme"].map((id) => ({ id, on: id === look, label: i18n.localize(`FILRODENSWMB.UI.SettlementLook.${id}`) })),
+            pinPath: `${i18n.localize("FILRODENSWMB.UI.ToolInfrastructure")} › ${this.#settlementName()}`,
         };
     }
 
@@ -1268,6 +1568,26 @@ export class LocalController {
             frame: i18n.format("FILRODENSWMB.UI.FromPinFrame", { width: km(input.frame.width), height: km(input.frame.height) }),
         };
     }
+}
+
+/** The theme's colours the theme style reads (Styles.js themeStyle). */
+const THEME_TOKENS = Object.freeze(["--fwmb-bg-base", "--fwmb-bg-panel", "--fwmb-bg-raised", "--fwmb-bg-hover", "--fwmb-bg-highlight", "--fwmb-accent-main", "--fwmb-fill-accent", "--fwmb-accent-secondary", "--fwmb-fill-secondary", "--fwmb-border-main", "--fwmb-border-strong", "--fwmb-text-primary", "--fwmb-text-muted"]);
+
+/** A colour's relative lightness, 0 to 1 (#rrggbb). */
+function luminance(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * A settlement's input with its walls as Map setup sets them (step 4): forced on or off, or the
+ * engine's own rule for Automatic.
+ * @param {object} input
+ * @param {"auto"|"on"|"off"} [walls]
+ */
+export function withWalls(input, walls = "auto") {
+    const walled = walls === "on" ? true : walls === "off" ? false : autoWalled(input);
+    return input.walled === walled ? input : { ...input, walled };
 }
 
 /** A version's name: the Default, or Alt. version 1 to 3. */

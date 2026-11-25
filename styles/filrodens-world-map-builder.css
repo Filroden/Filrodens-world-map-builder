@@ -3717,7 +3717,8 @@
     background: var(--fwmb-bg-hover);
     color: var(--fwmb-text-primary);
 }
-.fwmb-seg button[aria-checked="true"] {
+.fwmb-seg button[aria-checked="true"],
+.fwmb-seg button[aria-pressed="true"] {
     background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-on-accent);
     box-shadow: inset 0 0 0 1px var(--fwmb-fill-accent-edge);
@@ -5263,6 +5264,20 @@ button.fwmb-format {
     border-radius: 2px;
     background: var(--swatch);
     box-shadow: 0 0 0 1px var(--fwmb-border-strong);
+}
+
+/* Map setup's Walls and Look (step 4, board L3): segmented choices across the panel; off on a
+   held world's map */
+.fwmb-settlement-seg {
+    width: 100%;
+}
+.fwmb .fwmb-settlement-seg button[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.55;
+}
+.fwmb .fwmb-settlement-seg button[aria-disabled="true"]:hover {
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-secondary);
 }
 
 /* Households and supply's panel (board L6): its four totals, the cultures' share bar and legend,
