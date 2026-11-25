@@ -1150,9 +1150,11 @@ export class MapStudio {
         const inWorld = this.inWorld;
         const inWorlds = this.activeTool === "manage";
         const worldName = i18n.localize("FILRODENSWMB.UI.LayerWorld");
-        const world = { id: "world", icon: "public", full: worldName, short: worldName, tooltip: i18n.localize("FILRODENSWMB.UI.LayerWorldHint"), current: inWorld, action: inWorld ? null : "showWorld" };
-        // A settlement map open: neither World nor the Surface map is worked on, and both lead back
+        // A settlement map open: neither World nor the Surface map is worked on, and both lead back,
+        // World to the world's tool, the Surface map to its tool (Ken, 2026-11-25: World stayed lit
+        // over a settlement map opened from the overview, so choosing it did nothing)
         const inSettlement = this.inSettlement;
+        const world = { id: "world", icon: "public", full: worldName, short: worldName, tooltip: i18n.localize("FILRODENSWMB.UI.LayerWorldHint"), current: inWorld && !inSettlement, action: inWorld && !inSettlement ? null : "showWorld" };
         const surface = { id: "surface", icon: unmade ? "add" : "landscape", full: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"), short: i18n.localize("FILRODENSWMB.UI.LayerSurface"), current: !inWorld && !inWorlds && !inSettlement, action: inWorld || inWorlds || inSettlement ? "showMap" : null, unmade };
         // Its marks (MapMarks): icons on the segment, the words in its tooltip and the folded menu
         surface.marks = unmade || noWorld ? [] : MapMarks.named(MapMarks.of(MapMarks.state(this, { regionalStale: !!this.world?.held && this.#staleLines.length > 0 })));
@@ -1167,7 +1169,7 @@ export class MapStudio {
         }
         const geologyName = i18n.localize("FILRODENSWMB.UI.LayerGeologyFull");
         const geology = { id: "geology", icon: "strata", full: geologyName, short: i18n.localize("FILRODENSWMB.UI.LayerGeology"), disabled: true, tooltip: notBuilt(geologyName) };
-        const current = inWorld ? world : surface;
+        const current = inWorld && !inSettlement ? world : surface;
         return {
             name,
             nameMenuLabel: i18n.format("FILRODENSWMB.UI.WorldNameMenuHint", { name }),
@@ -6313,7 +6315,11 @@ export class MapStudio {
 
     /** World in the layer switcher: the world's rail, on the world tool last open (the overview at first). */
     showWorld() {
-        if (this.inSettlement) this.leaveSettlement({ render: false });
+        if (this.inSettlement) {
+            // Opened from one of the world's tools: back to it, drawn again
+            if (this.inWorld) return this.leaveSettlement();
+            this.leaveSettlement({ render: false });
+        }
         if (this.inWorld) return;
         if (this.activeTool === "manage") Inspector.close(this);
         return this.openWorldTool(this.#worldTool);
@@ -6322,8 +6328,9 @@ export class MapStudio {
     /** A map in the layer switcher (S0: the Surface map): its rail, on the tool last open there. */
     showMap() {
         if (this.inSettlement) {
-            this.leaveSettlement();
-            return;
+            // Opened from the map: back to it; opened from the world's tools: on to the map
+            if (!this.inWorld && this.activeTool !== "manage") return this.leaveSettlement();
+            this.leaveSettlement({ render: false });
         }
         if (!this.inWorld && this.activeTool !== "manage") return;
         Inspector.close(this);

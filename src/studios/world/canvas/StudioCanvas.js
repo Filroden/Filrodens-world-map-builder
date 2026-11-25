@@ -1534,7 +1534,7 @@ export class StudioCanvas {
         try {
             const longest = Math.max(this.mapWidth, this.mapHeight);
             if (!(longest > 0)) return null;
-            const canvas = this.#renderForExport(Math.min(1, side / longest));
+            const canvas = this.#withoutWorkingAids(() => this.#renderForExport(Math.min(1, side / longest)));
             const webp = canvas.toDataURL("image/webp", 0.8);
             return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", 0.8);
         } catch (error) {
@@ -1624,9 +1624,34 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * The working aids, which no picture of the map shows (an export, its preview and estimate, a
+     * thumbnail): the reference image, the land masks' outlines, the crop, the Regions and Routes
+     * tools' overlays, the homelands' markers and the brush's cursor. (The crop was drawn into the
+     * thumbnail of a regional world opened from Cut regional world…, over its own map; Ken,
+     * 2026-11-25.)
+     */
+    #workingAids() {
+        return [this.layers.reference, this.layers.landMasks, this.cropGraphics, ...this.regionOverlays.displayObjects, ...this.routeOverlays.displayObjects, ...this.homelandMarkers.displayObjects, this.brushCursor].filter(Boolean);
+    }
+
+    /** Draws with the working aids hidden (see #workingAids), and puts them back. */
+    #withoutWorkingAids(draw, more = []) {
+        const hidden = [...this.#workingAids(), ...more];
+        const visibility = hidden.map((layer) => layer.visible);
+        try {
+            for (const layer of hidden) layer.visible = false;
+            return draw();
+        } finally {
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
+    }
+
     /** The layers an export hides: the working aids always, and for a scene pass what that pass leaves out. */
     #exportHidden(pass) {
-        const hidden = [this.layers.reference, this.layers.landMasks];
+        const hidden = this.#workingAids();
         if (pass) hidden.push(this.gridLayer);
         if (pass === "gm") {
             // The GM overlay holds only what players must not see; a thematic layer is in the
@@ -1646,16 +1671,7 @@ export class StudioCanvas {
     exportPreview(side) {
         const longest = Math.max(this.mapWidth, this.mapHeight);
         if (!(longest > 0)) return null;
-        const hidden = [this.layers.reference, this.layers.landMasks];
-        const visibility = hidden.map((layer) => layer.visible);
-        try {
-            for (const layer of hidden) layer.visible = false;
-            return this.#renderForExport(Math.min(1, side / longest));
-        } finally {
-            hidden.forEach((layer, index) => {
-                layer.visible = visibility[index];
-            });
-        }
+        return this.#withoutWorkingAids(() => this.#renderForExport(Math.min(1, side / longest)));
     }
 
     /** What is on screen now, in map pixels (it may reach past the map). */
@@ -2549,16 +2565,7 @@ export class StudioCanvas {
                 places.push({ x: left + Math.max(0, Math.min(width - side, x)), y: top + Math.max(0, Math.min(height - side, y)), width: side, height: side });
             }
         }
-        const hidden = [this.layers.reference, this.layers.landMasks, ...(forScene ? [this.gridLayer] : [])];
-        const visibility = hidden.map((layer) => layer.visible);
-        try {
-            for (const layer of hidden) layer.visible = false;
-            return { tiles: this.#renderForExport(scale, places), pixels: width * height };
-        } finally {
-            hidden.forEach((layer, index) => {
-                layer.visible = visibility[index];
-            });
-        }
+        return this.#withoutWorkingAids(() => ({ tiles: this.#renderForExport(scale, places), pixels: width * height }), forScene ? [this.gridLayer] : []);
     }
 
     setRenderPass(mode) {
