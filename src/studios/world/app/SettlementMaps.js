@@ -171,6 +171,21 @@ export class SettlementMaps {
         return made;
     }
 
+    /**
+     * Generate again on one row of the overview's table (L-surface step 4b, board L4b): the world's
+     * own settlement map made again from its pin as it is now, without opening it (see
+     * LocalController.regenerate), one undo step on its own history.
+     */
+    static async regenerate(app, id) {
+        if (!this.available(app)) return false;
+        const card = this.#ownCards(app).find((each) => each.id === id);
+        const state = card ? this.existing(app)?.stateOf(id) : null;
+        if (!state?.changed?.length || state.pinGone) return false;
+        const made = await this.controller(app).regenerate([id]);
+        app.view?.render(["worldbar", "context"]);
+        return made > 0;
+    }
+
     /** The pins with a settlement map of this world's own (kept since included), by id. */
     static linkedPinIds(app) {
         return new Set(this.#ownCards(app).map((card) => card.pinId));
@@ -498,22 +513,40 @@ export class SettlementMaps {
         const cards = this.#allCards(app);
         const lang = i18n.lang;
         const surface = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
+        const controller = this.existing(app);
         return cards
             .map((card) => {
                 const name = this.#nameOf(app, card);
+                const state = card.owner ? null : controller?.stateOf(card.id);
                 return {
                     id: card.id,
                     name,
                     kind: this.tierLabel(card.tier),
                     people: (card.people ?? 0).toLocaleString(lang),
                     from: card.owner ? i18n.format("FILRODENSWMB.UI.SettlementMadeFromOwner", { owner: card.owner.name, map: surface }) : surface,
-                    marks: this.#named(this.#marksOf(app, card)),
+                    marks: this.#named(this.#marksOf(app, card)).map((mark) => ({ ...mark, tooltip: this.#markTip(app, card, mark, name) })),
                     // A held world's parent's map is deleted in its own world (Ken, 2026-11-24: Delete here too)
                     deletable: !card.owner,
+                    // Generate again on the row (step 4b): the world's own (a held world's Fill in maps
+                    // included, as in their Map setup), Out of date, its pin there
+                    again: !card.owner && !!state?.changed?.length && !state.pinGone,
                     search: name.toLocaleLowerCase(lang),
                 };
             })
             .sort((a, b) => a.name.localeCompare(b.name, lang, { numeric: true, sensitivity: "base" }));
+    }
+
+    /**
+     * A mark's tooltip in the overview's table (board L4b): the state and what changed, as the
+     * mark shows only its icon where the table is narrow.
+     */
+    static #markTip(app, card, mark, name) {
+        const { i18n } = platform;
+        const controller = this.existing(app);
+        if (mark.label === i18n.localize("FILRODENSWMB.UI.MarkPinGone")) return i18n.format("FILRODENSWMB.UI.SettlementPinGoneLine", { name, map: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull") });
+        const state = card.owner ? { changed: card.stale ?? [] } : controller?.stateOf(card.id);
+        const changes = state?.changed?.length && controller ? controller.describe(state) : null;
+        return changes ? i18n.format("FILRODENSWMB.UI.SettlementMarkChanged", { changes }) : mark.label;
     }
 
     /**

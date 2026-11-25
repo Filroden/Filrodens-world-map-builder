@@ -72,6 +72,24 @@ export class GenerateAll {
         return this.plan({ maps: this.mapsOf(app) }).run.length;
     }
 
+    /**
+     * The overview's notice (L-surface step 4b, board L4b): what Generate all would run now, in its
+     * order, from what is known (as the rail's count is); null when nothing needs a run, on a held
+     * regional world (its runs are its parent's) and on a world with no Surface map yet.
+     */
+    static overview(app) {
+        if (app.world?.held || Generation.heldByParent(app) || app.surfaceMade === false) return null;
+        const { i18n } = platform;
+        const { run } = this.plan({ maps: this.mapsOf(app) });
+        if (!run.length) return null;
+        const line = { noRun: "FILRODENSWMB.UI.GenerateAllNoRun", stale: "FILRODENSWMB.UI.GenerateAllStale" };
+        return {
+            title: run.length === 1 ? i18n.localize("FILRODENSWMB.UI.OverviewUpdateTitleOne") : i18n.format("FILRODENSWMB.UI.OverviewUpdateTitle", { count: run.length }),
+            maps: run.map((map) => ({ name: map.name, line: i18n.localize(line[map.state] ?? line.stale) })),
+            label: i18n.format("FILRODENSWMB.UI.GenerateAllCount", { count: run.length }),
+        };
+    }
+
     /** Generate all's label in Peoples and realms' Run: with how many maps it would run. */
     static buttonLabel(app) {
         const count = this.count(app);

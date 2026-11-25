@@ -4,6 +4,7 @@ import { Inspector } from "./Inspector.js";
 import { MapMarks } from "./MapMarks.js";
 import { WorldEditor, WorldsPanel } from "./WorldsPanel.js";
 import { SettlementMaps } from "./SettlementMaps.js";
+import { GenerateAll } from "./GenerateAll.js";
 
 /** The engines' short names, as World setup and Worlds name them. */
 const ENGINES = Object.freeze({
@@ -63,6 +64,8 @@ export class WorldOverview {
             cutFrom: node?.held && node.parentId ? WorldOverview.#cutFrom(app, node) : null,
             // Its settlement maps (L-surface; board L4), a searchable table
             settlements: SettlementMaps.overview(app),
+            // What Generate all would run, at the head of the In group when anything needs a run (step 4b; board L4b)
+            update: GenerateAll.overview(app),
             settlementsHere: SettlementMaps.available(app),
         };
     }
@@ -79,7 +82,7 @@ export class WorldOverview {
         const saved = Date.parse(map?.savedAt ?? "");
         return {
             name: i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull"),
-            thumbnail: (!app.isDirty && map?.thumbnail) || app.canvasEngine?.thumbnail?.() || map?.thumbnail || null,
+            thumbnail: (!app.isDirty && map?.thumbnail) || WorldOverview.#drawnThumbnail(app) || map?.thumbnail || null,
             meta: i18n.localize(!state.hasRun ? "FILRODENSWMB.UI.OverviewNoRun" : state.runEdited ? "FILRODENSWMB.UI.OverviewRunEdited" : "FILRODENSWMB.UI.OverviewRun"),
             saved: [
                 Number.isFinite(saved) ? WorldsPanel.savedLabel(saved) : i18n.localize("FILRODENSWMB.UI.OverviewNotSaved"),
@@ -88,6 +91,23 @@ export class WorldOverview {
             // Its marks (MapMarks): No run is the line above, so not a mark here
             marks: MapMarks.named(MapMarks.of(state, { noRun: false })),
         };
+    }
+
+    /** The Surface map's thumbnail as it is now, by the map and its change stamp. */
+    static #drawn = new WeakMap();
+
+    /**
+     * The Surface map drawn as it is now, kept until the map changes again (its surfaceStamp):
+     * drawing it reads the whole map back from the GPU, so the overview does not draw it again on
+     * each render while only a settlement map changed (L-surface step 4b).
+     */
+    static #drawnThumbnail(app) {
+        const key = `${app.currentSaveId ?? ""}:${app.surfaceStamp ?? ""}`;
+        const kept = WorldOverview.#drawn.get(app);
+        if (kept?.key === key && kept.url) return kept.url;
+        const url = app.canvasEngine?.thumbnail?.() ?? null;
+        if (url) WorldOverview.#drawn.set(app, { key, url });
+        return url;
     }
 
     /** A held regional world's "Cut from" note (see context). */

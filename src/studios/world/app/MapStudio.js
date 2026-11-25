@@ -183,6 +183,7 @@ export class MapStudio {
         local(e, t)                { SettlementMaps.existing(this)?.act(t.dataset.local, t, e); },
         openSettlementMap(_e, t)   { SettlementMaps.open(this, t.dataset.settlementId); },
         deleteSettlementMap(_e, t) { SettlementMaps.deleteMap(this, t.dataset.settlementId); },
+        regenerateSettlementMap(_e, t) { SettlementMaps.regenerate(this, t.dataset.settlementId); },
 
         // --- STYLES AND ICONS: the map's styles (see StyleLists) ---
         openCulture(e, t)       { if (!MapStudio.#fromRowControl(e, t)) CultureEditor.open(this, t.dataset.id, MapStudio.#FROM_LIST); },
@@ -859,9 +860,23 @@ export class MapStudio {
         return this.#dirty || !!SettlementMaps.existing(this)?.isDirty;
     }
 
+    /**
+     * Raised by every change to the Surface map or the world's settings (each markDirty), so what
+     * is drawn from the map can be kept until it changes again: the overview's thumbnail of it
+     * (L-surface step 4b; a settlement map's change does not raise it).
+     */
+    get surfaceStamp() {
+        return this.#surfaceStamp;
+    }
+
+    #surfaceStamp = 0;
+
     set isDirty(dirty) {
         // A change to the Surface map is one the settlement maps' source reads
-        if (dirty) SettlementMaps.invalidate(this);
+        if (dirty) {
+            this.#surfaceStamp++;
+            SettlementMaps.invalidate(this);
+        }
         // Saved or given up: the settlement maps' changes go with the rest
         else SettlementMaps.existing(this)?.forgetChanges();
         if (dirty === this.#dirty) {

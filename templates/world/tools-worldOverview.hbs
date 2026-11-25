@@ -7,11 +7,21 @@
     off with why when the Surface map cannot be cut from; a held regional world says what it was
     cut from, why it is Out of date, and offers Cut again…. Parts a later track builds are drawn in
     their places, disabled: Add a map (Layers 1). Its settlement maps are a table (L-surface, board
-    L4). See WorldOverview.
+    L4). Bringing the world up to date (step 4b, board L4b): a notice at the head of the In group,
+    only when something needs a run, listing what Generate all would run in its order (a box
+    scrolling past five names) with Generate all…; Generate again on each of the world's own Out of
+    date rows. See WorldOverview.
 --}}
 <div class="fwmb-overview">
     <section class="fwmb-world-group" aria-labelledby="fwmb-overview-in">
         <div class="fwmb-world-group-head"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span><div><b id="fwmb-overview-in">{{overview.inTitle}}</b><span class="fwmb-hint">{{localize "FILRODENSWMB.UI.OverviewInHint"}}</span></div></div>
+        {{#if overview.update}}
+        <div class="fwmb-notice fwmb-overview-update" role="status">
+            <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--sync" aria-hidden="true"></span>{{overview.update.title}}</span>
+            <ol class="fwmb-overview-update-list" aria-label="{{localize 'FILRODENSWMB.UI.OverviewUpdateList'}}">{{#each overview.update.maps}}<li><b>{{this.name}}</b> · {{this.line}}</li>{{/each}}</ol>
+            <div class="fwmb-notice-actions"><button type="button" class="fwmb-btn fwmb-btn--primary" data-action="generateAll" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAllHint'}}"><span class="fwmb-icon fwmb-icon--run" aria-hidden="true"></span>{{overview.update.label}}</button></div>
+        </div>
+        {{/if}}
         <div class="fwmb-overview-group">
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.OverviewMaps"}} <span class="fwmb-badge fwmb-badge--count">{{overview.maps.length}}</span></div>
             <div class="fwmb-cards fwmb-overview-cards">
@@ -52,7 +62,10 @@
 
         {{!-- Its settlement maps (L-surface; board L4): a searchable table scrolling past five rows,
              so the regional worlds below stay in view; each row's Open, and Delete… for the world's
-             own (Ken, 2026-11-24: deleting one by one from each pin took too long) --}}
+             own (Ken, 2026-11-24: deleting one by one from each pin took too long); Generate again
+             on the world's own Out of date rows (step 4b). Narrow, Generate again and the marks
+             show their icon alone, their words kept for screen readers and in their tooltips
+             (board L4b) --}}
         <div class="fwmb-overview-group fwmb-overview-settlements" data-settlement-list>
             <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SettlementMaps"}} <span class="fwmb-badge fwmb-badge--count">{{overview.settlements.length}}</span>
                 {{#if overview.settlements.length}}<input type="search" class="fwmb-settlement-search" data-settlement-search data-panel-ui placeholder="{{localize 'FILRODENSWMB.UI.Search'}}" aria-label="{{localize 'FILRODENSWMB.UI.SearchSettlementMaps'}}" />{{/if}}
@@ -64,12 +77,12 @@
                     <tbody>
                         {{#each overview.settlements}}
                         <tr data-settlement-row data-search="{{this.search}}">
-                            <th scope="row"><span class="fwmb-icon fwmb-icon--location-city" aria-hidden="true"></span> {{this.name}}</th>
+                            <th scope="row">{{this.name}}</th>
                             <td>{{this.kind}}</td>
                             <td class="fwmb-num">{{this.people}}</td>
                             <td>{{this.from}}</td>
-                            <td>{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</span>{{/each}}</td>
-                            <td class="fwmb-end"><button type="button" class="fwmb-btn fwmb-btn--go" data-action="openSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.OpenNamed' name=this.name}}">{{localize "FILRODENSWMB.UI.Open"}}</button>{{#if this.deletable}} <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i></button>{{/if}}</td>
+                            <td>{{#each this.marks}}<span class="fwmb-state-mark fwmb-state-mark--{{this.kind}}" data-tooltip="{{this.tooltip}}"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span><span class="fwmb-compact-label">{{this.label}}</span></span>{{/each}}</td>
+                            <td class="fwmb-end"><span class="fwmb-settlement-actions">{{#if this.again}}<button type="button" class="fwmb-btn fwmb-settlement-again" data-action="regenerateSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgainNamed' name=this.name}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgainNamed' name=this.name}}"><span class="fwmb-icon fwmb-icon--run" aria-hidden="true"></span><span class="fwmb-compact-label">{{localize "FILRODENSWMB.UI.GenerateAgain"}}</span></button> {{/if}}<button type="button" class="fwmb-btn fwmb-btn--go" data-action="openSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.OpenNamed' name=this.name}}">{{localize "FILRODENSWMB.UI.Open"}}</button>{{#if this.deletable}} <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteSettlementMap" data-settlement-id="{{this.id}}" aria-label="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteSettlementMapNamed' name=this.name}}"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i></button>{{/if}}</span></td>
                         </tr>
                         {{/each}}
                     </tbody>
