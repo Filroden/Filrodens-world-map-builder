@@ -141,6 +141,60 @@ export const HEIGHTS = Object.freeze({ house: 7, range: 4.5, inn: 8.5, hall: 11,
 export const CULTURE_DEFAULT = Object.freeze({ roof: null, wall: null, wallMaterial: "stone" });
 
 /**
+ * The household views (L-surface step 3, board L6): each house's roof, with its own ranges, in its
+ * household's colour; every other building muted so the houses read. Culture takes each culture's
+ * own colour (`cultures[name].roof`); the others colours of their own here, from the towns
+ * prototype's household pages: a five-step sequence for the people in a house and the age of its
+ * head, a ramp for wealth, a colour a trade group (the engine's groups, Households.js).
+ */
+export const HOUSEHOLD_VIEWS = Object.freeze(["people", "group", "culture", "wealth", "age"]);
+
+export const VIEW_COLOURS = Object.freeze({
+    sequence: Object.freeze(["#f7e9b8", "#f1c27d", "#e08a4c", "#c0502e", "#7f1d2a"]),
+    wealth: Object.freeze({ poor: "#c9b6a0", modest: "#e0c07a", middling: "#d68a3c", prosperous: "#b0472b", wealthy: "#6b1e3a" }),
+    groups: Object.freeze({ clergy: "#7b5ea7", learning: "#b06fb8", care: "#d65f8a", office: "#3f6fb5", arms: "#a83232", trade: "#d4a017", food: "#e07b39", cloth: "#4fa3a5", leather: "#8c5a3c", metal: "#5c6670", building: "#a3a35a", transport: "#2f7f4f", land: "#89b35b", labour: "#c9b6a0", mining: "#4b4b7a", light: "#e8c35a", none: "#e8e0d0" }),
+});
+
+/** The graded views' steps: the top of each of the first four (the fifth is everything above). */
+export const VIEW_STEPS = Object.freeze({ people: Object.freeze([3, 5, 7, 10]), age: Object.freeze([29, 39, 49, 59]) });
+
+/** Which of a graded view's five steps a value falls in (0 to 4). */
+export function stepOf(value, cuts) {
+    const at = cuts.findIndex((cut) => value <= cut);
+    return at < 0 ? cuts.length : at;
+}
+
+/**
+ * A home's colour in a household view, or null where it has none (no household, or a culture with
+ * no colour).
+ * @param {string} view - One of HOUSEHOLD_VIEWS.
+ * @param {{people?: number, headAge?: number, group?: string, wealth?: string, culture?: string}} home
+ * @param {Object<string, {roof?: string}>} [cultures]
+ */
+export function viewColour(view, home, cultures = {}) {
+    if (!home) return null;
+    switch (view) {
+        case "people":
+            return Number.isFinite(home.people) ? VIEW_COLOURS.sequence[stepOf(home.people, VIEW_STEPS.people)] : null;
+        case "age":
+            return Number.isFinite(home.headAge) ? VIEW_COLOURS.sequence[stepOf(home.headAge, VIEW_STEPS.age)] : null;
+        case "wealth":
+            return VIEW_COLOURS.wealth[home.wealth] ?? null;
+        case "group":
+            return VIEW_COLOURS.groups[home.group] ?? null;
+        case "culture":
+            return (home.culture && cultures[home.culture]?.roof) || null;
+        default:
+            return null;
+    }
+}
+
+/** The roof every building but a home takes in a household view: the style's own, greyed towards its ground. */
+export function mutedRoof(style) {
+    return mix(mix(style.roof, "#8f8f8f", 0.8), style.ground, 0.35);
+}
+
+/**
  * A style from the studio's theme (styles/fwmb-theme.css): the map drawn in the theme's own
  * surfaces and hue, light or dark. `tokens` holds the theme's custom properties by name.
  */

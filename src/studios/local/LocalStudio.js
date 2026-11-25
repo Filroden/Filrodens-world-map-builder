@@ -16,6 +16,7 @@ import { Worlds } from "../../kernel/worlds/Worlds.js";
 import { LocalController, tierName } from "./app/LocalController.js";
 import { SettlementRules } from "./data/SettlementRules.js";
 import { SettlementRecord } from "./data/SettlementRecord.js";
+import { HOUSEHOLD_VIEWS } from "./render/Styles.js";
 
 const SETTLEMENT = ["settlement"];
 
@@ -31,9 +32,9 @@ export const LOCAL_DEFINITION = defineStudio({
     ],
     tools: [
         { id: "mapSetup", stage: "shape", mode: "create", icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap", mapTypes: SETTLEMENT, lede: "FILRODENSWMB.UI.LedeSettlementSetup" },
-        // Built by L-surface's steps 5 and 3: drawn in their places until then, as S0's were
+        // Export is built by L-surface's step 5: drawn in its place until then, as S0's were
         { id: "export", stage: "finish", mode: "create", icon: "png", label: "FILRODENSWMB.UI.ToolExport", mapTypes: SETTLEMENT, later: "FILRODENSWMB.UI.ToolExport" },
-        { id: "households", stage: "explore", mode: "explore", icon: "groups", label: "FILRODENSWMB.UI.ToolHouseholds", mapTypes: SETTLEMENT, later: "FILRODENSWMB.UI.ToolHouseholds" },
+        { id: "households", stage: "explore", mode: "explore", icon: "groups", label: "FILRODENSWMB.UI.ToolHouseholds", mapTypes: SETTLEMENT, lede: "FILRODENSWMB.UI.LedeHouseholds" },
     ],
 });
 
@@ -50,8 +51,12 @@ async function page(record) {
     return { name: record.name, html };
 }
 
+/** A settlement map's Thematic views in the map controls (step 3): the household views, by id and label. */
+const VIEWS = Object.freeze(HOUSEHOLD_VIEWS.map((id) => Object.freeze({ id, label: `FILRODENSWMB.UI.SettlementView.${id}` })));
+
 export const LocalStudio = Object.freeze({
     definition: LOCAL_DEFINITION,
+    views: VIEWS,
     create: (shell, host) => new LocalController(shell, host, LOCAL_DEFINITION),
     rules: SettlementRules,
     // What the world keeps of a record (WorldRecord.settlementCard reads it safely)

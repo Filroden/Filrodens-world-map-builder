@@ -1726,6 +1726,8 @@ export class MapStudio {
         context.mapUnit = cleanUnit(this.uiState.mapUnit);
         // The map controls' Thematic views menu (the map region is drawn once; see ThematicView)
         context.thematic = ThematicView.menuContext();
+        // A settlement map's own Thematic views, from the studio that draws them (L-surface step 3)
+        context.settlementViews = this.shell?.registry?.get("local")?.views ?? [];
         context.pixelScale = this.#pixelScaleText();
         // The value per tick a bar matching the world draws (a number field, so unformatted)
         context.scaleBarValue = scaleBarTick(this.uiState, this.mapHeight).value;

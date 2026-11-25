@@ -294,6 +294,8 @@ export class SettlementMaps {
             leave: () => this.leave(app),
             openOwner: (owner, id) => app.openWorldAt(owner.worldId, { settlementId: id }),
             worldName: () => app.world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld"),
+            // Each culture's colour, by name, for the households' Culture view (step 3)
+            cultureColours: () => Object.fromEntries((app.uiState?.cultures ?? []).filter((c) => c?.name && c.color).map((c) => [c.name, c.color])),
         };
     }
 

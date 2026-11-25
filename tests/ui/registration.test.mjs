@@ -100,9 +100,13 @@ test("the Local studio registers beside the World studio, its rail Map setup, Ex
         local.definition.railStages("settlement").map((stage) => [stage.id, stage.tools.map((tool) => tool.id)]),
         [["shape", ["mapSetup"]], ["finish", ["export"]], ["explore", ["households"]]],
     );
-    // Export and Households and supply are later steps': drawn in their places, off
-    assert.ok(local.definition.tool("export").later && local.definition.tool("households").later);
+    // Export is a later step's: drawn in its place, off; Households and supply is step 3's
+    assert.ok(local.definition.tool("export").later);
+    assert.ok(!local.definition.tool("households").later);
     assert.equal(local.definition.tool("households").mode, "explore");
+    assert.equal(local.definition.tool("households").lede, "FILRODENSWMB.UI.LedeHouseholds");
+    // Its map controls' Thematic views: the five household views
+    assert.deepEqual(LocalStudio.views.map((view) => view.id), ["people", "group", "culture", "wealth", "age"]);
     // The World studio mounts its controller (the open world is its host): it is made with one
     const controller = local.create(shell, { world: () => null });
     assert.equal(controller.isOpen, false);

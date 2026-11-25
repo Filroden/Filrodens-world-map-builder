@@ -1953,9 +1953,19 @@ export const FILRODENSWMB = {
         MAX_SETTLEMENTS: 10000,
         // The canvas (SettlementCanvas): its finest detail in metres a pixel, the whole frame's
         // coarse picture's longer side, the delay before the drawing line shows, how many tiles are
-        // kept and drawn at once, how far past the whole frame it zooms out, and its wheel, keys
-        // and zoom steps
-        CANVAS: Object.freeze({ FINEST_M: 0.4, COARSE_PX: 2048, LINE_DELAY_MS: 500, KEEP_TILES: 160, AT_ONCE: 2, ROOM: 1.25, WHEEL: 0.0015, KEY_PAN_PX: 80, ZOOM_STEP: 1.5 }),
+        // kept and drawn at once, how far past the whole frame it zooms out, its wheel, keys and
+        // zoom steps, and a tap: a press let go within TAP_PX of where it went down, within TAP_MS
+        CANVAS: Object.freeze({ FINEST_M: 0.4, COARSE_PX: 2048, LINE_DELAY_MS: 500, KEEP_TILES: 160, AT_ONCE: 2, ROOM: 1.25, WHEEL: 0.0015, KEY_PAN_PX: 80, ZOOM_STEP: 1.5, TAP_PX: 5, TAP_MS: 500 }),
+        // Households and supply (step 3): where a house stands, in metres from what it is named by
+        // ("Cutler's house, on the market"), the nearest first; the trade groups the panel lists
+        // before "n more…"; the card's gap from its house and from the canvas's edges (CSS pixels);
+        // the index's cell (metres) for pointing at a house
+        HOUSEHOLDS: Object.freeze({
+            NEAR_M: Object.freeze({ market: 45, quay: 30, water: 25, gate: 45, worship: 35, castle: 60 }),
+            TRADES_SHOWN: 5,
+            CARD_GAP_PX: 12,
+            INDEX_CELL_M: 40,
+        }),
         // Out of date (step 2b) worked out once the Surface map has been left alone this long (ms),
         // then when the window is idle, so an edit never waits for it
         STATES_AFTER_MS: 1500,

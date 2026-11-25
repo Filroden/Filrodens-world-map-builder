@@ -9,6 +9,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { allTrades, wordKey } from "../../src/studios/local/app/Households.js";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const EN = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
@@ -75,6 +76,25 @@ const FAMILIES = [
     // What changed on an Out of date settlement map, by its input's parts (SettlementRecord.PARTS)
     { prefix: "FILRODENSWMB.UI.SettlementChanged.", values: readFileSync(join(ROOT, "src/studios/local/data/SettlementRecord.js"), "utf8").replace(/(\w+):/g, '"$1":') },
     "FILRODENSWMB.UI.SettlementChanged",
+    // Households and supply (step 3): a household's trade, its group, wealth and members' roles,
+    // where a trade is drawn to and a house stands, a supply route's way and the household views,
+    // by the engine's own words (tests/local/households.test.mjs holds that each has its string)
+    { prefix: "FILRODENSWMB.UI.HouseholdTrade.", values: JSON.stringify([...allTrades().keys(), "miller's man"].map(wordKey)) },
+    { prefix: "FILRODENSWMB.UI.HouseholdRole.", values: JSON.stringify(["servant", "apprentice", "journeyman", "miller's man", "lodger"].map(wordKey)) },
+    "FILRODENSWMB.UI.HouseholdTrade",
+    "FILRODENSWMB.UI.HouseholdRole",
+    "FILRODENSWMB.UI.HouseholdGroup.",
+    "FILRODENSWMB.UI.HouseholdGroup",
+    "FILRODENSWMB.UI.HouseholdWealth.",
+    "FILRODENSWMB.UI.HouseholdWealth",
+    "FILRODENSWMB.UI.HouseholdWhere.",
+    "FILRODENSWMB.UI.HouseholdWhere",
+    "FILRODENSWMB.UI.HousePlace.",
+    "FILRODENSWMB.UI.HousePlace",
+    "FILRODENSWMB.UI.SupplyBy.",
+    "FILRODENSWMB.UI.SupplyBy",
+    "FILRODENSWMB.UI.SettlementView.",
+    "FILRODENSWMB.UI.SettlementView",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
     // The name styles, by the name bases' names with their spaces taken out

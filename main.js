@@ -41,6 +41,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/local/settlement-bar.hbs",
         "modules/filrodens-world-map-builder/templates/local/tools-mapSetup.hbs",
         "modules/filrodens-world-map-builder/templates/local/tools-mapSetup-foot.hbs",
+        "modules/filrodens-world-map-builder/templates/local/tools-households.hbs",
         "modules/filrodens-world-map-builder/templates/local/toolbar-settlement.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-biomes.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-cartography.hbs",

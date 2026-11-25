@@ -137,6 +137,9 @@ export const ROLE = Object.freeze({
     MOST: 0.3,
 });
 
+/** Each trade's group and where it is drawn to, by kind of place (the tables above), for words about a house. */
+export const TRADE_TABLES = TRADES;
+
 export const GROUP_COLOURS = Object.freeze({ clergy: "#7b5ea7", learning: "#b06fb8", care: "#d65f8a", office: "#3f6fb5", arms: "#a83232", trade: "#d4a017", food: "#e07b39", cloth: "#4fa3a5", leather: "#8c5a3c", metal: "#5c6670", building: "#a3a35a", transport: "#2f7f4f", land: "#89b35b", labour: "#c9b6a0", mining: "#4b4b7a", light: "#e8c35a", none: "#e8e0d0" });
 /** The plan-first core's tiers (V2): what a house's quarter adds to its household's worth, in place
  * of nearness to the market (upper by the castle and places of worship, middle on the market and

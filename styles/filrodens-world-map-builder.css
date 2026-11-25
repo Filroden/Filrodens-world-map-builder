@@ -5044,7 +5044,11 @@ button.fwmb-format {
 .fwmb-studio.fwmb-is-settlement .fwmb-map-preview > .fwmb-unmade,
 .fwmb-studio.fwmb-is-settlement .fwmb-canvas-readout,
 .fwmb-studio.fwmb-is-settlement .fwmb-map-hint,
-.fwmb-studio.fwmb-is-settlement .fwmb-map-controls .fwmb-layer-group {
+.fwmb-studio.fwmb-is-settlement .fwmb-map-controls .fwmb-layer-group:not([data-layer-group="settlementViews"]) {
+    display: none;
+}
+/* A settlement map's own Thematic views (step 3): in the map controls only while one is open */
+.fwmb-studio:not(.fwmb-is-settlement) .fwmb-map-controls .fwmb-layer-group[data-layer-group="settlementViews"] {
     display: none;
 }
 .fwmb-settlement-stage {
@@ -5076,6 +5080,240 @@ button.fwmb-format {
 }
 .fwmb-settlement-surface .fwmb-drawline.fwmb-hidden {
     display: none;
+}
+
+/* Households and supply (step 3; boards L6, L6b): the outline's own canvas over the pictures, the
+   line naming the house pointed at, the households card beside its house (a sheet on touch), and
+   the household views' legend */
+.fwmb-settlement-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+/* At the canvas's top centre: the map's own title is drawn at its top start, Undo and Redo at its end */
+.fwmb-household-readout {
+    position: absolute;
+    top: 0.625rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    max-width: calc(100% - 18rem);
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    background: var(--fwmb-overlay-bg, rgba(11, 10, 7, 0.86));
+    color: var(--fwmb-overlay-text, #f3f2ef);
+    font: 400 0.75rem/1rem var(--fwmb-font-ui);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.fwmb-household-card {
+    position: absolute;
+    z-index: 3;
+    width: 20.625rem;
+    max-width: calc(100% - 1.5rem);
+    max-height: calc(100% - 1.5rem);
+    display: flex;
+    flex-direction: column;
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: 10px;
+    box-shadow: var(--fwmb-shadow-popout);
+    color: var(--fwmb-text-secondary);
+    font: 400 0.75rem/1.0625rem var(--fwmb-font-ui);
+    overflow: hidden;
+}
+/* A card that follows the pointer never takes it from the canvas */
+.fwmb-household-card:not(.fwmb-is-kept) {
+    pointer-events: none;
+}
+.fwmb-household-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    background: var(--fwmb-bg-raised);
+    border-bottom: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-primary);
+    font: 600 0.8125rem/1.125rem var(--fwmb-font-display);
+}
+.fwmb-household-head .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-household-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: inherit;
+}
+.fwmb-household-wealth {
+    flex: none;
+    padding: 1px 0.375rem;
+    border-radius: 3px;
+    background: var(--fwmb-badge-bg);
+    color: var(--fwmb-badge-text);
+    font: 400 0.6875rem/0.875rem var(--fwmb-font-ui);
+}
+.fwmb-household-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.5rem 0.625rem;
+    overflow-y: auto;
+}
+.fwmb .fwmb-household-body p {
+    margin: 0;
+}
+.fwmb-household-body b {
+    color: var(--fwmb-text-primary);
+}
+.fwmb-household-group {
+    margin-top: 0.125rem;
+    color: var(--fwmb-text-muted);
+    font: 700 0.625rem/0.875rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.fwmb .fwmb-household-body ul {
+    margin: 0;
+    padding-inline-start: 1rem;
+    color: var(--fwmb-text-primary);
+}
+.fwmb-household-own {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-household-foot {
+    padding: 0.375rem 0.625rem;
+    border-top: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-muted);
+    font-size: 0.6875rem;
+}
+/* On touch, a sheet from the canvas's foot, stopping above the map controls along it */
+.fwmb-household-card--sheet {
+    inset: auto 0.625rem 3.75rem;
+    width: auto;
+    max-width: none;
+    max-height: calc(100% - 5rem);
+    border-radius: 14px;
+}
+.fwmb-household-card--sheet .fwmb-household-head .fwmb-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+}
+/* Under Undo and Redo at the canvas's top end: the scale bar and north arrow are drawn along its foot */
+.fwmb-settlement-legend {
+    position: absolute;
+    top: 3.25rem;
+    inset-inline-end: 0.625rem;
+    z-index: 2;
+    max-width: min(18rem, calc(100% - 1.25rem));
+    padding: 0.375rem 0.5rem;
+    border-radius: 8px;
+    background: var(--fwmb-overlay-bg, rgba(11, 10, 7, 0.86));
+    color: var(--fwmb-overlay-text, #f3f2ef);
+    font: 400 0.75rem/1rem var(--fwmb-font-ui);
+}
+.fwmb-settlement-legend-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-settlement-legend-head b {
+    flex: 1;
+}
+.fwmb .fwmb-settlement-legend-fold {
+    width: 1.5rem;
+    height: 1.5rem;
+    min-width: 1.5rem;
+    color: inherit;
+}
+.fwmb-settlement-legend[data-folded] .fwmb-settlement-legend-fold .fwmb-icon {
+    transform: rotate(-90deg);
+}
+.fwmb-settlement-legend[data-folded] .fwmb-settlement-legend-keys {
+    display: none;
+}
+.fwmb .fwmb-settlement-legend-keys {
+    display: grid;
+    gap: 0.125rem 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, auto));
+    margin: 0.25rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+.fwmb-settlement-legend-keys li,
+.fwmb-share-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-width: 0;
+}
+.fwmb-settlement-legend-keys i,
+.fwmb-share-legend i {
+    width: 0.625rem;
+    height: 0.625rem;
+    min-width: 0.625rem;
+    border-radius: 2px;
+    background: var(--swatch);
+    box-shadow: 0 0 0 1px var(--fwmb-border-strong);
+}
+
+/* Households and supply's panel (board L6): its four totals, the cultures' share bar and legend,
+   and the rows of trades and supply */
+.fwmb-household-totals {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.375rem;
+}
+.fwmb-household-totals > span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.375rem 0.125rem;
+    border-radius: 6px;
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-muted);
+    font: 400 0.6875rem/0.875rem var(--fwmb-font-ui);
+    text-align: center;
+}
+.fwmb-household-totals b {
+    color: var(--fwmb-text-primary);
+    font: 600 1rem/1.25rem var(--fwmb-font-readout);
+}
+.fwmb-share-bar {
+    display: flex;
+    height: 0.625rem;
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px var(--fwmb-border-strong);
+}
+.fwmb-share-bar > span {
+    flex: 0 0 var(--share);
+    background: var(--swatch);
+}
+.fwmb-share-bar > span + span {
+    box-shadow: -1px 0 0 var(--fwmb-bg-panel);
+}
+.fwmb .fwmb-share-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--fwmb-text-secondary);
+    font-size: 0.75rem;
+}
+.fwmb-household-more > summary {
+    cursor: pointer;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-household-more[open] > summary {
+    margin-bottom: 0.25rem;
 }
 
 /* The four versions (board L2): a 2 by 2 grid of cards, each its name and radio, then its picture

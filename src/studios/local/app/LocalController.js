@@ -6,6 +6,8 @@ import { inputFrom } from "../engine/LocalInput.js";
 import { SettlementRecord } from "../data/SettlementRecord.js";
 import { OutOfDate } from "./OutOfDate.js";
 import { SettlementCanvas } from "./SettlementCanvas.js";
+import { HouseholdsView } from "./HouseholdsView.js";
+import { cultureRoofs, figuresOf, panelOf } from "./Households.js";
 import { PICTURE_LAYERS, VersionChoice, estimateMs } from "./VersionChoice.js";
 import { drawTown } from "../render/CanvasTown.js";
 import { ATLAS } from "../render/Styles.js";
@@ -43,6 +45,12 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  *   goToPin(pinId) → the Surface map, the pin in its inspector; leave() → back to the Surface map
  *   openOwner(owner, id) → the world that owns a held world's settlement map, opening it there
  *   worldName() → the open world's name, for the deletion's confirmation
+ *   cultureColours() → each of the world's cultures' colours, by name (the households' views)
+ *
+ * Households and supply (step 3): the version shown keeps its households (sent back once at
+ * Keep); Explore's tool shows its figures (Households.js), the card over its canvas
+ * (HouseholdsView), and the map controls' Thematic views colour its houses (`setView`, for the
+ * session: a settlement map opens with none, Ken 2026-11-24).
  */
 export class LocalController {
     /** "choosing", "building", "open", or null. */
@@ -91,6 +99,10 @@ export class LocalController {
     #history = new Map();
     /** The world that owns the open settlement map when it is not this one's (a held world's parent's): { worldId, name }. */
     #owner = null;
+    /** The household view shown (Styles.js HOUSEHOLD_VIEWS), or null. */
+    #view = null;
+    /** Who lives where over the canvas (HouseholdsView), once the shown version's households are in. */
+    #people = null;
 
     /** The engine's input from a source (LocalInput.inputFrom; a stand-in in tests). */
     #inputFrom;
@@ -314,12 +326,12 @@ export class LocalController {
                 this.#workersNow().release([versionId]).catch(() => {});
                 return false;
             }
-            await this.#workersNow().keep(versionId);
+            const kept = await this.#workersNow().keep(versionId);
             if (!current()) {
                 this.#workersNow().release([versionId]).catch(() => {});
                 return false;
             }
-            this.#remember(record.id, { versionId, key, result });
+            this.#remember(record.id, { versionId, key, result, kept });
             this.#shown = this.#built.get(record.id);
             this.mode = "open";
             this.#building = null;
@@ -568,7 +580,7 @@ export class LocalController {
         return {
             panel: {
                 title: choosing ? i18n.localize("FILRODENSWMB.UI.MakeSettlementMap") : i18n.localize(entry?.label ?? ""),
-                lede: choosing ? i18n.format("FILRODENSWMB.UI.LedeMakeSettlementMap", { name }) : entry?.lede ? i18n.localize(entry.lede) : null,
+                lede: choosing ? i18n.format("FILRODENSWMB.UI.LedeMakeSettlementMap", { name }) : entry?.lede ? i18n.format(entry.lede, { name }) : null,
                 notice: this.#notice(),
                 tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
                 meta,
@@ -578,8 +590,31 @@ export class LocalController {
             toolPartial: `${TEMPLATES}tools-${this.tool}.hbs`,
             panelFootPartial: choosing ? `${TEMPLATES}tools-mapSetup-foot.hbs` : null,
             panelHeadPartial: null,
-            local: this.#mapSetupContext(),
+            local: { ...this.#mapSetupContext(), households: this.tool === "households" ? this.#householdsContext() : null },
         };
+    }
+
+    /**
+     * Households and supply's panel (board L6): the figures of the version shown, worked out once;
+     * while its households are still being worked out, a line saying so.
+     */
+    #householdsContext() {
+        const shown = this.#shown;
+        if (!shown?.kept) return { working: true };
+        if (!shown.panel) {
+            const { i18n } = platform;
+            const t = { lang: i18n.lang, localize: (key) => i18n.localize(key), format: (key, data) => i18n.format(key, data) };
+            const input = this.#record?.input ?? this.#input();
+            const roofs = this.#roofsOf(shown);
+            shown.panel = panelOf(t, figuresOf(shown.kept.households, { supply: input?.supply ?? null, land: shown.kept.land }), { colours: Object.fromEntries(Object.entries(roofs).map(([name, style]) => [name, style.roof])) });
+        }
+        return shown.panel;
+    }
+
+    /** Each culture's roof for the Culture view (and the panel's and legend's colours): the world's colours, kept with the version. */
+    #roofsOf(shown) {
+        shown.roofs ??= cultureRoofs(shown.kept?.households, this.#host.cultureColours?.() ?? {});
+        return shown.roofs;
     }
 
     /**
@@ -660,21 +695,67 @@ export class LocalController {
         const shown = i18n.format("FILRODENSWMB.UI.SettlementSize", { width: size(width), height: size(height) });
         const ratio = globalThis.devicePixelRatio || 1;
         const detail = Math.max(FILRODENSWMB.LOCAL.CANVAS.FINEST_M, view.mPerPx / ratio);
+        // Households and supply (board L6): how to read a household, and the view shown
+        const pointing = this.tool === "households" && !!this.#people;
+        const viewName = this.#view ? i18n.format("FILRODENSWMB.UI.HouseholdsViewShown", { view: i18n.localize(`FILRODENSWMB.UI.SettlementView.${this.#view}`) }) : null;
         return {
-            lead: this.#framing === "town" ? i18n.format("FILRODENSWMB.UI.SettlementViewingTown", { size: shown }) : i18n.format("FILRODENSWMB.UI.SettlementViewing", { size: shown }),
-            hint: i18n.format("FILRODENSWMB.UI.SettlementDetail", { m: detail.toLocaleString(i18n.lang, { maximumFractionDigits: 1 }) }),
+            lead: pointing ? i18n.localize("FILRODENSWMB.UI.HouseholdsPoint") : this.#framing === "town" ? i18n.format("FILRODENSWMB.UI.SettlementViewingTown", { size: shown }) : i18n.format("FILRODENSWMB.UI.SettlementViewing", { size: shown }),
+            hint: viewName ?? i18n.format("FILRODENSWMB.UI.SettlementDetail", { m: detail.toLocaleString(i18n.lang, { maximumFractionDigits: 1 }) }),
             back: this.#alone ? i18n.localize("FILRODENSWMB.UI.BackToVersions") : null,
         };
     }
 
     // ------------------------------------------------------------------ actions
 
-    /** Changes the rail's tool (only Map setup is built in step 2a). */
+    /** Changes the rail's tool (Export is built in step 5); the households card opens only in Households and supply. */
     changeTool(tool) {
         if (!this.#definition.offers(tool, "settlement") || this.#definition.tool(tool)?.later) return false;
         this.tool = tool;
-        this.#host.render(["toolbar", "context"]);
+        if (this.#people) this.#people.enabled = tool === "households";
+        this.#host.render(["toolbar", "context", "editToolbar"]);
         return true;
+    }
+
+    /** The household view shown, or null. */
+    get view() {
+        return this.#view;
+    }
+
+    /**
+     * Shows a household view on the canvas ("none" for none): each house in its household's
+     * colour, drawn in the worker as every tile is; kept for the session.
+     * @param {string} id - One of Styles.js HOUSEHOLD_VIEWS, or "none".
+     */
+    async setView(id) {
+        const view = id === "none" || !id ? null : id;
+        if (view && !this.#shown?.kept) return false;
+        if (view === this.#view) return false;
+        this.#view = view;
+        this.#people?.showLegend(view);
+        this.#syncViews();
+        this.#host.render(["editToolbar"]);
+        await this.#canvas?.setVariant(view);
+        return true;
+    }
+
+    /**
+     * The map controls' Thematic views (map.hbs, its settlementViews group): the view shown
+     * checked and named on the button; the views off, with their note, until the households of
+     * the version shown are in.
+     */
+    #syncViews() {
+        const group = this.#container?.querySelector('[data-layer-group="settlementViews"]');
+        if (!group) return;
+        const { i18n } = platform;
+        const ready = !!this.#shown?.kept;
+        for (const row of group.querySelectorAll('[data-local="setView"]')) {
+            const id = row.dataset.view;
+            row.setAttribute("aria-checked", String((id === "none" ? null : id) === this.#view));
+            if (id !== "none") row.setAttribute("aria-disabled", String(!ready));
+        }
+        group.querySelector("[data-settlement-views-note]")?.classList.toggle("fwmb-hidden", ready);
+        const name = group.querySelector("[data-settlement-view-name]");
+        if (name) name.textContent = i18n.localize(this.#view ? `FILRODENSWMB.UI.SettlementView.${this.#view}` : "FILRODENSWMB.UI.SettlementViews");
     }
 
     /**
@@ -705,6 +786,8 @@ export class LocalController {
                 return this.#record ? this.deleteMap(this.#record.id) : undefined;
             case "openInOwner":
                 return this.openInOwner();
+            case "setView":
+                return this.setView(target.dataset.view);
             default:
                 return undefined;
         }
@@ -750,6 +833,9 @@ export class LocalController {
 
     /** Ends the choice (its versions released) and the canvas, before something else is shown. */
     #leaveCurrent() {
+        this.#people?.destroy();
+        this.#people = null;
+        this.#view = null;
         this.#choice?.destroy();
         this.#choice = null;
         this.#alone = null;
@@ -807,13 +893,14 @@ export class LocalController {
         this.#building = { startedAt: performance.now(), population: record.input.population, keeping: true };
         this.#drawStage();
         this.#host.changed();
+        let kept = null;
         try {
-            await this.#workersNow().keep(slot.id);
+            kept = await this.#workersNow().keep(slot.id);
         } catch (error) {
             console.error("FWMB | A settlement's households could not be worked out:", error);
         }
         if (this.#record !== record) return;
-        this.#remember(record.id, { versionId: slot.id, key: JSON.stringify(record.input), result: slot.result });
+        this.#remember(record.id, { versionId: slot.id, key: JSON.stringify(record.input), result: slot.result, kept });
         this.#shown = this.#built.get(record.id);
         this.mode = "open";
         this.#building = null;
@@ -851,19 +938,40 @@ export class LocalController {
         const surface = this.#stage?.querySelector(".fwmb-settlement-surface");
         if (!shown?.result || !surface) return;
         this.#canvas?.destroy();
+        this.#people?.destroy();
+        this.#people = null;
         const { result, versionId } = shown;
+        // A household view needs the version's households: none on a version opened alone from the choice
+        if (!shown.kept) this.#view = null;
         this.#canvas = new SettlementCanvas(surface, {
             frame: result.frame,
             label: platform.i18n.format("FILRODENSWMB.UI.SettlementCanvasLabel", { name: this.#settlementName() }),
-            draw: (view) => this.#workersNow().tile(versionId, view, { style: { name: "atlas" }, layers: PICTURE_LAYERS }),
+            variant: this.#view,
+            draw: (view, variant) => this.#workersNow().tile(versionId, view, { style: { name: "atlas" }, layers: PICTURE_LAYERS, theme: variant ?? null, cultures: variant === "culture" ? this.#roofsOf(shown) : {} }),
             // The map's own title, scale bar and north arrow, once over the tiles: the renderer's
             // labels layer, from what the build said of the settlement (the pin's name as it is now)
             decorate: (ctx, view) => this.#decorate(ctx, view, shown),
+            // The outline of the house whose household is shown, and pointing at houses (step 3)
+            overlay: (ctx, toCanvas) => this.#people?.drawOutline(ctx, toCanvas),
+            onPoint: (point) => this.#people?.point(point),
+            onTap: (point) => this.#people?.tap(point),
             onView: ({ moved }) => {
                 if (moved) this.#framing = null;
+                this.#people?.moved(moved);
                 this.#lineLater();
             },
         });
+        if (shown.kept) {
+            this.#people = new HouseholdsView(surface, {
+                canvas: () => this.#canvas,
+                kept: shown.kept,
+                place: { name: this.#settlementName(), kind: result.kind, walled: !!result.label?.wall, cave: false },
+                colours: Object.fromEntries(Object.entries(this.#roofsOf(shown)).map(([name, style]) => [name, style.roof])),
+            });
+            this.#people.enabled = this.tool === "households";
+            this.#people.showLegend(this.#view);
+        }
+        this.#syncViews();
         this.#canvas.show(result.townView.rect, { home: true });
         this.#framing = "town";
         await this.#canvas.drawCoarse().catch((error) => console.warn("FWMB | The settlement's picture could not be drawn:", error));
@@ -989,6 +1097,7 @@ export class LocalController {
             }
         }
         this.#updateCards();
+        this.#syncViews();
     }
 
     #versionsElement() {

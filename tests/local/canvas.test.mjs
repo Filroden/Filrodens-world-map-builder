@@ -120,3 +120,58 @@ test("its pictures are clipped to the frame: a tile at its edge runs past it", a
     }
 });
 
+
+test("each view of the drawing keeps its own pictures: going back to a view seen asks for nothing again (step 3)", async () => {
+    const { element } = host(1200, 900);
+    const asked = [];
+    const canvas = new SettlementCanvas(element, { frame: FRAME, draw: async (view, variant) => (asked.push(variant ?? "none"), {}) });
+    try {
+        canvas.show(TOWN, { home: true });
+        await canvas.drawCoarse();
+        await frames(20);
+        const plain = asked.length;
+        assert.ok(plain > 1, "the coarse picture and the town view's tiles");
+        await canvas.setVariant("wealth");
+        await frames(20);
+        const wealth = asked.filter((v) => v === "wealth").length;
+        assert.equal(wealth, plain, "the view's own coarse picture and tiles");
+        await canvas.setVariant(null);
+        await canvas.setVariant("wealth");
+        await frames(20);
+        assert.equal(asked.length, plain * 2, "nothing drawn again for a view already seen");
+        assert.equal(canvas.variant, "wealth");
+        // Drawn again (Generate again): every view's pictures go
+        canvas.clear();
+        await frames(20);
+        assert.ok(asked.length > plain * 2);
+    } finally {
+        canvas.destroy();
+    }
+});
+
+test("pointing: a mouse over it with no button down, and a press let go where it went down, are told to its owner (step 3)", async () => {
+    const { element } = host(1200, 900);
+    const points = [];
+    const taps = [];
+    const canvas = new SettlementCanvas(element, { frame: FRAME, draw: async () => ({}), onPoint: (p) => points.push(p), onTap: (p) => taps.push(p) });
+    try {
+        canvas.show(TOWN, { home: true });
+        const el = canvas.element;
+        el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1200, bottom: 900, width: 1200, height: 900 });
+        const fire = (type, x, y, extra = {}) => el.dispatchEvent(new window.PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", bubbles: true, ...extra }));
+        fire("pointermove", 600, 450);
+        assert.equal(points.length, 1);
+        assert.ok(Math.abs(points[0].x) < 1 && Math.abs(points[0].y) < 1, "the canvas's centre is the view's");
+        fire("pointerdown", 600, 450);
+        fire("pointerup", 601, 451);
+        assert.equal(taps.length, 1, "a press let go where it went down is a tap");
+        fire("pointerdown", 600, 450);
+        fire("pointermove", 700, 450, { buttons: 1 });
+        fire("pointerup", 700, 450);
+        assert.equal(taps.length, 1, "a drag is no tap");
+        fire("pointerleave", 0, 0);
+        assert.equal(points.at(-1), null, "leaving is told as null");
+    } finally {
+        canvas.destroy();
+    }
+});

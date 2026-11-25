@@ -1,0 +1,56 @@
+{{!--
+    Explore's Households and supply on a settlement map (L-surface step 3; board L6), read only:
+    the settlement's totals, its cultures by their people, its trade groups by their households,
+    and its supply in a normal year. Pointing at a house on the canvas opens its household's card
+    (HouseholdsView). Context: local.households (LocalController's, from Households.js panelOf),
+    or {working} while the households are still being worked out.
+--}}
+{{#if local.households.working}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HouseholdsWorking"}}</p>
+{{else}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="householdsTotals" title="FILRODENSWMB.UI.SectionHouseholdsTotals"}}
+    <div class="fwmb-household-totals">
+        {{#each local.households.totals}}<span><b>{{this.value}}</b>{{this.label}}</span>{{/each}}
+    </div>
+    {{#if local.households.country}}<p class="fwmb-hint">{{local.households.country}}</p>{{/if}}
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="householdsCultures" title="FILRODENSWMB.UI.SectionHouseholdsCultures"}}
+    {{#unless local.households.oneCulture}}
+    <div class="fwmb-share-bar" aria-hidden="true">{{#each local.households.cultures}}<span style="--share: {{this.width}}%; --swatch: {{this.colour}}"></span>{{/each}}</div>
+    {{/unless}}
+    <ul class="fwmb-share-legend">
+        {{#each local.households.cultures}}<li><i style="--swatch: {{this.colour}}"></i>{{this.label}}</li>{{/each}}
+    </ul>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="householdsTrades" title="FILRODENSWMB.UI.SectionHouseholdsTrades"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HouseholdsTradesHint"}}</p>
+    <dl class="fwmb-generate-results fwmb-household-rows">
+        {{#each local.households.groups}}<dt>{{this.label}}</dt><dd>{{this.count}}</dd>{{/each}}
+    </dl>
+    {{#if local.households.more}}
+    <details class="fwmb-household-more">
+        <summary>{{local.households.more}}</summary>
+        <dl class="fwmb-generate-results fwmb-household-rows">
+            {{#each local.households.moreGroups}}<dt>{{this.label}}</dt><dd>{{this.count}}</dd>{{/each}}
+        </dl>
+    </details>
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{#if local.households.supply}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="householdsSupply" title="FILRODENSWMB.UI.SectionHouseholdsSupply"}}
+    {{#if local.households.supply.standIn}}
+    <div class="fwmb-goto fwmb-settlement-standin" role="note">
+        <p><b>{{localize "FILRODENSWMB.UI.SettlementStandInTitle"}}</b> {{localize "FILRODENSWMB.UI.SettlementStandIn" map=local.mapName}}</p>
+    </div>
+    {{/if}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SupplyHint"}}</p>
+    <dl class="fwmb-generate-results fwmb-household-rows">
+        {{#each local.households.supply.rows}}<dt>{{this.label}}</dt><dd>{{this.value}}</dd>{{/each}}
+    </dl>
+    {{#if local.households.supply.clipped}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SupplyClipped"}}</p>{{/if}}
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
+{{/if}}

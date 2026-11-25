@@ -6,7 +6,7 @@
 // Plain JavaScript over a CanvasRenderingContext2D (or anything with its path and fill calls): no
 // DOM, no Node. A view is a rectangle of the frame (metres from its centre) and a resolution; the
 // drawing works in metres under the view's transform, so widths and sizes are in metres too.
-import { ATLAS, CULTURE_DEFAULT, HEIGHTS, mix, rgba, shade } from "./Styles.js";
+import { ATLAS, CULTURE_DEFAULT, HEIGHTS, HOUSEHOLD_VIEWS, mix, mutedRoof, rgba, shade, viewColour } from "./Styles.js";
 
 /** The layers, in the order they are drawn. */
 export const LAYERS = Object.freeze(["ground", "fields", "trees", "built", "water", "ways", "grounds", "shadows", "buildings", "walls", "landmarks", "labels"]);
@@ -16,7 +16,8 @@ export const LAYERS = Object.freeze(["ground", "fields", "trees", "built", "wate
  * @param view {rect: [x0, y0, x1, y1], mPerPx, widthPx, heightPx, title?: boolean}
  * @param style a style object (Styles.js)
  * @param options {cultures: {[name]: {roof, wall, wallMaterial}}, theme: null (the base appearance:
- *     roofs by their material) or "culture" (roofs and walls in each culture's colours), layers:
+ *     roofs by their material) or a household view (Styles.js HOUSEHOLD_VIEWS: each home's roof in
+ *     its household's colour, every other roof muted; "culture" colours the walls too), layers:
  *     names to draw, now: () => ms}
  * @returns the milliseconds each layer took
  */
@@ -1389,20 +1390,20 @@ function heightOf(b) {
 function roofColour(D, b) {
     const { style, town, cultures, theme } = D;
     let base;
-    if (b.kind === "barn") base = style.barn;
+    if (HOUSEHOLD_VIEWS.includes(theme)) {
+        // A household view: a home and its own ranges in its household's colour, the rest muted
+        const home = b.kind === "house" || b.kind === "farmhouse" ? b : b.kind === "range" && Number.isInteger(b.house) ? town.buildings[b.house] : null;
+        const own = viewColour(theme, home, cultures);
+        base = own ? (b.kind === "range" ? shade(own, -0.06) : own) : (D.muted ??= mutedRoof(style));
+    } else if (b.kind === "barn") base = style.barn;
     else if (b.kind === "warehouse") base = style.warehouse;
     else {
         // Outbuildings (ranges, workshops, stables, sheds) a shade lighter; inns and halls a shade
         // deeper, so they read as larger buildings of the same town
         const lesser = b.kind === "range" || b.kind === "workshop" || b.kind === "stable" || b.kind === "shed";
-        // The culture view (a thematic view, not the base appearance: Ken, 2026-11-17) colours each
-        // roof by its household's culture
-        const culture = theme === "culture" ? b.culture ?? (b.kind === "range" && Number.isInteger(b.house) ? town.buildings[b.house]?.culture : null) : null;
-        const own = culture ? cultures[culture]?.roof : null;
-        // Otherwise by what the roof is made of: straw, tile or slate (engine/town/roofs.mjs)
+        // By what the roof is made of: straw, tile or slate (engine/town/roofs.mjs)
         const material = b.roof === "thatch" ? style.thatch : b.roof === "slate" ? style.slate : null;
-        if (own) base = lesser ? shade(own, -0.06) : own;
-        else if (material) base = b.estate ? shade(material, -0.08) : lesser ? shade(material, -0.06) : material;
+        if (material) base = b.estate ? shade(material, -0.08) : lesser ? shade(material, -0.06) : material;
         else base = b.estate ? style.grandRoof : lesser ? style.rangeRoof : style.roof;
         if (b.kind === "inn" || b.kind === "hall") base = shade(base, -0.1);
     }

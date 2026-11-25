@@ -58,7 +58,11 @@ export function namerFor(input) {
     return createNamer({ cultures: input.cultures ?? [], nearby: (input.neighbours ?? []).map((n) => n.name) });
 }
 
-/** Each house and farmhouse marked with its household's culture, wealth and trade group, which the drawing reads (yards, gardens and the Culture view). */
+/**
+ * Each house and farmhouse marked with what the drawing reads of its household: its culture,
+ * wealth and trade group (yards, gardens and the household views), its people and its head's age
+ * (the People per house and Age of the head views).
+ */
 function markBuildings(town, households) {
     for (const h of [...households.houses, ...households.farms]) {
         const building = town.buildings[h.index];
@@ -66,7 +70,32 @@ function markBuildings(town, households) {
         building.culture = h.culture;
         building.wealth = h.wealth;
         building.group = h.group;
+        building.people = h.members.length;
+        building.headAge = h.members[0]?.age ?? null;
     }
+}
+
+/**
+ * The homes' footprints, in the households' order (the houses, then the farmhouses), for pointing
+ * at a house on the main thread: every point of every footprint in one array, in metres from the
+ * frame's centre, and where each home's points start (one more than the homes, the last the end).
+ */
+export function footprintsOf(town, households) {
+    const homes = [...households.houses, ...households.farms];
+    let count = 0;
+    for (const h of homes) count += town.buildings[h.index]?.poly.length ?? 0;
+    const points = new Float32Array(count * 2);
+    const offsets = new Uint32Array(homes.length + 1);
+    let at = 0;
+    homes.forEach((h, k) => {
+        offsets[k] = at / 2;
+        for (const [x, y] of town.buildings[h.index]?.poly ?? []) {
+            points[at++] = x;
+            points[at++] = y;
+        }
+    });
+    offsets[homes.length] = at / 2;
+    return { points, offsets };
 }
 
 /**
@@ -159,8 +188,9 @@ export const TASKS = {
 
     /**
      * The version kept: its households worked out (named by its cultures), its houses marked for
-     * the drawing, and its households copied back once, with its town where it is asked for (a
-     * thread that cannot draw it; the town is tens of MB, most of it its terrain).
+     * the drawing, and its households copied back once with the homes' footprints (moved, not
+     * copied) and the land the frame holds; with its town where it is asked for (a thread that
+     * cannot draw it; the town is tens of MB, most of it its terrain).
      */
     keep({ id, town = true }) {
         const version = versionOf(id);
@@ -170,9 +200,10 @@ export const TASKS = {
             version.households = householdsOf(version.town, { cultures: householdCultures(version.input, namer), namer });
             markBuildings(version.town, version.households);
         }
-        const value = { id, households: plain(version.households), ms: now() - started };
+        const homes = footprintsOf(version.town, version.households);
+        const value = { id, households: plain(version.households), homes, land: plain(version.town.land ?? null), ms: now() - started };
         if (town) value.town = plain(version.town);
-        return { value };
+        return { value, transfer: [homes.points.buffer, homes.offsets.buffer] };
     },
 
     /**

@@ -198,6 +198,27 @@
                         {{> "modules/filrodens-world-map-builder/templates/world/parts/thematic-menu.hbs" thematic=thematic}}
                     </div>
                 </div>
+
+                {{!-- A settlement map's Thematic views (L-surface step 3, board L6): each house in its
+                     household's colour. Shown only while a settlement map is open, in place of the
+                     three above (fwmb-is-settlement); its state is the Local studio's
+                     (LocalController.#syncViews), the view named on the button. --}}
+                <div class="fwmb-layer-group" data-layer-group="settlementViews">
+                    <button type="button" class="fwmb-map-menu" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.SettlementViews'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementViewsHint'}}">
+                        <span class="fwmb-icon fwmb-icon--gradient" aria-hidden="true"></span><span class="fwmb-map-menu-label" data-settlement-view-name>{{localize "FILRODENSWMB.UI.SettlementViews"}}</span>
+                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.SettlementViews'}}">
+                        <div class="fwmb-layer-menu-label fwmb-layer-menu-note fwmb-hidden" role="presentation" data-settlement-views-note>{{localize "FILRODENSWMB.UI.SettlementViewsOff"}}</div>
+                        <button type="button" role="menuitemradio" aria-checked="true" data-action="local" data-local="setView" data-view="none">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ThematicNone"}}
+                        </button>
+                        {{#each settlementViews}}
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="local" data-local="setView" data-view="{{this.id}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                    </div>
+                </div>
             </div>
 
             <div class="fwmb-map-control-group">

@@ -19,6 +19,11 @@ import { FILRODENSWMB } from "../../../config.js";
  *   past CANVAS.LINE_DELAY_MS.
  * - **Moved by** a drag, the wheel (round the pointer), two fingers (pinch and pan), and the keys
  *   (arrows pan, + and - zoom, 0 back to the town view) while it has focus.
+ * - **Views of the drawing** (step 3: a household view, or none): each has its own coarse picture
+ *   and tiles, kept side by side, so going back to a view already seen shows at once.
+ * - **Pointing:** a mouse or pen moving over it with no button down is told to its owner (onPoint,
+ *   in metres), and a press let go where it was pressed is a tap (onTap); an overlay over the
+ *   pictures is drawn by its owner (overlay), again on redrawOverlay() and after every paint.
  *
  * Views are in metres from the frame's centre, as the engine's framings are ({rect: [x0, y0, x1,
  * y1]}). The canvas tells its owner when the view moves (onView), so the settlement bar can show
@@ -59,6 +64,17 @@ export class SettlementCanvas {
     #home = null;
     /** A framing asked for before the canvas had a size, shown once it has one. */
     #pending = null;
+    /** The view of the drawing shown (null: the map as it is); its pictures are kept apart. */
+    #variant = null;
+    /** Each view's coarse picture, by view. */
+    #coarses = new Map();
+    /** The overlay's canvas, and what draws on it: (ctx, toCanvas) => void. */
+    #overlay = null;
+    #drawOverlay = null;
+    #onPoint;
+    #onTap;
+    /** A press that may be a tap: where and when it went down. */
+    #press = null;
 
     /**
      * @param {HTMLElement} host - The element the canvas fills.
@@ -69,13 +85,26 @@ export class SettlementCanvas {
      * @param {(ctx: CanvasRenderingContext2D, view: object) => void} [options.decorate] - Draws over
      *     the tiles, given the view in canvas pixels (rect, mPerPx, widthPx, heightPx).
      * @param {string} [options.label] - The canvas's accessible name.
+     * @param {(ctx: CanvasRenderingContext2D, toCanvas: (x: number, y: number) => number[]) => void} [options.overlay] -
+     *     Draws over everything on a canvas of its own, given where a point in metres falls on it
+     *     (in its pixels).
+     * @param {(point: {x: number, y: number, px: number, py: number}|null) => void} [options.onPoint] -
+     *     A mouse or pen over the canvas with no button down (null as it leaves), in metres and in
+     *     CSS pixels from the canvas's corner.
+     * @param {(point: {x: number, y: number, px: number, py: number, touch: boolean}) => void} [options.onTap] -
+     *     A press let go where it went down.
+     * @param {*} [options.variant] - The view of the drawing shown at first (draw is given it).
      */
-    constructor(host, { frame, draw, onView = () => {}, decorate = null, label = "" }) {
+    constructor(host, { frame, draw, onView = () => {}, decorate = null, label = "", overlay = null, onPoint = () => {}, onTap = () => {}, variant = null }) {
         this.#host = host;
         this.#frame = frame;
         this.#draw = draw;
         this.#decorate = decorate;
         this.#onView = onView;
+        this.#drawOverlay = overlay;
+        this.#onPoint = onPoint;
+        this.#onTap = onTap;
+        this.#variant = variant;
         this.#canvas = host.ownerDocument.createElement("canvas");
         this.#canvas.className = "fwmb-settlement-canvas";
         this.#canvas.tabIndex = 0;
@@ -85,7 +114,10 @@ export class SettlementCanvas {
         this.#line = host.ownerDocument.createElement("span");
         this.#line.className = "fwmb-drawline fwmb-hidden";
         this.#line.setAttribute("aria-hidden", "true");
-        host.append(this.#canvas, this.#line);
+        this.#overlay = host.ownerDocument.createElement("canvas");
+        this.#overlay.className = "fwmb-settlement-overlay";
+        this.#overlay.setAttribute("aria-hidden", "true");
+        host.append(this.#canvas, this.#overlay, this.#line);
         this.#listen();
         if (typeof ResizeObserver !== "undefined") {
             this.#resize = new ResizeObserver(() => this.#fit());
@@ -106,16 +138,66 @@ export class SettlementCanvas {
         return { rect: [cx - (width * m) / 2, cy - (height * m) / 2, cx + (width * m) / 2, cy + (height * m) / 2], mPerPx: m };
     }
 
-    /** The coarse picture of the whole frame, drawn at once (see the class comment). */
+    /** The coarse picture of the whole frame for the view shown, drawn at once (see the class comment). */
     async drawCoarse() {
+        const variant = this.#variant;
         const { width, height } = this.#frame;
         const { COARSE_PX } = FILRODENSWMB.LOCAL.CANVAS;
         const mPerPx = Math.max(width, height) / COARSE_PX;
         const view = { rect: [-width / 2, -height / 2, width / 2, height / 2], mPerPx, widthPx: Math.round(width / mPerPx), heightPx: Math.round(height / mPerPx) };
-        const bitmap = await this.#draw(view);
+        const bitmap = await this.#draw(view, variant);
         if (this.#destroyed) return;
-        this.#coarse = { bitmap, rect: view.rect };
+        this.#coarses.set(variant, { bitmap, rect: view.rect });
+        if (variant === this.#variant) this.#coarse = this.#coarses.get(variant);
         this.#schedule();
+    }
+
+    /** The view of the drawing shown (see the class comment). */
+    get variant() {
+        return this.#variant;
+    }
+
+    /**
+     * Shows another view of the drawing: its pictures where they are kept, else its coarse picture
+     * drawn (the last view's stretched meanwhile) and its tiles asked for.
+     * @returns {Promise<void>} Once its coarse picture is shown.
+     */
+    async setVariant(variant) {
+        if (variant === this.#variant) return;
+        this.#variant = variant;
+        const coarse = this.#coarses.get(variant);
+        if (coarse) {
+            this.#coarse = coarse;
+            this.#schedule();
+            return;
+        }
+        this.#schedule();
+        await this.drawCoarse();
+    }
+
+    /** Where a point in metres falls on the canvas, in CSS pixels from its corner. */
+    toCss(x, y) {
+        const { rect, mPerPx } = this.view;
+        return [(x - rect[0]) / mPerPx, (y - rect[1]) / mPerPx];
+    }
+
+    /** The point in metres at a place on the canvas, in CSS pixels from its corner. */
+    fromCss(px, py) {
+        const { rect, mPerPx } = this.view;
+        return [rect[0] + px * mPerPx, rect[1] + py * mPerPx];
+    }
+
+    /** Draws the overlay again (its owner's picture changed). */
+    redrawOverlay() {
+        if (this.#destroyed || !this.#sized()) return;
+        const ctx = this.#overlay.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.#overlay.width, this.#overlay.height);
+        if (!this.#drawOverlay) return;
+        const ratio = this.#overlay.width / Math.max(1, this.#size().width);
+        ctx.save();
+        this.#drawOverlay(ctx, (x, y) => this.toCss(x, y).map((v) => v * ratio));
+        ctx.restore();
     }
 
     /**
@@ -164,6 +246,7 @@ export class SettlementCanvas {
         this.#tiles.clear();
         this.#asked.clear();
         this.#coarse = null;
+        this.#coarses.clear();
         this.#schedule();
     }
 
@@ -172,8 +255,10 @@ export class SettlementCanvas {
         this.#resize?.disconnect();
         if (this.#frameRequest !== null) cancelAnimationFrame(this.#frameRequest);
         this.#canvas.remove();
+        this.#overlay.remove();
         this.#line.remove();
         this.#tiles.clear();
+        this.#coarses.clear();
     }
 
     // ------------------------------------------------------------------ the view
@@ -222,6 +307,10 @@ export class SettlementCanvas {
         this.#canvas.height = Math.max(1, Math.round(height * ratio));
         this.#canvas.style.width = `${width}px`;
         this.#canvas.style.height = `${height}px`;
+        this.#overlay.width = this.#canvas.width;
+        this.#overlay.height = this.#canvas.height;
+        this.#overlay.style.width = `${width}px`;
+        this.#overlay.style.height = `${height}px`;
         if (this.#pending) {
             this.show(this.#pending);
             return;
@@ -269,8 +358,8 @@ export class SettlementCanvas {
         ctx.clip();
         if (this.#coarse) ctx.drawImage(this.#coarse.bitmap, ...place(...this.#coarse.rect));
         const want = this.#levelFor(mPerPx / ratio);
-        // The tiles held, coarse to fine, so the sharpest of what is held lies on top
-        const held = [...this.#tiles.values()].filter((tile) => tile.level >= want && this.#overlaps(tile, rect)).sort((a, b) => b.level - a.level);
+        // The view's tiles held, coarse to fine, so the sharpest of what is held lies on top
+        const held = [...this.#tiles.values()].filter((tile) => tile.variant === this.#variant && tile.level >= want && this.#overlaps(tile, rect)).sort((a, b) => b.level - a.level);
         for (const tile of held) ctx.drawImage(tile.bitmap, ...place(...tile.rect));
         ctx.restore();
         // The map's own title, scale bar and north arrow, once over the whole view
@@ -285,6 +374,7 @@ export class SettlementCanvas {
         const missing = sharper ? this.#visibleTiles(want, rect).filter((tile) => !this.#tiles.has(tile.key)) : [];
         this.#showLine(missing.length > 0);
         this.#ask(missing);
+        this.redrawOverlay();
     }
 
     /** The frame's rectangle in metres, round the centre. */
@@ -318,7 +408,7 @@ export class SettlementCanvas {
             for (let x = x0; x < x1; x++) {
                 const tileRect = [x * side - halfW, y * side - halfH, (x + 1) * side - halfW, (y + 1) * side - halfH];
                 const d = Math.hypot((tileRect[0] + tileRect[2]) / 2 - cx, (tileRect[1] + tileRect[3]) / 2 - cy);
-                tiles.push({ key: `${level}:${x}:${y}`, level, x, y, rect: tileRect, d });
+                tiles.push({ key: `${this.#variant ?? ""}:${level}:${x}:${y}`, level, x, y, rect: tileRect, d, variant: this.#variant });
             }
         }
         return tiles.sort((a, b) => a.d - b.d);
@@ -334,7 +424,7 @@ export class SettlementCanvas {
             this.#drawing++;
             const side = FILRODENSWMB.LOCAL.TILE_PX;
             const view = { rect: tile.rect, mPerPx: (tile.rect[2] - tile.rect[0]) / side, widthPx: side, heightPx: side };
-            this.#draw(view)
+            this.#draw(view, tile.variant)
                 .then((bitmap) => {
                     if (this.#destroyed) return;
                     this.#keep(tile, bitmap);
@@ -353,7 +443,7 @@ export class SettlementCanvas {
     /** Keeps a tile, dropping the oldest past CANVAS.KEEP_TILES. */
     #keep(tile, bitmap) {
         this.#tiles.delete(tile.key);
-        this.#tiles.set(tile.key, { key: tile.key, level: tile.level, rect: tile.rect, bitmap });
+        this.#tiles.set(tile.key, { key: tile.key, level: tile.level, rect: tile.rect, variant: tile.variant, bitmap });
         const { KEEP_TILES } = FILRODENSWMB.LOCAL.CANVAS;
         while (this.#tiles.size > KEEP_TILES) {
             const [oldest, entry] = this.#tiles.entries().next().value;
@@ -381,13 +471,31 @@ export class SettlementCanvas {
 
     #listen() {
         const canvas = this.#canvas;
+        const at = (event) => {
+            const box = canvas.getBoundingClientRect();
+            const px = event.clientX - box.left;
+            const py = event.clientY - box.top;
+            const [x, y] = this.fromCss(px, py);
+            return { x, y, px, py };
+        };
         canvas.addEventListener("pointerdown", (event) => {
-            canvas.setPointerCapture?.(event.pointerId);
+            // A pointer already let go (or one the browser does not track) cannot be captured
+            try {
+                canvas.setPointerCapture?.(event.pointerId);
+            } catch {
+                // the drag is still followed while the pointer stays over the canvas
+            }
             this.#pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            this.#press = this.#pointers.size === 1 ? { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now() } : null;
         });
         canvas.addEventListener("pointermove", (event) => {
             const last = this.#pointers.get(event.pointerId);
-            if (!last) return;
+            if (!last) {
+                if (event.pointerType !== "touch" && !event.buttons) this.#onPoint(at(event));
+                return;
+            }
+            const { TAP_PX } = FILRODENSWMB.LOCAL.CANVAS;
+            if (this.#press && Math.hypot(event.clientX - this.#press.x, event.clientY - this.#press.y) > TAP_PX) this.#press = null;
             const now = { x: event.clientX, y: event.clientY };
             if (this.#pointers.size === 1) {
                 this.pan(now.x - last.x, now.y - last.y);
@@ -406,8 +514,22 @@ export class SettlementCanvas {
         const up = (event) => {
             this.#pointers.delete(event.pointerId);
         };
-        canvas.addEventListener("pointerup", up);
-        canvas.addEventListener("pointercancel", up);
+        canvas.addEventListener("pointerup", (event) => {
+            const press = this.#press;
+            this.#press = null;
+            up(event);
+            const { TAP_PX, TAP_MS } = FILRODENSWMB.LOCAL.CANVAS;
+            if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) <= TAP_PX && performance.now() - press.at <= TAP_MS) {
+                this.#onTap({ ...at(event), touch: event.pointerType === "touch" });
+            }
+        });
+        canvas.addEventListener("pointercancel", (event) => {
+            this.#press = null;
+            up(event);
+        });
+        canvas.addEventListener("pointerleave", (event) => {
+            if (event.pointerType !== "touch") this.#onPoint(null);
+        });
         canvas.addEventListener(
             "wheel",
             (event) => {

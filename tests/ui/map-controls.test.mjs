@@ -65,12 +65,13 @@ const showRow = (root, id) => root.querySelector(`[data-action="openShowPart"][d
 const showPanel = (root, id) => root.querySelector(`[data-show-panel="${id}"]`);
 const menuButton = (root, id) => root.querySelector(`.fwmb-layer-group[data-layer-group="${id}"] > [data-action="toggleLayerMenu"]`);
 
-test("the map controls are three labelled menus, Visibility, Show and Thematic views, then the zoom (S0 step 6b)", () => {
+test("the map controls are three labelled menus, Visibility, Show and Thematic views, then the zoom (S0 step 6b), with a settlement map's own Thematic views beside them (L-surface step 3)", () => {
     const root = drawMap();
     const controls = root.querySelector(".fwmb-map-controls");
     const menus = [...controls.querySelectorAll(".fwmb-map-menu")];
-    assert.deepEqual(menus.map((button) => button.closest(".fwmb-layer-group").dataset.layerGroup), ["visibility", "show", "thematic"]);
-    assert.deepEqual(menus.map((button) => button.querySelector(".fwmb-map-menu-label").textContent), ["FILRODENSWMB.UI.Visibility", "FILRODENSWMB.UI.ShowMenu", "FILRODENSWMB.UI.ThematicLayers"]);
+    // The settlement map's group is shown only while one is open, in the three's place (the stylesheet's fwmb-is-settlement)
+    assert.deepEqual(menus.map((button) => button.closest(".fwmb-layer-group").dataset.layerGroup), ["visibility", "show", "thematic", "settlementViews"]);
+    assert.deepEqual(menus.map((button) => button.querySelector(".fwmb-map-menu-label").textContent), ["FILRODENSWMB.UI.Visibility", "FILRODENSWMB.UI.ShowMenu", "FILRODENSWMB.UI.ThematicLayers", "FILRODENSWMB.UI.SettlementViews"]);
     assert.ok(menus.every((button) => button.getAttribute("aria-haspopup") === "menu" && button.getAttribute("aria-label")), "named while folded too");
     assert.deepEqual([...controls.querySelectorAll(".fwmb-map-btn")].map((button) => button.dataset.action), ["zoomOut", "resetZoom", "zoomIn"], "no separate toggles left");
     assert.equal(controls.querySelector(".fwmb-map-controls-wide, .fwmb-map-controls-folded, [data-layer-group=layers]"), null, "v4's Layers menu is gone");
