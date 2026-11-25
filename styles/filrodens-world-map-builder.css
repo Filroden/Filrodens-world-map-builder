@@ -5074,6 +5074,10 @@ button.fwmb-format {
 .fwmb-settlement-canvas:active {
     cursor: grabbing;
 }
+/* Over a house whose household a click opens (Households and supply): a pointer, not the grab hand */
+.fwmb-settlement-canvas.fwmb-is-over-house:not(:active) {
+    cursor: pointer;
+}
 .fwmb-settlement-canvas:focus-visible {
     outline: 2px solid var(--fwmb-border-focus);
     outline-offset: -2px;

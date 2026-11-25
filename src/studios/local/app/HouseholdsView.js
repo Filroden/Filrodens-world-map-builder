@@ -75,7 +75,16 @@ export class HouseholdsView {
     /** Whether the card opens (the tool is Households and supply); closed when it stops. */
     set enabled(on) {
         this.#enabled = !!on;
-        if (!on) this.close();
+        if (!on) {
+            this.close();
+            this.#overHouse(false);
+        }
+    }
+
+    /** The canvas's pointer: a pointer over a house, its grab hand elsewhere (set only when it changes). */
+    #overHouse(over) {
+        const element = this.#canvas()?.element;
+        if (element && element.classList.contains("fwmb-is-over-house") !== over) element.classList.toggle("fwmb-is-over-house", over);
     }
 
     get enabled() {
@@ -84,10 +93,15 @@ export class HouseholdsView {
 
     // ------------------------------------------------------------------ pointing
 
-    /** A mouse or pen over the canvas (null as it leaves). */
+    /**
+     * A mouse or pen over the canvas (null as it leaves): the pointer over a house (a click opens
+     * it, kept card or not), and the card following it unless one is kept.
+     */
     point(point) {
-        if (!this.#enabled || this.#card?.kept) return;
+        if (!this.#enabled) return;
         const k = point ? this.index.at(point.x, point.y) : -1;
+        this.#overHouse(k >= 0);
+        if (this.#card?.kept) return;
         if (k < 0) {
             if (this.#card) this.close();
             return;
@@ -344,6 +358,7 @@ export class HouseholdsView {
 
     destroy() {
         this.close();
+        this.#overHouse(false);
         this.#legend?.remove();
         this.#legend = null;
     }
