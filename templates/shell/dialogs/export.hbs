@@ -4,9 +4,11 @@
     once the area is drawn, Aspect, the map as it shows now with the area over it, how to change the
     area and its size on the ground. At the end: the drawing's progress (shown while it draws),
     Scale (the slider, the number, the ground a pixel, why one scale is recommended, the terrain
-    line or the steer to Cut regional world…), then the image: its size or Too large with the two
+    line or the steer to Cut regional world…, or the map type's own line), then the image: its size or Too large with the two
     nearest fits, Image format and quality with each format's estimated size, and File name. The
-    controller fills in every value; the template holds the parts.
+    controller fills in every value; the template holds the parts. A map type may give its own
+    presets, stops and line under the slider (a settlement map's: Town view, Hinterland view,
+    Finest).
 
     Export to scene (board X4) adds its own: the area snapped to the grid (the drawn outline dashed
     beside it, the grid over the preview), the journal and GM overlay choices under the Area, and
@@ -100,6 +102,7 @@
             <p class="fwmb-hint fwmb-export-line"><span class="fwmb-scale-rec-key" aria-hidden="true"></span><span data-export-reason></span></p>
             <p class="fwmb-hint fwmb-export-line" data-export-floor hidden></p>
             <p class="fwmb-hint fwmb-export-line" data-export-terrain hidden></p>
+            <p class="fwmb-hint fwmb-export-line" data-export-note{{#unless note}} hidden{{/unless}}>{{note}}</p>
             <div class="fwmb-export-steer" data-export-steer hidden>
                 <p class="fwmb-hint fwmb-export-line">{{localize "FILRODENSWMB.UI.ExportSteer"}}</p>
                 <div class="fwmb-goto-row"><button type="button" class="fwmb-btn fwmb-btn--go" data-export-cut>{{localize "FILRODENSWMB.UI.CutRegionalWorld"}}</button></div>

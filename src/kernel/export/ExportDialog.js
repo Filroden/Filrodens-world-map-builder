@@ -51,10 +51,25 @@ const SHORT_BELOW = 760;
  * @property {number|null} rasterPx - The terrain's own pixels across (null: no raster terrain).
  * @property {number} ceiling - The largest scale offered.
  * @property {number} tileLimit - The largest tile drawn at once.
- * @property {(side: number) => HTMLCanvasElement|null} drawPreview - The map as it shows now, its longest side `side`.
- * @property {(area: object, scale: number) => {tiles: HTMLCanvasElement[], pixels: number}} samples
+ * @property {(side: number) => HTMLCanvasElement|null|Promise<HTMLCanvasElement|null>} drawPreview - The map as it shows now, its longest side `side` (drawn now, or later).
+ * @property {(area: object, scale: number) => {tiles: HTMLCanvasElement[], pixels: number}|Promise<object>} samples
  * @property {(area: object, scale: number, options: {onTile: Function, signal: AbortSignal}) => Promise<HTMLCanvasElement|null>} [draw] - An image export's drawing.
  * @property {(() => string|null)} [cutOff] - Why a regional world cannot be cut (null when it can).
+ *
+ * A map type may give the dialogue its own parts (a settlement map, L-surface step 5); the World
+ * studio gives none of these, and the dialogue is as S0 built it:
+ * @property {Array<{id: string, label: string, what: string, area: object}>} [presets] - The Area's
+ *   presets in place of Whole map and What's on screen, the first the default: each its label, the
+ *   image line's key ("of the town view at {scale}") and its area in map pixels.
+ * @property {Array<{stop: number, label: string, minor?: boolean}>} [stops] - The slider's stops, labelled.
+ * @property {(scale: number) => string|null} [scaleName] - A scale's name in place of "2×" (Finest), or null.
+ * @property {{lengths: (width: number, height: number) => {width: string, height: string, unit: string}, pixel: (scale: number) => {distance: string, unit: string}}} [measure]
+ *   - The ground an area and a pixel cover, in the map type's own units (in place of the map's unit and km a pixel).
+ * @property {{scale: number, reason: string}} [recommended] - The scale recommended and why (in place of
+ *   the smallest names'); the scale starts there, or at the largest that fits when it does not.
+ * @property {string} [scaleNote] - A line under the slider.
+ * @property {{preset: string, aspect: string}} [settings] - The settings the preset and aspect are remembered in.
+ * @property {(choice: {preset: string, scale: number}) => string} [fileName] - The file name from the choices.
  * @property {((area: object) => void)} [cut] - Opens Cut regional world… on the area.
  * @property {((on: boolean) => void)} [hold] - Holds the studio while the export draws, and frees it.
  * @property {{type: string, size: number}} [grid] - A scene's: the map's grid type and size.
@@ -111,6 +126,7 @@ export class ExportDialog {
 
     /** The setting keys of this kind's remembered preset and aspect. */
     get #settings() {
+        if (this.#source.settings) return this.#source.settings;
         const { SETTINGS } = FILRODENSWMB.EXPORT_PNG;
         return this.#scene ? { preset: SETTINGS.PRESET_SCENE, aspect: SETTINGS.ASPECT_SCENE } : { preset: SETTINGS.PRESET_PNG, aspect: SETTINGS.ASPECT_PNG };
     }
@@ -123,25 +139,28 @@ export class ExportDialog {
     async #open() {
         const { i18n } = platform;
         const source = this.#source;
-        const { PRESETS, ASPECTS, SCALE } = FILRODENSWMB.EXPORT_PNG;
+        const { ASPECTS, SCALE } = FILRODENSWMB.EXPORT_PNG;
         const available = await ImageFormat.available();
         this.#formats = available.map((id) => ({ id, label: i18n.localize(ImageFormat.byId(id).label) }));
         this.#format = ImageFormat.remembered(source.kind, available);
-        this.#preset = this.#setting(this.#settings.preset, PRESETS);
+        this.#preset = this.#setting(this.#settings.preset, this.#presetIds());
         this.#lastPreset = this.#preset;
         this.#aspect = this.#setting(this.#settings.aspect, ASPECTS.map((aspect) => aspect.id));
         this.#setArea(this.#presetArea(this.#preset));
-        this.#recommend = ExportArea.recommend(source.smallestLabelPx, source.ceiling);
+        this.#recommend = source.recommended ? { scale: source.recommended.scale, kind: "given" } : ExportArea.recommend(source.smallestLabelPx, source.ceiling);
         this.#scale = this.#sceneScale(this.#recommend.scale);
+        // A recommendation of the map type's own starts at the largest scale that fits, when it does not
+        if (source.recommended && !this.#plan().fits && this.#plan().fitScale) this.#scale = this.#sceneScale(this.#plan().fitScale, { fit: true });
 
-        const stops = [...SCALE.STOPS.filter((stop) => stop <= source.ceiling).map((stop) => ({ stop, minor: false })), ...SCALE.MINOR.map((stop) => ({ stop, minor: true }))];
+        const stops = source.stops ?? [...SCALE.STOPS.filter((stop) => stop <= source.ceiling).map((stop) => ({ stop, label: `${stop}×` })), ...SCALE.MINOR.map((stop) => ({ stop, minor: true }))];
         const content = await platform.templates.render(TEMPLATE, {
-            presets: PRESETS.map((id) => ({ id, label: i18n.localize(PRESET_LABELS[id]) })),
+            presets: this.#presetIds().map((id) => ({ id, label: this.#presetLabel(id) })),
             aspects: ASPECTS.map(({ id }) => ({ id, label: i18n.localize(ASPECT_LABELS[id]) })),
             ratio: source.map.width / source.map.height,
             min: SCALE.MIN,
             ceiling: source.ceiling,
-            stops: stops.map(({ stop, minor }) => ({ minor, pos: this.#position(stop) * 100, label: `${stop}×` })),
+            stops: stops.map(({ stop, minor = false, label = "" }) => ({ minor, pos: this.#position(stop) * 100, label })),
+            note: source.scaleNote ?? null,
             formats: this.#formats,
             scene: this.#scene,
             snaps: this.#snaps,
@@ -191,9 +210,20 @@ export class ExportDialog {
         return allowed.includes(value) ? value : allowed[0];
     }
 
+    /** The Area's presets: the map type's own, or Whole map and What's on screen. */
+    #presetIds() {
+        return this.#source.presets?.map((preset) => preset.id) ?? FILRODENSWMB.EXPORT_PNG.PRESETS;
+    }
+
+    #presetLabel(id) {
+        const own = this.#source.presets?.find((preset) => preset.id === id);
+        return own ? own.label : platform.i18n.localize(PRESET_LABELS[id]);
+    }
+
     #presetArea(preset) {
         const { map, view } = this.#source;
-        const area = ExportArea.preset(preset, map, view);
+        const own = this.#source.presets?.find((each) => each.id === preset);
+        const area = own ? ExportArea.clip(own.area, map) : ExportArea.preset(preset, map, view);
         return ExportArea.withAspect(area, ExportArea.ratio(this.#aspect, map), map);
     }
 
@@ -244,6 +274,7 @@ export class ExportDialog {
             reason: find("[data-export-reason]"),
             floor: find("[data-export-floor]"),
             terrain: find("[data-export-terrain]"),
+            note: find("[data-export-note]"),
             steer: find("[data-export-steer]"),
             cut: find("[data-export-cut]"),
             result: find("[data-export-result]"),
@@ -269,12 +300,17 @@ export class ExportDialog {
         const parts = this.#parts;
         parts.aspect.value = this.#aspect;
 
-        // The map as it shows now, once
+        // The map as it shows now, once (drawn now, or by a worker and shown when it comes)
+        const shown = (picture) => {
+            if (picture && parts.element.isConnected) parts.preview.prepend(picture);
+        };
+        const failed = (error) => console.warn("FWMB | The export's preview could not be drawn:", error);
         try {
             const picture = this.#source.drawPreview(PREVIEW_SIDE);
-            if (picture) parts.preview.prepend(picture);
+            if (typeof picture?.then === "function") picture.then(shown, failed);
+            else shown(picture);
         } catch (error) {
-            console.warn("FWMB | The export's preview could not be drawn:", error);
+            failed(error);
         }
         this.#showGrid();
         this.#control = new AreaControl(parts.preview, {
@@ -290,7 +326,7 @@ export class ExportDialog {
         parts.aspect.addEventListener("change", () => this.#chooseAspect(parts.aspect.value));
         parts.track.addEventListener("pointerdown", this.#onTrackDown);
         parts.track.addEventListener("keydown", this.#onTrackKey);
-        parts.scaleField.addEventListener("change", () => this.#setScale(parseFloat(parts.scaleField.value.replace(",", "."))));
+        parts.scaleField.addEventListener("change", () => this.#setScale(this.#typedScale(parts.scaleField.value)));
         parts.scaleField.addEventListener("keydown", (event) => {
             if (event.key !== "Enter") return;
             // Enter takes the number typed, rather than exporting
@@ -502,7 +538,7 @@ export class ExportDialog {
     #onTrackKey = (event) => {
         const { STOPS, MIN } = FILRODENSWMB.EXPORT_PNG.SCALE;
         const ceiling = this.#source.ceiling;
-        const stops = STOPS.filter((stop) => stop <= ceiling);
+        const stops = this.#source.stops ? this.#source.stops.filter((each) => !each.minor).map((each) => each.stop) : STOPS.filter((stop) => stop <= ceiling);
         let next = null;
         if (event.key === "ArrowRight" || event.key === "ArrowUp") next = this.#nextStep(1);
         else if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = this.#nextStep(-1);
@@ -547,8 +583,23 @@ export class ExportDialog {
         return formatDistance(px * this.#source.kmPerPx);
     }
 
+    /** An area's size on the ground: "1.6 × 1.2 km" (in the map type's own units where it gives them). */
+    #ground(width, height) {
+        const own = this.#source.measure?.lengths(width, height);
+        const values = own ?? { width: this.#km(width), height: this.#km(height), unit: this.#source.unit };
+        return platform.i18n.format("FILRODENSWMB.UI.ExportAreaGround", values);
+    }
+
     #scaleText(scale = this.#scale) {
-        return `${scale.toLocaleString(undefined, { maximumFractionDigits: 2 })}×`;
+        return this.#source.scaleName?.(scale) ?? `${scale.toLocaleString(undefined, { maximumFractionDigits: 2 })}×`;
+    }
+
+    /** The scale typed: a number ("2", "1,5×"), or the name of one (Finest). NaN when neither. */
+    #typedScale(text) {
+        const typed = String(text).trim();
+        const named = this.#source.stops?.find((each) => each.label && each.label.toLowerCase() === typed.toLowerCase());
+        if (named) return named.stop;
+        return parseFloat(typed.replace(",", "."));
     }
 
     /** The scene's cell at the scale, in its pixels (null on a gridless map). */
@@ -570,12 +621,12 @@ export class ExportDialog {
         // The Area
         for (const button of parts.presets) button.setAttribute("aria-pressed", String(button.dataset.exportPreset === this.#preset));
         parts.drawn.hidden = this.#preset !== "drawn";
-        const ground = i18n.format("FILRODENSWMB.UI.ExportAreaGround", { width: this.#km(this.#area.width), height: this.#km(this.#area.height), unit: source.unit });
+        const ground = this.#ground(this.#area.width, this.#area.height);
         if (this.#snaps) {
             parts.areaRead.textContent = i18n.format("FILRODENSWMB.UI.ExportAreaMapPixels", { width: number(Math.round(this.#area.width)), height: number(Math.round(this.#area.height)) });
             this.#control.setLabel(this.#cells ? i18n.format("FILRODENSWMB.UI.ExportSnappedCells", { across: this.#cells.across, down: this.#cells.down }) : ground);
         } else {
-            parts.areaRead.textContent = this.#preset === "drawn" ? ground : i18n.format("FILRODENSWMB.UI.ExportAreaPresetGround", { preset: i18n.localize(PRESET_LABELS[this.#preset]), ground });
+            parts.areaRead.textContent = this.#preset === "drawn" ? ground : i18n.format("FILRODENSWMB.UI.ExportAreaPresetGround", { preset: this.#presetLabel(this.#preset), ground });
             this.#control.setLabel(ground);
         }
         this.#control.setOver(!plan.fits);
@@ -585,7 +636,7 @@ export class ExportDialog {
         const position = this.#position(scale);
         parts.track.style.setProperty("--pos", `${position * 100}%`);
         parts.track.setAttribute("aria-valuenow", String(scale));
-        const groundPx = i18n.format("FILRODENSWMB.UI.ExportGroundPixel", { distance: formatDistance(source.kmPerPx / scale), unit: source.unit });
+        const groundPx = i18n.format("FILRODENSWMB.UI.ExportGroundPixel", source.measure?.pixel(scale) ?? { distance: formatDistance(source.kmPerPx / scale), unit: source.unit });
         const groundLine = cell ? i18n.format("FILRODENSWMB.UI.ExportGroundCells", { ground: groundPx, cell }) : groundPx;
         parts.track.setAttribute("aria-valuetext", `${scaleText}, ${groundLine}`);
         if (parts.element.ownerDocument.activeElement !== parts.scaleField) parts.scaleField.value = scaleText;
@@ -599,6 +650,7 @@ export class ExportDialog {
         parts.terrain.hidden = !(source.rasterPx > 0 && scale > 1 && !atCeiling);
         if (!parts.terrain.hidden) parts.terrain.textContent = i18n.format("FILRODENSWMB.UI.ExportTerrainLine", { scale: scaleText, px: number(source.rasterPx) });
         parts.steer.hidden = !(atCeiling && source.cut);
+        if (parts.note) parts.note.hidden = !source.scaleNote;
         if (!parts.steer.hidden) {
             const off = source.cutOff?.() ?? null;
             parts.cut.setAttribute("aria-disabled", String(!!off));
@@ -655,7 +707,8 @@ export class ExportDialog {
     #whatText(scaleText, cell) {
         const { i18n } = platform;
         if (this.#scene && cell && this.#cells) return i18n.format("FILRODENSWMB.UI.ExportSceneCells", { across: this.#cells.across, down: this.#cells.down, cell });
-        const key = this.#preset === "whole" ? "FILRODENSWMB.UI.ExportOfTheMap" : this.#preset === "screen" ? "FILRODENSWMB.UI.ExportOfTheView" : "FILRODENSWMB.UI.ExportOfTheArea";
+        const own = this.#source.presets?.find((preset) => preset.id === this.#preset)?.what;
+        const key = own ?? (this.#preset === "whole" ? "FILRODENSWMB.UI.ExportOfTheMap" : this.#preset === "screen" ? "FILRODENSWMB.UI.ExportOfTheView" : "FILRODENSWMB.UI.ExportOfTheArea");
         return i18n.format(key, { scale: scaleText });
     }
 
@@ -675,7 +728,7 @@ export class ExportDialog {
         });
         this.#fitButton(parts.fitArea, plan.fitArea, () => [
             i18n.localize("FILRODENSWMB.UI.ExportFitArea"),
-            i18n.format("FILRODENSWMB.UI.ExportFitAreaLine", { width: this.#km(plan.fitArea.width), height: this.#km(plan.fitArea.height), unit: source.unit, scale: scaleText }),
+            i18n.format("FILRODENSWMB.UI.ExportFitAreaLine", { ground: this.#ground(plan.fitArea.width, plan.fitArea.height), scale: scaleText }),
         ]);
     }
 
@@ -689,6 +742,7 @@ export class ExportDialog {
 
     #reasonText() {
         const { i18n } = platform;
+        if (this.#source.recommended) return this.#source.recommended.reason;
         const reason = this.#recommend;
         const px = (value) => Math.round(value);
         const scale = `${reason.scale}×`;
@@ -717,6 +771,7 @@ export class ExportDialog {
     }
 
     #fileName() {
+        if (this.#source.fileName) return this.#source.fileName({ preset: this.#preset, scale: this.#scale });
         return ExportArea.fileName({ name: this.#source.name, preset: this.#preset, scale: this.#scale });
     }
 
@@ -736,7 +791,8 @@ export class ExportDialog {
         this.#estimateTimer = setTimeout(async () => {
             if (!this.#parts.element?.isConnected || this.#drawing) return;
             try {
-                const { tiles, pixels } = this.#source.samples(area, scale);
+                const { tiles, pixels } = await this.#source.samples(area, scale);
+                if (!this.#parts.element?.isConnected) return;
                 this.#estimates.set(key, await ImageFormat.estimate(tiles, pixels, this.#formats.map((format) => format.id)));
             } catch (error) {
                 console.warn("FWMB | Export size estimate failed", error);

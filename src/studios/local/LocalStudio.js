@@ -6,7 +6,7 @@
  * and Save world, and hands the controller what it needs of the world as plain functions, so
  * neither studio imports the other.
  *
- * Besides its definition and create(), it gives what other code needs of a settlement map without
+ * Besides its definition, create() and its settings (the export's), it gives what other code needs of a settlement map without
  * opening one: `rules` (a record read safely, for the world file and backups), `card` (what the
  * world's record keeps of one) and `page` (the readable page Foundry keeps in the world's journal).
  */
@@ -17,6 +17,7 @@ import { LocalController, tierName } from "./app/LocalController.js";
 import { SettlementRules } from "./data/SettlementRules.js";
 import { SettlementRecord } from "./data/SettlementRecord.js";
 import { HOUSEHOLD_VIEWS } from "./render/Styles.js";
+import { registerLocalExportSettings } from "./app/LocalExport.js";
 
 const SETTLEMENT = ["settlement"];
 
@@ -32,8 +33,8 @@ export const LOCAL_DEFINITION = defineStudio({
     ],
     tools: [
         { id: "mapSetup", stage: "shape", mode: "create", icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap", mapTypes: SETTLEMENT, lede: "FILRODENSWMB.UI.LedeSettlementSetup" },
-        // Export is built by L-surface's step 5: drawn in its place until then, as S0's were
-        { id: "export", stage: "finish", mode: "create", icon: "png", label: "FILRODENSWMB.UI.ToolExport", mapTypes: SETTLEMENT, later: "FILRODENSWMB.UI.ToolExport" },
+        // Export (step 5): the export dialogue on the settlement map (see LocalExport)
+        { id: "export", stage: "finish", mode: "create", icon: "png", label: "FILRODENSWMB.UI.ToolExport", mapTypes: SETTLEMENT, lede: "FILRODENSWMB.UI.LedeSettlementExport" },
         { id: "households", stage: "explore", mode: "explore", icon: "groups", label: "FILRODENSWMB.UI.ToolHouseholds", mapTypes: SETTLEMENT, lede: "FILRODENSWMB.UI.LedeHouseholds" },
     ],
 });
@@ -68,4 +69,6 @@ export const LocalStudio = Object.freeze({
         Worlds.pageOf = page;
         return null;
     },
+    // The export's remembered preset and aspect (step 5)
+    registerSettings: () => registerLocalExportSettings(),
 });

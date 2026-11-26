@@ -3,7 +3,8 @@
 // not on a held regional world or a world with no Surface map; Generate again on each of the
 // world's own Out of date rows (not an up-to-date one, one whose pin has gone, or a held world's
 // parent's), making that map again from its pin without opening it; the marks' tooltips saying
-// what changed; the rows without the settlement icon.
+// what changed; the rows without the settlement icon. A row's Generate again waits while that
+// map's export draws (step 5).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -47,6 +48,11 @@ function world({ held = false, modelRun = null } = {}) {
         states: () => states,
         stateOf: (id) => states.get(id) ?? null,
         describe: (state) => state.changed.join(" and "),
+        // The map whose export is drawing (L-surface step 5), set by a test
+        exportingId: null,
+        exportWait(id) {
+            return id === this.exportingId ? `ExportWaiting ${id}` : null;
+        },
         regenerate: async (ids) => {
             made.push(...ids);
             for (const id of ids) states.set(id, { changed: [], pinGone: false });
@@ -65,7 +71,7 @@ function world({ held = false, modelRun = null } = {}) {
         view: { render: (regions) => rendered.push(regions) },
     };
     SettlementMaps.controller(app);
-    return { app, made, rendered, states };
+    return { app, made, rendered, states, controller };
 }
 
 const render = async (overview) => {
@@ -140,4 +146,21 @@ test("a row's Generate again makes that map again from its pin, then draws the l
     assert.deepEqual(made, ["holloway"]);
     assert.deepEqual(rendered.at(-1), ["worldbar", "context"]);
     assert.equal(SettlementMaps.overview(app).find((row) => row.id === "holloway").again, false, "up to date once made again");
+});
+
+test("while a map's export draws, its row's Generate again waits, saying why (L-surface step 5)", async () => {
+    const { app, made, controller } = world();
+    controller.exportingId = "holloway";
+    const rows = SettlementMaps.overview(app);
+    const row = rows.find((each) => each.id === "holloway");
+    assert.deepEqual([row.again, row.waiting], [true, "ExportWaiting holloway"]);
+    const box = await render({ settlements: rows });
+    const button = box.querySelector(".fwmb-settlement-again");
+    assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.dataset.action, undefined, "nothing to press");
+    assert.equal(button.getAttribute("data-tooltip"), "ExportWaiting holloway");
+    assert.equal(await SettlementMaps.regenerate(app, "holloway"), false);
+    assert.deepEqual(made, []);
+    controller.exportingId = null;
+    assert.equal(await SettlementMaps.regenerate(app, "holloway"), true, "once it ends");
 });

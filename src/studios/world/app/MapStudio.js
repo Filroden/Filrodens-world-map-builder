@@ -2483,16 +2483,20 @@ export class MapStudio {
         const counts = settlement ? (SettlementMaps.existing(this)?.historyCounts ?? { undo: 0, redo: 0 }) : null;
         const undoCount = settlement ? counts.undo : (this.globalHistoryLedger?.length ?? 0);
         const redoCount = settlement ? counts.redo : (this.globalRedoLedger?.length ?? 0);
+        // While its export draws, a settlement map's Undo and Redo wait, saying why (L-surface step 5)
+        const waiting = settlement ? (counts.waiting ?? null) : null;
         // While a route is being placed, Undo takes its last waypoint back (see #processHistoryStep)
         const drafting = !settlement && RouteTool.drafting(this);
         for (const undoBtn of this.root.querySelectorAll('[data-action="undoBrush"]')) {
-            undoBtn.disabled = undoCount === 0 && !drafting;
+            undoBtn.disabled = (undoCount === 0 && !drafting) || !!waiting;
             if (drafting) undoBtn.dataset.tooltip = platform.i18n.localize("FILRODENSWMB.UI.UndoWaypoint");
+            else if (waiting && undoCount > 0) undoBtn.dataset.tooltip = waiting;
             else undoBtn.dataset.tooltip = undoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Undo");
         }
         for (const redoBtn of this.root.querySelectorAll('[data-action="redoBrush"]')) {
-            redoBtn.disabled = redoCount === 0;
-            redoBtn.dataset.tooltip = redoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Redo");
+            redoBtn.disabled = redoCount === 0 || !!waiting;
+            if (waiting && redoCount > 0) redoBtn.dataset.tooltip = waiting;
+            else redoBtn.dataset.tooltip = redoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Redo");
         }
     }
 

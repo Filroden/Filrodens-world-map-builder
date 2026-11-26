@@ -1,7 +1,8 @@
 {{!--
     Explore's Households and supply on a settlement map (L-surface step 3; board L6), read only:
     the settlement's totals, its cultures by their people, its trade groups by their households,
-    and its supply in a normal year. Pointing at a house on the canvas opens its household's card
+    and its supply in a normal year, then Export… (step 5; board X3a: the export dialogue, with the
+    household view shown). Pointing at a house on the canvas opens its household's card
     (HouseholdsView). Context: local.households (LocalController's, from Households.js panelOf),
     or {working} while the households are still being worked out.
 --}}
@@ -54,3 +55,9 @@
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 {{/if}}
 {{/if}}
+
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="householdsExport" title="FILRODENSWMB.UI.ToolExport"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide"{{#if local.export.off}} aria-disabled="true" data-tooltip="{{local.export.off}}"{{else}} data-action="local" data-local="export" data-tooltip="{{localize 'FILRODENSWMB.UI.HouseholdsExportHint'}}"{{/if}}>
+        <i class="fwmb-icon fwmb-icon--png" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportEllipsis"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

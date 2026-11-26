@@ -1988,6 +1988,21 @@ export const FILRODENSWMB = {
         // longer side over COARSEST a pixel, nor wider or taller than SPAN times it (a view of a far
         // larger area costs seconds and gigabytes for a picture that shows nothing)
         VIEW_LIMITS: Object.freeze({ COARSEST: 64, SPAN: 4 }),
+        // A settlement map's export (step 5; Ken, 2026-11-25): 1× is M_PER_PX metres a pixel, the
+        // scale it is drawn for (a house about 8 to 15 px across) and the one recommended; the
+        // scale goes from the dialogue's least to Finest (the canvas's finest detail, 3.125×), its
+        // stops labelled and MINOR ones a short tick; drawn by the worker in tiles of TILE_PX a
+        // side and joined; the Area's presets, the first the default; and the settings the last
+        // preset and aspect are kept in (the format is the image export's)
+        EXPORT: Object.freeze({
+            M_PER_PX: 1.25,
+            RECOMMENDED: 1,
+            STOPS: Object.freeze([0.25, 1, 2]),
+            MINOR: Object.freeze([0.5]),
+            TILE_PX: 2048,
+            PRESETS: Object.freeze(["town", "hinterland", "screen"]),
+            SETTINGS: Object.freeze({ PRESET: "exportPresetSettlement", ASPECT: "exportAspectSettlement" }),
+        }),
     }),
     // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the
     // guide read every COURSE_STEP_PX and each point moved onto the traced river within SNAP_PX;

@@ -6,7 +6,8 @@
 // map not open; Delete settlement map… after its confirmation; a pin gone; a held world's parent's
 // map, read only. Map setup (step 4): Walls redraw it from its own input, its seed kept, and Look
 // only its pictures, each one undo step; Choose another version… beside the version kept, Cancel
-// and Keep; the foot's Generate again.
+// and Keep; the foot's Generate again. Export (step 5): the dialogue given the settlement map's
+// parts; while it draws, that map's changes wait and its version is held.
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { Window } from "happy-dom";
@@ -113,7 +114,7 @@ test("Make settlement map draws four versions, the Default from the map's seed f
     assert.equal(local.choosing, true);
     assert.ok(local.keep.off, "Keep waits for the chosen version");
     assert.equal(controller.panelContext().panelFootPartial.endsWith("tools-mapSetup-foot.hbs"), true);
-    // Only Map setup while choosing; Export and Households and supply are later steps'
+    // Only Map setup while choosing: Export and Households and supply wait for a version kept
     assert.deepEqual(controller.railContext().railStages.flatMap((stage) => stage.tools.filter((tool) => !tool.disabled).map((tool) => tool.id)), ["mapSetup"]);
     controller.close();
 });
@@ -430,6 +431,104 @@ test("Choose another version…: the version kept beside three new alternatives;
     await finishLast(workers);
     await undone;
     assert.equal((await controller.changes()).saved[0].record.seed, seed, "Undo: the seed kept before");
+    controller.destroy();
+    container.remove();
+});
+
+// ------------------------------------------------------------------ Export (step 5)
+
+const { ExportDialog } = await import("../../src/kernel/export/ExportDialog.js");
+
+/** A map kept with its canvas mounted (the canvas is made as the kept map is shown). */
+async function keptOnCanvas() {
+    const setupped = setup();
+    const { controller, workers } = setupped;
+    const container = document.createElement("div");
+    document.body.append(container);
+    controller.mountCanvas(container);
+    await controller.make("pin1");
+    await finish(workers.builds[0]);
+    await controller.act("keep", { dataset: {} });
+    return { ...setupped, container };
+}
+
+test("Export: the dialogue given the settlement map's parts; while it draws, that map's changes wait and its version is held", async () => {
+    const { controller, workers, pins, container } = await keptOnCanvas();
+    assert.equal(controller.panelContext().local.export.off, null, "the open map can be exported");
+    const tiles = [];
+    workers.tile = async (id, view, options) => (tiles.push({ id, view, options }), { width: view.widthPx, height: view.heightPx, close() {} });
+    const open = ExportDialog.open;
+    let source = null;
+    let during = null;
+    ExportDialog.open = async (given) => {
+        source = given;
+        given.hold(true);
+        pins.get("pin1").population = 3400;
+        controller.sourceChanged();
+        const panel = controller.panelContext();
+        during = {
+            wait: controller.exportWait(),
+            off: panel.local.settings.off,
+            notice: panel.panel.notice.actions[0].off,
+            exportOff: panel.local.export.off,
+            walls: await controller.setWalls("on"),
+            look: await controller.setLook("theme"),
+            again: await controller.generateAgain(),
+            another: await controller.chooseAnother(),
+            made: await controller.regenerate([controller.exporting]),
+        };
+        const image = await given.draw({ x: 0, y: 0, width: 400, height: 300 }, 1, { onTile() {}, signal: null });
+        given.hold(false);
+        return !!image;
+    };
+    try {
+        assert.equal(await controller.act("export", { dataset: {} }), true);
+    } finally {
+        ExportDialog.open = open;
+    }
+    // Its parts: the presets, Finest, metres a pixel, 1× recommended, its own settings and file name
+    assert.deepEqual(source.presets.map((preset) => preset.id), ["town", "hinterland", "screen"]);
+    assert.deepEqual(source.map, { width: 4800, height: 3600 }, "the frame at 1.25 m a pixel");
+    assert.deepEqual(source.presets[0].area, { x: 2000, y: 1480, width: 800, height: 640 }, "the town view");
+    assert.equal(source.ceiling, 3.125);
+    assert.equal(source.stops.find((stop) => stop.stop === 3.125).label, "FILRODENSWMB.UI.ExportFinest");
+    assert.equal(source.recommended.scale, 1);
+    assert.deepEqual(source.measure.pixel(2), { distance: "0.63", unit: "m" });
+    assert.equal(source.fileName({ preset: "town", scale: 2 }), "fwmb_castford_town-view_2x");
+    assert.equal(source.title, 'FILRODENSWMB.UI.ExportNamed{"name":"Castford"}');
+    // While it drew: Walls, Look, Generate again (the foot, the notice), Choose another version… and Generate all's part waited
+    const waiting = 'FILRODENSWMB.UI.ExportWaiting{"name":"Castford"}';
+    assert.deepEqual(during, { wait: waiting, off: waiting, notice: waiting, exportOff: waiting, walls: false, look: false, again: false, another: false, made: 0 });
+    // After: free again
+    assert.equal(controller.exportWait(), null);
+    assert.equal(controller.panelContext().local.settings.off, null);
+    // Drawn by the version's worker, without labels, in one tile at this size
+    assert.equal(tiles.length, 1);
+    assert.ok(!tiles[0].options.layers.includes("labels"));
+    assert.deepEqual(tiles[0].view, { rect: [-3000, -2250, -2500, -1875], mPerPx: 1.25, widthPx: 400, heightPx: 300 });
+    controller.destroy();
+    container.remove();
+});
+
+test("Export: a version let go while its export draws is released only once the drawing ends", async () => {
+    const { controller, workers, container } = await keptOnCanvas();
+    const id = (await controller.changes()).saved[0].record.id;
+    const open = ExportDialog.open;
+    let releasedDuring = null;
+    ExportDialog.open = async (given) => {
+        given.hold(true);
+        await controller.deleteMap(id);
+        releasedDuring = workers.log.filter((entry) => entry[0] === "release").length;
+        given.hold(false);
+        return false;
+    };
+    try {
+        await controller.act("export", { dataset: {} });
+    } finally {
+        ExportDialog.open = open;
+    }
+    assert.equal(releasedDuring, 0, "held while it drew");
+    assert.equal(workers.log.filter((entry) => entry[0] === "release").length, 1, "released after");
     controller.destroy();
     container.remove();
 });

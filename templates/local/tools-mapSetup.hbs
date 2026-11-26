@@ -6,7 +6,8 @@
     its look (step 4; boards L3, L3b), what it was drawn from, a line back to its pin, and on a map
     with no run that its supply is a stand-in; Generate again is its foot. Choose another version…
     is the choice again, over the kept version (board L2b). On a held world's map every control is
-    off. Context: local (LocalController's Map setup context).
+    off, as is every change while the map's export draws (step 5), each saying why. Context: local
+    (LocalController's Map setup context).
 --}}
 {{#if local.standIn}}
 <div class="fwmb-goto fwmb-settlement-standin" role="note">
@@ -32,14 +33,14 @@
 {{#if local.settings}}
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementWalls" title="FILRODENSWMB.UI.SectionSettlementWalls" badge=local.settings.redraws}}
     <div class="fwmb-seg fwmb-seg--equal fwmb-settlement-seg" role="group" aria-label="{{localize 'FILRODENSWMB.UI.SectionSettlementWalls'}}" style="--n: 3">
-        {{#each local.settings.walls}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true"{{else}} data-action="local" data-local="setWalls" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
+        {{#each local.settings.walls}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true" data-tooltip="{{../local.settings.off}}"{{else}} data-action="local" data-local="setWalls" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
     </div>
     <p class="fwmb-hint">{{local.settings.wallsHint}}</p>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementLook" title="FILRODENSWMB.UI.SectionSettlementLook"}}
     <div class="fwmb-seg fwmb-seg--equal fwmb-settlement-seg" role="group" aria-label="{{localize 'FILRODENSWMB.UI.SectionSettlementLook'}}" style="--n: 2">
-        {{#each local.settings.looks}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true"{{else}} data-action="local" data-local="setLook" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
+        {{#each local.settings.looks}}<button type="button" aria-pressed="{{#if this.on}}true{{else}}false{{/if}}"{{#if ../local.settings.off}} aria-disabled="true" data-tooltip="{{../local.settings.off}}"{{else}} data-action="local" data-local="setLook" data-value="{{this.id}}"{{/if}}>{{this.label}}</button>{{/each}}
     </div>
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SettlementLookHint"}}</p>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

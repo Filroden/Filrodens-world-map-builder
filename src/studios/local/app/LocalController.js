@@ -11,6 +11,8 @@ import { cultureRoofs, figuresOf, panelOf } from "./Households.js";
 import { PICTURE_LAYERS, VersionChoice, estimateMs } from "./VersionChoice.js";
 import { drawTown } from "../render/CanvasTown.js";
 import { styleOf } from "../LocalTasks.js";
+import { ExportDialog } from "../../../kernel/export/ExportDialog.js";
+import { LocalExport } from "./LocalExport.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/local/";
 
@@ -58,11 +60,15 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  * step; Choose another version… (the kept version as the Default beside three new alternatives,
  * built from the map's own input: keeping one changes only its seed, Ken 2026-11-25); and
  * Generate again in the panel's foot.
+ *
+ * Export (step 5; boards X3a, X2a, X2b): the kernel's export dialogue on the open map (`export`,
+ * see LocalExport), drawn from the version shown in its worker and held there until it ends; while
+ * it draws, that map's changes wait (`exportWait`), and everything else stays free.
  */
 export class LocalController {
     /** "choosing", "building", "open", or null. */
     mode = null;
-    /** The tool open on the rail (Map setup; Export and Households and supply come later). */
+    /** The tool open on the rail: Map setup, Export or Households and supply. */
     tool = "mapSetup";
 
     #shell;
@@ -116,6 +122,12 @@ export class LocalController {
     #themes = new Map();
     /** Watching the studio's theme while a map in the theme look is shown. */
     #themeWatch = null;
+    /** The export drawing from a settlement map (step 5): { id, name, versionId }, or null. */
+    #export = null;
+    /** The export dialogue open (one at a time). */
+    #exportOpen = false;
+    /** Versions let go while an export drew from them: released when it ends. */
+    #releaseLater = new Set();
 
     /** The engine's input from a source (LocalInput.inputFrom; a stand-in in tests). */
     #inputFrom;
@@ -336,12 +348,12 @@ export class LocalController {
         try {
             const result = await this.#workersNow().build(versionId, record.input);
             if (!current()) {
-                this.#workersNow().release([versionId]).catch(() => {});
+                this.#letGo(versionId);
                 return false;
             }
             const kept = await this.#workersNow().keep(versionId);
             if (!current()) {
-                this.#workersNow().release([versionId]).catch(() => {});
+                this.#letGo(versionId);
                 return false;
             }
             this.#remember(record.id, { versionId, key, result, kept });
@@ -380,7 +392,7 @@ export class LocalController {
      * with its kept seed, one undo step on the settlement map; rebuilt and drawn.
      */
     async generateAgain() {
-        if (!this.canChange) return false;
+        if (!this.canChange || this.exportWait()) return false;
         const next = this.#inputNow(this.#record);
         if (!next) return false;
         this.#step(this.#record.id, next);
@@ -398,6 +410,8 @@ export class LocalController {
     async regenerate(ids) {
         let made = 0;
         for (const id of ids) {
+            // A map whose export is drawing waits for it (step 5)
+            if (this.exportWait(id)) continue;
             const record = this.#pending.get(id) ?? (await this.#load(id));
             const next = record ? this.#inputNow(record) : null;
             if (!next) continue;
@@ -411,17 +425,19 @@ export class LocalController {
 
     /** Whether the open settlement map has a step to undo, or to redo. */
     get canUndo() {
-        return this.canChange && (this.#history.get(this.#record.id)?.undo.length ?? 0) > 0;
+        return this.canChange && !this.exportWait() && (this.#history.get(this.#record.id)?.undo.length ?? 0) > 0;
     }
 
     get canRedo() {
-        return this.canChange && (this.#history.get(this.#record.id)?.redo.length ?? 0) > 0;
+        return this.canChange && !this.exportWait() && (this.#history.get(this.#record.id)?.redo.length ?? 0) > 0;
     }
 
-    /** How many steps the open settlement map can undo and redo. */
+    /** How many steps the open settlement map can undo and redo, and why they wait (its export drawing), or null. */
     get historyCounts() {
         const history = this.canChange ? this.#history.get(this.#record.id) : null;
-        return { undo: history?.undo.length ?? 0, redo: history?.redo.length ?? 0 };
+        const counts = { undo: history?.undo.length ?? 0, redo: history?.redo.length ?? 0 };
+        const waiting = this.canChange ? this.exportWait() : null;
+        return waiting ? { ...counts, waiting } : counts;
     }
 
     /** Undo on the open settlement map: its input before its last Generate again, drawn again. */
@@ -435,7 +451,7 @@ export class LocalController {
     }
 
     async #travel(from, to) {
-        if (!this.canChange) return false;
+        if (!this.canChange || this.exportWait()) return false;
         const id = this.#record.id;
         const history = this.#history.get(id);
         const entry = history?.[from].pop();
@@ -490,7 +506,7 @@ export class LocalController {
         const built = this.#built.get(id);
         if (built) {
             this.#built.delete(id);
-            this.#workersNow().release([built.versionId]).catch(() => {});
+            this.#letGo(built.versionId);
         }
         if (this.#record?.id === id) this.#host.leave();
         this.#host.changed();
@@ -615,7 +631,7 @@ export class LocalController {
             // Keep and Cancel while choosing; Generate again once open (step 4, board L3)
             panelFootPartial: choosing || (this.tool === "mapSetup" && this.mode === "open" && this.#record) ? `${TEMPLATES}tools-mapSetup-foot.hbs` : null,
             panelHeadPartial: null,
-            local: { ...this.#mapSetupContext(), households: this.tool === "households" ? this.#householdsContext() : null },
+            local: { ...this.#mapSetupContext(), households: this.tool === "households" ? this.#householdsContext() : null, export: { off: this.exportOff } },
         };
     }
 
@@ -663,7 +679,8 @@ export class LocalController {
             return { title: i18n.localize("FILRODENSWMB.UI.MarkPinGone"), icon: "warning-mark", lines: [i18n.format("FILRODENSWMB.UI.SettlementPinGoneLine", { name, map: this.#host.mapName() })], actions: [local("deleteMap", i18n.localize("FILRODENSWMB.UI.DeleteSettlementMapEllipsis"), "delete")] };
         }
         if (state?.changed.length) {
-            return { title: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate"), icon: "warning-mark", lines: [i18n.format("FILRODENSWMB.UI.SettlementStaleLine", { name, changes: this.describe(state) }), i18n.localize("FILRODENSWMB.UI.SettlementStaleKeeps")], actions: [local("generateAgain", i18n.localize("FILRODENSWMB.UI.GenerateAgain"), "run")] };
+            const again = { ...local("generateAgain", i18n.localize("FILRODENSWMB.UI.GenerateAgain"), "run"), off: this.exportWait() };
+            return { title: i18n.localize("FILRODENSWMB.UI.MarkOutOfDate"), icon: "warning-mark", lines: [i18n.format("FILRODENSWMB.UI.SettlementStaleLine", { name, changes: this.describe(state) }), i18n.localize("FILRODENSWMB.UI.SettlementStaleKeeps")], actions: [again] };
         }
         return null;
     }
@@ -732,7 +749,7 @@ export class LocalController {
 
     // ------------------------------------------------------------------ actions
 
-    /** Changes the rail's tool (Export is built in step 5); the households card opens only in Households and supply. */
+    /** Changes the rail's tool; the households card opens only in Households and supply. */
     changeTool(tool) {
         if (!this.#definition.offers(tool, "settlement") || this.#definition.tool(tool)?.later) return false;
         this.tool = tool;
@@ -763,6 +780,108 @@ export class LocalController {
         return true;
     }
 
+    // ------------------------------------------------------------------ Export (step 5)
+
+    /** The settlement map whose export is drawing (its id), or null. */
+    get exporting() {
+        return this.#export?.id ?? null;
+    }
+
+    /**
+     * Why a change to a settlement map waits, or null (step 5): its export is drawing. Generate
+     * again, Choose another version…, Walls, Look, Undo and Redo wait; looking round the map,
+     * Households and supply and the world's other maps don't.
+     * @param {string} [id] - The settlement map's id (the open one's by default).
+     */
+    exportWait(id = this.#record?.id) {
+        if (!id || !this.#export || this.#export.id !== id) return null;
+        return platform.i18n.format("FILRODENSWMB.UI.ExportWaiting", { name: this.#export.name });
+    }
+
+    /** Why the open settlement map can't be exported now (an export drawing, or the map not drawn), or null. */
+    get exportOff() {
+        const { i18n } = platform;
+        if (this.#export) return i18n.format("FILRODENSWMB.UI.ExportWaiting", { name: this.#export.name });
+        if (this.mode !== "open" || !this.#shown?.result || !this.#canvas) return i18n.localize("FILRODENSWMB.UI.SettlementExportWhenDrawn");
+        return null;
+    }
+
+    /**
+     * Export (step 5; boards X3a, X2a, X2b): the kernel's export dialogue given the settlement
+     * map's parts (see LocalExport). The image is drawn from the version shown, in its worker,
+     * in the look and household view shown now; the version is held until the drawing ends.
+     */
+    async export() {
+        if (this.exportOff || this.#exportOpen) return false;
+        const { i18n } = platform;
+        const shown = this.#shown;
+        const id = this.#record?.id ?? null;
+        const name = this.#settlementName();
+        const frame = shown.result.frame;
+        const theme = this.#view;
+        const lookKey = this.#lookKey();
+        const style = this.#styleFor(lookKey);
+        const cultures = theme === "culture" ? this.#roofsOf(shown) : {};
+        const town = this.#labelTown(shown);
+        const tile = (view) => this.#workersNow().tile(shown.versionId, view, { style, layers: PICTURE_LAYERS, theme, cultures });
+        const { EXPORT } = FILRODENSWMB.LOCAL;
+        this.#exportOpen = true;
+        try {
+            return await ExportDialog.open({
+                kind: "png",
+                title: i18n.format("FILRODENSWMB.UI.ExportNamed", { name }),
+                name,
+                map: LocalExport.mapOf(frame),
+                view: null,
+                smallestLabelPx: null,
+                kmPerPx: EXPORT.M_PER_PX / 1000,
+                unit: "km",
+                rasterPx: null,
+                ceiling: LocalExport.ceiling(),
+                tileLimit: EXPORT.TILE_PX,
+                presets: LocalExport.presets(frame, { town: shown.result.townView.rect, screen: this.#canvas?.view.rect ?? null }),
+                stops: LocalExport.stops(),
+                scaleName: (scale) => LocalExport.scaleName(scale),
+                measure: LocalExport.measure(),
+                recommended: { scale: EXPORT.RECOMMENDED, reason: i18n.localize("FILRODENSWMB.UI.SettlementExportReason") },
+                scaleNote: i18n.format("FILRODENSWMB.UI.SettlementExportNote", { m: FILRODENSWMB.LOCAL.CANVAS.FINEST_M.toLocaleString(i18n.lang) }),
+                settings: { preset: EXPORT.SETTINGS.PRESET, aspect: EXPORT.SETTINGS.ASPECT },
+                fileName: ({ preset, scale }) => LocalExport.fileName({ name, preset, scale }),
+                // The whole frame, at the preview's size, as the version cards are drawn
+                drawPreview: async (side) => {
+                    const mPerPx = Math.max(frame.width, frame.height) / side;
+                    const widthPx = Math.max(1, Math.round(frame.width / mPerPx));
+                    const heightPx = Math.max(1, Math.round(frame.height / mPerPx));
+                    const rect = [-frame.width / 2, -frame.height / 2, frame.width / 2, frame.height / 2];
+                    return LocalExport.canvasOf(await tile({ rect, mPerPx, widthPx, heightPx }));
+                },
+                samples: async (area, scale) => {
+                    const { views, pixels } = LocalExport.samples(area, scale, frame);
+                    const tiles = [];
+                    for (const view of views) tiles.push(LocalExport.canvasOf(await tile(view)));
+                    return { tiles, pixels };
+                },
+                draw: (area, scale, { onTile, signal }) =>
+                    LocalExport.draw({ area, scale, frame, tile, onTile, signal, labels: (ctx, view) => drawTown(ctx, town, view, styleOf(style), { layers: ["labels"] }) }),
+                hold: (on) => this.#holdForExport(on ? { id, name, versionId: shown.versionId } : null),
+            });
+        } finally {
+            this.#exportOpen = false;
+        }
+    }
+
+    /** While an export draws: the map's changes wait (see exportWait); after, any version let go meanwhile is released. */
+    #holdForExport(held) {
+        this.#export = held;
+        if (!held && this.#releaseLater.size) {
+            const inUse = new Set([...this.#built.values()].map((entry) => entry.versionId));
+            const gone = [...this.#releaseLater].filter((versionId) => !inUse.has(versionId));
+            this.#releaseLater.clear();
+            if (gone.length && this.#workers) this.#workers.release(gone).catch(() => {});
+        }
+        this.#host.render(["context", "editToolbar"]);
+    }
+
     // ------------------------------------------------------------------ Map setup (step 4)
 
     /** The open map's Walls: "auto", "on" or "off". */
@@ -781,7 +900,7 @@ export class LocalController {
      * still come only through Generate again.
      */
     async setWalls(value) {
-        if (!this.canChange || !["auto", "on", "off"].includes(value) || value === this.walls) return false;
+        if (!this.canChange || this.exportWait() || !["auto", "on", "off"].includes(value) || value === this.walls) return false;
         const record = this.#record;
         this.#step(record.id, withWalls(record.input, value), record, { settings: { ...record.settings, walls: value }, fresh: false });
         await this.#showRecord(this.#record);
@@ -793,7 +912,7 @@ export class LocalController {
      * map's tiles are kept by look), as one undo step.
      */
     async setLook(value) {
-        if (!this.canChange || !["atlas", "theme"].includes(value) || value === this.look) return false;
+        if (!this.canChange || this.exportWait() || !["atlas", "theme"].includes(value) || value === this.look) return false;
         const record = this.#record;
         this.#step(record.id, record.input, record, { look: value, fresh: false });
         await this.#showLook();
@@ -898,7 +1017,7 @@ export class LocalController {
      * changes only the map's seed (Ken, 2026-11-25). Cancel goes back to the map as it was.
      */
     async chooseAnother() {
-        if (!this.canChange || this.mode !== "open") return false;
+        if (!this.canChange || this.mode !== "open" || this.exportWait()) return false;
         const record = this.#record;
         const built = this.#built.get(record.id);
         const held = built && built.key === JSON.stringify(record.input) ? built : null;
@@ -1054,6 +1173,8 @@ export class LocalController {
                 return this.setLook(target.dataset.value);
             case "chooseAnother":
                 return this.chooseAnother();
+            case "export":
+                return this.export();
             default:
                 return undefined;
         }
@@ -1124,14 +1245,23 @@ export class LocalController {
     /** Keeps a built settlement map's version in its worker, dropping the oldest past KEEP_BUILT. */
     #remember(id, entry) {
         const old = this.#built.get(id);
-        if (old && old.versionId !== entry.versionId) this.#workersNow().release([old.versionId]).catch(() => {});
+        if (old && old.versionId !== entry.versionId) this.#letGo(old.versionId);
         this.#built.delete(id);
         this.#built.set(id, entry);
         while (this.#built.size > FILRODENSWMB.LOCAL.KEEP_BUILT) {
             const [oldest, gone] = this.#built.entries().next().value;
             this.#built.delete(oldest);
-            this.#workersNow().release([gone.versionId]).catch(() => {});
+            this.#letGo(gone.versionId);
         }
+    }
+
+    /** A version dropped from its worker; one an export is drawing from is dropped when it ends (step 5). */
+    #letGo(versionId) {
+        if (this.#export?.versionId === versionId) {
+            this.#releaseLater.add(versionId);
+            return;
+        }
+        this.#workersNow().release([versionId]).catch(() => {});
     }
 
     /** Keep <version>: households worked out in its worker, the record made, the map opened. */
@@ -1537,7 +1667,8 @@ export class LocalController {
         const look = this.look;
         const state = this.#owner ? null : this.stateOf(this.#record.id);
         return {
-            off: this.#owner ? i18n.format("FILRODENSWMB.UI.SettlementHeldOff", { owner: this.#owner.name }) : null,
+            // A held world's parent's map, or its export drawing (step 5)
+            off: this.#owner ? i18n.format("FILRODENSWMB.UI.SettlementHeldOff", { owner: this.#owner.name }) : this.exportWait(),
             stale: !!state && (state.changed.length > 0 || state.pinGone),
             redraws: i18n.localize("FILRODENSWMB.UI.SettlementRedraws"),
             walls: ["auto", "on", "off"].map((id) => ({ id, on: id === walls, label: i18n.localize(`FILRODENSWMB.UI.SettlementWalls.${id}`) })),

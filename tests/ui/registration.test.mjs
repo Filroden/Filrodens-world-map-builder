@@ -100,8 +100,9 @@ test("the Local studio registers beside the World studio, its rail Map setup, Ex
         local.definition.railStages("settlement").map((stage) => [stage.id, stage.tools.map((tool) => tool.id)]),
         [["shape", ["mapSetup"]], ["finish", ["export"]], ["explore", ["households"]]],
     );
-    // Export is a later step's: drawn in its place, off; Households and supply is step 3's
-    assert.ok(local.definition.tool("export").later);
+    // Export is step 5's, Households and supply step 3's: both built, each with its lede
+    assert.ok(!local.definition.tool("export").later);
+    assert.equal(local.definition.tool("export").lede, "FILRODENSWMB.UI.LedeSettlementExport");
     assert.ok(!local.definition.tool("households").later);
     assert.equal(local.definition.tool("households").mode, "explore");
     assert.equal(local.definition.tool("households").lede, "FILRODENSWMB.UI.LedeHouseholds");

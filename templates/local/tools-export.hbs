@@ -1,0 +1,11 @@
+{{!--
+    A settlement map's Export (L-surface step 5; board X3a): the export dialogue on the map, its
+    image of an area at a scale with its title, scale bar and north arrow. Off, with why, while an
+    export is drawing or the map is still being drawn. The explanation is the button's tooltip, as
+    the interface's writing rules ask. Context: local.export (LocalController's).
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="settlementExportImage" title="FILRODENSWMB.UI.ExportPngTitle"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide"{{#if local.export.off}} aria-disabled="true" data-tooltip="{{local.export.off}}"{{else}} data-action="local" data-local="export" data-tooltip="{{localize 'FILRODENSWMB.UI.SettlementExportHint'}}"{{/if}}>
+        <i class="fwmb-icon fwmb-icon--png" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportPNG"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}

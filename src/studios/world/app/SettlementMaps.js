@@ -181,6 +181,8 @@ export class SettlementMaps {
         const card = this.#ownCards(app).find((each) => each.id === id);
         const state = card ? this.existing(app)?.stateOf(id) : null;
         if (!state?.changed?.length || state.pinGone) return false;
+        // Its export drawing (L-surface step 5): Generate again waits until it ends
+        if (this.existing(app)?.exportWait(id)) return false;
         const made = await this.controller(app).regenerate([id]);
         app.view?.render(["worldbar", "context"]);
         return made > 0;
@@ -530,6 +532,8 @@ export class SettlementMaps {
                     // Generate again on the row (step 4b): the world's own (a held world's Fill in maps
                     // included, as in their Map setup), Out of date, its pin there
                     again: !card.owner && !!state?.changed?.length && !state.pinGone,
+                    // …and waiting while its export draws (step 5)
+                    waiting: card.owner ? null : (controller?.exportWait(card.id) ?? null),
                     search: name.toLocaleLowerCase(lang),
                 };
             })

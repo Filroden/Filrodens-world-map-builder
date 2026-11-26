@@ -29,13 +29,15 @@ export class ExportScale {
  * what fits when a choice is too large. Pure, so the dialogue and its tests share it.
  */
 export const ExportArea = Object.freeze({
-    /** The scale's slider: a value in steps of SCALE.STEP, from SCALE.MIN to the ceiling. */
+    /** The scale's slider: a value in steps of SCALE.STEP, from SCALE.MIN to the ceiling (the ceiling past the last step). */
     snapScale(value, ceiling = FILRODENSWMB.EXPORT_PNG.SCALE.CEILING) {
         const { MIN, STEP } = FILRODENSWMB.EXPORT_PNG.SCALE;
         const number = Number(value);
         if (!Number.isFinite(number)) return 1;
         const stepped = Math.round(number / STEP) * STEP;
-        return Math.round(Math.min(Math.max(stepped, MIN), ceiling) * 100) / 100;
+        // The ceiling itself, unrounded: a settlement map's Finest is 3.125×
+        if (stepped >= ceiling - 1e-9) return ceiling;
+        return Math.round(Math.max(stepped, MIN) * 100) / 100;
     },
 
     /** The image's size for an area at a scale, in whole pixels (one at least). */
