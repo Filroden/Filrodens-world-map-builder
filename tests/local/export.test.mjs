@@ -175,25 +175,40 @@ test("the report's file name has report_ before the preset", () => {
     assert.equal(LocalExport.fileName({ name: "Castford", preset: "town", scale: 1, kind: "map" }), "fwmb_castford_town-view_1x");
 });
 
-test("the sheet: the inset and block below an area wider than 4:3, beside a tall or square one", () => {
-    const { SIDE_PX, INSET_PX, GAP_PX, MARGIN_PX } = FILRODENSWMB.LOCAL.EXPORT.REPORT;
-    // A 2:1 map part: the two side by side under it
-    const wide = Report.layout({ width: 3840, height: 1920 }, 600);
-    assert.equal(wide.below, true);
-    assert.deepEqual([wide.width, wide.height], [3840 + 2 * MARGIN_PX, MARGIN_PX + 1920 + GAP_PX + 600 + MARGIN_PX]);
-    assert.equal(wide.inset.y, wide.block.y);
-    assert.equal(wide.block.x, wide.inset.x + SIDE_PX + GAP_PX);
-    // A 3:4 map part: the inset over the block beside it
-    const tall = Report.layout({ width: 1500, height: 2000 }, 600);
-    assert.equal(tall.below, false);
-    assert.deepEqual([tall.width, tall.height], [MARGIN_PX + 1500 + GAP_PX + SIDE_PX + MARGIN_PX, 2000 + 2 * MARGIN_PX]);
-    assert.equal(tall.block.y, tall.inset.y + INSET_PX + GAP_PX);
-    // A map part smaller than the side: the paper grows round it, the map centred
+test("the sheet: the inset over the block beside the map part, the column growing to about a quarter of a large sheet", () => {
+    const { SIDE_PX, INSET_PX, GAP_PX, MARGIN_PX, SIDE_SHARE } = FILRODENSWMB.LOCAL.EXPORT.REPORT;
+    // A town's map part: the column at its least
+    const town = Report.layout({ width: 1720, height: 1290 }, 700);
+    assert.equal(town.factor, 1);
+    assert.equal(town.below, false);
+    assert.deepEqual([town.width, town.height], [MARGIN_PX + 1720 + GAP_PX + SIDE_PX + MARGIN_PX, 2 * MARGIN_PX + Math.max(1290, INSET_PX + GAP_PX + 700)]);
+    assert.equal(town.block.y, town.inset.y + INSET_PX + GAP_PX);
+    assert.equal(town.inset.x, MARGIN_PX + 1720 + GAP_PX);
+    // A great city's: the column and all in it grown together, to SIDE_SHARE of the sheet
+    const city = Report.layout({ width: 8400, height: 6300 }, 700);
+    assert.ok(city.factor > 4);
+    assert.ok(Math.abs(city.inset.width / city.width - SIDE_SHARE) < 0.002, `${city.inset.width / city.width}`);
+    assert.equal(city.inset.height, Math.round(INSET_PX * city.factor));
+    assert.equal(city.block.height, Math.round(700 * city.factor));
+    // A wide map part: grown no taller than the map part
+    const wide = Report.layout({ width: 8000, height: 4000 }, 700);
+    assert.ok(wide.inset.width / wide.width < SIDE_SHARE);
+    assert.ok(wide.inset.height + Math.round(GAP_PX * wide.factor) + wide.block.height <= 4000 + 2);
+    assert.equal(wide.height, 4000 + 2 * Math.round(MARGIN_PX * wide.factor));
+    // A small map part: the paper round it, the map centred on the column's height
     const small = Report.layout({ width: 400, height: 300 }, 900);
     assert.equal(small.height, 2 * MARGIN_PX + INSET_PX + GAP_PX + 900);
     assert.ok(small.map.y > MARGIN_PX);
-    // Exactly 4:3 is beside
-    assert.equal(Report.layout({ width: 1600, height: 1200 }, 500).below, false);
+});
+
+test("the sheet drawn: the inset and block at their least size, scaled with the column", () => {
+    const layout = Report.layout({ width: 8400, height: 6300 }, 700);
+    const ctx = recordingContext(layout.width, layout.height);
+    const boxes = [];
+    Report.drawSheet(ctx, layout, { map: { width: 8400, height: 6300 }, inset: (c, box) => boxes.push(box), block: (c, box) => boxes.push(box) }, { paper: "#efe7d0", ink: "#3b2f25", font: "serif" });
+    assert.ok(Math.abs(boxes[0].width - 720) < 1 && Math.abs(boxes[0].height - 540) < 1, "the inset at its least size");
+    assert.ok(Math.abs(boxes[1].width - 720) < 1 && Math.abs(boxes[1].height - 700) < 1, "the block at its least size");
+    assert.ok(ctx.calls.some((call) => call[0] === "scale" && Math.abs(call[1] - layout.factor) < 1e-9));
 });
 
 test("Too large is judged on the whole sheet, and its fits are the sheet's", () => {

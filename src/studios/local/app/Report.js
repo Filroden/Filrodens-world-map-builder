@@ -6,8 +6,11 @@
  * - **The legend:** a thematic view's key in the image's top-right corner (the title is top left,
  *   the scale bar bottom left, north bottom right), sized from the image's height as the title box
  *   is: up to LEGEND.ROWS keys a column in up to LEGEND.COLUMNS columns, then "and N others".
- * - **The sheet:** the map part, then the parent map inset and the information block, SIDE_PX
- *   across each: below an area wider than WIDE, beside a tall or square one (`layout`).
+ * - **The sheet:** the map part, and beside it a column holding the parent map inset over the
+ *   information block (`layout`). The column is SIDE_PX across at least; on a larger map part it
+ *   grows with everything in it (its `factor`), to SIDE_SHARE of the sheet's width, so it keeps
+ *   its proportion beside a great city (Ken, 2026-11-26). The inset and block are laid out and
+ *   drawn at the least size and scaled by the factor.
  * - **The information block:** its rows worked out first (`blockRows`, wrapped to the block's
  *   width), so the sheet's size is known before anything is drawn; then drawn (`drawBlock`).
  * - **The inset:** the box of the Surface map it shows (`insetBox`), and over the World studio's
@@ -148,38 +151,45 @@ export const Report = Object.freeze({
     // ------------------------------------------------------------------ the sheet
 
     /**
-     * The sheet's layout: the map part, the inset and the block, in pixels.
+     * How much the side column grows beside a map part: 1 at the least, up to SIDE_SHARE of the
+     * sheet's width, but never taller than the map part.
+     * @param {{width: number, height: number}} part
+     * @param {number} blockHeight - The block's height at the least size.
+     */
+    factor(part, blockHeight) {
+        const { SIDE_PX, INSET_PX, GAP_PX, MARGIN_PX, SIDE_SHARE } = REPORT();
+        // The column's share of the sheet: SIDE × f = share × (part + f × (2 × MARGIN + GAP + SIDE))
+        const byShare = (SIDE_SHARE * part.width) / (SIDE_PX - SIDE_SHARE * (2 * MARGIN_PX + GAP_PX + SIDE_PX));
+        const byHeight = part.height / (INSET_PX + GAP_PX + blockHeight);
+        return Math.max(1, Math.min(byShare, byHeight));
+    },
+
+    /**
+     * The sheet's layout: the map part, and beside it the inset over the block, in pixels, with
+     * the column's factor (see `factor`). `below` is kept for the dialogue's small drawing (always
+     * beside since Ken, 2026-11-26).
      * @param {{width: number, height: number}} part - The map part.
-     * @param {number} blockHeight - The information block's height.
+     * @param {number} blockHeight - The information block's height at the least size.
      */
     layout(part, blockHeight) {
-        const { SIDE_PX, INSET_PX, GAP_PX, MARGIN_PX, WIDE } = REPORT();
-        const below = part.width / part.height > WIDE;
-        if (below) {
-            const row = 2 * SIDE_PX + GAP_PX;
-            const inner = Math.max(part.width, row);
-            const side = Math.max(INSET_PX, blockHeight);
-            const top = MARGIN_PX + part.height + GAP_PX;
-            const left = MARGIN_PX + Math.round((inner - row) / 2);
-            return {
-                below,
-                width: 2 * MARGIN_PX + inner,
-                height: top + side + MARGIN_PX,
-                map: { x: MARGIN_PX + Math.round((inner - part.width) / 2), y: MARGIN_PX, ...part },
-                inset: { x: left, y: top, width: SIDE_PX, height: INSET_PX },
-                block: { x: left + SIDE_PX + GAP_PX, y: top, width: SIDE_PX, height: blockHeight },
-            };
-        }
-        const side = INSET_PX + GAP_PX + blockHeight;
-        const inner = Math.max(part.height, side);
-        const left = MARGIN_PX + part.width + GAP_PX;
+        const { SIDE_PX, INSET_PX, GAP_PX, MARGIN_PX } = REPORT();
+        const factor = this.factor(part, blockHeight);
+        const grow = (px) => Math.round(px * factor);
+        const margin = grow(MARGIN_PX);
+        const gap = grow(GAP_PX);
+        const side = { width: grow(SIDE_PX), inset: grow(INSET_PX), block: grow(blockHeight) };
+        const column = side.inset + gap + side.block;
+        const inner = Math.max(part.height, column);
+        const left = margin + part.width + gap;
         return {
-            below,
-            width: left + SIDE_PX + MARGIN_PX,
-            height: 2 * MARGIN_PX + inner,
-            map: { x: MARGIN_PX, y: MARGIN_PX + Math.round((inner - part.height) / 2), ...part },
-            inset: { x: left, y: MARGIN_PX, width: SIDE_PX, height: INSET_PX },
-            block: { x: left, y: MARGIN_PX + INSET_PX + GAP_PX, width: SIDE_PX, height: blockHeight },
+            below: false,
+            factor,
+            side: side.width,
+            width: left + side.width + margin,
+            height: 2 * margin + inner,
+            map: { x: margin, y: margin + Math.round((inner - part.height) / 2), ...part },
+            inset: { x: left, y: margin, width: side.width, height: side.inset },
+            block: { x: left, y: margin + side.inset + gap, width: side.width, height: side.block },
         };
     },
 
@@ -191,14 +201,24 @@ export const Report = Object.freeze({
      * @param {object} style
      */
     drawSheet(ctx, layout, parts, style) {
+        const factor = layout.factor ?? 1;
         ctx.save();
         ctx.fillStyle = style.paper;
         ctx.fillRect(0, 0, layout.width, layout.height);
         ctx.drawImage(parts.map, layout.map.x, layout.map.y);
-        parts.inset(ctx, layout.inset);
-        parts.block(ctx, layout.block);
+        // The inset and the block drawn at the least size, scaled up with the column
+        for (const [draw, box] of [
+            [parts.inset, layout.inset],
+            [parts.block, layout.block],
+        ]) {
+            ctx.save();
+            ctx.translate(box.x, box.y);
+            ctx.scale(factor, factor);
+            draw(ctx, { x: 0, y: 0, width: box.width / factor, height: box.height / factor });
+            ctx.restore();
+        }
         ctx.strokeStyle = style.ink;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = Math.max(1, Math.round(factor));
         for (const box of [layout.map, layout.inset, layout.block]) ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
         ctx.restore();
     },
@@ -350,7 +370,8 @@ export const Report = Object.freeze({
      * @param {CanvasRenderingContext2D} ctx
      * @param {object} box - The inset's box on the sheet.
      * @param {object} inset
-     * @param {CanvasImageSource|null} inset.picture - The map's picture of `inset.area`, `inset.scale` pixels a map pixel.
+     * @param {CanvasImageSource|null} inset.picture - The map's picture of `inset.area`, drawn at
+     *   `inset.density` of its pixels to one of the box's (the column's factor; 1 by default).
      * @param {{x: number, y: number, width: number, height: number}} inset.area - In the map's pixels.
      * @param {number} inset.scale
      * @param {{x: number, y: number}} inset.at - The settlement.
@@ -370,10 +391,13 @@ export const Report = Object.freeze({
         ctx.fillStyle = "#dfe3d2";
         ctx.fillRect(box.x, box.y, box.width, box.height);
         const { picture, area, scale } = inset;
+        const density = inset.density ?? 1;
         // The picture centred in the box (a map smaller than the box leaves paper round it)
-        const offX = box.x + (picture ? (box.width - picture.width) / 2 : 0);
-        const offY = box.y + (picture ? (box.height - picture.height) / 2 : 0);
-        if (picture) ctx.drawImage(picture, offX, offY);
+        const shownW = picture ? picture.width / density : 0;
+        const shownH = picture ? picture.height / density : 0;
+        const offX = box.x + (picture ? (box.width - shownW) / 2 : 0);
+        const offY = box.y + (picture ? (box.height - shownH) / 2 : 0);
+        if (picture) ctx.drawImage(picture, offX, offY, shownW, shownH);
         const to = ([x, y]) => [offX + (x - area.x) * scale, offY + (y - area.y) * scale];
         if (area) {
             // The country cells, sized by what they give

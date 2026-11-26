@@ -2537,7 +2537,7 @@
     "FILRODENSWMB.UI.ExportReportAction": "Export report",
     "FILRODENSWMB.UI.ExportReportWaiting": "The report waits for the households to be worked out.",
     "FILRODENSWMB.UI.ExportSheet": "The sheet",
-    "FILRODENSWMB.UI.ExportSheetHint": "The map part is the area at your scale. The parent map inset and the information block keep their size: below a wide area, beside a tall one.",
+    "FILRODENSWMB.UI.ExportSheetHint": "The map part is the area at your scale. Beside it, the parent map inset and the information block grow with a large map part, to about a quarter of the sheet.",
     "FILRODENSWMB.UI.ExportSheetPart": "map part {size}, {what}",
     "FILRODENSWMB.UI.ExportLegend": "Legend",
     "FILRODENSWMB.UI.ExportLegendHint": "Draws the key to {view} in the image's top-right corner.",

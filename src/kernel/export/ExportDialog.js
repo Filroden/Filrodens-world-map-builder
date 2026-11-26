@@ -70,7 +70,7 @@ const SHORT_BELOW = 760;
  * @property {string} [scaleNote] - A line under the slider.
  * @property {{preset: string, aspect: string}} [settings] - The settings the preset and aspect are remembered in.
  * @property {(choice: {preset: string, scale: number, kind: string|null}) => string} [fileName] - The file name from the choices.
- * @property {Array<{id: string, label: string, action: string, settings: {preset: string, aspect: string}, off?: string|null, sheet?: (part: {width: number, height: number}) => {width: number, height: number, below: boolean}}>} [kinds]
+ * @property {Array<{id: string, label: string, action: string, settings: {preset: string, aspect: string}, off?: string|null, sheet?: (part: {width: number, height: number}) => {width: number, height: number, below: boolean, side?: number}}>} [kinds]
  *   - The What row (a settlement map's Map only and Report): each kind's label, its action's label,
  *   the settings its preset and aspect are remembered in, why it is off (or null), and for a sheet
  *   (the report) the whole image from the area's part; shown when there are two or more.
@@ -792,7 +792,8 @@ export class ExportDialog {
 
     /**
      * The sheet (a report's, board X3b): its layout drawn small, the map part the area as the
-     * preview shows it, beside a tall or square area and below a wide one. Hidden for a kind with no sheet.
+     * preview shows it, beside its side (or below it), the two in the widths the sheet gives them.
+     * Hidden for a kind with no sheet.
      */
     #showSheet(plan) {
         const parts = this.#parts;
@@ -800,8 +801,11 @@ export class ExportDialog {
         const sheet = this.#kind?.sheet;
         parts.sheet.hidden = !sheet;
         if (!sheet) return;
-        const below = !!sheet(plan.part).below;
-        parts.sheetBox.classList.toggle("fwmb-report-sheet--below", below);
+        const layout = sheet(plan.part);
+        parts.sheetBox.classList.toggle("fwmb-report-sheet--below", !!layout.below);
+        // The side's width in proportion to the map part's, as on the sheet
+        if (!layout.below && layout.side > 0) parts.sheetBox.style.gridTemplateColumns = `minmax(0, ${plan.part.width}fr) minmax(4rem, ${layout.side}fr)`;
+        else parts.sheetBox.style.removeProperty("grid-template-columns");
         parts.sheetMap.style.setProperty("--ar", String(plan.part.width / plan.part.height));
         const picture = parts.preview.querySelector("canvas");
         const canvas = parts.sheetMap.querySelector("canvas");

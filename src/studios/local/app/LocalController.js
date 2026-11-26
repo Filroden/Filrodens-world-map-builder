@@ -965,9 +965,12 @@ export class LocalController {
             const out = held || !(supply?.out?.way?.length > 1) ? null : supply.out;
             const points = [...cells.map((cell) => [cell.x, cell.y]), ...ways.flatMap((flow) => flow.way), ...(out?.way ?? [])];
             const box = Report.insetBox({ x: pin.x, y: pin.y }, framePx, points);
-            const drawn = (await this.#host.inset?.(box, REPORT.SIDE_PX, REPORT.INSET_PX)) ?? null;
+            // Drawn at the column's size, so it stays sharp beside a great city's map part
+            const density = layout.factor ?? 1;
+            const drawn = (await this.#host.inset?.(box, layout.inset.width, layout.inset.height)) ?? null;
             if (signal?.aborted) return null;
-            inset = { picture: drawn?.picture ?? null, area: drawn?.box ?? box, scale: drawn?.scale ?? Math.min(REPORT.SIDE_PX / box.width, REPORT.INSET_PX / box.height), at: { x: pin.x, y: pin.y }, frame: framePx, cells, ways, out };
+            const scale = drawn?.scale ? drawn.scale / density : Math.min(REPORT.SIDE_PX / box.width, REPORT.INSET_PX / box.height);
+            inset = { picture: drawn?.picture ?? null, density, area: drawn?.box ?? box, scale, at: { x: pin.x, y: pin.y }, frame: framePx, cells, ways, out };
         }
         const words = { foodIn: i18n.localize("FILRODENSWMB.UI.ReportFoodIn"), soldOn: i18n.localize("FILRODENSWMB.UI.ReportSoldOn"), note: held && this.#owner ? i18n.format("FILRODENSWMB.UI.ReportSupplyElsewhere", { world: this.#owner.name }) : null };
         const sheet = Object.assign(globalThis.document.createElement("canvas"), { width: layout.width, height: layout.height });

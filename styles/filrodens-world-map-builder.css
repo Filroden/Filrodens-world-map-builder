@@ -4906,8 +4906,9 @@ button.fwmb-format {
 }
 
 /* The report sheet in the end column (L-surface's): the map part follows the area and the scale;
-   the parent map inset and the information block keep their size, beside a tall or square area and
-   below a wide one. Drawn small, as the paper it is laid out on (its colours the map's, not the theme's). */
+   the parent map inset and the information block sit beside it, the column's width in proportion
+   (set by the dialogue). Drawn small, as the paper it is laid out on (its colours the map's, not
+   the theme's). The --below form is kept for a sheet laid out below. */
 .fwmb-report-sheet {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 6.5rem;

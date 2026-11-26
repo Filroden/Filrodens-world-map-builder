@@ -2014,15 +2014,18 @@ export const FILRODENSWMB = {
             // The legend in an export (Ken, 2026-11-26): in the image's top-right corner, up to
             // ROWS keys a column in up to COLUMNS columns, then "and N others"
             LEGEND: Object.freeze({ ROWS: 8, COLUMNS: 2 }),
-            // The report (board X3b): the parent map inset and the information block SIDE_PX across
-            // (the inset INSET_PX high), GAP_PX apart and MARGIN_PX in from the paper's edge; they go
-            // below an area wider than WIDE, beside a tall or square one. The block's type in px.
+            // The report (board X3b; Ken, 2026-11-26): the parent map inset and the information
+            // block in a column beside the map part, SIDE_PX across at least (the inset INSET_PX
+            // high), GAP_PX apart and MARGIN_PX in from the paper's edge. On a larger map part the
+            // column and everything in it grow together, so it takes SIDE_SHARE of the sheet's
+            // width, unless that would make it taller than the map part. The block's type in px at
+            // the least size.
             REPORT: Object.freeze({
                 SIDE_PX: 720,
                 INSET_PX: 540,
                 GAP_PX: 24,
                 MARGIN_PX: 24,
-                WIDE: 4 / 3,
+                SIDE_SHARE: 0.26,
                 PAD_PX: 28,
                 // The inset: at least INSET_FRAMES frames across round the settlement, PAD of the
                 // box round what it shows, and never drawn past INSET_MAX_SCALE (the Surface map's
