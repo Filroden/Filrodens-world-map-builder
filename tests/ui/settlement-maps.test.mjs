@@ -51,7 +51,7 @@ function fakeWorkers(size = 1) {
         },
         async keep(id) {
             log.push(["keep", id]);
-            return { town: {}, households: {} };
+            return { town: {}, households: { houses: [{ culture: "Anglic", members: [{ culture: "Anglic" }, { culture: "Anglic" }] }], farms: [], totals: { people: 2, houses: 1, groups: { crafts: 1 }, cultures: { Anglic: 1 } } } };
         },
         cancel(id) {
             log.push(["cancel", id]);
@@ -100,7 +100,7 @@ function setup() {
     host.openOwner = (owner, id) => went.push(`${owner.worldId}/${id}`);
     const input = (_source, pin, { seed }) => ({ id: pin.id, name: pins.get(pin.id)?.name ?? "Castford", seed, population: pins.get(pin.id)?.population ?? 2900, tier: "town", kind: "town", walled: false, roads: [], cultures: [{ name: "Local", share: 1 }], relief: { lie: "level" }, biome: "GRASSLAND", frame: { width: 6000, height: 4500 } });
     const controller = new LocalController({ registry: null }, host, LOCAL_DEFINITION, { workers, inputFrom: input });
-    return { controller, workers, rendered, went, world, pins, changes: () => changed };
+    return { controller, workers, rendered, went, world, pins, host, changes: () => changed };
 }
 
 test("Make settlement map draws four versions, the Default from the map's seed first, the rest waiting for a worker", async () => {
@@ -529,6 +529,50 @@ test("Export: a version let go while its export draws is released only once the 
     }
     assert.equal(releasedDuring, 0, "held while it drew");
     assert.equal(workers.log.filter((entry) => entry[0] === "release").length, 1, "released after");
+    controller.destroy();
+    container.remove();
+});
+
+test("Export (5b): Map only and Report in the What row, the Legend offered while a view is on, and the report laid out round its map part", async () => {
+    const { controller, workers, pins, container, host } = await keptOnCanvas();
+    pins.get("pin1").x = 500;
+    pins.get("pin1").y = 400;
+    host.source = () => ({ mapSeed: "P0JBVA", map: { kmPerPx: 2 } });
+    const insets = [];
+    host.inset = async (box, width, height) => (insets.push({ box, width, height }), { picture: Object.assign(document.createElement("canvas"), { width, height }), box, scale: width / box.width });
+    workers.tile = async (id, view) => ({ width: view.widthPx, height: view.heightPx, close() {} });
+    const open = ExportDialog.open;
+    const seen = [];
+    ExportDialog.open = async (given) => {
+        seen.push(given);
+        if (seen.length === 1) return false;
+        const map = await given.draw({ x: 0, y: 0, width: 400, height: 300 }, 1, { kind: "map", options: { legend: true }, onTile() {}, signal: null });
+        const report = await given.draw({ x: 0, y: 0, width: 400, height: 300 }, 1, { kind: "report", options: { legend: true }, onTile() {}, signal: null });
+        return { map, report, layout: given.kinds[1].sheet({ width: 400, height: 300 }) };
+    };
+    let drawn;
+    try {
+        // No view on: no Legend
+        await controller.act("export", { dataset: {} });
+        await controller.setView("group");
+        drawn = await controller.export();
+    } finally {
+        ExportDialog.open = open;
+    }
+    const [plain, viewed] = seen;
+    assert.deepEqual(plain.kinds.map((kind) => [kind.id, kind.off ?? null]), [["map", null], ["report", null]]);
+    assert.equal(plain.kindSetting, "exportWhatSettlement");
+    assert.deepEqual(plain.options, [], "no Legend without a view");
+    assert.deepEqual(viewed.options.map((option) => [option.id, option.setting]), [["legend", "exportLegendSettlement"]]);
+    assert.equal(viewed.fileName({ preset: "town", scale: 2, kind: "report" }), "fwmb_castford_report_town-view_2x");
+    // Map only is the map part; the report its sheet, the inset drawn round the settlement
+    assert.deepEqual([drawn.map.width, drawn.map.height], [400, 300]);
+    assert.deepEqual([drawn.report.width, drawn.report.height], [drawn.layout.width, drawn.layout.height]);
+    assert.equal(drawn.layout.below, false, "a 4:3 area: beside");
+    assert.equal(insets.length, 1);
+    const { box } = insets[0];
+    assert.ok(box.x < 500 && box.x + box.width > 500 && box.y < 400 && box.y + box.height > 400, "round the pin");
+    assert.ok(box.width >= 4 * (6000 / 1000 / 2), "at least four frames across");
     controller.destroy();
     container.remove();
 });

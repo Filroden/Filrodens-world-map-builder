@@ -35,7 +35,7 @@ test("the recommendation is the smallest whole stop that makes the smallest name
 
 test("an area that fits says so; one too large offers the largest scale that fits and the largest area that fits", () => {
     const fits = ExportArea.plan(MAP, WHOLE, 4);
-    assert.deepEqual(fits, { width: 8000, height: 6400, fits: true, fitScale: null, fitArea: null });
+    assert.deepEqual(fits, { width: 8000, height: 6400, part: { width: 8000, height: 6400 }, fits: true, fitScale: null, fitArea: null });
     // 16,384 px on a side: 2000 x 8.25 = 16,500 is past it
     const large = ExportArea.plan({ width: 2000, height: 600 }, { x: 0, y: 0, width: 2000, height: 600 }, 8.25);
     assert.equal(large.fits, false);

@@ -9,8 +9,10 @@
  * - **The scale** goes from the dialogue's least to **Finest** (the canvas's finest detail), read
  *   in metres a pixel; 1× is recommended (Ken, 2026-11-25).
  * - **The drawing:** the version's worker draws the area in tiles without the labels; the tiles are
- *   joined here, and the map's title, scale bar and north arrow drawn once over the whole image at
- *   its size, as the canvas draws them over its view.
+ *   joined here, and the map's title, scale bar and north arrow (and the legend, when asked) drawn
+ *   once over the whole image at its size, as the canvas draws them over its view.
+ * - **The report** (5b) lays the map part out on a sheet with the inset and the information block
+ *   (Report.js).
  *
  * Pure but for the drawing, which is handed its worker's and the labels' calls.
  */
@@ -90,13 +92,14 @@ export const LocalExport = Object.freeze({
 
     /**
      * The file name (the plan's §2): `fwmb_<settlement>_<preset, or "area">_<scale>`, the scale
-     * written 2x, 0-75x or finest. The extension is the format's.
+     * written 2x, 0-75x or finest, with `report_` before the preset for the report. The extension
+     * is the format's.
      */
-    fileName({ name, preset, scale }) {
+    fileName({ name, preset, scale, kind = "map" }) {
         const slug = String(name ?? "").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase() || "settlement";
         const where = PRESETS[preset]?.file ?? "area";
         const times = this.scaleName(scale) ? "finest" : `${String(Math.round(scale * 100) / 100).replace(".", "-")}x`;
-        return `fwmb_${slug}_${where}_${times}`;
+        return `fwmb_${slug}_${kind === "report" ? "report_" : ""}${where}_${times}`;
     },
 
     /**
@@ -191,9 +194,17 @@ function canvasOfSize(width, height) {
     return Object.assign(globalThis.document.createElement("canvas"), { width, height });
 }
 
-/** The settlement export's remembered preset and aspect (client scope, not in Foundry's settings sheet). */
+/**
+ * The settlement export's remembered choices (client scope, not in Foundry's settings sheet): the
+ * What, each kind's preset and aspect, and the Legend checkbox.
+ */
 export function registerLocalExportSettings() {
-    const { PRESETS: ids, SETTINGS } = FILRODENSWMB.LOCAL.EXPORT;
+    const { PRESETS: ids, KINDS, SETTINGS } = FILRODENSWMB.LOCAL.EXPORT;
+    const aspect = FILRODENSWMB.EXPORT_PNG.ASPECTS[0].id;
+    platform.settings.register(SETTINGS.WHAT, { scope: "client", config: false, type: String, default: KINDS[0] });
     platform.settings.register(SETTINGS.PRESET, { scope: "client", config: false, type: String, default: ids[0] });
-    platform.settings.register(SETTINGS.ASPECT, { scope: "client", config: false, type: String, default: FILRODENSWMB.EXPORT_PNG.ASPECTS[0].id });
+    platform.settings.register(SETTINGS.ASPECT, { scope: "client", config: false, type: String, default: aspect });
+    platform.settings.register(SETTINGS.PRESET_REPORT, { scope: "client", config: false, type: String, default: ids[0] });
+    platform.settings.register(SETTINGS.ASPECT_REPORT, { scope: "client", config: false, type: String, default: aspect });
+    platform.settings.register(SETTINGS.LEGEND, { scope: "client", config: false, type: Boolean, default: true });
 }

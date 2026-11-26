@@ -3,6 +3,7 @@ import { platform } from "../../../platform/index.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { SettlementSource } from "../settlement/SettlementSource.js";
+import { ExportArea } from "../../../kernel/export/ExportScale.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { UserFigures } from "./UserFigures.js";
 
@@ -313,7 +314,25 @@ export class SettlementMaps {
             worldName: () => app.world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld"),
             // Each culture's colour, by name, for the households' Culture view (step 3)
             cultureColours: () => Object.fromEntries((app.uiState?.cultures ?? []).filter((c) => c?.name && c.color).map((c) => [c.name, c.color])),
+            // The report's parent map inset (step 5b): the Surface map's picture of a box (kept on
+            // the map), drawn as an export of it is, at the scale that fits it in width × height
+            inset: (box, width, height) => this.#inset(app, box, width, height),
         };
+    }
+
+    /** The Surface map's picture of a box for a report's inset: { picture, box, scale }, or null. */
+    static async #inset(app, box, width, height) {
+        const engine = app.canvasEngine;
+        if (!engine?.drawExport || !(engine.mapWidth > 0)) return null;
+        const area = ExportArea.clip(box, { width: engine.mapWidth, height: engine.mapHeight });
+        const scale = Math.min(width / area.width, height / area.height);
+        try {
+            const picture = await engine.drawExport(area, scale);
+            return picture ? { picture, box: area, scale } : null;
+        } catch (error) {
+            console.warn("FWMB | The report's inset could not be drawn:", error);
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ opening and leaving

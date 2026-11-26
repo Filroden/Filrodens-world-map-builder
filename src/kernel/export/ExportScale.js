@@ -78,11 +78,17 @@ export const ExportArea = Object.freeze({
      * @param {{width: number, height: number}} map - The map's size in pixels.
      * @param {{x: number, y: number, width: number, height: number}} area
      * @param {number} scale
-     * @param {{maxSide?: number}} [options]
+     * @param {{maxSide?: number, sheet?: (part: {width: number, height: number}) => {width: number, height: number}}} [options]
+     *   - `sheet`: the whole image from the area's part (a settlement map's report: the map part
+     *   with its inset and information block); it is the whole that must fit, and the plan's size
+     *   is the whole's, with the area's as `part`.
      */
-    plan(map, area, scale, { maxSide = Infinity } = {}) {
+    plan(map, area, scale, { maxSide = Infinity, sheet = null } = {}) {
         const { MIN, STEP } = FILRODENSWMB.EXPORT_PNG.SCALE;
-        const size = this.size(area, scale);
+        const whole = (part) => (sheet ? sheet(part) : part);
+        const fitsAt = (part) => this.fits(whole(part), maxSide);
+        const part = this.size(area, scale);
+        const size = whole(part);
         const fits = this.fits(size, maxSide);
         let fitScale = null;
         let fitArea = null;
@@ -90,7 +96,7 @@ export const ExportArea = Object.freeze({
             // The largest step below the scale chosen at which the whole area fits
             for (let steps = Math.floor(scale / STEP + 1e-9); steps * STEP >= MIN - 1e-9; steps--) {
                 const candidate = Math.round(steps * STEP * 100) / 100;
-                if (this.fits(this.size(area, candidate), maxSide)) {
+                if (fitsAt(this.size(area, candidate))) {
                     fitScale = candidate;
                     break;
                 }
@@ -101,13 +107,13 @@ export const ExportArea = Object.freeze({
             const shrink = Math.min(1, side / Math.max(area.width, area.height), Math.sqrt(MAX_PIXELS / (area.width * area.height * scale * scale)));
             let width = Math.floor(area.width * shrink);
             let height = Math.floor(area.height * shrink);
-            while ((width > 1 || height > 1) && !this.fits(this.size({ width, height }, scale), maxSide)) {
+            while ((width > 1 || height > 1) && !fitsAt(this.size({ width, height }, scale))) {
                 width = Math.max(1, width - 1);
                 height = Math.max(1, Math.round((width * area.height) / area.width));
             }
             fitArea = this.clip({ x: area.x + (area.width - width) / 2, y: area.y + (area.height - height) / 2, width, height }, map);
         }
-        return { ...size, fits, fitScale, fitArea };
+        return { width: size.width, height: size.height, part, fits, fitScale, fitArea };
     },
 
     /** An area kept on the map: whole pixels, at least one wide and high, moved (not cut) inside it. */

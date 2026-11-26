@@ -7,12 +7,13 @@ import { SettlementRecord } from "../data/SettlementRecord.js";
 import { OutOfDate } from "./OutOfDate.js";
 import { SettlementCanvas } from "./SettlementCanvas.js";
 import { HouseholdsView } from "./HouseholdsView.js";
-import { cultureRoofs, figuresOf, panelOf } from "./Households.js";
+import { cultureRoofs, figuresOf, legendOf, panelOf } from "./Households.js";
 import { PICTURE_LAYERS, VersionChoice, estimateMs } from "./VersionChoice.js";
 import { drawTown } from "../render/CanvasTown.js";
 import { styleOf } from "../LocalTasks.js";
 import { ExportDialog } from "../../../kernel/export/ExportDialog.js";
 import { LocalExport } from "./LocalExport.js";
+import { Report, measurer } from "./Report.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/local/";
 
@@ -48,6 +49,8 @@ const pointOf = (bearing) => POINTS[Math.round((((bearing % 360) + 360) % 360) /
  *   openOwner(owner, id) → the world that owns a held world's settlement map, opening it there
  *   worldName() → the open world's name, for the deletion's confirmation
  *   cultureColours() → each of the world's cultures' colours, by name (the households' views)
+ *   inset(box, width, height) → the Surface map's picture of a box for a report's inset:
+ *     { picture, box (kept on the map), scale }, or null
  *
  * Households and supply (step 3): the version shown keeps its households (sent back once at
  * Keep); Explore's tool shows its figures (Households.js), the card over its canvas
@@ -807,9 +810,11 @@ export class LocalController {
     }
 
     /**
-     * Export (step 5; boards X3a, X2a, X2b): the kernel's export dialogue given the settlement
-     * map's parts (see LocalExport). The image is drawn from the version shown, in its worker,
-     * in the look and household view shown now; the version is held until the drawing ends.
+     * Export (step 5; boards X3a, X3b, X2a, X2b): the kernel's export dialogue given the settlement
+     * map's parts (see LocalExport): **Map only** or **Report** (the map part with the parent map
+     * inset and the information block, see Report.js), and the **Legend** while a household
+     * view is on. The image is drawn from the version shown, in its worker, in the look and
+     * household view shown now; the version is held until the drawing ends.
      */
     async export() {
         if (this.exportOff || this.#exportOpen) return false;
@@ -825,6 +830,27 @@ export class LocalController {
         const town = this.#labelTown(shown);
         const tile = (view) => this.#workersNow().tile(shown.versionId, view, { style, layers: PICTURE_LAYERS, theme, cultures });
         const { EXPORT } = FILRODENSWMB.LOCAL;
+        const look = styleOf(style);
+        // The legend of the household view shown (step 5b), and the report's block, once the households are worked out
+        const legend = theme && shown.kept ? legendOf(this.#words(), theme, shown.kept.households, Object.fromEntries(Object.entries(this.#roofsOf(shown)).map(([culture, roof]) => [culture, roof.roof]))) : null;
+        const others = legend ? Report.legendColumns(legend).more : 0;
+        const othersText = others ? i18n.format("FILRODENSWMB.UI.LegendOthers", { count: others.toLocaleString(i18n.lang) }) : "";
+        const rows = shown.kept ? this.#reportRows(shown, look) : null;
+        const blockHeight = rows ? Report.blockHeight(rows) : 0;
+        const record = this.#record;
+        const drawMap = (area, scale, { onTile, signal, options }) =>
+            LocalExport.draw({
+                area,
+                scale,
+                frame,
+                tile,
+                onTile,
+                signal,
+                labels: (ctx, view) => {
+                    drawTown(ctx, town, view, look, { layers: ["labels"] });
+                    if (legend && options?.legend) Report.drawLegend(ctx, legend, look, othersText);
+                },
+            });
         this.#exportOpen = true;
         try {
             return await ExportDialog.open({
@@ -845,8 +871,20 @@ export class LocalController {
                 measure: LocalExport.measure(),
                 recommended: { scale: EXPORT.RECOMMENDED, reason: i18n.localize("FILRODENSWMB.UI.SettlementExportReason") },
                 scaleNote: i18n.format("FILRODENSWMB.UI.SettlementExportNote", { m: FILRODENSWMB.LOCAL.CANVAS.FINEST_M.toLocaleString(i18n.lang) }),
-                settings: { preset: EXPORT.SETTINGS.PRESET, aspect: EXPORT.SETTINGS.ASPECT },
-                fileName: ({ preset, scale }) => LocalExport.fileName({ name, preset, scale }),
+                kinds: [
+                    { id: "map", label: i18n.localize("FILRODENSWMB.UI.ExportMapOnly"), action: i18n.localize("FILRODENSWMB.UI.ExportPNG"), settings: { preset: EXPORT.SETTINGS.PRESET, aspect: EXPORT.SETTINGS.ASPECT } },
+                    {
+                        id: "report",
+                        label: i18n.localize("FILRODENSWMB.UI.ExportReport"),
+                        action: i18n.localize("FILRODENSWMB.UI.ExportReportAction"),
+                        settings: { preset: EXPORT.SETTINGS.PRESET_REPORT, aspect: EXPORT.SETTINGS.ASPECT_REPORT },
+                        off: rows ? null : i18n.localize("FILRODENSWMB.UI.ExportReportWaiting"),
+                        sheet: (part) => Report.layout(part, blockHeight),
+                    },
+                ],
+                kindSetting: EXPORT.SETTINGS.WHAT,
+                options: legend ? [{ id: "legend", label: i18n.localize("FILRODENSWMB.UI.ExportLegend"), hint: i18n.format("FILRODENSWMB.UI.ExportLegendHint", { view: legend.title }), setting: EXPORT.SETTINGS.LEGEND }] : [],
+                fileName: ({ preset, scale, kind }) => LocalExport.fileName({ name, preset, scale, kind }),
                 // The whole frame, at the preview's size, as the version cards are drawn
                 drawPreview: async (side) => {
                     const mPerPx = Math.max(frame.width, frame.height) / side;
@@ -855,19 +893,86 @@ export class LocalController {
                     const rect = [-frame.width / 2, -frame.height / 2, frame.width / 2, frame.height / 2];
                     return LocalExport.canvasOf(await tile({ rect, mPerPx, widthPx, heightPx }));
                 },
-                samples: async (area, scale) => {
+                samples: async (area, scale, choice) => {
                     const { views, pixels } = LocalExport.samples(area, scale, frame);
                     const tiles = [];
                     for (const view of views) tiles.push(LocalExport.canvasOf(await tile(view)));
-                    return { tiles, pixels };
+                    // A report's pixels are its whole sheet's
+                    if (choice?.kind !== "report") return { tiles, pixels };
+                    const part = LocalExport.views(area, scale, frame);
+                    const layout = Report.layout({ width: part.width, height: part.height }, blockHeight);
+                    return { tiles, pixels: layout.width * layout.height };
                 },
-                draw: (area, scale, { onTile, signal }) =>
-                    LocalExport.draw({ area, scale, frame, tile, onTile, signal, labels: (ctx, view) => drawTown(ctx, town, view, styleOf(style), { layers: ["labels"] }) }),
+                draw: async (area, scale, choice) => {
+                    const map = await drawMap(area, scale, choice);
+                    if (!map || choice.kind !== "report" || !rows) return map;
+                    return this.#drawReport({ map, rows, blockHeight, look, record, input: shown.input ?? this.#record?.input ?? this.#input(), frame, signal: choice.signal });
+                },
                 hold: (on) => this.#holdForExport(on ? { id, name, versionId: shown.versionId } : null),
             });
         } finally {
             this.#exportOpen = false;
         }
+    }
+
+    /** The words' functions the Households helpers take. */
+    #words() {
+        const { i18n } = platform;
+        return { lang: i18n.lang, localize: (key) => i18n.localize(key), format: (key, data) => i18n.format(key, data) };
+    }
+
+    /** The report's information block (board X3b): its rows, wrapped in the look's face. */
+    #reportRows(shown, look) {
+        const { i18n } = platform;
+        const input = this.#record?.input ?? this.#input();
+        const panel = this.#householdsContext();
+        if (!input || panel?.working) return null;
+        const kept = this.#record?.keptAt ? new Date(this.#record.keptAt).toLocaleDateString(i18n.lang, { day: "numeric", month: "short", year: "numeric" }) : null;
+        const seed = this.#record?.seed ?? input.seed ?? "";
+        return Report.blockRows(
+            {
+                heading: this.#settlementName(),
+                sub: i18n.format("FILRODENSWMB.UI.ReportSub", { kind: tierName(input.tier), people: (input.population ?? 0).toLocaleString(i18n.lang) }),
+                panel,
+                titles: { totals: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsTotals"), cultures: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsCultures"), trades: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsTrades"), supply: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsSupply") },
+                standIn: panel.supply?.standIn ? i18n.localize("FILRODENSWMB.UI.SettlementStandInTitle") : null,
+                foot: kept ? i18n.format("FILRODENSWMB.UI.ReportFoot", { seed, date: kept }) : i18n.format("FILRODENSWMB.UI.ReportFootSeed", { seed }),
+            },
+            look.font,
+            measurer(),
+        );
+    }
+
+    /**
+     * The report's sheet: the map part, the parent map inset (the World studio's picture of the
+     * Surface map round the settlement, with its supply drawn over it) and the information block.
+     * On a held world's parent's map the supply's ways are in the parent's pixels, so the inset
+     * shows the frame's place without them, saying where they are.
+     */
+    async #drawReport({ map, rows, blockHeight, look, record, input, frame, signal }) {
+        const { i18n } = platform;
+        const layout = Report.layout({ width: map.width, height: map.height }, blockHeight);
+        const { REPORT } = FILRODENSWMB.LOCAL.EXPORT;
+        const pin = record ? this.#host.pinOf(record.pinId) : null;
+        const kmPerPx = this.#host.source()?.map?.kmPerPx ?? null;
+        const held = !!this.#owner;
+        const supply = input?.supply ?? null;
+        let inset = { picture: null, area: null, scale: 1 };
+        if (pin && kmPerPx > 0) {
+            const framePx = { width: frame.width / 1000 / kmPerPx, height: frame.height / 1000 / kmPerPx };
+            const ways = held ? [] : (supply?.fromPlaces ?? []).filter((flow) => flow.way?.length > 1);
+            const cells = held ? [] : (supply?.countryCells ?? []);
+            const out = held || !(supply?.out?.way?.length > 1) ? null : supply.out;
+            const points = [...cells.map((cell) => [cell.x, cell.y]), ...ways.flatMap((flow) => flow.way), ...(out?.way ?? [])];
+            const box = Report.insetBox({ x: pin.x, y: pin.y }, framePx, points);
+            const drawn = (await this.#host.inset?.(box, REPORT.SIDE_PX, REPORT.INSET_PX)) ?? null;
+            if (signal?.aborted) return null;
+            inset = { picture: drawn?.picture ?? null, area: drawn?.box ?? box, scale: drawn?.scale ?? Math.min(REPORT.SIDE_PX / box.width, REPORT.INSET_PX / box.height), at: { x: pin.x, y: pin.y }, frame: framePx, cells, ways, out };
+        }
+        const words = { foodIn: i18n.localize("FILRODENSWMB.UI.ReportFoodIn"), soldOn: i18n.localize("FILRODENSWMB.UI.ReportSoldOn"), note: held && this.#owner ? i18n.format("FILRODENSWMB.UI.ReportSupplyElsewhere", { world: this.#owner.name }) : null };
+        const sheet = Object.assign(globalThis.document.createElement("canvas"), { width: layout.width, height: layout.height });
+        Report.drawSheet(sheet.getContext("2d"), layout, { map, inset: (ctx, box) => Report.drawInset(ctx, box, inset, look, words), block: (ctx, box) => Report.drawBlock(ctx, rows, box, look) }, look);
+        return sheet;
     }
 
     /** While an export draws: the map's changes wait (see exportWait); after, any version let go meanwhile is released. */

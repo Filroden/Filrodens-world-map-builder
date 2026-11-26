@@ -1992,8 +1992,9 @@ export const FILRODENSWMB = {
         // scale it is drawn for (a house about 8 to 15 px across) and the one recommended; the
         // scale goes from the dialogue's least to Finest (the canvas's finest detail, 3.125×), its
         // stops labelled and MINOR ones a short tick; drawn by the worker in tiles of TILE_PX a
-        // side and joined; the Area's presets, the first the default; and the settings the last
-        // preset and aspect are kept in (the format is the image export's)
+        // side and joined; the Area's presets, the first the default; the What row's kinds (Map
+        // only and the report); and the settings the What, each kind's last preset and aspect and
+        // the Legend checkbox are kept in (the format is the image export's)
         EXPORT: Object.freeze({
             M_PER_PX: 1.25,
             RECOMMENDED: 1,
@@ -2001,7 +2002,36 @@ export const FILRODENSWMB = {
             MINOR: Object.freeze([0.5]),
             TILE_PX: 2048,
             PRESETS: Object.freeze(["town", "hinterland", "screen"]),
-            SETTINGS: Object.freeze({ PRESET: "exportPresetSettlement", ASPECT: "exportAspectSettlement" }),
+            KINDS: Object.freeze(["map", "report"]),
+            SETTINGS: Object.freeze({
+                WHAT: "exportWhatSettlement",
+                PRESET: "exportPresetSettlement",
+                ASPECT: "exportAspectSettlement",
+                PRESET_REPORT: "exportPresetSettlementReport",
+                ASPECT_REPORT: "exportAspectSettlementReport",
+                LEGEND: "exportLegendSettlement",
+            }),
+            // The legend in an export (Ken, 2026-11-26): in the image's top-right corner, up to
+            // ROWS keys a column in up to COLUMNS columns, then "and N others"
+            LEGEND: Object.freeze({ ROWS: 8, COLUMNS: 2 }),
+            // The report (board X3b): the parent map inset and the information block SIDE_PX across
+            // (the inset INSET_PX high), GAP_PX apart and MARGIN_PX in from the paper's edge; they go
+            // below an area wider than WIDE, beside a tall or square one. The block's type in px.
+            REPORT: Object.freeze({
+                SIDE_PX: 720,
+                INSET_PX: 540,
+                GAP_PX: 24,
+                MARGIN_PX: 24,
+                WIDE: 4 / 3,
+                PAD_PX: 28,
+                // The inset: at least INSET_FRAMES frames across round the settlement, PAD of the
+                // box round what it shows, and never drawn past INSET_MAX_SCALE (the Surface map's
+                // pins and names grow with the scale, as in its own exports)
+                INSET_FRAMES: 4,
+                INSET_PAD: 0.12,
+                INSET_MAX_SCALE: 2,
+                TYPE: Object.freeze({ heading: 30, sub: 17, title: 15, body: 17, foot: 14, line: 26 }),
+            }),
         }),
     }),
     // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the

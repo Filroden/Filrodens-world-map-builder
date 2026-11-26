@@ -4907,7 +4907,7 @@ button.fwmb-format {
 
 /* The report sheet in the end column (L-surface's): the map part follows the area and the scale;
    the parent map inset and the information block keep their size, beside a tall or square area and
-   below a wide one. */
+   below a wide one. Drawn small, as the paper it is laid out on (its colours the map's, not the theme's). */
 .fwmb-report-sheet {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 6.5rem;
@@ -4923,10 +4923,14 @@ button.fwmb-format {
 .fwmb-report-map {
     position: relative;
     aspect-ratio: var(--ar, 1.333);
+    /* A tall area stays short enough to see: narrower, centred */
+    width: min(100%, calc(14rem * var(--ar, 1.333)));
+    margin-inline: auto;
     overflow: hidden;
     border: 1px solid #b9b2a3;
 }
-.fwmb-report-map img {
+.fwmb-report-map img,
+.fwmb-report-map canvas {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -4943,6 +4947,7 @@ button.fwmb-format {
 .fwmb-report-inset {
     height: 3.5rem;
     border: 1px solid #b9b2a3;
+    background-color: #dfe3d2;
     background: center / cover no-repeat;
 }
 .fwmb-report-sheet--below .fwmb-report-inset {

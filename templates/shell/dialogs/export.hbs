@@ -8,7 +8,8 @@
     nearest fits, Image format and quality with each format's estimated size, and File name. The
     controller fills in every value; the template holds the parts. A map type may give its own
     presets, stops and line under the slider (a settlement map's: Town view, Hinterland view,
-    Finest).
+    Finest), a What row heading the start column (Map only, Report), the sheet a report is laid
+    out on (heading the end column, board X3b) and checkboxes under the file name (Legend).
 
     Export to scene (board X4) adds its own: the area snapped to the grid (the drawn outline dashed
     beside it, the grid over the preview), the journal and GM overlay choices under the Area, and
@@ -16,6 +17,16 @@
     scale) heading the end column. It has no file name.
 --}}
 <div class="fwmb-export-col">
+    {{#if kinds}}
+    <section class="fwmb-group" data-export-part="what">
+        <div class="fwmb-section-title" id="fwmb-export-what">{{localize "FILRODENSWMB.UI.ExportWhat"}}</div>
+        <div class="fwmb-seg fwmb-seg--equal fwmb-export-what" role="radiogroup" aria-labelledby="fwmb-export-what" style="--n: {{kindCount}}">
+            {{#each kinds}}
+            <button type="button" role="radio" aria-checked="false" data-export-kind="{{this.id}}"{{#if this.off}} aria-disabled="true" data-tooltip="{{this.off}}"{{/if}}>{{this.label}}</button>
+            {{/each}}
+        </div>
+    </section>
+    {{/if}}
     <section class="fwmb-group" data-export-part="area">
         <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportArea"}}</div>
         <div class="fwmb-area-head">
@@ -84,6 +95,19 @@
         </div>
     </section>
     {{/if}}
+    {{#if sheets}}
+    <section class="fwmb-group" data-export-part="sheet" data-export-sheet hidden>
+        <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportSheet"}}</div>
+        <div class="fwmb-report-sheet" data-export-sheet-box aria-hidden="true">
+            <div class="fwmb-report-map" data-export-sheet-map><canvas></canvas></div>
+            <div class="fwmb-report-side">
+                <div class="fwmb-report-inset"></div>
+                <div class="fwmb-report-lines"><i></i><i></i><i></i><i></i></div>
+            </div>
+        </div>
+        <p class="fwmb-hint fwmb-export-line">{{localize "FILRODENSWMB.UI.ExportSheetHint"}}</p>
+    </section>
+    {{/if}}
     <section class="fwmb-group" data-export-part="scale">
         <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</div>
         <div class="fwmb-scale">
@@ -139,5 +163,8 @@
             </div>
         </div>
         {{/unless}}
+        {{#each options}}
+        <label class="fwmb-setting-row"{{#if this.hint}} data-tooltip="{{this.hint}}"{{/if}}><input type="checkbox" class="fwmb-checkbox" data-export-option="{{this.id}}"{{#if this.checked}} checked{{/if}}><span>{{this.label}}</span></label>
+        {{/each}}
     </section>
 </div>
