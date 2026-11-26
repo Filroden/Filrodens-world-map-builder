@@ -1,5 +1,6 @@
 import { NamesGenerator } from "../../../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../../../config.js";
+import { cleanFromList, drawName } from "../../../kernel/names/NameFilter.js";
 import { nameStream } from "../../../kernel/names/PlaceNames.js";
 import { stageRandom } from "../../../kernel/random/Random.js";
 
@@ -19,6 +20,10 @@ import { stageRandom } from "../../../kernel/random/Random.js";
  * Places are named largest first. A name is tried again a few times to avoid a duplicate (a new
  * roll of the item's own stream), then a duplicate is accepted (real maps have those too); so a
  * place's name changes only when a larger place takes it first.
+ *
+ * From generator revision 3 (`cleanNames`), a name holding a common rude word (see NameFilter) counts
+ * as used and is drawn again; if every try is blocked, the last clean try stands, else a clean name
+ * from the base's own list (a realm, its capital's name). Before, names are drawn as they were.
  *
  * Only the names themselves are made here. The words around them ("Kingdom of", "Castle") are the
  * interface's, in the user's language, so a castle carries the kind of keep it is rather than an
@@ -49,9 +54,10 @@ export function nameBaseNames() {
  *     or in a later age, and anything else is named in the name base of the people living there
  *     in that age.
  * @param {boolean} [context.idNames] - Each item named from a stream of its own (generator revision 2).
+ * @param {boolean} [context.cleanNames] - Blocked names drawn again (generator revision 3).
  * @returns {{towns: Map<number, string>, castles: {name: string, keep: string}[], counties: string[], duchies: string[], realms: {name: string, capital: string}[], former: {towns: Map<number, string>, castles: {name: string, keep: string}[]}, history: {places: Map<number, string>, castles: {name: string, keep: string}[], realms: string[]}[]}}
  */
-export function nameEverything({ seed, nameBase, cultures, towns, castles, realms, former = null, history = [], idNames = false }) {
+export function nameEverything({ seed, nameBase, cultures, towns, castles, realms, former = null, history = [], idNames = false, cleanNames = false }) {
     const generator = new NamesGenerator(stageRandom(seed, "names"));
     const baseAt = baseChooser(generator, nameBase, cultures, towns);
     const used = new Set();
@@ -64,32 +70,35 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
             return make();
         };
     };
-    const unique = (make, pool = used) => {
-        let name = make();
-        for (let attempt = 0; attempt < FILRODENSWMB.GENERATOR.NAME_RETRIES && pool.has(name); attempt++) name = make();
+    // A name not taken in its pool (and not blocked, from revision 3); `fallback` gives a clean one
+    // when every try was blocked
+    const unique = (make, pool = used, fallback = null) => {
+        const name = drawName(make, { used: pool, clean: cleanNames, retries: FILRODENSWMB.GENERATOR.NAME_RETRIES, fallback });
         pool.add(name);
         return name;
     };
+    // A clean name from a base's own list, chosen by the stream the item last drew from
+    const fromBase = (base) => () => cleanFromList(String(generator.nameBases[base]?.b ?? "").split(","), generator.rng);
 
     const townNames = new Map();
     for (const town of [...towns].sort((a, b) => b.population - a.population || a.cell - b.cell)) {
-        townNames.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(baseAt(town.cell)))));
+        townNames.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(baseAt(town.cell))), used, fromBase(baseAt(town.cell))));
     }
     const words = FILRODENSWMB.GENERATOR.CASTLE_WORDS;
     // A castle's keep word follows its name in the same stream
     const castleName = (cell, base) => ({
-        name: unique(item(itemKey("castle", cell), () => generator.getBaseShort(base))),
+        name: unique(item(itemKey("castle", cell), () => generator.getBaseShort(base)), used, fromBase(base)),
         keep: words[Math.floor(generator.rng() * words.length)],
     });
     const castleNames = castles.map((castle) => castleName(castle.cell, baseAt(castle.cell)));
-    const seatName = (cell) => townNames.get(cell) ?? unique(item(itemKey("town", cell), () => generator.getBase(baseAt(cell))));
+    const seatName = (cell) => townNames.get(cell) ?? unique(item(itemKey("town", cell), () => generator.getBase(baseAt(cell))), used, fromBase(baseAt(cell)));
     const countyNames = realms.counties.map((county) => seatName(county.seat));
     const duchyNames = realms.duchies.map((duchy) => seatName(duchy.seat));
     // A realm may share its capital's name, but not another realm's
     const realmNames = new Set();
     const realmList = realms.realms.map((realm) => {
         const capital = seatName(realm.seat);
-        const name = realm.kind === "kingdom" ? unique(item(itemKey("realm", realm.seat), () => generator.getState(capital, baseAt(realm.seat))), realmNames) : capital;
+        const name = realm.kind === "kingdom" ? unique(item(itemKey("realm", realm.seat), () => generator.getState(capital, baseAt(realm.seat))), realmNames, () => capital) : capital;
         return { name, capital };
     });
     const baseOf = (name) => {
@@ -98,7 +107,7 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
     };
     const formerTowns = new Map();
     for (const town of [...(former?.towns ?? [])].sort((a, b) => b.population - a.population || a.cell - b.cell)) {
-        formerTowns.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(baseOf(town.nameBase)))));
+        formerTowns.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(baseOf(town.nameBase))), used, fromBase(baseOf(town.nameBase))));
     }
     const formerCastles = (former?.castles ?? []).map((castle) => castleName(castle.cell, baseOf(castle.nameBase)));
 
@@ -114,7 +123,7 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
         const ageBaseAt = baseChooser(generator, nameBase, age.cultures, age.towns);
         const places = new Map();
         for (const town of [...age.towns].sort((a, b) => b.population - a.population || a.cell - b.cell)) {
-            if (!knownTowns.has(town.cell)) knownTowns.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(ageBaseAt(town.cell)))));
+            if (!knownTowns.has(town.cell)) knownTowns.set(town.cell, unique(item(itemKey("town", town.cell), () => generator.getBase(ageBaseAt(town.cell))), used, fromBase(ageBaseAt(town.cell))));
             places.set(town.cell, knownTowns.get(town.cell));
         }
         const ageCastles = age.castles.map((castle) => {
@@ -122,9 +131,9 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
             return knownCastles.get(castle.cell);
         });
         const ageRealms = age.realms.realms.map((realm) => {
-            if (!knownTowns.has(realm.seat)) knownTowns.set(realm.seat, unique(item(itemKey("town", realm.seat), () => generator.getBase(ageBaseAt(realm.seat)))));
+            if (!knownTowns.has(realm.seat)) knownTowns.set(realm.seat, unique(item(itemKey("town", realm.seat), () => generator.getBase(ageBaseAt(realm.seat))), used, fromBase(ageBaseAt(realm.seat))));
             const capital = knownTowns.get(realm.seat);
-            return realm.kind === "kingdom" ? unique(item(itemKey("realm", realm.seat), () => generator.getState(capital, ageBaseAt(realm.seat))), realmNames) : capital;
+            return realm.kind === "kingdom" ? unique(item(itemKey("realm", realm.seat), () => generator.getState(capital, ageBaseAt(realm.seat))), realmNames, () => capital) : capital;
         });
         historyNames[at] = { places, castles: ageCastles, realms: ageRealms };
     }

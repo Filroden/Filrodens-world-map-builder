@@ -1919,6 +1919,9 @@ export const FILRODENSWMB = {
     }),
     // Personal names for the Local studio's households (personal names N2, `PersonNames`): the
     // namer's own defaults, not a culture's
+    // The name filter (roadmap decision 45; kernel/names/NameFilter): a word goes on its list only
+    // where it takes out no more than CAP of any name base's generated names (scripts/name-probe.mjs)
+    NAME_FILTER: Object.freeze({ CAP: 0.01 }),
     PERSON_NAMES: Object.freeze({
         REAL_SHARE: 0.8, // mix: the share of given names taken from the list as they are
         RETRIES: 8, // a generated name that fails the checks is drawn again this many times

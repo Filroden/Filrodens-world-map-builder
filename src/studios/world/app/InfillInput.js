@@ -46,9 +46,10 @@ export class InfillInput {
      * @param {Uint8Array} [source.riverImage] - The river image the map is painted from (see dryCell).
      * @param {object} [source.grid] - The in-fill cells, when already worked out.
      * @param {object[]} [source.pinStyles] - The map's pin styles, for each pin's tier (see places).
-     * @param {{seats?: boolean, idNames?: boolean}} [source.rules] - The generator rules the map
+     * @param {{seats?: boolean, idNames?: boolean, cleanNames?: boolean}} [source.rules] - The generator rules the map
      *     follows (see GeneratorRevision.rules): seats, every settlement pin a place in-fill builds
-     *     round; idNames, each place named from a stream of its own.
+     *     round; idNames, each place named from a stream of its own; cleanNames, names holding a
+     *     common rude word drawn again.
      * @returns {{input: object, grid: object}}
      */
     static gather({ mesh, parentRun, payload, pins, routes, speeds, seed, nameBase, areaFactor, land = null, riverImage = null, grid = this.grid(mesh), pinStyles = [], rules = {} }) {
@@ -95,6 +96,7 @@ export class InfillInput {
             dry: land && riverImage ? this.#dryCells(mesh, grid, land, riverImage) : null,
             names: (pins ?? []).map((pin) => pin?.name).filter(Boolean),
             idNames: rules.idNames === true,
+            cleanNames: rules.cleanNames === true,
         };
         return { input, grid };
     }

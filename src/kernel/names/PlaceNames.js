@@ -1,6 +1,7 @@
 import { NamesGenerator } from "../../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../../config.js";
 import { stageRandom } from "../random/Random.js";
+import { cleanFromList, drawName } from "./NameFilter.js";
 
 /**
  * Names for the map's own items (regions, pins, routes): one suggestion per item, drawn from a
@@ -14,6 +15,10 @@ import { stageRandom } from "../random/Random.js";
  * module holds no language of its own.
  *
  * The generator's names (Names.js) draw from one stream for the whole run and are unchanged by this.
+ *
+ * A generated name holding a common rude word (see NameFilter) is drawn again from the same
+ * stream, so the same three still give the same name, and the next roll is a different one; the
+ * interface's words round it are not checked.
  */
 
 /** One generator for every suggestion: its chains are worked out once per name base and kept. */
@@ -55,10 +60,21 @@ export function placeName({ mapSeed, itemId, roll = 0, nameBase, descriptor = nu
     // Drawn first, so whether a word is added never shifts the name drawn after it
     const worded = generator.rng() < FILRODENSWMB.PLACE_NAMES.FORM_SHARE || descriptor?.always === true;
     const pick = Math.floor(generator.rng() * Math.max(1, words));
-    if (!worded || !words) return generator.getBase(base);
-    if (pick >= forms.length) return generator.getState(generator.getBase(base), base);
-    const proper = descriptor.short ? generator.getBaseShort(base) : generator.getBase(base);
+    if (!worded || !words) return clean(() => generator.getBase(base), base);
+    if (pick >= forms.length) {
+        const name = clean(() => generator.getBase(base), base);
+        return clean(() => generator.getState(name, base), base, () => name);
+    }
+    const proper = clean(() => (descriptor.short ? generator.getBaseShort(base) : generator.getBase(base)), base);
     return forms[pick].replace("{name}", proper);
+}
+
+/**
+ * A generated name drawn again while it is blocked (NameFilter), from the stream it drew from, up
+ * to NAME_RETRIES; then a clean name from the base's own list.
+ */
+function clean(make, base, fallback = () => cleanFromList(String(generator.nameBases[base]?.b ?? "").split(","), generator.rng)) {
+    return drawName(make, { clean: true, retries: FILRODENSWMB.GENERATOR.NAME_RETRIES, fallback });
 }
 
 /** A name base's index: the one named, else the default name style, else the first. */

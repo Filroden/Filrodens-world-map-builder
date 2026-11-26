@@ -1,6 +1,7 @@
 import { NamesGenerator } from "../../../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../../../config.js";
 import { nameStream } from "../../../kernel/names/PlaceNames.js";
+import { cleanFromList, drawName } from "../../../kernel/names/NameFilter.js";
 import { MinHeap } from "../../../kernel/util/MinHeap.js";
 import { EDGE } from "./CellGraph.js";
 import { stageRandom } from "../../../kernel/random/Random.js";
@@ -62,6 +63,7 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  * @param {number} [input.areaFactor] - The map's area factor: about one settled cell in this many has a village (see placeVillages).
  * @param {Iterable<string>} [input.names] - Names already on the map.
  * @param {boolean} [input.idNames] - Each place named from a stream of its own (generator revision 2).
+ * @param {boolean} [input.cleanNames] - Names holding a common rude word drawn again (generator revision 3).
  * @param {object} [input.options] - Overrides of FILRODENSWMB.INFILL.
  * @returns {{places: {cell: number, tier: string, population: number, name: string}[], lanes: {cells: number[]}[], people: Float64Array, stats: object}}
  */
@@ -536,9 +538,11 @@ function treeFrom(graph, cost, sources) {
 
 /**
  * Names, largest place first, each in the name base of its parent cell's main culture, retried a
- * few times to avoid a name already used (on the map or by in-fill).
+ * few times to avoid a name already used (on the map or by in-fill), and from revision 3
+ * (`cleanNames`) one holding a common rude word (see NameFilter), a clean name from the base's own
+ * list standing in if every try is blocked.
  */
-function namePlaces(places, { parentOf, parent, seed, nameBase, names = [], idNames = false }) {
+function namePlaces(places, { parentOf, parent, seed, nameBase, names = [], idNames = false, cleanNames = false }) {
     const generator = new NamesGenerator(stageRandom(seed, "infill"));
     // A place's draws: its own stream from revision 2 (each try a new roll), before the one stream
     const draw = (cell, base) => {
@@ -557,9 +561,9 @@ function namePlaces(places, { parentOf, parent, seed, nameBase, names = [], idNa
     const used = new Set(names);
     const order = places.map((place, index) => index).sort((a, b) => places[b].population - places[a].population || places[a].cell - places[b].cell);
     for (const index of order) {
-        const next = draw(places[index].cell, baseOf(places[index].cell));
-        let name = next();
-        for (let attempt = 0; attempt < FILRODENSWMB.GENERATOR.NAME_RETRIES && used.has(name); attempt++) name = next();
+        const base = baseOf(places[index].cell);
+        const next = draw(places[index].cell, base);
+        const name = drawName(next, { used, clean: cleanNames, retries: FILRODENSWMB.GENERATOR.NAME_RETRIES, fallback: () => cleanFromList(String(generator.nameBases[base]?.b ?? "").split(","), generator.rng) });
         used.add(name);
         places[index].name = name;
     }

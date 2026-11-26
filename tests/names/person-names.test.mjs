@@ -96,6 +96,17 @@ test("every one of the 43 bases names every member of every household", () => {
     }
 });
 
+test("no given or family name holds a common rude word (NameFilter), in 300 households of every base", async () => {
+    const { isBlockedName } = await import("../../src/kernel/names/NameFilter.js");
+    const bad = [];
+    for (const base of BASES) {
+        const { households } = sample(base, 300);
+        // The sample has no neighbouring places (whose names are the map's own and not checked)
+        for (const h of households) for (const m of h.members) for (const part of [m.given, m.family].filter(Boolean)) if (isBlockedName(part)) bad.push(`${base}: ${m.full}`);
+    }
+    assert.deepEqual(bad.slice(0, 20), [], `${bad.length} blocked`);
+});
+
 test("no empty, cut-short, run-together or garbled names", () => {
     const bad = [];
     const check = (base, namer, m) => {

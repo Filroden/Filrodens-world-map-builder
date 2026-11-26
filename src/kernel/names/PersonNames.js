@@ -16,6 +16,7 @@ import { FILRODENSWMB } from "../../config.js";
 import { hashString, mulberry32 } from "../random/Random.js";
 import { FAMOUS, FANTASY_BASES, REAL_BASES, TRADE_CONCEPT } from "./data/PersonNameBases.js";
 import { feminineFamily, fill, patronymic } from "./NameConventions.js";
+import { isBlockedName } from "./NameFilter.js";
 
 export const METHODS = Object.freeze(["list", "chain", "mix", "stem"]);
 
@@ -205,7 +206,7 @@ export function isCleanName(name, [min, max]) {
 function givenName(d, C, sex) {
     const s = sex === "f" ? "f" : "m";
     const list = C.lists[s];
-    const fromList = () => d.weighted(list, C.weights[s]);
+    const fromList = () => listName(d, list, C.weights[s]);
     switch (C.method) {
         case "list":
             return list.length ? fromList() : (chained(d, C, s) ?? "Ann");
@@ -222,7 +223,18 @@ function givenName(d, C, sex) {
     }
 }
 
-/** A name from the chain trained on the culture's list, checked whole and readable. */
+/**
+ * A name from one of the culture's lists, by its weights, drawn again while it holds a common rude
+ * word (NameFilter; an allowed name passes), up to RETRIES; then the first clean name on the list.
+ * A list with no blocked name draws exactly as before.
+ */
+function listName(d, list, weights) {
+    let name = d.weighted(list, weights);
+    for (let attempt = 0; attempt < NAMES.RETRIES && isBlockedName(name); attempt++) name = d.weighted(list, weights);
+    return isBlockedName(name) ? (list.find((entry) => !isBlockedName(entry)) ?? name) : name;
+}
+
+/** A name from the chain trained on the culture's list, checked whole and readable, and not blocked (NameFilter). */
 function chained(d, C, s) {
     C.chain.rng = d.rng;
     for (let attempt = 0; attempt < NAMES.RETRIES; attempt++) {
@@ -230,7 +242,7 @@ function chained(d, C, s) {
         if (C.lowerAfterHyphen) name = name.replace(/-(\p{L})/u, (_, c) => `-${c.toLowerCase()}`);
         // A real base's chain should make new names: one already on the list is the list's
         if (!C.fantasy && C.sets[s].has(name)) continue;
-        if (FAMOUS.has(name)) continue;
+        if (FAMOUS.has(name) || isBlockedName(name)) continue;
         if (!C.fantasy && syllables(name) > C.syllables[s]) continue;
         if (isCleanName(name, C.lengths[s]) && endsWell(name, C)) return name;
     }
@@ -249,12 +261,12 @@ function stemName(d, C, s) {
     const ending = d.pick(C.endings[s]);
     if (/[aeiouy]$/.test(stem) && /^[aeiouy]/.test(ending)) stem = stem.slice(0, -1);
     const name = stem.charAt(0).toUpperCase() + stem.slice(1) + ending;
-    return isCleanName(name, C.lengths[s]) && !FAMOUS.has(name) ? name : null;
+    return isCleanName(name, C.lengths[s]) && !FAMOUS.has(name) && !isBlockedName(name) ? name : null;
 }
 
 /**
- * A whole place name of one word in the culture's place-name base; `short` for a byname, which
- * carries a suffix and stands beside a given name.
+ * A whole place name of one word in the culture's place-name base, not blocked (NameFilter); `short`
+ * for a byname, which carries a suffix and stands beside a given name.
  */
 function placeWord(d, C, short = false) {
     const gen = C.places;
@@ -262,8 +274,8 @@ function placeWord(d, C, short = false) {
     const longest = short ? Math.max(gen.nameBases[C.placeBase].max - 2, gen.nameBases[C.placeBase].min) : gen.nameBases[C.placeBase].max;
     const make = () => (short ? gen.getBaseShort(C.placeBase) : gen.getBase(C.placeBase));
     let name = make();
-    for (let attempt = 0; attempt < NAMES.PLACE_RETRIES && (name.length >= longest - 1 || /[ '-]/.test(name)); attempt++) name = make();
-    return /[ '-]/.test(name) ? null : name;
+    for (let attempt = 0; attempt < NAMES.PLACE_RETRIES && (name.length >= longest - 1 || /[ '-]/.test(name) || isBlockedName(name)); attempt++) name = make();
+    return /[ '-]/.test(name) || isBlockedName(name) ? null : name;
 }
 
 /**
@@ -272,9 +284,9 @@ function placeWord(d, C, short = false) {
  */
 function lineName(d, C, { trade = null } = {}) {
     const { base, words, settings, lists } = C;
-    if ((settings.form === "clan" || settings.form === "roman" || base.familyFrom === "list") && lists.family.length) return { name: d.weighted(lists.family, C.weights.family), kind: "list" };
+    if ((settings.form === "clan" || settings.form === "roman" || base.familyFrom === "list") && lists.family.length) return { name: listName(d, lists.family, C.weights.family), kind: "list" };
     if (settings.form === "clan" || settings.form === "roman") {
-        if (lists.family.length) return { name: d.weighted(lists.family, C.weights.family), kind: "list" };
+        if (lists.family.length) return { name: listName(d, lists.family, C.weights.family), kind: "list" };
         return { name: placeWord(d, C) ?? givenName(d, C, "m"), kind: "place" };
     }
     const own = TRADE_CONCEPT[trade];
@@ -297,7 +309,7 @@ function lineName(d, C, { trade = null } = {}) {
     const kind = d.share(shares) ?? "place";
     switch (kind) {
         case "list":
-            return { name: d.weighted(lists.family, C.weights.family), kind };
+            return { name: listName(d, lists.family, C.weights.family), kind };
         case "trade": {
             if (ownWord && (settings.form === "byname" || d.chance(NAMES.OWN_TRADE))) return { name: ownWord, kind };
             if (tradeWords.length) return { name: d.pick(tradeWords), kind };
@@ -447,7 +459,7 @@ function nameHousehold(seed, household, cultureOf) {
             const { place } = toponym(d, C);
             if (place) extra = { name: fill(C.base.place, "p", place) };
         }
-        if (NAMES.ALSO_FAMILY[C.baseName] && d.chance(NAMES.ALSO_FAMILY[C.baseName]) && C.lists.family.length) extra = { name: d.weighted(C.lists.family, C.weights.family) };
+        if (NAMES.ALSO_FAMILY[C.baseName] && d.chance(NAMES.ALSO_FAMILY[C.baseName]) && C.lists.family.length) extra = { name: listName(d, C.lists.family, C.weights.family) };
         if (C.baseName === "Arabic" && d.chance(NAMES.ARABIC_LAQAB)) {
             const concept = TRADE_CONCEPT[household.trade];
             const word = concept ? C.base.trades[concept] : null;
