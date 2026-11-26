@@ -24,7 +24,7 @@ Node's built-in test runner, no test framework. From the repository root:
 - `tutorial/`: the wiki's tutorial pages, played in the web studio (see [The tutorial](#the-tutorial-tutorial) below).
 - `support/`: shared helpers that are not tests. `pipeline-setup.mjs` builds a stand-in for the studio app from a saved map so the generation pipeline can run outside Foundry; `web-worker-shim.mjs` gives Node a browser-style module `Worker`.
 
-Two checks run the studio in headless Chromium (Playwright) and stay in `design/`, run by hand: `design/prototypes/thin-frame/studio-smoke-check.mjs` (the studio in a stand-in Foundry window) and `design/prototypes/web/web-smoke-check.mjs` (the web version, from the working copy or any site address). The browser render check for the region fill (`design/tests/mesh/browser/render-check.mjs`, headless Chromium through Playwright) stays in `design/` and is run by hand; it reads the fixtures from here.
+Three checks run in headless Chromium (Playwright) and stay in `design/checks/`, run by hand: `design/checks/studio-smoke/studio-smoke-check.mjs` (the studio in a stand-in Foundry window), `design/checks/web-smoke/web-smoke-check.mjs` (the web version, from the working copy or any site address) and `design/checks/mesh-render/render-check.mjs` (the region fill as drawn; it reads the fixtures from here).
 
 ## The tutorial (`tutorial/`)
 
