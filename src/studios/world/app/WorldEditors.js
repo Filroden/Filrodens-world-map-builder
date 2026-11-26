@@ -12,7 +12,8 @@ import { platform } from "../../../platform/index.js";
  *   World settings are not in the map's undo, but for Styles and icons: a style's change reaches the
  *   map's own objects, so it stays an undo step of the map, and its head has Undo and Redo;
  * - the lede, then **Read by**: each map tool that reads the page, with a Go to it (`readBy`, the
- *   mirror of Peoples and realms' Read from the world);
+ *   mirror of Peoples and realms' Read from the world), and with `readBySettlements` the
+ *   settlement maps' Households and supply (the Cultures page's names settings, N3);
  * - on a held regional world, the held banner naming the world it reads its settings from, the
  *   page read only (its World setup is its own but fixed by its crop).
  *
@@ -24,7 +25,7 @@ export const WORLD_EDITORS = Object.freeze({
     // area factor and unit the scale bar, travel and the run's areas
     worldSetup: Object.freeze({ groups: ["setup"], icon: "tune", label: "FILRODENSWMB.UI.WorldSetup", lede: "FILRODENSWMB.UI.WorldSetupLede", readBy: ["climate", "cartography", "travel", "generate"] }),
     // The cultures and the default naming style, one page (round 4c): every random name reads them
-    worldCultures: Object.freeze({ groups: ["cultures", "nameStyle"], icon: "groups", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede", readBy: ["generate", "history", "infrastructure", "regions", "labels", "features"] }),
+    worldCultures: Object.freeze({ groups: ["cultures", "nameStyle"], icon: "groups", label: "FILRODENSWMB.UI.WorldCultures", lede: "FILRODENSWMB.UI.WorldCulturesLede", readBy: ["generate", "history", "infrastructure", "regions", "labels", "features"], readBySettlements: true }),
     worldAges: Object.freeze({ groups: ["ages"], icon: "history", label: "FILRODENSWMB.UI.WorldAges", lede: "FILRODENSWMB.UI.WorldAgesLede", readBy: ["generate", "history"] }),
     // A style's change reaches the map's own objects that use it (its cascade), so Styles and icons
     // keeps the map's undo rather than Revert changes (Ken, 2026-11-19)

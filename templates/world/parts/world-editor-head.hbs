@@ -18,7 +18,7 @@
 <div class="fwmb-readby" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ReadBy'}}">
     <span class="fwmb-readby-head">{{localize "FILRODENSWMB.UI.ReadBy"}}</span>
     {{#each worldEditor.readBy}}
-    <span class="fwmb-readby-chip"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.name}} <span class="fwmb-readby-map">· {{this.map}}</span><button type="button" class="fwmb-btn fwmb-btn--go" data-action="goToMapTool" data-tool="{{this.tool}}" aria-label="{{this.goLabel}}"{{#if this.disabled}} aria-disabled="true"{{/if}}{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}>{{localize "FILRODENSWMB.UI.Go"}}</button></span>
+    <span class="fwmb-readby-chip"><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.name}} <span class="fwmb-readby-map">· {{this.map}}</span><button type="button" class="fwmb-btn fwmb-btn--go" data-action="{{#if this.action}}{{this.action}}{{else}}goToMapTool{{/if}}"{{#if this.tool}} data-tool="{{this.tool}}"{{/if}} aria-label="{{this.goLabel}}"{{#if this.disabled}} aria-disabled="true"{{/if}}{{#if this.tooltip}} data-tooltip="{{this.tooltip}}"{{/if}}>{{localize "FILRODENSWMB.UI.Go"}}</button></span>
     {{/each}}
     {{#if worldEditor.heldReach}}<span class="fwmb-hint">{{worldEditor.heldReach}}</span>{{/if}}
 </div>

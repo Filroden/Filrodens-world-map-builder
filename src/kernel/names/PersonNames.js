@@ -97,6 +97,17 @@ export function createNamer({ cultures = [], method = "mix", nearby = [] } = {})
     };
 }
 
+/**
+ * The convention a name base gives with every names setting on Automatic (N3: what the culture
+ * inspector's Automatic reads), as the namer resolves it; an unknown base as Human Generic.
+ * @param {string} nameBase
+ * @returns {{form: string, order: string, lineage: string, wife: string}}
+ */
+export function conventionOf(nameBase) {
+    const base = REAL_BASES[nameBase] ?? FANTASY_BASES[nameBase] ?? FANTASY_BASES["Human Generic"];
+    return { form: base.form ?? "inherited", order: base.order ?? "given-first", lineage: base.lineage ?? "father", wife: base.wife ?? "takes" };
+}
+
 function prepare(culture, defaultMethod, places, near = []) {
     const baseName = REAL_BASES[culture.nameBase] || FANTASY_BASES[culture.nameBase] ? culture.nameBase : "Human Generic";
     const real = REAL_BASES[baseName];

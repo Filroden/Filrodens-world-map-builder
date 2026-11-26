@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../../../config.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
 import { FRAME } from "../engine/LocalInput.js";
 import { LIES } from "../engine/CellContext.js";
+import { FORMS, HOUSEHOLD_HEADS, LINEAGES, ORDERS, WIVES } from "../../../kernel/names/NameConventions.js";
 
 /**
  * A settlement map's record read safely (L-surface, `claude/v5-l-surface-step2-plan.md` §3.1):
@@ -127,8 +128,27 @@ const culture = (value) => {
         openness: share(value.openness ?? 0.5, "a culture's openness"),
         nameBase: text(value.nameBase ?? "English", MAX_TEXT, "a culture's name base"),
         share: share(value.share, "a culture's share"),
+        ...namesOf(value),
     };
 };
+
+/** Each names setting's choices (N3), as the culture's in MapRules. */
+const NAME_CHOICES = Object.freeze({ form: FORMS, order: ORDERS, lineage: LINEAGES, wife: WIVES });
+
+/**
+ * A culture's names settings (N3): only those chosen, as the input keeps them (see LocalInput's
+ * cultures). An unknown value is left out, so it reads as Automatic, as it does on the world's
+ * culture; it refuses nothing.
+ */
+function namesOf(value) {
+    const out = {};
+    if (value.names && typeof value.names === "object" && !Array.isArray(value.names)) {
+        const names = Object.fromEntries(Object.entries(NAME_CHOICES).filter(([key, choices]) => choices.includes(value.names[key])).map(([key]) => [key, value.names[key]]));
+        if (Object.keys(names).length) out.names = names;
+    }
+    if (HOUSEHOLD_HEADS.includes(value.heads)) out.heads = value.heads;
+    return out;
+}
 
 /**
  * The engine's input, checked (see the class comment), or a Refused error.

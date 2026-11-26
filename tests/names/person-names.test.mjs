@@ -342,3 +342,29 @@ test("names follow the head and the lineage", () => {
     });
     assert.ok(checked > 100, `${checked}`);
 });
+
+test("a culture's own names settings (N3) win over its name style's; every one on Automatic names exactly as none", () => {
+    const r = load("Bonevilde");
+    const local = r.cultures[0];
+    const withNames = (names) => ({ ...r, cultures: [{ ...local, names }] });
+    const plain = nameAll(r);
+    // Automatic everywhere (each setting null, as the culture inspector keeps it): the same names
+    assert.deepEqual(nameAll(withNames({ form: null, order: null, lineage: null, wife: null })), plain);
+    const families = (households) => households.filter((h) => h.members.some((m) => m.role === "child" && !m.own) && h.members[0].sex === "m");
+    const childTakes = (households) => {
+        const all = families(households).flatMap((h) => h.members.filter((m) => m.role === "child" && !m.own).map((c) => c.family === h.members[0].family));
+        return all.filter(Boolean).length / all.length;
+    };
+    // English by its style: an inherited family name the children take, a wife taking it, given name first
+    assert.ok(childTakes(plain) > 0.95, `${childTakes(plain)}`);
+    // Patronymic: each child named after the father, not his own name
+    const patronymic = nameAll(withNames({ form: "patronymic" }));
+    assert.ok(childTakes(patronymic) < 0.05, `${childTakes(patronymic)}`);
+    // Family name first
+    const first = nameAll(withNames({ order: "family-first" })).flatMap((h) => h.members).filter((m) => m.family && m.full !== m.given);
+    assert.ok(first.length > 1000 && first.every((m) => m.full.startsWith(`${m.family} `)), first.find((m) => !m.full.startsWith(`${m.family} `))?.full);
+    // The spouse keeping their own name
+    const wives = (households) => households.map((h) => [h.members[0], h.members.find((m) => m.role === "wife")]).filter(([, wife]) => wife);
+    const sameName = (households) => wives(households).filter(([head, wife]) => head.family === wife.family).length / wives(households).length;
+    assert.ok(sameName(plain) > 0.95 && sameName(nameAll(withNames({ wife: "keeps" }))) < 0.2, `${sameName(plain)} ${sameName(nameAll(withNames({ wife: "keeps" })))}`);
+});

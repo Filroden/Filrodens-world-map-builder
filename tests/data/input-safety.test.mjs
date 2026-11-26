@@ -567,6 +567,8 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.cultures[0].habitat.relief = ["low", 1];
     file.cultures[0].openness = 7;
     file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
+    file.cultures[0].names = { form: "patronymic", order: "<b>first</b>", lineage: null, wife: "keeps", lists: { m: "Ann" } };
+    file.cultures[0].households = { heads: "kings" };
     file.thematic = { fill: "__proto__", opacity: 40 };
     file.travel = { mode: "dragon", season: "monsoon", speeds: { foot: 5000, sea: -3, riverUp: "fast" }, start: { x: 10, y: "2" } };
     file.manualRivers = [
@@ -581,6 +583,8 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");
     assert.equal(mapData.cultures[0].openness, 1);
     assert.deepEqual(mapData.cultures[0].homelands, [{ x: 12, y: 30 }, { x: 80, y: 44.5 }]);
+    assert.deepEqual(mapData.cultures[0].names, { form: "patronymic", lineage: null, wife: "keeps" }, "a culture's names settings (N3): known choices or Automatic (null); an unknown one dropped, read as Automatic; the deferred lists not kept");
+    assert.deepEqual(mapData.cultures[0].households, {});
     assert.ok(!("src" in mapData.mapDecorations[0]));
     assert.ok(!("behavesLike" in mapData.customBiomes[0]), "Behaves like names only a land biome the generator knows");
     assert.deepEqual(mapData.customBiomes[0].properties, { farming: 0.5, cover: 0.1, raiders: 2 }, "a biome's own numbers keep only known properties, in range: cover 0 is raised to its least (clearing divides by it); a word and an unknown key are dropped");

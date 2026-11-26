@@ -535,3 +535,46 @@ test("deleting a culture regions of the map were given says so; they keep it as 
     assert.match(answers.asked.content, /CultureDeleteRegionsOne/);
     assert.deepEqual(region.cultures, [{ culture: id, share: null }], "the region keeps it, read as deleted");
 });
+
+test("the Names section (N3): each setting Automatic first, saying what the name style gives; a choice applies with no undo step and no run out of date", async () => {
+    // The panel's name style is Nordic: patronymics, the father's line, mostly men heading households
+    const app = await withCulture();
+    const fields = form(app).elements;
+    const options = (name) => [...fields[name].options].map((option) => [option.value, option.textContent.trim()]);
+    assert.deepEqual(options("cultureNameForm")[0], ["", 'FILRODENSWMB.UI.CultureNamesAutoOf {"value":"FILRODENSWMB.UI.PersonFormPatronymicLower"}']);
+    assert.deepEqual(options("cultureNameForm").slice(1).map(([value]) => value), ["inherited", "byname", "patronymic", "clan", "single", "roman"]);
+    assert.deepEqual(options("cultureNameOrder")[0], ["", "FILRODENSWMB.UI.CultureNamesAuto"]);
+    assert.deepEqual(options("cultureNameLineage")[0], ["", 'FILRODENSWMB.UI.CultureNamesAutoOf {"value":"FILRODENSWMB.UI.PersonLineageFatherLower"}']);
+    assert.deepEqual(options("cultureHouseholdHeads").map(([value]) => value), ["", "men", "women", "either"]);
+    assert.ok(options("cultureHouseholdHeads")[0][1].includes("PersonHeadsMenLower"));
+    // Opening and closing it changes nothing: a culture that never had them still has none
+    const stale = app.stale;
+    await commitField(fields.cultureOpenness, String(culture(app).openness));
+    assert.ok(!("names" in culture(app)) && !("households" in culture(app)));
+    // A choice: kept on the culture, no undo step, no run out of date, the world changed
+    const dirty = app.dirty;
+    await commitField(form(app).elements.cultureNameForm, "inherited");
+    assert.deepEqual(culture(app).names, { form: "inherited", order: null, lineage: null, wife: null });
+    assert.equal(app.stale, stale, "Generate does not read a culture's names settings");
+    assert.ok(app.dirty > dirty);
+    noUndo(app);
+    // The lineage through the mother: Household heads' Automatic follows it
+    await commitField(form(app).elements.cultureNameLineage, "mother");
+    assert.ok(options("cultureHouseholdHeads")[0][1].includes("PersonHeadsWomenLower"));
+    await commitField(form(app).elements.cultureHouseholdHeads, "either");
+    assert.deepEqual(culture(app).households, { heads: "either" });
+    // Back to Automatic: null, so it reads as the name style's again
+    await commitField(form(app).elements.cultureNameForm, "");
+    assert.equal(culture(app).names.form, null);
+    assert.equal(app.stale, stale);
+    // The name style's own: Automatic follows it
+    await commitField(form(app).elements.cultureNameBase, "English");
+    assert.ok(options("cultureNameForm")[0][1].includes("PersonFormInheritedLower"));
+});
+
+test("on a held regional world the Names section is read only: a choice changes nothing", async () => {
+    const app = await withCulture();
+    app.world = { held: true };
+    await commitField(form(app).elements.cultureNameForm, "roman");
+    assert.ok(!("names" in culture(app)));
+});

@@ -169,7 +169,10 @@ export function cardOf(t, h, { name = "", kind = "town", walled = false, cave = 
     const children = rest.filter((m) => m.role === "child").sort((a, b) => b.age - a.age);
     if (children.length) {
         const key = (children.length === 1 ? CHILD : CHILDREN)[whose];
-        const names = listOf(children.map((m) => m.given || ""), lang);
+        // Given names alone where the children carry the head's family name; otherwise (a
+        // patronymic, the line through the other parent) each child's whole name
+        const sameLine = children.every((m) => !m.family || m.family === head?.family);
+        const names = listOf(children.map((m) => (sameLine ? m.given || "" : nameOf(m))), lang);
         family.push({ ...line(t, key, { name: names, ages: listOf(children.map((m) => number(m.age, lang)), lang) }), culture: null });
     }
     for (const m of rest) {

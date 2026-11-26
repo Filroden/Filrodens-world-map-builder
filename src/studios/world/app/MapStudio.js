@@ -321,6 +321,7 @@ export class MapStudio {
         openWorldTool(_e, t)            { this.openWorldTool(t.dataset.tool, t.dataset.section); },
         revertWorldGroup(_e, t)         { this.revertWorldGroup(t.dataset.tool); },
         goToMapTool(_e, t)              { this.goToMapTool(t.dataset.tool, t.dataset.section); },
+        openSettlementList()            { this.#openSettlementList(); },
         placeHomeland(_e, t)            { this.#placeHomeland(t.dataset.cultureId); },
         removeHomeland(_e, t)           { CultureMarkers.remove(this, t.dataset.cultureId, Number(t.dataset.index)); },
         autoHomelands(_e, t)            { CultureMarkers.clear(this, t.dataset.cultureId); },
@@ -6390,7 +6391,7 @@ export class MapStudio {
             changed: editor.groups.some((group) => this.worldGroupChanged(group)),
             heldCount: (node?.children ?? []).filter((child) => child.held).length,
             heldBy: this.world?.held ? WorldsPanel.named(parent ?? { name: "" }) : null,
-            readBy: this.#readByChips(editor.readBy),
+            readBy: this.#readByChips(editor.readBy, { settlements: editor.readBySettlements }),
         });
         // Why a held regional world is Out of date, on its held banner (S0 step 5)
         context.worldEditor.stale = this.world?.held ? this.#staleLines : [];
@@ -6424,14 +6425,17 @@ export class MapStudio {
     /**
      * A world page's Read by (round 4c): a chip for each map tool that reads it, on each map that
      * has the tool (S0: the Surface map), with a Go that switches to that map and opens the tool.
-     * An Explore tool needs a run to show anything, so its Go waits for one.
+     * An Explore tool needs a run to show anything, so its Go waits for one. With `settlements`, the
+     * Local studio's Households and supply too, read on every settlement map (N3: the Cultures
+     * page): its Go opens the world bar's list of settlement maps, and waits for one.
      * @param {string[]} tools
+     * @param {{settlements?: boolean}} [options]
      */
-    #readByChips(tools = []) {
+    #readByChips(tools = [], { settlements = false } = {}) {
         const { i18n } = platform;
         const map = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
         const hasRun = !!(this.modelRun || this.parentRun);
-        return tools
+        const chips = tools
             .map((id) => this.definition.tool(id))
             .filter((entry) => entry && this.#isMapTool(entry.id) && this.definition.offers(entry.id, this.mapType, entry.mode))
             .map((entry) => {
@@ -6448,6 +6452,32 @@ export class MapStudio {
                     tooltip: !this.surfaceMade ? i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap") : explore && !hasRun ? i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") : null,
                 };
             });
+        if (settlements && SettlementMaps.available(this)) {
+            const none = !SettlementMaps.menuContext(this).count;
+            chips.push({
+                action: "openSettlementList",
+                icon: "groups",
+                name: i18n.localize("FILRODENSWMB.UI.ToolHouseholds"),
+                map: i18n.localize("FILRODENSWMB.UI.ReadBySettlementMaps"),
+                goLabel: i18n.localize("FILRODENSWMB.UI.ReadBySettlementMapsGo"),
+                disabled: none,
+                tooltip: none ? i18n.localize("FILRODENSWMB.UI.SettlementMapsNone") : null,
+            });
+        }
+        return chips;
+    }
+
+    /**
+     * The Households and supply chip's Go (the Cultures page): the world bar's list of settlement
+     * maps opened, its search taking the keys; in the layer menu where the bar has folded it away.
+     */
+    #openSettlementList() {
+        const root = this.root;
+        const own = root?.querySelector(".fwmb-worldbar-settlements.fwmb-dropdown");
+        const button = own?.getClientRects().length ? own.querySelector(":scope > .fwmb-barbtn") : root?.querySelector(".fwmb-layers-menu > .fwmb-barbtn");
+        if (!button) return;
+        button.focus();
+        requestAnimationFrame(() => own?.querySelector("[data-settlement-search]")?.focus({ preventScroll: true }));
     }
 
     /**

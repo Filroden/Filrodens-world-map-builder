@@ -17,6 +17,8 @@ export const FORMS = Object.freeze(["inherited", "byname", "patronymic", "clan",
 export const ORDERS = Object.freeze(["given-first", "family-first"]);
 export const LINEAGES = Object.freeze(["father", "mother"]);
 export const WIVES = Object.freeze(["takes", "keeps"]);
+/** Who heads a culture's households (N2b): mostly men, mostly women, or either; none for Automatic (by the lineage). */
+export const HOUSEHOLD_HEADS = Object.freeze(["men", "women", "either"]);
 
 const VOWEL = /[aeiouyàáâãäåæèéêëìíîïòóôõöøùúûüýāăēĕīĭōŏūŭœ]/i;
 const isVowel = (c) => VOWEL.test(c ?? "");

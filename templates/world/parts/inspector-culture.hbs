@@ -1,8 +1,8 @@
 {{!--
     The inspector's culture (see CultureEditor): its name, colour and name style; then, in folding
     sections, how open and how dense it is; its habitat (its climate from chosen biomes or from
-    zones, relief as a band on one track, coast and river from avoids to seeks); and its
-    homelands. Every field applies when committed (see Inspector): cultures are the world's (S0
+    zones, relief as a band on one track, coast and river from avoids to seeks); its names (N3);
+    and its homelands. Every field applies when committed (see Inspector): cultures are the world's (S0
     step 4b), so no change is an undo step of the map. Dwelling and Mining affinity are drawn for
     the Underground track, disabled. Read only on a held regional world.
 --}}
@@ -112,6 +112,26 @@
     <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureAvoids"}}</span><span>{{localize "FILRODENSWMB.UI.CultureSeeks"}}</span></div>
     {{> "modules/filrodens-world-map-builder/templates/shell/parts/shared-range.hbs" name="habitatRiver" label="FILRODENSWMB.UI.CultureRiver" hint="FILRODENSWMB.UI.CultureRiverHint" value=fields.river.value min=fields.river.min max=fields.river.max step=fields.river.step resetTo=fields.river.resetTo}}
     <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureAvoids"}}</span><span>{{localize "FILRODENSWMB.UI.CultureSeeks"}}</span></div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+
+{{!-- How its households are named and who heads them (N3, board L5): each Automatic by default,
+     saying what its name style gives; read only by settlement maps' households --}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="cultureNames" title="FILRODENSWMB.UI.CultureNames" badge="FILRODENSWMB.UI.CultureNamesBadge" instant=true}}
+    {{!-- Stacked, so Automatic's words ("Automatic (inherited family name)") are read whole (on
+         two lines in a narrow inspector) --}}
+    {{#each names}}
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label class="fwmb-label" for="{{this.id}}">{{localize this.label}}</label>
+        <div class="fwmb-form-fields">
+            <select id="{{this.id}}" name="{{this.name}}">
+                {{#each this.choices}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{/each}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CultureNamesHint"}}</p>
 {{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
 
 {{!-- Where the culture starts is each map's own (S0 step 4c-2, board C5): placed on the map, in

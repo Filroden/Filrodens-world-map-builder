@@ -11,13 +11,16 @@ import { InspectorFields } from "./InspectorFields.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { platform } from "../../../platform/index.js";
+import { conventionOf } from "../../../kernel/names/PersonNames.js";
+import { FORMS, HOUSEHOLD_HEADS, LINEAGES, ORDERS, WIVES } from "../../../kernel/names/NameConventions.js";
 
 /**
  * A culture in the inspector (see Inspector), opened from its row in the Generate panel's Cultures
  * section (see CultureLists): its name, colour and name style; then, in folding sections, how open
  * and how dense it is; its habitat (its climate from chosen biomes or from zones, see
- * CultureClimate; relief as a band on one track; coast and river from avoids to seeks); and its
- * homelands.
+ * CultureClimate; relief as a band on one track; coast and river from avoids to seeks); its names
+ * (N3: the convention, order, lineage and spouse's name its households are named by, and who heads
+ * them, each Automatic by default, as its name style gives); and its homelands.
  *
  * Each field applies when committed. Cultures are the world's (S0 step 4b), so a change is no undo
  * step of the map: the Cultures editor's Revert changes puts the list back. A change marks a run
@@ -29,6 +32,10 @@ import { platform } from "../../../platform/index.js";
  * same either way). Relief is the height a cell spans, in the map's elevation units (as the biome
  * rule editor and the Elev readout show it). A band covering its whole track is no limit, and is
  * kept as none.
+ *
+ * The names settings are read only by settlement maps' households, through each map's input (see
+ * LocalInput's cultures): a change marks those maps Out of date and no run, and Generate again
+ * brings it in.
  */
 
 const TEMPLATE = "modules/filrodens-world-map-builder/templates/world/parts/inspector-culture.hbs";
@@ -41,6 +48,21 @@ const COVERAGE_STRIDE = 4;
 
 /** The older bands a climate of its own replaces. */
 const OLD_BANDS = Object.freeze(["temperature", "moisture", "height"]);
+
+/**
+ * The Names section's fields (N3): each field's form name, where it is kept on the culture, its
+ * choices and their strings' stems. Automatic (null) is the first choice of each.
+ */
+const NAME_FIELDS = Object.freeze([
+    Object.freeze({ name: "cultureNameForm", group: "names", key: "form", label: "FILRODENSWMB.UI.CultureNamesConvention", choices: FORMS, stem: "PersonForm" }),
+    Object.freeze({ name: "cultureNameOrder", group: "names", key: "order", label: "FILRODENSWMB.UI.CultureNamesOrder", choices: ORDERS, stem: "PersonOrder" }),
+    Object.freeze({ name: "cultureNameLineage", group: "names", key: "lineage", label: "FILRODENSWMB.UI.CultureNamesLineage", choices: LINEAGES, stem: "PersonLineage" }),
+    Object.freeze({ name: "cultureNameSpouse", group: "names", key: "wife", label: "FILRODENSWMB.UI.CultureNamesSpouse", choices: WIVES, stem: "PersonSpouse" }),
+    Object.freeze({ name: "cultureHouseholdHeads", group: "households", key: "heads", label: "FILRODENSWMB.UI.CultureNamesHeads", choices: HOUSEHOLD_HEADS, stem: "PersonHeads" }),
+]);
+
+/** A choice's string key: "inherited" under PersonForm is PersonFormInherited, "given-first" PersonOrderGivenFirst. */
+const choiceKey = (stem, value) => `FILRODENSWMB.UI.${stem}${value.replace(/(^|-)(\w)/g, (_m, _d, c) => c.toUpperCase())}`;
 
 /** Steps of the fields (a band's handle, a slider). */
 const STEP = 0.01;
@@ -118,9 +140,53 @@ export class CultureEditor {
                 relief: { ...band(habitat.relief, 0, reliefMax), min: 0, max: reliefMax, step: STEP / 2, zones: reliefZones },
             },
             climate: this.#climateContext(app, climate),
+            names: this.#namesContext(app, culture),
             // A held regional world reads its cultures from the world above it
             readOnly: WorldEditors.readOnly(app),
         };
+    }
+
+    /**
+     * The Names section (N3): each field's choices, Automatic first and saying what it gives where
+     * the name style's own differs from the usual (given name first, the spouse taking the head's
+     * name): the style's convention and lineage always, and Household heads from the lineage as
+     * chosen in the same section.
+     */
+    static #namesContext(app, culture) {
+        const { i18n } = platform;
+        const base = conventionOf(culture.nameBase ?? GeneratePanel.settings(app).nameBase);
+        const lineage = culture.names?.lineage ?? base.lineage;
+        const auto = { form: base.form, order: base.order === "given-first" ? null : base.order, lineage: base.lineage, wife: base.wife === "takes" ? null : base.wife, heads: lineage === "mother" ? "women" : "men" };
+        return NAME_FIELDS.map((field) => {
+            const current = culture[field.group]?.[field.key] ?? null;
+            const resolved = auto[field.key];
+            const autoLabel = resolved ? i18n.format("FILRODENSWMB.UI.CultureNamesAutoOf", { value: i18n.localize(`${choiceKey(field.stem, resolved)}Lower`) }) : i18n.localize("FILRODENSWMB.UI.CultureNamesAuto");
+            return {
+                name: field.name,
+                id: `fwmb-inspector-${field.name}`,
+                label: field.label,
+                choices: [{ value: "", label: autoLabel, selected: current === null }, ...field.choices.map((value) => ({ value, label: i18n.localize(choiceKey(field.stem, value)), selected: current === value }))],
+            };
+        });
+    }
+
+    /**
+     * The Names section's settings as the form holds them, by where they are kept: Automatic is
+     * null. A culture that never had them and still has none gets none (so opening and closing the
+     * section changes nothing).
+     */
+    static #readNames(culture, form) {
+        const read = {};
+        for (const field of NAME_FIELDS) {
+            const value = form.elements[field.name]?.value;
+            const kept = culture[field.group]?.[field.key] ?? null;
+            const chosen = value === undefined ? kept : field.choices.includes(value) ? value : null;
+            (read[field.group] ??= {})[field.key] = chosen;
+        }
+        for (const group of Object.keys(read)) {
+            if (!culture[group] && Object.values(read[group]).every((value) => value === null)) delete read[group];
+        }
+        return read;
     }
 
     /**
@@ -242,15 +308,17 @@ export class CultureEditor {
             openness: number("cultureOpenness", culture.openness),
             density: number("cultureDensity", culture.density),
             habitat,
+            ...this.#readNames(culture, form),
         };
     }
 
     /**
-     * What Generate reads of a culture, to compare: everything but its name and colour, its habitat
-     * by the climate it means (an older culture's bands and the one zone they become read the same).
+     * What Generate reads of a culture, to compare: everything but its name and colour and its names
+     * settings (read only by settlement maps' households), its habitat by the climate it means (an
+     * older culture's bands and the one zone they become read the same).
      */
     static #generatorReading(culture) {
-        const { name: _name, color: _color, habitat = {}, ...rest } = culture;
+        const { name: _name, color: _color, names: _names, households: _households, habitat = {}, ...rest } = culture;
         const { mode, biomes, zones } = climateOf(habitat);
         const { relief = null, coast = 0, river = 0 } = habitat;
         return JSON.stringify([rest, mode, biomes, zones, relief, coast, river]);
@@ -258,7 +326,8 @@ export class CultureEditor {
 
     /**
      * Applies what changed (no undo step: the world's setting). A run made before is then out of date, unless only
-     * the culture's name or colour changed: Generate reads neither (places are named in its name
+     * the culture's name, colour or names settings changed (the names settings reach settlement
+     * maps through their input, making them Out of date there): Generate reads neither (places are named in its name
      * style, and what a run made names its cultures by id), so the map is drawn again at once in
      * the new colour instead (the Culture layer and its legend take the map culture's own).
      */

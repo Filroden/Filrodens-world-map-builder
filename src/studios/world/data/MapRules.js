@@ -3,6 +3,7 @@ import { LAYER_SET_KINDS, NESTING_MODES, ROUTE_CLASSES, ROUTE_TRANSPORTS, VISIBI
 import { MODEL_RUN_ARRAYS } from "../generator/ModelRun.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
 import { FEATURE_KINDS } from "../../../kernel/names/FeatureDetection.js";
+import { FORMS, HOUSEHOLD_HEADS, LINEAGES, ORDERS, WIVES } from "../../../kernel/names/NameConventions.js";
 
 /**
  * The allow-list of a saved map's data: every field each kind of object may hold, and what its
@@ -400,7 +401,7 @@ const RULE_ROW = obj({ elevation: list({ t: "segment" }), moisture: list({ t: "s
  * A culture (the Cultures section and the culture inspector; see CultureInput): its look, name
  * base, how open and how dense it is, its habitat (its climate from chosen biomes or from zones,
  * or, saved before that choice, from its temperature, moisture and height bands; see
- * CultureClimate), and its homelands as map points.
+ * CultureClimate), its homelands as map points, and its names settings (N3; Automatic when absent).
  */
 const CULTURE = obj({
     id,
@@ -415,6 +416,10 @@ const CULTURE = obj({
         zones: list(RULE_ROW),
         temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
     homelands: list({ t: "xy" }),
+    // Its names settings (N3): each null for Automatic (the name style's own), so an unknown value
+    // reads as Automatic; and who heads its households (N2b), null for Automatic (by the lineage)
+    names: obj({ form: enumOf(FORMS, { nullable: true }), order: enumOf(ORDERS, { nullable: true }), lineage: enumOf(LINEAGES, { nullable: true }), wife: enumOf(WIVES, { nullable: true }) }),
+    households: obj({ heads: enumOf(HOUSEHOLD_HEADS, { nullable: true }) }),
 });
 
 /**

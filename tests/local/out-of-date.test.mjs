@@ -101,3 +101,36 @@ test("a pin gone is said so, and nothing is compared", () => {
 test("with no source (the mesh still loading) nothing is known", () => {
     assert.equal(OutOfDate.of({ source: null, cards: [card], pinFor: () => null, inputFrom }).size, 0);
 });
+
+test("a culture's names settings (N3): none on Automatic gives the input it always gave; one chosen marks cultures, and Automatic again clears it", () => {
+    // The fixture's run has no cultures: the pin is given one of the world's, as a place of a run with cultures is
+    const westmark = { id: "cultureWestmark", name: "Westmark", color: "#5b7fa6", openness: 0.4, nameBase: "English" };
+    const sourceWith = (culture) => {
+        app.uiState.cultures = [culture];
+        return SettlementSource.of(app);
+    };
+    const pinFor = (pinId) => SettlementSource.pin(app, pinId);
+    const generated = pin.generated;
+    pin.generated = { ...generated, mix: [{ culture: westmark.id, share: 1 }] };
+    try {
+        const plain = inputFrom(sourceWith(westmark), pinFor(pin.id), { seed: "kept" });
+        assert.deepEqual(plain.cultures.map((c) => c.name), ["Westmark"]);
+        assert.ok(!("names" in plain.cultures[0]) && !("heads" in plain.cultures[0]));
+        // Every setting on Automatic, as the culture inspector keeps them: the same input
+        const automatic = { ...westmark, names: { form: null, order: null, lineage: null, wife: null }, households: { heads: null } };
+        assert.deepEqual(inputFrom(sourceWith(automatic), pinFor(pin.id), { seed: "kept" }), plain);
+        const kept = SettlementRecord.card(SettlementRecord.create({ id: "map3", pinId: pin.id, name: pin.name, input: plain }));
+        const stateWith = (culture) => OutOfDate.of({ source: sourceWith(culture), cards: [kept], pinFor, inputFrom }).get(kept.id);
+        assert.deepEqual(stateWith(automatic).changed, []);
+        // Patronymic and Mostly women: only the chosen settings join the input, and Out of date names the cultures
+        const chosen = { ...westmark, names: { form: "patronymic", order: null, lineage: null, wife: null }, households: { heads: "women" } };
+        const input = inputFrom(sourceWith(chosen), pinFor(pin.id), { seed: "kept" });
+        assert.deepEqual(input.cultures[0].names, { form: "patronymic" });
+        assert.equal(input.cultures[0].heads, "women");
+        assert.deepEqual(stateWith(chosen).changed, ["cultures"]);
+        assert.deepEqual(stateWith(automatic).changed, []);
+    } finally {
+        app.uiState.cultures = [];
+        pin.generated = generated;
+    }
+});

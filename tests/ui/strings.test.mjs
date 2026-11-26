@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { allTrades, wordKey } from "../../src/studios/local/app/Households.js";
+import { FORMS, HOUSEHOLD_HEADS, LINEAGES, ORDERS, WIVES } from "../../src/kernel/names/NameConventions.js";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const EN = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
@@ -100,6 +101,12 @@ const FAMILIES = [
     "FILRODENSWMB.UI.SettlementWalls",
     "FILRODENSWMB.UI.SettlementLook.",
     "FILRODENSWMB.UI.SettlementLook",
+    // A culture's names settings (N3: CultureEditor's NAME_FIELDS), by the conventions' own values
+    // ("given-first" as GivenFirst), each with its lower-case form for Automatic's words
+    ...[["PersonForm", FORMS], ["PersonOrder", ORDERS], ["PersonLineage", LINEAGES], ["PersonSpouse", WIVES], ["PersonHeads", HOUSEHOLD_HEADS]].map(([stem, values]) => {
+        const keys = values.map((value) => value.replace(/(^|-)(\w)/g, (_m, _d, c) => c.toUpperCase()));
+        return { prefix: `FILRODENSWMB.UI.${stem}`, values: JSON.stringify([...keys, ...keys.map((key) => `${key}Lower`)]) };
+    }),
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
     // The name styles, by the name bases' names with their spaces taken out

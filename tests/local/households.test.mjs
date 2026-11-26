@@ -92,6 +92,9 @@ test("the card's kinds: a farmhouse, a widowed head, a woman heading her househo
     assert.deepEqual(card.lodging.map(text), ["Ulf Brasbury, lodger, 30"]);
     assert.equal(card.family[0].name, "Ragna Kjerstad", "the name is set apart, to be drawn bold");
     assert.equal(card.trade, "Food: brewer.");
+    // Children of another line than the head's (a patronymic, N3): each child's whole name
+    const patronymic = { ...h, members: [h.members[0], h.members[1], { role: "child", age: 12, given: "Solveig", family: "Eiriksdottir", full: "Solveig Eiriksdottir" }, { role: "child", age: 9, given: "Brand", family: "Eiriksson", full: "Brand Eiriksson" }] };
+    assert.equal(text(cardOf(t, patronymic, place).family[2]), "Solveig Eiriksdottir and Brand Eiriksson, their children, 12 and 9");
     // One person
     const alone = cardOf(t, { ...h, members: [h.members[0]] }, place);
     assert.equal(alone.line, "1 person · Valefolk.");

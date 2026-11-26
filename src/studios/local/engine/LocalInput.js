@@ -286,15 +286,29 @@ export function inputFrom(source, pin, options = {}) {
 
 /**
  * The place's mix of cultures (its own, or its cell's main culture in the run), named and with
- * each culture's openness and name base from the world; a single local culture where it has none.
+ * each culture's openness and name base from the world, and its names settings where they are not
+ * Automatic (N3: `names` with only the settings chosen, and `heads`), so a culture left on
+ * Automatic gives the input it always gave; a single local culture where it has none.
  */
 function culturesOf(source, place, runCulture) {
     const known = new Map((source.cultures ?? []).map((c) => [c.id, c]));
     const mix = place.mix?.length ? place.mix : runCulture ? [{ culture: runCulture, share: 1 }] : [];
     // The world's name style where a culture names none (and English where the world has none)
     const fallback = source.nameBase ?? "English";
-    const named = mix.filter((m) => known.has(m.culture)).map((m) => ({ name: known.get(m.culture).name, colour: known.get(m.culture).colour, openness: known.get(m.culture).openness ?? 0.5, nameBase: known.get(m.culture).nameBase ?? fallback, share: m.share }));
+    const named = mix.filter((m) => known.has(m.culture)).map((m) => ({ name: known.get(m.culture).name, colour: known.get(m.culture).colour, openness: known.get(m.culture).openness ?? 0.5, nameBase: known.get(m.culture).nameBase ?? fallback, share: m.share, ...namesSettingsOf(known.get(m.culture)) }));
     if (!named.length) return [{ name: "Local", colour: "#9a8f7a", openness: 0.5, nameBase: fallback, share: 1 }];
     const sum = named.reduce((a, c) => a + c.share, 0);
     return named.map((c) => ({ ...c, share: c.share / sum }));
 }
+
+/** The names settings a world culture has chosen (none on Automatic): `names` and `heads`, each left out when unset. */
+function namesSettingsOf(culture) {
+    const names = Object.fromEntries(NAME_SETTINGS.map((key) => [key, culture.names?.[key]]).filter(([, value]) => typeof value === "string"));
+    const out = {};
+    if (Object.keys(names).length) out.names = names;
+    if (typeof culture.heads === "string") out.heads = culture.heads;
+    return out;
+}
+
+/** The culture's names settings the namer reads (PersonNames' createNamer), in this order. */
+const NAME_SETTINGS = Object.freeze(["form", "order", "lineage", "wife"]);

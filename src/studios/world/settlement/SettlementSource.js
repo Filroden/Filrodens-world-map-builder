@@ -72,7 +72,7 @@ export class SettlementSource {
             levels: { model: modelLevel(mesh), infill: infillLevel(mesh) },
             places,
             run: runOf(app, mesh),
-            cultures: (app.uiState.cultures ?? []).map((c) => ({ id: c.id, name: c.name, colour: c.color, openness: c.openness ?? 0.5, nameBase: c.nameBase })),
+            cultures: (app.uiState.cultures ?? []).map((c) => ({ id: c.id, name: c.name, colour: c.color, openness: c.openness ?? 0.5, nameBase: c.nameBase, names: c.names ?? null, heads: c.households?.heads ?? null })),
             nameBase: app.uiState.generatorSettings?.nameBase ?? "English",
         };
     }

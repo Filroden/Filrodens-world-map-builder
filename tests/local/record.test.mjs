@@ -111,3 +111,17 @@ test("its supply is compared by its main figures, within the tolerance: a change
     assert.equal(SettlementRecord.supplyChanged(saved, SettlementRecord.supplyOf({ ...input, countryDensity: input.countryDensity * 2 + 10 }), tolerance), true, "its country twice as full");
     assert.equal(SettlementRecord.supplyChanged(null, saved, tolerance), false, "a card kept before its figures were");
 });
+
+test("a culture's names settings (N3) in the input: the chosen ones kept, an unknown one left out as Automatic, refusing nothing", () => {
+    const base = inputs.Grironcairn;
+    const culture = { ...base.cultures[0], names: { form: "patronymic", order: "family-first", lineage: "mother", wife: "keeps" }, heads: "either" };
+    const chosen = { ...base, cultures: [culture] };
+    assert.deepEqual(SettlementRules.input(chosen), chosen);
+    const odd = { ...base, cultures: [{ ...base.cultures[0], names: { form: "<script>", order: "family-first", lineage: 3, extra: "x" }, heads: "kings" }] };
+    assert.deepEqual(SettlementRules.input(odd).cultures[0], { ...base.cultures[0], names: { order: "family-first" } });
+    const none = { ...base, cultures: [{ ...base.cultures[0], names: "patronymic", heads: null }] };
+    assert.deepEqual(SettlementRules.input(none).cultures[0], base.cultures[0]);
+    // Only the culture's part moves
+    const changed = SettlementRecord.changed(SettlementRecord.parts(base), SettlementRecord.parts(chosen));
+    assert.deepEqual(changed, ["cultures"]);
+});

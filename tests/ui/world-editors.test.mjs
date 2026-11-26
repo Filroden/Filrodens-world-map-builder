@@ -173,6 +173,12 @@ test("a page's head: what this sitting changed, Revert changes or Undo, Read by 
     const go = box.querySelector('.fwmb-readby [data-action="goToMapTool"]');
     assert.deepEqual([go.dataset.tool, go.getAttribute("aria-label")], ["biomes", "Go to Biomes"]);
     assert.ok(!box.querySelector("fieldset.fwmb-world-editor").disabled);
+    // Households and supply on the Cultures page (N3): its Go opens the settlement maps list, and waits for one
+    assert.ok(WORLD_EDITORS.worldCultures.readBySettlements && !WORLD_EDITORS.worldAges.readBySettlements);
+    const settlements = { action: "openSettlementList", icon: "groups", name: "ToolHouseholds", map: "ReadBySettlementMaps", goLabel: "ReadBySettlementMapsGo", disabled: true, tooltip: "SettlementMapsNone" };
+    const chips = await page(head({ readBy: [...readBy, settlements] }));
+    const list = chips.querySelector('.fwmb-readby [data-action="openSettlementList"]');
+    assert.deepEqual([list.dataset.tool, list.getAttribute("aria-disabled"), list.dataset.tooltip], [undefined, "true", "SettlementMapsNone"]);
     assert.ok(box.querySelector('input[name="latTop"]') && box.querySelector('input[name="worldAreaFactor"]'), "the frame's fields");
 
     box = await page(held);
