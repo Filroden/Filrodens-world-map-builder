@@ -19,16 +19,19 @@ export const LAYERS = Object.freeze(["ground", "fields", "trees", "built", "wate
  *     roofs by their material) or a household view (Styles.js HOUSEHOLD_VIEWS: each home's roof in
  *     its household's colour, every other roof muted; "culture" colours the walls too), layers:
  *     names to draw, now: () => ms, wallMaterial: "stone" or "palisade" (the place's own, by its
- *     size; else the ruling culture's)}
+ *     size; else the ruling culture's), words: the title's line under the name, the scale bar's
+ *     length and the north arrow's letter in the caller's language ({sub, length(metres), north};
+ *     the prototype's English without it)}
  * @returns the milliseconds each layer took
  */
-export function drawTown(ctx, town, view, style, { cultures = {}, theme = null, layers = LAYERS, now = () => 0, outside = null, outsideStyle = ATLAS, links = null, levelIndex = null, level = null, wallMaterial = null } = {}) {
+export function drawTown(ctx, town, view, style, { cultures = {}, theme = null, layers = LAYERS, now = () => 0, outside = null, outsideStyle = ATLAS, links = null, levelIndex = null, level = null, wallMaterial = null, words = null } = {}) {
     const m = view.mPerPx;
     const [x0, y0, x1, y1] = view.rect;
     const D = makeDrawing(ctx, town, view, style, cultures, theme, wallMaterial);
     D.links = links;
     D.levelIndex = levelIndex;
     D.level = level;
+    D.words = words;
     const times = {};
     const inMetres = () => {
         ctx.setTransform(1 / m, 0, 0, 1 / m, -x0 / m, -y0 / m);
@@ -1030,7 +1033,9 @@ const DRAW = {
         if (D.links) linkMarks(D);
         const under = D.cave || D.onFloor;
         const kindName = under ? (town.input.capital ? "Cavern capital" : { village: "Cavern village", town: "Cavern town", city: "Cavern city" }[town.kind]) : town.input.capital ? "Capital" : town.input.fortified ? "Fortified town" : town.input.port && town.shore ? (town.kind === "city" ? "Port city" : "Port") : { village: "Village", town: "Market town", city: town.wall ? "Walled city" : "City" }[town.kind];
-        const sub = `${kindName}${D.level && D.level !== "Level" && !town.name.includes(D.level) ? ` · ${D.level}` : ""} · ${town.input.population.toLocaleString("en-GB")} people`;
+        // The words are the caller's where it gives them (the module's, in its language: `words.sub`,
+        // `words.length(metres)` and `words.north`), else the prototype's English
+        const sub = D.words?.sub ?? `${kindName}${D.level && D.level !== "Level" && !town.name.includes(D.level) ? ` · ${D.level}` : ""} · ${town.input.population.toLocaleString("en-GB")} people`;
         ctx.font = `${fs * 1.15}px ${style.font}`;
         const tw = Math.max(ctx.measureText(town.name).width, (ctx.font = `italic ${fs * 0.62}px ${style.font}`, ctx.measureText(sub).width));
         ctx.fillStyle = rgba(style.paper, 0.9);
@@ -1054,7 +1059,7 @@ const DRAW = {
         ctx.font = `${fs * 0.55}px ${style.font}`;
         ctx.fillText("0", bx, by - fs * 0.55);
         ctx.textAlign = "center";
-        ctx.fillText(bar >= 1000 ? `${bar / 1000} km` : `${bar} m`, bx + bw, by - fs * 0.55);
+        ctx.fillText(D.words?.length ? D.words.length(bar) : bar >= 1000 ? `${bar / 1000} km` : `${bar} m`, bx + bw, by - fs * 0.55);
         // North
         const nx = wPx - fs * 1.8, ny = hPx - fs * 2.2;
         ctx.fillStyle = rgba(style.paper, 0.85);
@@ -1066,7 +1071,7 @@ const DRAW = {
         poly(ctx, [[nx, ny - fs], [nx + fs * 0.4, ny + fs * 0.4], [nx, ny], [nx - fs * 0.4, ny + fs * 0.4]]);
         ctx.fill();
         ctx.font = `${fs * 0.7}px ${style.font}`;
-        ctx.fillText("N", nx, ny - fs * 1.15);
+        ctx.fillText(D.words?.north ?? "N", nx, ny - fs * 1.15);
         ctx.textAlign = "start";
     },
 };

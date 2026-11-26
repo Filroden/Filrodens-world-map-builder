@@ -154,3 +154,22 @@ test("every icon the templates and the bar name has a mask, and every mask's fil
     assert.ok(named.has("edit-arrow-up") && named.has("format-paint") && named.has("insert-text"), "the bar's mode icons were found");
     for (const icon of named) assert.ok(masks.has(icon), `fwmb-icon--${icon} has a mask`);
 });
+
+/** Every template under templates/, by its path from the root. */
+function templateFiles(dir = join(ROOT, "templates")) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? templateFiles(join(dir, entry.name)) : entry.name.endsWith(".hbs") ? [join(dir, entry.name)] : []));
+}
+
+test("every button with no words of its own has a name or a tooltip, unless the code writes its words (L-surface step 6's sweep)", () => {
+    // Buttons whose words the code fills in: the export dialogue's two fits, the cover's keep button
+    const FILLED = ['data-export-fit="scale"', 'data-export-fit="area"', 'data-action="keepProcessing"'];
+    const unnamed = [];
+    for (const file of templateFiles()) {
+        for (const [, attributes, inner] of readFileSync(file, "utf8").matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+            if (/aria-label=|aria-labelledby=|data-tooltip=|title=/.test(attributes) || FILLED.some((mark) => attributes.includes(mark))) continue;
+            const words = inner.replace(/<(span|i) class="fwmb-icon[^"]*"[^>]*>\s*<\/\1>/g, "").replace(/<[^>]+>/g, "").replace(/\{\{[#/]?(if|unless|else|each)[^}]*\}\}/g, "");
+            if (!words.trim()) unnamed.push(`${file.slice(ROOT.length)}: <button${attributes}>`);
+        }
+    }
+    assert.deepEqual(unnamed, []);
+});

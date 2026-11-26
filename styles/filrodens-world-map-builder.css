@@ -504,8 +504,10 @@
 }
 
 /* ---------- Section titles and labels ---------- */
+/* A title's state marks wrap under it where the inspector is narrow (Out of date, Unsaved) */
 .fwmb-section-title {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     margin: 0 0 0.5rem;
@@ -5340,6 +5342,13 @@ button.fwmb-format {
 .fwmb-household-more[open] > summary {
     margin-bottom: 0.25rem;
 }
+/* On touch, the trades' "N more…" is a 2.75rem target, as every button is (S0 step 8c) */
+@media (pointer: coarse) {
+    .fwmb .fwmb-household-more > summary {
+        min-height: 2.75rem;
+        line-height: 2.75rem;
+    }
+}
 
 /* The four versions (board L2): a 2 by 2 grid of cards, each its name and radio, then its picture
    or its progress */
@@ -5477,6 +5486,10 @@ button.fwmb-format {
 }
 .fwmb-settlement-version-text b {
     color: var(--fwmb-text-primary);
+}
+/* A seed is one long word: it breaks where it must rather than running past the card */
+.fwmb-settlement-version-text .fwmb-hint {
+    overflow-wrap: anywhere;
 }
 .fwmb-settlement-map-line {
     display: flex;
@@ -10086,12 +10099,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     padding: 0;
     border: none;
 }
-.fwmb-culture-biome {
+.fwmb .fwmb-culture-biome {
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-4);
     min-width: 0;
     white-space: normal;
+}
+/* A long biome name ("Temperate rainforest") wraps inside its column rather than running into the next */
+.fwmb .fwmb-culture-biome > .fwmb-flex-1 {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 /* A culture's climate zones, each its name over its three axes' ranges */
 .fwmb-culture-zones {

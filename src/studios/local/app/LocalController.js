@@ -847,7 +847,7 @@ export class LocalController {
                 onTile,
                 signal,
                 labels: (ctx, view) => {
-                    drawTown(ctx, town, view, look, { layers: ["labels"] });
+                    drawTown(ctx, town, view, look, { layers: ["labels"], words: this.#mapWords(town) });
                     if (legend && options?.legend) Report.drawLegend(ctx, legend, look, othersText);
                 },
             });
@@ -916,6 +916,22 @@ export class LocalController {
     }
 
     /** The words' functions the Households helpers take. */
+    /**
+     * The words the renderer draws on the map (its title's line under the name, the scale bar's
+     * length, the north arrow's letter), in the module's language: the line as the report's
+     * ("Large town of 7,987 people"), by the settlement's tier.
+     */
+    #mapWords(town) {
+        const { i18n } = platform;
+        const input = this.#record?.input ?? town.input;
+        const number = (value) => value.toLocaleString(i18n.lang);
+        return {
+            sub: i18n.format("FILRODENSWMB.UI.ReportSub", { kind: tierName(input.tier, { start: true }), people: number(input.population ?? town.input.population ?? 0) }),
+            length: (metres) => (metres >= 1000 ? i18n.format("FILRODENSWMB.UI.LengthKm", { value: number(metres / 1000) }) : i18n.format("FILRODENSWMB.UI.LengthM", { value: number(metres) })),
+            north: i18n.localize("FILRODENSWMB.UI.North"),
+        };
+    }
+
     #words() {
         const { i18n } = platform;
         return { lang: i18n.lang, localize: (key) => i18n.localize(key), format: (key, data) => i18n.format(key, data) };
@@ -932,7 +948,7 @@ export class LocalController {
         return Report.blockRows(
             {
                 heading: this.#settlementName(),
-                sub: i18n.format("FILRODENSWMB.UI.ReportSub", { kind: tierName(input.tier), people: (input.population ?? 0).toLocaleString(i18n.lang) }),
+                sub: i18n.format("FILRODENSWMB.UI.ReportSub", { kind: tierName(input.tier, { start: true }), people: (input.population ?? 0).toLocaleString(i18n.lang) }),
                 panel,
                 titles: { totals: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsTotals"), cultures: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsCultures"), trades: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsTrades"), supply: i18n.localize("FILRODENSWMB.UI.SectionHouseholdsSupply") },
                 standIn: panel.supply?.standIn ? i18n.localize("FILRODENSWMB.UI.SettlementStandInTitle") : null,
@@ -1530,7 +1546,7 @@ export class LocalController {
             const layerCtx = layer.getContext("2d");
             layerCtx.setTransform(1, 0, 0, 1, 0, 0);
             layerCtx.clearRect(0, 0, widthPx, heightPx);
-            drawTown(layerCtx, town, { rect, mPerPx: m, widthPx, heightPx }, styleOf(this.#styleFor(lookKey)), { layers: ["labels"] });
+            drawTown(layerCtx, town, { rect, mPerPx: m, widthPx, heightPx }, styleOf(this.#styleFor(lookKey)), { layers: ["labels"], words: this.#mapWords(town) });
             this.#labels = { key, canvas: layer, left, top };
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1834,11 +1850,15 @@ function versionName(index) {
     return index === 0 ? platform.i18n.localize("FILRODENSWMB.UI.VersionDefault") : platform.i18n.format("FILRODENSWMB.UI.VersionAlt", { n: index });
 }
 
-/** A pin tier's name, lower case for running text ("town"): the pin style's own name. */
-export function tierName(tier) {
+/**
+ * A pin tier's name, lower case for running text ("town"), or with `start` as the pin style
+ * writes it, for a line that begins with it ("Large town of 7,987 people").
+ */
+export function tierName(tier, { start = false } = {}) {
     const key = tier ? `FILRODENSWMB.UI.PinStyle${tier.charAt(0).toUpperCase()}${tier.slice(1)}` : null;
     const name = key ? platform.i18n.localize(key) : null;
-    return (name && name !== key ? name : platform.i18n.localize("FILRODENSWMB.UI.SettlementPlace")).toLocaleLowerCase(platform.i18n.lang);
+    const word = name && name !== key ? name : platform.i18n.localize("FILRODENSWMB.UI.SettlementPlace");
+    return start ? word : word.toLocaleLowerCase(platform.i18n.lang);
 }
 
 /** A picture as an object URL (for an <img>), through a canvas the size given. */

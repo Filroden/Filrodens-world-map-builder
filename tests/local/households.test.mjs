@@ -61,7 +61,7 @@ test("the card's kinds: a farmhouse, a widowed head, a woman heading her househo
     const place = { name: "Grironcairn", kind: town.kind, walled: !!town.wall };
     const farm = households.farms[0];
     assert.equal(cardOf(t, farm, place).title, "A farmhouse, in its country");
-    assert.match(tradeLine(t, farm, place), /grain for Grironcairn's market/);
+    assert.match(tradeLine(t, farm, place), /grain for the market of “Grironcairn”/);
     const widow = households.houses.find((h) => h.trade === "widow" || h.trade === "widower");
     if (widow) {
         const card = cardOf(t, widow, place);

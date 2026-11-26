@@ -219,3 +219,56 @@ test("no code falls back to hard-coded English when a string is missing", () => 
     const fallbacks = SOURCES.filter(({ path }) => path.endsWith(".js")).flatMap(({ path, text }) => [...text.matchAll(/(?:localize|format)\([^)]*\)\s*\|\|\s*["'`]/g)].map((match) => `${path.slice(ROOT.length)}: ${match[0]}`));
     assert.deepEqual(fallbacks, []);
 });
+
+/**
+ * Names inside sentences are quoted (roadmap decision 40): a thing's name (a world's, map's,
+ * settlement's, pin's, region's, tier's, set's, culture's, style's, icon's, biome's or file's) that
+ * sits among other words is set in curly quotation marks in the string itself, so translators use
+ * their own marks; a name standing alone is bare. These placeholders carry such names wherever they
+ * appear ({name} also carries a tool's or a font's name in the keys exempt below).
+ */
+const NAME_PLACEHOLDERS = ["name", "world", "owner", "parent", "source", "place", "level", "set", "tier"];
+
+/**
+ * Where a name placeholder stands alone and stays bare, by key or by key prefix:
+ * - strings that make a name (a title, a landform's, a copy's, an older map's, a file's);
+ * - a name heading a row, its figures or its role after it (household members, seat and minority
+ *   lines, shares, the history's event captions, "Capital: …", a world's menu "…: the world's menu");
+ * - a title or label then its value after a mark ("Generate all · …", "Settlement map: …",
+ *   "region · …"), or a name with a note in brackets after it ("… (its rank now)");
+ * - placeholders that are not a thing's name there: a tool's label (Go to, Not built yet), a font,
+ *   a tier's number, a phrase ("A house on the market"), the template token {name} itself.
+ */
+const BARE_PREFIXES = ["FILRODENSWMB.UI.NameForm", "FILRODENSWMB.UI.Generated", "FILRODENSWMB.UI.GenerateEvent", "FILRODENSWMB.UI.GenerateSeat", "FILRODENSWMB.UI.Household", "FILRODENSWMB.UI.WindowTitle", "FILRODENSWMB.UI.InspectorSubtitle"];
+const BARE_KEYS = new Set([
+    "UI.FontMissing", "UI.ThematicCultureValue", "UI.HistoryCapital", "UI.HistoryExportName", "UI.TravelExportName", "UI.TravelExportNameNoPlace",
+    "UI.RangeBandFrom", "UI.RangeBandTo", "UI.GenerateRegionMinorityItem", "UI.StyleCopyName", "UI.SaveAsCopyName", "UI.LayerName",
+    "UI.LevelTitleTemplateHint", "UI.WorldNameMenuHint", "UI.NotBuiltYet", "UI.GoTo", "UI.GoToOn", "UI.GenerateAllTitle", "UI.CutAgainOldName",
+    "JOURNAL.WorldHeldBy", "UI.StandaloneMapName", "UI.CopyMapName", "UI.RegionalMapName", "UI.NumberedMapName", "UI.RestoreSummaryFailure",
+    "UI.EngineVersion", "UI.GenerateAllSettlementName", "UI.FromPinSettlement", "UI.HouseNamedAt", "UI.HouseAt",
+    "UI.MoveAsMissing", "UI.MoveAsCurrent", "UI.LabelOwnerRegionMeta",
+].map((key) => `FILRODENSWMB.${key}`));
+const isBare = (key) => BARE_KEYS.has(key) || BARE_PREFIXES.some((prefix) => key.startsWith(prefix));
+
+test("names inside sentences are in curly quotation marks; names standing alone are bare", () => {
+    assert.deepEqual([...BARE_KEYS].filter((key) => !(key in EN)), [], "a bare key no longer in en.json");
+    const placeholder = new RegExp(`\\{(${NAME_PLACEHOLDERS.join("|")})\\}`, "g");
+    for (const [file, strings] of [["en.json", EN], ["en-gb.json", GB]]) {
+        const unquoted = [];
+        const straight = [];
+        for (const [key, text] of Object.entries(strings)) {
+            for (const match of text.matchAll(placeholder)) {
+                const before = text[match.index - 1];
+                const after = text[match.index + match[0].length];
+                if (before === '"' || after === '"' || before === "'" && after === "'") straight.push(`${key}: ${text}`);
+                else if (!isBare(key) && !(before === "“" && after === "”")) unquoted.push(`${key}: ${text}`);
+            }
+        }
+        assert.deepEqual([...new Set(straight)], [], `${file}: straight quotation marks round a name`);
+        assert.deepEqual([...new Set(unquoted)], [], `${file}: a name inside a sentence, unquoted (quote it, or add the key to the bare list on purpose)`);
+    }
+});
+
+test("no possessive is put on a quoted name", () => {
+    assert.deepEqual(Object.entries(EN).filter(([, text]) => /”['’]s\b/.test(text)).map(([key, text]) => `${key}: ${text}`), [], "reword: “the map of “…”” rather than “…”’s map");
+});
