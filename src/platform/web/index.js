@@ -16,6 +16,7 @@ import { createI18n } from "./i18n.js";
 import { createNotifications } from "./notifications.js";
 import { createWebSettings } from "./settings.js";
 import { createWebStore } from "./store.js";
+import { createWebWorldLocks } from "./worldLocks.js";
 import { createWebTemplates, registerHelpers } from "./templates.js";
 import * as utils from "./utils.js";
 
@@ -55,6 +56,8 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
         dialogs: createOverlayDialogs({ localize: i18n.localize }),
         settings: createWebSettings(storage),
         store: createWebStore(records),
+        // One window per world (WL): Web Locks and a BroadcastChannel
+        worldLocks: createWebWorldLocks(),
         assets: createWebAssets({ moduleId: manifest.id, baseUrl }),
         module: { version: manifest.version, host: "web", hostVersion: null },
         grid: {

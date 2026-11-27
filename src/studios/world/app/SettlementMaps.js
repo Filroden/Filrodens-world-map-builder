@@ -165,6 +165,7 @@ export class SettlementMaps {
 
     /** Generate all's last step: every settlement map Out of date now made again (see LocalController.regenerate). */
     static async regenerateStale(app) {
+        if (app.viewOnly) return 0;
         const ids = this.forGenerateAll(app, { compute: true }).map((map) => map.id);
         if (!ids.length) return 0;
         const made = await this.controller(app).regenerate(ids);
@@ -178,7 +179,7 @@ export class SettlementMaps {
      * LocalController.regenerate), one undo step on its own history.
      */
     static async regenerate(app, id) {
-        if (!this.available(app)) return false;
+        if (!this.available(app) || app.viewOnly) return false;
         const card = this.#ownCards(app).find((each) => each.id === id);
         const state = card ? this.existing(app)?.stateOf(id) : null;
         if (!state?.changed?.length || state.pinGone) return false;
@@ -202,6 +203,7 @@ export class SettlementMaps {
 
     /** Delete settlement map… (board L1b): after its confirmation, gone at the next Save world. */
     static async deleteMap(app, id) {
+        if (app.viewOnly) return false;
         const controller = this.controller(app);
         if (!controller || !(await controller.deleteMap(id))) return false;
         app.view?.render(["worldbar", "context"]);
@@ -312,6 +314,9 @@ export class SettlementMaps {
             leave: () => this.leave(app),
             openOwner: (owner, id) => app.openWorldAt(owner.worldId, { settlementId: id }),
             worldName: () => app.world?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld"),
+            // A world open view only (WL): explored, never changed, with its notice
+            viewOnly: () => app.viewOnly === true,
+            viewOnlyNotice: () => app.viewOnlyNotice?.() ?? null,
             // Each culture's colour, by name, for the households' Culture view (step 3)
             cultureColours: () => Object.fromEntries((app.uiState?.cultures ?? []).filter((c) => c?.name && c.color).map((c) => [c.name, c.color])),
             // The report's parent map inset (step 5b): the Surface map's picture of a box (kept on
@@ -344,6 +349,8 @@ export class SettlementMaps {
      * @param {string} pinId
      */
     static async make(app, pinId) {
+        // A world open view only (WL) makes nothing
+        if (app.viewOnly) return false;
         const pin = app.mapPins?.find((each) => each.id === pinId);
         const controller = this.controller(app);
         if (!pin || !controller || !app.meshSession?.mesh) return false;
@@ -535,6 +542,8 @@ export class SettlementMaps {
         const lang = i18n.lang;
         const surface = i18n.localize("FILRODENSWMB.UI.LayerSurfaceFull");
         const controller = this.existing(app);
+        // A world open view only (WL): its settlement maps opened, never made again or deleted
+        const viewOnly = app.viewOnly === true;
         return cards
             .map((card) => {
                 const name = this.#nameOf(app, card);
@@ -547,10 +556,10 @@ export class SettlementMaps {
                     from: card.owner ? i18n.format("FILRODENSWMB.UI.SettlementMadeFromOwner", { owner: card.owner.name, map: surface }) : surface,
                     marks: this.#named(this.#marksOf(app, card)).map((mark) => ({ ...mark, tooltip: this.#markTip(app, card, mark, name) })),
                     // A held world's parent's map is deleted in its own world (Ken, 2026-11-24: Delete here too)
-                    deletable: !card.owner,
+                    deletable: !card.owner && !viewOnly,
                     // Generate again on the row (step 4b): the world's own (a held world's Fill in maps
                     // included, as in their Map setup), Out of date, its pin there
-                    again: !card.owner && !!state?.changed?.length && !state.pinGone,
+                    again: !card.owner && !viewOnly && !!state?.changed?.length && !state.pinGone,
                     // …and waiting while its export draws (step 5)
                     waiting: card.owner ? null : (controller?.exportWait(card.id) ?? null),
                     search: name.toLocaleLowerCase(lang),

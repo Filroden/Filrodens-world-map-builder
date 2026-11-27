@@ -13,7 +13,7 @@ test("loading the platform touches no Foundry global", () => {
     // A fresh process with no Foundry globals at all, as on the web
     const result = spawnSync(process.execPath, ["--input-type=module", "-e", 'const { platform } = await import("./src/platform/index.js"); console.log(Object.keys(platform).join(","));'], { cwd: ROOT, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout.trim(), "i18n,notify,utils,templates,fonts,dialogs,settings,store,assets,module,grid,scene,frame");
+    assert.equal(result.stdout.trim(), "i18n,notify,utils,templates,fonts,dialogs,settings,store,assets,module,grid,scene,frame,worldLocks");
 });
 
 const { platform } = await import("../../src/platform/index.js");

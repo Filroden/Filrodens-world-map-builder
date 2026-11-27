@@ -78,7 +78,7 @@ export class GenerateAll {
      * regional world (its runs are its parent's) and on a world with no Surface map yet.
      */
     static overview(app) {
-        if (app.world?.held || Generation.heldByParent(app) || app.surfaceMade === false) return null;
+        if (app.viewOnly || app.world?.held || Generation.heldByParent(app) || app.surfaceMade === false) return null;
         const { i18n } = platform;
         const { run } = this.plan({ maps: this.mapsOf(app) });
         if (!run.length) return null;
@@ -117,6 +117,8 @@ export class GenerateAll {
      */
     static async open(app) {
         const { i18n } = platform;
+        // A world open view only (WL) runs nothing: its notice says why
+        if (app.viewOnly) return false;
         if (app.world?.held || Generation.heldByParent(app)) {
             platform.notify.warn(i18n.localize("FILRODENSWMB.UI.GenerateAllHeldWorld"));
             return false;

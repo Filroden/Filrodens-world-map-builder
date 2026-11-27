@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/platform/foundry/store.js";
+import { registerWorldLocks } from "./src/platform/foundry/worldLocks.js";
 import { registerPinIconSettings } from "./src/kernel/data/pinIcons.js";
 import { registerExportFormatSettings } from "./src/kernel/export/ImageFormat.js";
 import { attachTheme, registerThemeSettings } from "./src/shell/Theme.js";
@@ -21,6 +22,8 @@ Hooks.once("init", async () => {
     registerPinIconSettings();
     registerExportFormatSettings();
     Shell.registerSettings(STUDIOS);
+    // One window per world (WL): which GM client holds each world open for editing
+    registerWorldLocks();
 
     // The module's own template helpers (a free-text field's maxlength), beside Foundry's
     registerModuleHelpers(Handlebars);

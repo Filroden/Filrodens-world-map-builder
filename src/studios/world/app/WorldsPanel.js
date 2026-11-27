@@ -1,4 +1,5 @@
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { WorldAccess } from "../../../kernel/worlds/WorldAccess.js";
 import { Inspector } from "./Inspector.js";
 import { WorldThumbnails } from "./WorldThumbnails.js";
 import { ListQuery } from "./ListQuery.js";
@@ -11,6 +12,8 @@ const MARKS = Object.freeze({
     noRun: Object.freeze({ kind: "older", icon: "generate", label: "FILRODENSWMB.UI.MarkNoRun" }),
     // A held regional world whose parent changed what it shows (RegionalRecord.staleness, S0 step 5)
     stale: Object.freeze({ kind: "stale", icon: "sync", label: "FILRODENSWMB.UI.MarkOutOfDate" }),
+    // Open for editing in another tab or window (WL): Worlds' own, from the host's locks
+    elsewhere: Object.freeze({ kind: "held", icon: "open-in-new", label: "FILRODENSWMB.UI.MarkOpenElsewhere", tooltip: "FILRODENSWMB.UI.MarkOpenElsewhereHint" }),
 });
 
 /** Out of date's reasons (RegionalRecord.staleness), by rule. */
@@ -113,11 +116,14 @@ export class WorldsPanel {
      */
     static async load(app) {
         const tree = await Worlds.tree();
+        // The worlds open for editing in another tab or window (WL)
+        const elsewhere = await WorldAccess.elsewhere();
         const index = new Map();
         const renaming = this.#renaming.get(app);
         const walk = (nodes, parent, root) => {
             for (const node of nodes) {
                 if (renaming?.has(node.id)) node.name = renaming.get(node.id);
+                node.elsewhere = elsewhere.has(node.id);
                 index.set(node.id, { ...node, parentName: parent?.name ?? null, rootId: root?.id ?? node.id });
                 walk(node.children, node, root ?? node);
             }
@@ -144,10 +150,30 @@ export class WorldsPanel {
 
     /** A world's marks, as they show (MARKS). */
     static marks(node) {
-        return (node.marks ?? [])
+        return [...(node.marks ?? []), ...(node.elsewhere ? ["elsewhere"] : [])]
             .map((mark) => MARKS[mark])
             .filter(Boolean)
-            .map((mark) => ({ ...mark, label: platform.i18n.localize(mark.label), ...(mark.kind === "stale" ? { tooltip: WorldsPanel.staleLines(node).join(" ") } : {}) }));
+            .map((mark) => ({
+                ...mark,
+                label: platform.i18n.localize(mark.label),
+                ...(mark.kind === "stale" ? { tooltip: WorldsPanel.staleLines(node).join(" ") } : {}),
+                ...(mark.tooltip ? { tooltip: platform.i18n.localize(mark.tooltip) } : {}),
+            }));
+    }
+
+    /**
+     * Why Delete… or Rename is off for a world (WL): it is open for editing in another tab or
+     * window, or (for Delete…) a regional world the delete would rewrite is. Null when neither is.
+     * @param {object} node - Its tree node (see load).
+     * @param {"delete"|"rename"} action
+     * @returns {string|null}
+     */
+    static blocked(node, action) {
+        const { i18n } = platform;
+        if (node?.elsewhere) return i18n.localize("FILRODENSWMB.UI.CloseElsewhereFirst");
+        if (action !== "delete") return null;
+        const open = (node?.children ?? []).find((child) => child.elsewhere);
+        return open ? i18n.format("FILRODENSWMB.UI.CloseElsewhereFirstNamed", { name: WorldsPanel.named(open) }) : null;
     }
 
     /**
@@ -296,10 +322,13 @@ export const WorldEditor = Object.freeze({
         hasMap: !!world.mapId,
         stale: WorldsPanel.staleLines(world),
         cutAgain: WorldEditor.cutAgain(app, world),
+        // Off while it (or, for Delete…, a world the delete rewrites) is open for editing elsewhere (WL)
+        renameOff: WorldsPanel.blocked(world, "rename"),
+        deleteOff: WorldsPanel.blocked(world, "delete"),
     }),
     apply: (app, world, _ref, form) => {
         const name = String(form.elements.worldName?.value ?? "").trim();
-        if (!name || name === world.name) return false;
+        if (!name || name === world.name || WorldsPanel.blocked(world, "rename")) return false;
         WorldsPanel.rename(app, world, name);
         return false;
     },
@@ -351,8 +380,12 @@ export const WorldEditor = Object.freeze({
     cutAgain(app, world) {
         if (!world.held || !world.parentId) return null;
         const { i18n } = platform;
-        if (!WorldsPanel.find(app, world.parentId)) return { off: i18n.localize("FILRODENSWMB.UI.CutAgainNoParent") };
+        const parent = WorldsPanel.find(app, world.parentId);
+        if (!parent) return { off: i18n.localize("FILRODENSWMB.UI.CutAgainNoParent") };
         if (!world.cropKnown) return { off: i18n.localize("FILRODENSWMB.UI.CutAgainNoCrop") };
+        // It and the world it is cut from are both written (WL)
+        const open = [world, parent].find((node) => node.elsewhere);
+        if (open) return { off: i18n.format("FILRODENSWMB.UI.CloseElsewhereFirstNamed", { name: WorldsPanel.named(open) }) };
         return { note: i18n.localize(world.migrated ? "FILRODENSWMB.UI.CutAgainMigrated" : "FILRODENSWMB.UI.CutAgainNote") };
     },
 

@@ -9,6 +9,7 @@ import { labelFontList } from "../../kernel/data/fonts.js";
 import { createOverlayDialogs } from "../../shell/dialogs.js";
 import * as store from "./store.js";
 import { foundryAssets } from "./assets.js";
+import { foundryWorldLocks } from "./worldLocks.js";
 
 /** Offered when Foundry's font list is not available yet. */
 
@@ -122,4 +123,4 @@ const scene = {
     },
 };
 
-export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets: foundryAssets, module: moduleInfo, grid, scene, frame: foundryFrame });
+export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets: foundryAssets, module: moduleInfo, grid, scene, frame: foundryFrame, worldLocks: foundryWorldLocks });

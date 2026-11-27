@@ -1,6 +1,7 @@
 import { platform } from "../../../platform/index.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
+import { WorldAccess } from "../../../kernel/worlds/WorldAccess.js";
 
 /**
  * Draw thumbnails, in Worlds' foot (S0 step 8d; `claude/v5-s0-step8-plan.md` §8d): a picture for
@@ -55,11 +56,18 @@ export class WorldThumbnails {
         // It can take minutes: said first, unless only the open world's picture is to be drawn
         // (Ken, 2026-11-22)
         const before = studio.open();
-        const toOpen = WorldThumbnails.missing(await Worlds.tree()).filter((world) => wasDirty || !before?.mapId || world.id !== before.worldId);
+        // A world open for editing elsewhere, or view only here, is left for next time (WL)
+        const writable = async (worlds) => {
+            const refused = new Set(await WorldAccess.refused(worlds.map((world) => world.id)));
+            return worlds.filter((world) => !refused.has(world.id));
+        };
+        const toOpen = (await writable(WorldThumbnails.missing(await Worlds.tree()))).filter((world) => wasDirty || !before?.mapId || world.id !== before.worldId);
         if (toOpen.length && !(await WorldThumbnails.#confirm(toOpen.length))) return null;
         if (!(await studio.gate())) return null;
         const open = studio.open();
-        let queue = WorldThumbnails.missing(await Worlds.tree());
+        const missing = WorldThumbnails.missing(await Worlds.tree());
+        let queue = await writable(missing);
+        const skipped = missing.length - queue.length;
         const total = queue.length;
         let drawn = 0;
         const failed = [];
@@ -106,6 +114,7 @@ export class WorldThumbnails {
         }
 
         await WorldThumbnails.#report({ drawn, failed, total, cancelled });
+        if (skipped) platform.notify.info(skipped === 1 ? i18n.localize("FILRODENSWMB.UI.DrawThumbnailsSkippedOne") : i18n.format("FILRODENSWMB.UI.DrawThumbnailsSkipped", { count: skipped }));
         return { drawn, failed, total, cancelled };
     }
 

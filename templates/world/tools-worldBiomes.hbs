@@ -7,7 +7,7 @@
     them the Biomes tool's. Read only on a held regional world.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.locked}} disabled{{/if}}>
 <div class="fwmb-page-bar">
     <span class="fwmb-section-title">{{localize "FILRODENSWMB.UI.WorldBiomes"}} <span class="fwmb-meta">{{biomeTable.count}}</span></span>
     <button type="button" class="fwmb-btn" data-action="openBiomeRuleEditor"><i class="fwmb-icon fwmb-icon--tune" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.RuleEditorOpen"}}</button>

@@ -5,6 +5,7 @@ import { WorldSettings } from "./WorldSettings.js";
 import { Backup } from "./Backup.js";
 import { MapPackage } from "./MapPackage.js";
 import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
+import { WorldAccess } from "../../../kernel/worlds/WorldAccess.js";
 import { ParentRunRecovery } from "../app/ParentRunRecovery.js";
 import { StrokeHistory } from "../tools/StrokeHistory.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -159,6 +160,11 @@ export class WorldMigration {
      * @returns {Promise<{worlds: number, maps: number, backup: string|null, backupFailed?: boolean}>}
      */
     static async run() {
+        // One tab at a time (WL): a second tab started at the same moment finds it done
+        return WorldAccess.exclusive("migration", () => WorldMigration.#run());
+    }
+
+    static async #run() {
         const [maps, saved] = await Promise.all([platform.store.listMapData(), platform.store.listWorlds()]);
         const worlds = new Map(saved.map((world) => [world.id, world]));
         const { worlds: records, metas } = WorldMigration.plan({ maps, worlds, icons: WorldMigration.hostIcons() });
@@ -178,6 +184,7 @@ export class WorldMigration {
         // The worlds first: a map is only taken as migrated once it names a world that is saved
         for (const record of records) await platform.store.saveWorld(record);
         for (const { mapId, meta } of metas) await platform.store.saveMapMeta(mapId, meta);
+        for (const record of records) WorldAccess.tell("created", record.id);
         return backupFailed ? { worlds: records.length, maps: metas.length, backup, backupFailed } : { worlds: records.length, maps: metas.length, backup };
     }
 

@@ -57,6 +57,8 @@ export class WorldOverview {
             line: WorldOverview.line(app, dirtyGroups),
             // A world with no maps yet offers to make its Surface map (board N3)
             maps: app.surfaceMade === false ? [] : [surfaceCard],
+            // Made in the tab holding a world open view only (WL)
+            makeOff: app.viewOnly ? (app.cutOff?.() ?? null) : null,
             regional,
             // Cut regional world… (S0 step 5), off with why when the Surface map cannot be cut from
             cutOff: app.cutOff?.() ?? null,
@@ -119,7 +121,8 @@ export class WorldOverview {
             id: node.id,
             line: zoom ? i18n.format("FILRODENSWMB.UI.OverviewCutFromZoom", { name: parentName, zoom }) : i18n.format("FILRODENSWMB.UI.OverviewCutFromLine", { name: parentName }),
             stale: WorldsPanel.staleLines(node),
-            again: WorldEditor.cutAgain(app, node),
+            // Not from a world open view only (WL): Cut again… writes it
+            again: app.viewOnly ? null : WorldEditor.cutAgain(app, node),
         };
     }
 

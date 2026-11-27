@@ -5,14 +5,16 @@
     world under the one it was cut from), each row choosing that world, this one lit, the search's
     matches marked, each regional world with its zoom against the world it was cut from and Out of
     date where it is (S0 step 5); why this one is Out of date; the action list (Cut again… and
-    Clone as new… only for a held regional world); Delete… apart.
+    Clone as new… only for a held regional world); Delete… apart. Rename and Delete… are off while
+    the world (or, for Delete…, a world the delete rewrites) is open for editing in another tab or
+    window (WL), their tooltip saying so.
     A label ending in "…" asks something first; one without acts at once.
 --}}
 <div class="fwmb-group">
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-world-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-world-name" name="worldName" maxlength="{{fwmbTextLimit 'name'}}" value="{{world.name}}" />
+            <input type="text" id="fwmb-inspector-world-name" name="worldName" maxlength="{{fwmbTextLimit 'name'}}" value="{{world.name}}"{{#if renameOff}} readonly aria-readonly="true" data-tooltip="{{renameOff}}"{{/if}} />
         </div>
     </div>
     {{!-- A world with no maps yet opens too, on its overview (S0 step 4c-2) --}}
@@ -71,5 +73,5 @@
 </div>
 
 <div class="fwmb-foot-danger">
-    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-inspector-action="delete"><span class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DeleteEllipsis"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet"{{#if deleteOff}} aria-disabled="true" data-tooltip="{{deleteOff}}"{{else}} data-inspector-action="delete"{{/if}}><span class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DeleteEllipsis"}}</button>
 </div>

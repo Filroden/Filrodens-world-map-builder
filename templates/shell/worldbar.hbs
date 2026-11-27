@@ -12,8 +12,9 @@
       the bar for the layer menu; 4: the layer switcher becomes one menu button naming the map;
       5: the world name ellipsises.
 
-    Beside the name: Out of date on a held regional world whose parent changed what it shows, and
-    Back to while a regional world's parent is open for its settings (S0 step 5).
+    Beside the name: View only on a world another tab or window holds for editing (WL); Out of date
+    on a held regional world whose parent changed what it shows, and Back to while a regional
+    world's parent is open for its settings (S0 step 5).
 
     Save world never folds. Parts later tracks fill (Geology, Add a map) are drawn in their places
     and disabled, with a tooltip saying they are not built yet (aria-disabled, so the tooltip still
@@ -47,6 +48,11 @@
             <button type="button" role="menuitem" data-action="importMapJson"><span class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></span> {{localize "FILRODENSWMB.UI.MenuImportWorld"}}</button>
         </div>
     </div>
+    {{!-- A world open view only here, as another tab or window holds it for editing (WL): the
+         notice's first line its tooltip; the panel's notice has the rest --}}
+    {{#if worldBar.viewOnly}}
+    <span class="fwmb-state-mark fwmb-state-mark--held fwmb-worldbar-view" role="img" aria-label="{{worldBar.viewOnly}}" data-tooltip="{{worldBar.viewOnly}}"><span class="fwmb-icon fwmb-icon--visibility" aria-hidden="true"></span><span class="fwmb-fold-full">{{localize "FILRODENSWMB.UI.ViewOnlyMark"}}</span></span>
+    {{/if}}
     {{!-- A held regional world Out of date (S0 step 5), and, while a regional world's parent is
          open for its settings, whose they are with Back to --}}
     {{#if worldBar.stale}}

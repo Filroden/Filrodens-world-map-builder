@@ -7,7 +7,7 @@
     regional world all of it is its own, fixed by its crop, and read only.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor fwmb-page-form"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-form"{{#if worldEditor.locked}} disabled{{/if}}>
 {{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="worldScale" title="FILRODENSWMB.UI.WorldSetupFrame" badge=worldSetup.badge rebuilds=worldSetup.sizeFixed}}
     {{#if worldSetup.creating}}
     <div class="fwmb-form-group">

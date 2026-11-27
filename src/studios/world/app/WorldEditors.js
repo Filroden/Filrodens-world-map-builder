@@ -119,10 +119,11 @@ function keepPlaces(restored, now) {
 export class WorldEditors {
     /**
      * Whether the world's settings are read only here: on a held regional world, which reads them
-     * from the world above it. Each editor's changes check it before they write.
+     * from the world above it, and on a world open view only (WL). Each editor's changes check it
+     * before they write.
      */
     static readOnly(app) {
-        return !!app?.world?.held;
+        return !!app?.world?.held || app?.viewOnly === true;
     }
 
     /** Whether a tool is a world settings editor. */
@@ -220,10 +221,12 @@ export class WorldEditors {
             heldReach: heldCount && !heldBy ? i18n.format(heldCount === 1 ? "FILRODENSWMB.UI.ReadByHeldOne" : "FILRODENSWMB.UI.ReadByHeld", { count: heldCount }) : null,
             readBy,
             held: !!heldBy,
+            // Its fields off: on a held regional world, and on a world open view only (WL)
+            locked: !!heldBy || app?.viewOnly === true,
             heldBanner: heldBy ? i18n.format(editor.groups.includes("setup") ? "FILRODENSWMB.UI.WorldHeldSetup" : "FILRODENSWMB.UI.WorldHeldBanner", { name: heldBy }) : null,
             // Styles and icons: Undo, not Revert changes, takes a change back (see WORLD_EDITORS)
             undo: !!editor.undo,
-            canRevert: changed && !heldBy && !editor.undo,
+            canRevert: changed && !heldBy && !editor.undo && app?.viewOnly !== true,
         };
     }
 }

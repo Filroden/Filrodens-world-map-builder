@@ -35,6 +35,14 @@
  *   can use createOverlayDialogs from there).
  * - `settings`: `register(key, config)`, `get(key)`, `set(key, value)` for the module's settings.
  * - `store`: the saved maps (see foundry/store.js for the methods and what they return).
+ * - `worldLocks`: one window per world (WL; see kernel/worlds/WorldAccess.js, its only reader).
+ *   `available` (false where the host cannot lock); `claim(worldId)` resolving to `{ release() }`,
+ *   or null when another tab or client holds the world; `whenFree(worldId, callback)`, called
+ *   once when the holder lets go (returns a function that stops waiting); `held()`, the ids held
+ *   anywhere; `exclusive(name, fn)`, `fn` run while no other tab runs one of that name; `tell({
+ *   kind, worldId })`, what was done to a world told to the other tabs (never this one), and
+ *   `listen(callback)` to hear them (returns a function that stops listening). A host that gives
+ *   none claims every world, as before WL.
  * - `assets`: `url(path)`, a stored asset path as a URL that resolves the same from any page or
  *   stylesheet; `read(src)`, an image's bytes (or null); `keep(bytes, type, hash)`, a checked image
  *   stored the host's way, resolving with the source to save (see MapPackage).

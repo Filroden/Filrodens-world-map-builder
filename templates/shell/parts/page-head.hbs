@@ -2,7 +2,8 @@
     A world page's head (S0 step 4c-1; the design system's WorldPage): the world's name as a crumb,
     the page's title and the World tag, then what this sitting has changed and Revert changes (on
     Styles and icons, whose changes are undo steps of the map, Undo and Redo instead; a held regional
-    world's pages have neither), and the lede under it. The overview (panel.overview) has only the
+    world's pages have neither, nor has a world open view only), and the lede under it, then the
+    action notice where there is one (a world open view only, WL). The overview (panel.overview) has only the
     crumb, its title and its line as the lede. See WorldEditors.head.
 --}}
 <div class="fwmb-page-head">
@@ -10,7 +11,7 @@
     <h2 class="fwmb-page-title">{{panel.title}}</h2>
     {{#unless panel.overview}}
     <span class="fwmb-tag" data-tooltip="{{localize 'FILRODENSWMB.UI.WorldTagHint'}}"><span class="fwmb-icon fwmb-icon--public" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.WorldTag"}}</span>
-    {{#unless panel.worldEditor.held}}
+    {{#unless panel.worldEditor.locked}}
     <span class="fwmb-page-changes">{{panel.worldEditor.changes}}</span>
     {{#if panel.worldEditor.undo}}
     <span class="fwmb-page-history">
@@ -24,3 +25,13 @@
     {{/unless}}
 </div>
 <p class="fwmb-page-lede{{#if panel.overview}} fwmb-page-lede--line{{/if}}">{{panel.worldEditor.lede}}</p>
+{{!-- The action notice, as a map tool's panel has it: a world open view only (WL) says so here too --}}
+{{#if panel.notice}}
+<div class="fwmb-notice fwmb-panel-notice" role="status">
+    <span class="fwmb-notice-title"><span class="fwmb-icon fwmb-icon--{{panel.notice.icon}}" aria-hidden="true"></span>{{panel.notice.title}}</span>
+    {{#each panel.notice.lines}}<span>{{this}}</span>{{/each}}
+    <div class="fwmb-notice-actions">
+        {{#each panel.notice.actions}}<button type="button" class="fwmb-btn"{{#if this.off}} disabled data-tooltip="{{this.off}}"{{else}} data-action="{{this.action}}"{{/if}}><span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>{{this.label}}</button>{{/each}}
+    </div>
+</div>
+{{/if}}

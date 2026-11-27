@@ -36,7 +36,7 @@
                 </button>
                 {{else}}
                 {{!-- A world with no maps yet (board N3): its Surface map is made from its Map setup --}}
-                <button type="button" class="fwmb-card fwmb-card--add fwmb-card--make" data-action="goToMapTool" data-tool="scene"><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.MakeTheSurfaceMap"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.MakeTheSurfaceMapHint"}}</span></button>
+                <button type="button" class="fwmb-card fwmb-card--add fwmb-card--make"{{#if overview.makeOff}} aria-disabled="true" data-tooltip="{{overview.makeOff}}"{{else}} data-action="goToMapTool" data-tool="scene"{{/if}}><span class="fwmb-icon fwmb-icon--landscape" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.MakeTheSurfaceMap"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.MakeTheSurfaceMapHint"}}</span></button>
                 {{/each}}
                 <button type="button" class="fwmb-card fwmb-card--add" aria-disabled="true" data-tooltip="{{localize 'FILRODENSWMB.UI.OverviewAddMapLater'}}"><span class="fwmb-icon fwmb-icon--add" aria-hidden="true"></span><span class="fwmb-card-title">{{localize "FILRODENSWMB.UI.AddMap"}}</span><span class="fwmb-card-meta">{{localize "FILRODENSWMB.UI.OverviewAddMapKinds"}}</span></button>
             </div>

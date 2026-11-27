@@ -714,6 +714,8 @@ export class MapDialogManager {
         // The maps that read the open world's icons: its own, and its held regional worlds'
         const mapIds = await app._mapsReadingWorldIcons();
         const usage = await findPinIconUsage(id, app.mapPins, mapIds);
+        // Refused while a world whose maps it rewrites is open for editing elsewhere (WL)
+        if (await app._iconRemovalRefused?.(id, mapIds)) return;
 
         const content =
             usage.totalCount > 0

@@ -10,7 +10,7 @@
     world.
 --}}
 {{> "modules/filrodens-world-map-builder/templates/world/parts/world-editor-head.hbs"}}
-<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.held}} disabled{{/if}}>
+<fieldset class="fwmb-world-editor fwmb-page-stack"{{#if worldEditor.locked}} disabled{{/if}}>
 <div class="fwmb-page-bar">
     <span class="fwmb-section-title">{{localize "FILRODENSWMB.UI.SectionStyles"}} <span class="fwmb-badge fwmb-badge--count">{{styleCount}}</span></span>
     <button type="button" class="fwmb-btn" data-action="importSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ImportSettingsHint'}}"><i class="fwmb-icon fwmb-icon--upload-file" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ImportStyles"}}</button>

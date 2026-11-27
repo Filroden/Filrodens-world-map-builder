@@ -114,6 +114,7 @@ import { ExportDialog } from "../../../kernel/export/ExportDialog.js";
 import { WORLD_DEFINITION } from "../definition.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
+import { WorldAccess } from "../../../kernel/worlds/WorldAccess.js";
 import { MAP_TYPES, WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
 import { WorldSettings } from "../data/WorldSettings.js";
 import { CropFingerprint } from "./CropFingerprint.js";
@@ -289,6 +290,9 @@ export class MapStudio {
         makeSurfaceMap(e, t)            { this._onMakeSurfaceMap(e, t); },
         createWorld(e, t)               { this._onCreateWorld(e, t); },
         cancelNewWorld(e, t)            { this._onCancelNewWorld(e, t); },
+        // A world open view only (WL): Edit here once it is free, or the version saved there
+        editHere()                      { this.reopenWorld(); },
+        showSavedVersion()              { this.reopenWorld(); },
         cancelProcessing()              { this.#cancelRunning?.abort(); },
         keepProcessing()                { this.#keepRunning?.(); },
         changeTool(e, t)                { this._onChangeTool(e, t); },
@@ -854,11 +858,272 @@ export class MapStudio {
     }
 
     /**
+     * Whether removing a custom pin icon is refused (WL): it rewrites the pins of every saved map
+     * reading the open world's icons that uses it, its held regional worlds' included, so it waits
+     * while one of those worlds is open for editing elsewhere (naming it). The open world's own
+     * map is changed in the studio and saved with it.
+     * @param {string} key - The icon's id.
+     * @param {Set<string>} mapIds - The maps reading the open world's icons.
+     * @returns {Promise<boolean>}
+     */
+    async _iconRemovalRefused(key, mapIds) {
+        const worldIds = new Set();
+        for (const mapId of mapIds ?? []) {
+            if (mapId === this.currentSaveId) continue;
+            const pins = (await platform.store.loadMapData(mapId))?.mapPins;
+            if (!Array.isArray(pins) || !pins.some((pin) => pin?.icon === key)) continue;
+            const worldId = (await platform.store.loadMapMeta(mapId))?.worldId;
+            if (worldId && worldId !== this.world?.id) worldIds.add(worldId);
+        }
+        return this.#refusedElsewhere([...worldIds]);
+    }
+
+    /**
      * Whether the open world has changes that are not saved: its Surface map's or settings', or its
      * settlement maps' (kept, changed or deleted since the last save; see SettlementMaps).
      */
     get isDirty() {
+        // A world open view only has nothing to save: what changes in it (an Explore tool's view,
+        // what its opening works out again) is never written
+        if (this.viewOnly) return false;
         return this.#dirty || !!SettlementMaps.existing(this)?.isDirty;
+    }
+
+    // ------------------------------------------------------------------ one window per world (WL)
+
+    /**
+     * Whether the open world is view only here: Explore and nothing that writes. WL opens a world
+     * so when another tab or window holds it for editing (`why` "elsewhere"); decision 42's viewer
+     * will open one so on purpose ("chosen"). A mode of the open world, set before its panels draw.
+     */
+    get viewOnly() {
+        return this.#access.mode === "view";
+    }
+
+    /** The open world's access: "edit", or "view" with why. */
+    #access = { mode: "edit", why: null };
+
+    /** The world this studio claimed (or has view only), or null. */
+    #accessWorldId = null;
+
+    /** Stops waiting for the holder of a view-only world to let it go. */
+    #stopWaiting = null;
+
+    /** What has happened to a view-only world in the tab holding it: null, "newer" or "free". */
+    #viewNews = null;
+
+    /** When the newer version told of was saved (a time), for its notice. */
+    #newerAt = null;
+
+    /** Stops hearing the other tabs. */
+    #stopListening = null;
+
+    /**
+     * Takes the open world's access: a claim on `worldId` (the world opened), or, refused because
+     * another tab or window holds it, view only. Lets go of the world held before. With `claim`
+     * false (Draw thumbnails' quiet openings) nothing is claimed.
+     * @param {string|null} worldId
+     * @param {{claim?: boolean}} [options]
+     * @returns {Promise<boolean>} Whether it is open for editing.
+     */
+    async #takeAccess(worldId, { claim = true } = {}) {
+        this.#listenToTabs();
+        if (this.#accessWorldId && this.#accessWorldId !== worldId) this.#releaseAccess();
+        this.#stopWaiting?.();
+        this.#stopWaiting = null;
+        this.#viewNews = null;
+        this.#newerAt = null;
+        this.#accessWorldId = worldId ?? null;
+        if (!worldId || !claim) {
+            this.#access = { mode: "edit", why: null };
+            return true;
+        }
+        const edit = await WorldAccess.claim(worldId);
+        this.#access = edit ? { mode: "edit", why: null } : { mode: "view", why: "elsewhere" };
+        if (!edit) this.#stopWaiting = WorldAccess.whenFree(worldId, () => this.#heldElsewhereFree(worldId));
+        return edit;
+    }
+
+    /** Lets go of the open world's claim (or its view only). */
+    #releaseAccess() {
+        this.#stopWaiting?.();
+        this.#stopWaiting = null;
+        if (this.#accessWorldId) WorldAccess.release(this.#accessWorldId);
+        this.#accessWorldId = null;
+        this.#access = { mode: "edit", why: null };
+        this.#viewNews = null;
+        this.#newerAt = null;
+    }
+
+    /** The tab holding a view-only world let it go: its notice offers Edit here. */
+    #heldElsewhereFree(worldId) {
+        if (this.#shutDown || this.#accessWorldId !== worldId || !this.viewOnly) return;
+        this.#stopWaiting = null;
+        this.#viewNews = "free";
+        this.view?.render(["worldbar", "context", "toolbar"]);
+    }
+
+    /** Hears the other tabs (once): see #onTabNews. */
+    #listenToTabs() {
+        if (this.#stopListening) return;
+        this.#stopListening = WorldAccess.listen((news) => {
+            this.#onTabNews(news).catch((error) => console.warn("FWMB | What another tab told could not be shown:", error));
+        });
+    }
+
+    /**
+     * What another tab or window told: Worlds and its marks read again; a view-only world's notice
+     * says a newer version is saved there (Show the saved version), its name follows a rename, and
+     * it closes when deleted; a held regional world reads again whether its parent made it Out of
+     * date.
+     * @param {{kind: string, worldId: string|null}} news
+     */
+    async #onTabNews({ kind, worldId }) {
+        if (this.#shutDown) return;
+        const regions = new Set();
+        if (this.activeTool === "manage") regions.add("context");
+        const open = this.world?.id ?? null;
+        if (open && worldId === open && this.viewOnly) {
+            if (kind === "deleted") {
+                await this.#viewedWorldDeleted();
+                return;
+            }
+            const saved = await Worlds.get(open);
+            if (kind === "saved" && saved) {
+                this.#viewNews = this.#viewNews === "free" ? "free" : "newer";
+                this.#newerAt = MapStudio.#savedTime(saved);
+            }
+            if (kind === "renamed" && saved) {
+                this.world = { ...this.world, name: saved.name };
+                this.currentSaveName = saved.name;
+            }
+            regions.add("worldbar").add("context");
+        } else if (open && worldId !== open && this.world?.held && (kind === "saved" || kind === "deleted")) {
+            // Its parent (or a world above it) saved: whether that reaches it (Out of date)
+            await this.#refreshStale();
+            regions.add("worldbar").add("context");
+        }
+        if (regions.size) this.view?.render([...regions]);
+    }
+
+    /**
+     * Whether a write to these worlds is refused (WL): any of them open for editing in another tab
+     * or window, or open view only here. Says which, naming them, when it is.
+     * @param {string[]} worldIds
+     * @param {{except?: string|null}} [options] - A world this tab holds and may write anyway.
+     * @returns {Promise<boolean>}
+     */
+    async #refusedElsewhere(worldIds, { except = null } = {}) {
+        const refused = (await WorldAccess.refused(worldIds)).filter((id) => id !== except);
+        if (!refused.length) return false;
+        const { i18n } = platform;
+        const worlds = await Worlds.all();
+        const names = refused.map((id) => worlds.get(id)?.name || i18n.localize("FILRODENSWMB.UI.UnnamedWorld"));
+        const quoted = names.map((name) => i18n.format("FILRODENSWMB.UI.QuotedName", { name })).join(", ");
+        platform.notify.warn(i18n.format(names.length === 1 ? "FILRODENSWMB.UI.CloseElsewhereFirstNamed" : "FILRODENSWMB.UI.CloseElsewhereFirstList", { name: names[0], names: quoted }));
+        return true;
+    }
+
+    /** A view-only world deleted in the tab holding it: closed, and Worlds shown, saying so. */
+    async #viewedWorldDeleted() {
+        const name = this.world?.name || this.#saveName || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        Inspector.close(this);
+        this.#clearMap();
+        this.#closeWorld();
+        await this.switchTool("manage", { force: true });
+        this.view?.render(["worldbar", "toolbar", "context", "editToolbar"]);
+        platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ViewOnlyDeleted", { name }));
+    }
+
+    /** When anything of a world was last saved (its settings or a map), as a time, or null. */
+    static #savedTime(world) {
+        const times = [world?.settingsSavedAt, ...(world?.maps ?? []).map((map) => map.savedAt)].map((value) => Date.parse(value ?? "")).filter(Number.isFinite);
+        return times.length ? Math.max(...times) : null;
+    }
+
+    /** A saved time as the notice says it: the time today, else the date and time. */
+    static #clock(time) {
+        if (!Number.isFinite(time)) return null;
+        const lang = platform.i18n.lang;
+        const today = new Date(time).toDateString() === new Date().toDateString();
+        try {
+            return new Intl.DateTimeFormat(lang, today ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" }).format(new Date(time));
+        } catch {
+            return new Date(time).toLocaleString();
+        }
+    }
+
+    /**
+     * The view-only notice (the panel's action notice, in every panel the world shows, its
+     * settlement maps' too): the world open for editing elsewhere, as saved when; then a newer
+     * version saved there, with Show the saved version; or free again, with Edit here.
+     * @returns {object|null}
+     */
+    viewOnlyNotice() {
+        if (!this.viewOnly) return null;
+        const { i18n } = platform;
+        const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const place = i18n.localize(platform.module?.host === "foundry" ? "FILRODENSWMB.UI.ViewOnlyPlaceFoundry" : "FILRODENSWMB.UI.ViewOnlyPlaceWeb");
+        if (this.#viewNews === "free") {
+            return {
+                title: i18n.localize("FILRODENSWMB.UI.ViewOnlyMark"),
+                icon: "visibility",
+                lines: [i18n.format("FILRODENSWMB.UI.ViewOnlyFree", { name })],
+                actions: [{ action: "editHere", label: i18n.localize("FILRODENSWMB.UI.EditHere"), icon: "edit" }],
+            };
+        }
+        const savedAt = MapStudio.#clock(MapStudio.#savedTime(this.world));
+        // "You can explore it here" only where there is something to explore (a run, for History
+        // and Travel); a world with none is only looked at here
+        const explore = this.surfaceMade && (this.modelRun || this.parentRun);
+        const key = savedAt ? (explore ? "FILRODENSWMB.UI.ViewOnlyNotice" : "FILRODENSWMB.UI.ViewOnlyNoticeLook") : explore ? "FILRODENSWMB.UI.ViewOnlyNoticeNoTime" : "FILRODENSWMB.UI.ViewOnlyNoticeLookNoTime";
+        const lines = [i18n.format(key, { name, where: place, time: savedAt })];
+        const actions = [];
+        if (this.#viewNews === "newer") {
+            const newer = MapStudio.#clock(this.#newerAt);
+            lines.push(newer ? i18n.format("FILRODENSWMB.UI.ViewOnlyNewer", { name, time: newer }) : i18n.format("FILRODENSWMB.UI.ViewOnlyNewerNoTime", { name }));
+            actions.push({ action: "showSavedVersion", label: i18n.localize("FILRODENSWMB.UI.ShowSavedVersion"), icon: "sync" });
+        }
+        return { title: i18n.localize("FILRODENSWMB.UI.ViewOnlyMark"), icon: "visibility", lines, actions };
+    }
+
+    /**
+     * Edit here and Show the saved version: the open world opened again from what is saved, on
+     * the tool it shows. Claimed if it is free now, so Edit here opens it for editing; still view
+     * only, Show the saved version shows the version saved there. A view-only world has no unsaved
+     * changes to lose.
+     */
+    async reopenWorld() {
+        const world = this.world;
+        if (!world?.id) return;
+        const mapId = this.surfaceMade ? this.currentSaveId : null;
+        await this.worldAction("load", mapId, world.name, undefined, world.id);
+    }
+
+    /** Whether a map tool has something to show on a world open view only (a run, for most of Explore). */
+    #explorable(tool) {
+        if (!this.surfaceMade) return false;
+        if (tool === "threeD" || tool === "export") return true;
+        return !!(this.modelRun || this.parentRun);
+    }
+
+    /** The view-only line: the world bar's mark's tooltip, and Save world's while it is off. */
+    #viewOnlyLine() {
+        const { i18n } = platform;
+        const name = this.world?.name || this.#saveName || i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
+        const place = i18n.localize(platform.module?.host === "foundry" ? "FILRODENSWMB.UI.ViewOnlyPlaceFoundry" : "FILRODENSWMB.UI.ViewOnlyPlaceWeb");
+        return i18n.format("FILRODENSWMB.UI.ViewOnlyHint", { name, where: place });
+    }
+
+    /**
+     * Whether a tool is offered on a world open view only: Explore's tools, Export (an image of
+     * what is shown, which is what is saved), the world's pages (read only) and Worlds.
+     */
+    #viewOffers(tool) {
+        if (!this.viewOnly) return true;
+        if (this.definition.tool(tool)?.mode === "explore") return true;
+        if (tool === "export" || tool === "manage") return true;
+        return WorldEditors.isEditor(tool) || tool === "worldOverview";
     }
 
     /**
@@ -1121,13 +1386,20 @@ export class MapStudio {
         else if (!this.surfaceMade && inWorld) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldGenerateAll" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap") } : tool)) }));
         // Cut regional world… needs a Surface map the cut can read
         const cutOff = this.cutOff();
+        // View only (WL): Explore's tools, Export and the world's pages; what runs or cuts goes
+        if (this.viewOnly) {
+            railStages = only((id) => this.#viewOffers(id));
+            if (!(this.modelRun || this.parentRun)) {
+                railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (this.definition.tool(tool.id)?.mode === "explore" && tool.id !== "threeD" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") } : tool)) }));
+            }
+        }
         if (inWorld && cutOff) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldCut" ? { ...tool, disabled: true, tooltip: cutOff } : tool)) }));
         const unmade = !this.surfaceMade || this.#creatingWorld;
         return {
             railWorld: inWorld,
             railStages,
             // A map's occasional tools are its own; the menus and toggles are on both rails
-            railOccasional: inWorld || unmade ? occasional.filter((entry) => !entry.tool) : occasional,
+            railOccasional: inWorld || unmade || this.viewOnly ? occasional.filter((entry) => !entry.tool) : occasional,
             railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
             helpOpen: HelpPanel.shows(this),
         };
@@ -1186,7 +1458,9 @@ export class MapStudio {
             settlements: noWorld || creating ? null : SettlementMaps.menuContext(this),
             noWorld,
             // Save world and Save as have nothing to save with no world open or while one is made
-            savesOff: noWorld || creating ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint") : null,
+            savesOff: noWorld || creating ? i18n.localize(noWorld ? "FILRODENSWMB.UI.NoWorldOpenHint" : "FILRODENSWMB.UI.CreatingWorldHint") : this.viewOnly ? this.#viewOnlyLine() : null,
+            // A world open view only (WL): its mark beside the name, the notice's first line its tooltip
+            viewOnly: !noWorld && this.viewOnly ? this.#viewOnlyLine() : null,
             fold: this.root?.querySelector(":scope > .fwmb-worldbar")?.dataset.fold ?? "1",
             // A held regional world Out of date (S0 step 5): the mark beside its name, saying why
             stale: !noWorld && this.#staleLines.length ? this.#staleLines.join(" ") : null,
@@ -1311,7 +1585,8 @@ export class MapStudio {
             // What the tool does on this map, under its title (Appearance › Tool descriptions hides it)
             lede: entry?.lede ? i18n.localize(entry.lede) : null,
             // A state of the map that needs action, at the head of every one of its tools
-            notice: this.#isMapTool(tool) && this.surfaceMade ? this.#actionNotice() : null,
+            // A world open view only (WL) says so first, in every panel
+            notice: this.viewOnly ? this.viewOnlyNotice() : this.#isMapTool(tool) && this.surfaceMade ? this.#actionNotice() : null,
             // Explore's tools read the map and change nothing on it
             tag: entry?.mode === "explore" ? i18n.localize("FILRODENSWMB.UI.ExploreReadOnly") : null,
             // A world settings editor's: what it edits is the world's, not this map's (board W2);
@@ -3113,6 +3388,10 @@ export class MapStudio {
      */
     destroy() {
         this.#shutDown = true;
+        // The open world's claim let go, so another tab or window may edit it (WL)
+        this.#releaseAccess();
+        this.#stopListening?.();
+        this.#stopListening = null;
         this.#closeLayerMenu();
         this.#layout?.stop();
         this.#layout = null;
@@ -5408,6 +5687,11 @@ export class MapStudio {
      */
     async #performSave(asNew, promptTitle = null) {
         if (!this.worldOpen || this.#creatingWorld) return false;
+        // A world open view only (WL) is saved in the tab holding it
+        if (this.viewOnly) {
+            platform.notify.warn(this.#viewOnlyLine());
+            return false;
+        }
         let mapName = this.currentSaveName;
         const createsNewMap = asNew || !this.currentSaveId;
 
@@ -5497,7 +5781,13 @@ export class MapStudio {
         if (!result) return null;
         // The regional worlds it holds learn whether it changed inside their crops (rule 1)
         const mapId = result.maps[0]?.id ?? null;
-        if (mapId && (this.#dirty || createsNewMap) && !asNew && (await this.#updateChildFingerprints(result.world, mapId))) await platform.store.saveWorld(result.world);
+        if (mapId && (this.#dirty || createsNewMap) && !asNew && (await this.#updateChildFingerprints(result.world, mapId))) {
+            await platform.store.saveWorld(result.world);
+            // The regional worlds it holds read their Out of date from these (WL)
+            WorldAccess.tell("saved", result.world.id);
+        }
+        // Save as (or a first save): the world now open is the one saved, claimed here (WL)
+        if (result.world.id !== this.#accessWorldId) await this.#takeAccess(result.world.id);
         // The same world (Save as gives it a new id, its settlement maps with it): the settlement
         // map open stays open, under its saved id
         this.#world = result.world;
@@ -6664,8 +6954,18 @@ export class MapStudio {
     async #openWorldOnItsTool() {
         this.#mapToolWorldId = this.world?.id ?? this.#saveId;
         const kept = this.#worldMapTools.get(this.#mapToolWorldId);
-        const offered = (tool) => this.#isMapTool(tool) && this.definition.offers(tool, this.mapType);
-        const tool = [kept, this.activeTool, this.#mapTool].find(offered) ?? MapStudio.#FIRST_MAP_TOOL;
+        const offered = (tool) => this.#isMapTool(tool) && this.definition.offers(tool, this.mapType) && this.#viewOffers(tool) && (!this.viewOnly || this.#explorable(tool));
+        if (this.viewOnly && !offered(kept) && !offered(this.activeTool) && !offered(this.#mapTool)) {
+            // View only with nothing to explore (no run): the world's overview, read only (WL)
+            const explore = this.surfaceMade && (this.modelRun || this.parentRun) ? "history" : null;
+            if (!explore) {
+                this.#worldTool = "worldOverview";
+                await this.switchTool("worldOverview", { force: true });
+                this.view?.render(["worldbar", "toolbar", "context"]);
+                return;
+            }
+        }
+        const tool = [kept, this.activeTool, this.#mapTool].find(offered) ?? (this.viewOnly ? "history" : MapStudio.#FIRST_MAP_TOOL);
         this.#mapTool = tool;
         // A world opens on its map (S0 step 4c-2): leaving Worlds may have shown the world tool
         // left, which the opening's overlay hid
@@ -6697,6 +6997,8 @@ export class MapStudio {
         // With no world open there is only Worlds (board N5); with no Surface map made, its Map
         // setup is all its rail holds (board N4)
         if (!this.worldOpen && newTool !== "manage") return;
+        // A world open view only (WL) offers Explore, Export and its pages only
+        if (this.worldOpen && !this.#viewOffers(newTool)) return;
         if (this.worldOpen && !this.surfaceMade && this.#isMapTool(newTool) && newTool !== "scene") return;
         // Cut regional world… needs a Surface map it can cut from; Cancel goes back where it was opened
         if (newTool === "worldCut" && this.cutOff()) return;
@@ -7068,6 +7370,8 @@ export class MapStudio {
     cutOff() {
         const { i18n } = platform;
         if (!this.worldOpen || this.#creatingWorld) return i18n.localize("FILRODENSWMB.UI.NoWorldOpenHint");
+        // A world open view only (WL) is cut from in the tab holding it
+        if (this.viewOnly) return this.#viewOnlyLine();
         if (!this.surfaceMade) return i18n.localize("FILRODENSWMB.UI.NeedsSurfaceMap");
         if (!TerrainVersion.canCreateRegionalMap(this.uiState)) return i18n.localize("FILRODENSWMB.UI.RegionalMapNeedsUpdate");
         return null;
@@ -7244,6 +7548,8 @@ export class MapStudio {
             const saved = (await Worlds.get(parent.id)) ?? parent;
             saved.childFingerprints = { ...RegionalRecord.checkChildFingerprints(saved.childFingerprints), [world.id]: { [mapId]: fingerprint } };
             await platform.store.saveWorld(saved);
+            WorldAccess.tell("saved", world.id);
+            WorldAccess.tell("saved", saved.id);
             this.world = saved;
             platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.RegionalWorldCut", { name }));
             return { worldId: world.id, mapId, name };
@@ -7322,6 +7628,9 @@ export class MapStudio {
         const parent = old?.parentWorldId ? worlds.get(old.parentWorldId) : null;
         const entry = RegionalRecord.forMap(old?.regional, Worlds.mapOf(old));
         if (!old?.held || !parent || !entry?.crop?.parent || !entry.size) return;
+        // It and the world it is cut from are both written: refused while either is open for
+        // editing elsewhere, or this one is open view only here (WL)
+        if (await this.#refusedElsewhere([old.id, parent.id], { except: this.world?.id === old.id && !this.viewOnly ? old.id : null })) return;
         const name = old.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedWorld");
         const oldName = MapStudio.#oldWorldName(name, new Set([...worlds.values()].map((world) => world.name)));
         if (!(await MapDialogManager.promptCutAgain(name, parent.name || "", oldName))) return;
@@ -7745,7 +8054,8 @@ export class MapStudio {
             this.#endProcessing();
         }
         // What asks the user comes once the world is open and shown
-        if (opened) {
+        // A world open view only (WL) writes nothing, so neither asks: both wait for it to be edited
+        if (opened && !this.viewOnly) {
             await this.#offerFirstOpeningNotice();
             await this.#offerTerrainUpgrade();
         }
@@ -7837,6 +8147,9 @@ export class MapStudio {
         const loaded = await WorldMaps.load(mapId);
         if (loaded) {
             const { payload, world, settings } = loaded;
+            // Claimed for editing, or view only when another tab or window holds it (WL): set
+            // before anything below draws, so no Create tool shows. Draw thumbnails claims nothing
+            await this.#takeAccess(world?.id ?? null, { claim: !thumbnailOnly });
             this.currentSaveId = mapId;
             this.currentSaveName = name;
             this.world = world;
@@ -7851,7 +8164,7 @@ export class MapStudio {
             await this.#refreshStale();
             // A world made from a 4.3 map has no thumbnail until its first save in v5: one is drawn
             // now, from the map as saved, before anything below changes it (S0 step 8d)
-            const drawn = await this.#drawMissingThumbnail();
+            const drawn = this.viewOnly ? false : await this.#drawMissingThumbnail();
             if (thumbnailOnly) {
                 // Nothing of it was changed or is to be asked: what its opening does waits for the
                 // next time it is opened
@@ -7881,7 +8194,7 @@ export class MapStudio {
                 if (ports + rivers) this._repaintVectors();
             }
             // Filled in now when asked for as it was cut; the map then has changes to save
-            if (this.infillPending) {
+            if (this.infillPending && !this.viewOnly) {
                 this.infillPending = false;
                 if (InfillInput.offered(this)) await Infilling.run(this, { ask: false });
             }
@@ -7938,7 +8251,10 @@ export class MapStudio {
      * Closes the open world's state: no world record, no map, no save (the map's state is
      * #clearMap's). Nothing is open after it until a world is opened or made.
      */
-    #closeWorld() {
+    #closeWorld({ keepAccessOf = null } = {}) {
+        // Its claim let go (WL), so another tab may edit it; kept when the same world opens again
+        // at once (a world with no maps opened afresh), so no other tab is offered Edit here between
+        if (!keepAccessOf || keepAccessOf !== this.#accessWorldId) this.#releaseAccess();
         this.currentSaveId = null;
         this.currentSaveName = null;
         this.currentParentId = null;
@@ -7997,6 +8313,7 @@ export class MapStudio {
             return;
         }
         this.world = result.world;
+        await this.#takeAccess(result.world.id);
         this.currentSaveName = name;
         this.worldSettingsOpened = settings;
         this.#creatingWorld = false;
@@ -8039,11 +8356,13 @@ export class MapStudio {
         const frame = settings?.setup?.frame;
         this.mapWidth = Number.isInteger(frame?.width) ? frame.width : FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         this.mapHeight = Number.isInteger(frame?.height) ? frame.height : FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
-        this.#closeWorld();
+        this.#closeWorld({ keepAccessOf: world.id });
         this.#clearMap();
         // The world's settings read in as a map's load reads them, from an empty map in its frame
         const base = WorldSettings.split(this._buildSavePayload().payload).mapData;
         const payload = WorldSettings.merge(settings, base, { inline: false });
+        // Claimed, or view only (WL), before its pages draw
+        await this.#takeAccess(world.id);
         this.world = world;
         this.currentSaveName = world.name;
         this.worldSettingsOpened = settings;
@@ -8096,7 +8415,7 @@ export class MapStudio {
      */
     async #offerFirstOpeningNotice() {
         const world = this.world;
-        if (!world?.migration || world.migration.noticed) return;
+        if (this.viewOnly || !world?.migration || world.migration.noticed) return;
         const { i18n } = platform;
         const noticed = { ...world, migration: { ...world.migration, noticed: true } };
         this.world = noticed;
@@ -8203,6 +8522,8 @@ export class MapStudio {
     async #handleMapDelete(mapId, knownWorldId = null) {
         const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
         const plan = worldId ? await Worlds.deletePlan(worldId) : { movedUp: [], released: [], unlinked: [] };
+        // Refused while it, or a world the delete rewrites, is open for editing elsewhere (WL)
+        if (worldId && (await this.#refusedElsewhere([worldId, ...[...plan.movedUp, ...plan.released, ...plan.unlinked].map((world) => world.id)]))) return;
         const names = (worlds) => worlds.map((world) => world.name).join(", ");
         const notes = [];
         if (plan.released.length) notes.push(platform.i18n.format("FILRODENSWMB.UI.DeleteWorldReleases", { names: names(plan.released) }));
@@ -8217,9 +8538,11 @@ export class MapStudio {
         const shown = worldId && Inspector.inspected(this).world === worldId ? WorldsPanel.find(this, worldId) : null;
         const showNext = shown ? (shown.parentId ?? plan.released[0]?.id ?? plan.movedUp[0]?.id ?? null) : null;
 
-        if (worldId) await Worlds.delete(worldId);
-        else await platform.store.deleteSavedMap(mapId);
+        if (worldId) {
+            if (!(await Worlds.delete(worldId))) return;
+        } else await platform.store.deleteSavedMap(mapId);
         if ((mapId && this.currentSaveId === mapId) || (worldId && this.world?.id === worldId)) {
+            this.#releaseAccess();
             this.currentSaveId = null;
             this.world = null;
             // The open world is gone: nothing is open, and Worlds has nothing to go back to
@@ -8242,8 +8565,11 @@ export class MapStudio {
         if (newName && newName !== currentName) {
             // The world and its maps (see Worlds.rename)
             const worldId = knownWorldId ?? (await MapStudio.#worldIdOf(mapId));
-            if (worldId) await Worlds.rename(worldId, newName);
-            else await platform.store.renameSavedMap(mapId, newName);
+            if (worldId) {
+                // Refused while it is open for editing elsewhere (WL)
+                if (await this.#refusedElsewhere([worldId])) return;
+                if (!(await Worlds.rename(worldId, newName))) return;
+            } else await platform.store.renameSavedMap(mapId, newName);
 
             const isOpen = (!!mapId && this.currentSaveId === mapId) || (!!worldId && this.world?.id === worldId);
             if (isOpen) {

@@ -318,7 +318,8 @@ export class LocalController {
         this.#owner = owner;
         this.#record = record;
         this.#pinId = record.pinId;
-        this.tool = "mapSetup";
+        // A world open view only (WL) explores its settlement maps: Map setup changes them
+        this.tool = this.#viewOnly() ? "households" : "mapSetup";
         return this.#showRecord(record, { render: false });
     }
 
@@ -380,9 +381,17 @@ export class LocalController {
 
     // ------------------------------------------------------------------ keeping it in step (2b)
 
-    /** Whether the open settlement map is this world's to change (not a held world's parent's). */
+    /**
+     * Whether the open settlement map is this world's to change: not a held world's parent's, and
+     * its world not open view only (WL).
+     */
     get canChange() {
-        return !!this.#record && !this.#owner && this.mode !== "choosing";
+        return !!this.#record && !this.#owner && this.mode !== "choosing" && !this.#viewOnly();
+    }
+
+    /** Whether the world is open view only here (WL): its settlement maps are explored, never changed. */
+    #viewOnly() {
+        return this.#host.viewOnly?.() === true;
     }
 
     /** The world that owns the open settlement map when it is not this one's, or null. */
@@ -600,15 +609,17 @@ export class LocalController {
     /** The rail: its stages and tools from the studio's definition; those not built yet drawn off. */
     railContext() {
         const { i18n } = platform;
+        // View only (WL): Explore's tool and Export, never Map setup
+        const viewOnly = this.#viewOnly();
         const stages = this.#definition.railStages("settlement").map((stage) => ({
             ...stage,
-            tools: stage.tools.map((tool) => ({
+            tools: stage.tools.filter((tool) => !viewOnly || tool.id !== "mapSetup").map((tool) => ({
                 ...tool,
                 disabled: !!tool.later || (this.mode === "choosing" && tool.id !== "mapSetup"),
                 tooltip: tool.later ? i18n.format("FILRODENSWMB.UI.NotBuiltYet", { name: i18n.localize(tool.label) }) : i18n.localize(tool.label),
             })),
         }));
-        return { railWorld: false, railStages: stages, activeTool: this.tool };
+        return { railWorld: false, railStages: stages.filter((stage) => stage.tools.length), activeTool: this.tool };
     }
 
     /** The panel's frame (context.hbs) and the Local studio's own context for its templates. */
@@ -670,6 +681,9 @@ export class LocalController {
     #notice() {
         const { i18n } = platform;
         if (this.mode === "choosing" || !this.#record) return null;
+        // A world open view only (WL): its notice, in every panel
+        const viewOnly = this.#host.viewOnlyNotice?.();
+        if (viewOnly) return viewOnly;
         const name = this.#settlementName();
         const local = (action, label, icon) => ({ action: "local", data: { local: action }, label, icon });
         if (this.#owner) {
@@ -755,6 +769,7 @@ export class LocalController {
     /** Changes the rail's tool; the households card opens only in Households and supply. */
     changeTool(tool) {
         if (!this.#definition.offers(tool, "settlement") || this.#definition.tool(tool)?.later) return false;
+        if (tool === "mapSetup" && this.#viewOnly()) return false;
         this.tool = tool;
         if (this.#people) this.#people.enabled = tool === "households";
         this.#host.render(["toolbar", "context", "editToolbar"]);

@@ -62,6 +62,8 @@ export class Generation {
      * @returns {Promise<boolean>} Whether content was added.
      */
     static async run(app, { confirmed = false } = {}) {
+        // A world open view only (WL) runs nothing: its notice says why
+        if (app.viewOnly) return false;
         if (this.heldByParent(app)) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.GenerateHeldByParentWarn"));
             return false;

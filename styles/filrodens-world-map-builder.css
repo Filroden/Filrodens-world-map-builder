@@ -3240,6 +3240,9 @@
 .fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page):has(.fwmb-studio-body > .fwmb-overlay-docked[open]) :is(.fwmb-page-head, .fwmb-page-lede, .fwmb-page-body > .fwmb-readby, .fwmb-page-body > .fwmb-held, .fwmb-page-stack > :not(.fwmb-world-table-wrap)) {
     padding-inline-end: calc(var(--fwmb-inspector-width) + 1.25rem);
 }
+.fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page):has(.fwmb-studio-body > .fwmb-overlay-docked[open]) .fwmb-panel--page > .fwmb-panel-notice {
+    margin-inline-end: calc(var(--fwmb-inspector-width) + 1.25rem);
+}
 .fwmb .fwmb-studio[data-fwmb-width="narrow"]:has(.fwmb-panel--page) .fwmb-overlay-docked .fwmb-form-group {
     flex-direction: column;
     align-items: stretch;
@@ -5806,6 +5809,11 @@ button.fwmb-format {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+/* A page's action notice (a world open view only, WL) lines up with the page's cards below it */
+.fwmb .fwmb-panel--page > .fwmb-panel-notice {
+    flex: none;
+    margin: 0.875rem 1.25rem 0;
 }
 /* Read by: the mirror of Peoples and realms' Read from the world, a Go a map tool that reads the page */
 .fwmb-readby {
@@ -10666,7 +10674,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-overview-update .fwmb-notice-actions {
     align-items: flex-start;
 }
-.fwmb-worldbar .fwmb-worldbar-stale {
+.fwmb-worldbar .fwmb-worldbar-stale,
+.fwmb-worldbar .fwmb-worldbar-view {
     flex: none;
     margin-inline-start: 0.25rem;
 }

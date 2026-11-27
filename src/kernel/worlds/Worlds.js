@@ -1,6 +1,7 @@
 import { platform } from "../../platform/index.js";
 import { MAP_TYPES, WorldRecord } from "./WorldRecord.js";
 import { RegionalRecord } from "./RegionalRecord.js";
+import { WorldAccess } from "./WorldAccess.js";
 
 /**
  * The world records and their maps, over the platform's store (v5's family records; see
@@ -28,6 +29,11 @@ import { RegionalRecord } from "./RegionalRecord.js";
  *   the record names them. Each save drops the blobs a map's record no longer names; a copy takes
  *   them along with its record; Clone as new and a release drop the record, and the blobs with it.
  *
+ * **One window per world (WL):** every write of an existing world checks WorldAccess first and
+ * is refused (null or false, said in the console) when the world is open view only here or held
+ * for editing elsewhere; deleting a world checks every world it rewrites too. Each write done is
+ * told to the other tabs (WorldAccess.tell), so they read again what they show.
+ *
  * The clock and the id maker can be replaced for tests.
  */
 export class Worlds {
@@ -40,6 +46,18 @@ export class Worlds {
     /** Every world record, by id. */
     static async all() {
         return new Map((await platform.store.listWorlds()).map((world) => [world.id, world]));
+    }
+
+    /**
+     * Whether a write to these worlds is refused (see WorldAccess.refused), said in the console.
+     * @param {Array<string|null|undefined>} worldIds
+     * @param {string} what - The write, for the console.
+     */
+    static async refused(worldIds, what) {
+        const refused = await WorldAccess.refused(worldIds);
+        if (!refused.length) return false;
+        console.warn(`FWMB | ${what} refused: open for editing in another tab or window, or view only here (${refused.join(", ")})`);
+        return true;
     }
 
     /** A world record, or null. */
@@ -138,6 +156,7 @@ export class Worlds {
     static async save({ world, name, settings, maps, asNew = false, settingsChanged = undefined, regional = undefined, settlements = {} }) {
         const stamp = Worlds.now();
         const fresh = !world || asNew;
+        if (!fresh && (await Worlds.refused([world.id], "Saving the world"))) return null;
         const record = fresh
             ? WorldRecord.create({ id: Worlds.newWorldId(), name, parentWorldId: world?.parentWorldId ?? null, held: world?.held === true })
             : structuredClone(world);
@@ -190,6 +209,7 @@ export class Worlds {
         if (!(await platform.store.saveWorld(record))) return null;
         for (const { record: entry, page } of plan.writes) if (!(await platform.store.saveSettlementMap(record.id, entry, page))) return null;
         if (!fresh) for (const id of plan.deletes) await platform.store.deleteSettlementMap(record.id, id);
+        WorldAccess.tell(fresh ? "created" : "saved", record.id);
         return { world: record, maps: savedMaps.map(({ id, type }) => ({ id, type })), settlements: plan.ids };
     }
 
@@ -287,6 +307,7 @@ export class Worlds {
         // Its settlement maps, once its journal exists to hold them
         copy.settlements = await Worlds.#copySettlements(world, copy, Worlds.mapOf(copy));
         if (copy.settlements.length) await platform.store.saveWorld(copy);
+        WorldAccess.tell("created", copy.id);
         return copy;
     }
 
@@ -314,6 +335,7 @@ export class Worlds {
         // pins on its map, as its own (L-surface step 2b)
         copy.settlements.push(...(await Worlds.#copyHeldSettlements(world, copy, surfaceId, new Set(copy.settlements.map((card) => card.pinId)))));
         if (copy.settlements.length) await platform.store.saveWorld(copy);
+        WorldAccess.tell("created", copy.id);
         return copy;
     }
 
@@ -344,8 +366,11 @@ export class Worlds {
     static async rename(worldId, name) {
         const world = await Worlds.get(worldId);
         if (!world) return null;
+        if (await Worlds.refused([worldId], "Renaming the world")) return null;
         for (const map of world.maps ?? []) await platform.store.renameSavedMap(map.id, name);
-        return platform.store.saveWorld({ ...world, name });
+        const saved = await platform.store.saveWorld({ ...world, name });
+        WorldAccess.tell("renamed", worldId);
+        return saved;
     }
 
     /**
@@ -363,9 +388,12 @@ export class Worlds {
         if (index < 0 || world.maps[index].thumbnail) return null;
         const card = WorldRecord.mapCard({ thumbnail });
         if (!card.thumbnail) return null;
+        if (await Worlds.refused([worldId], "Drawing the world's thumbnail")) return null;
         const maps = world.maps.map((map, i) => (i === index ? { ...map, thumbnail: card.thumbnail } : map));
         const record = { ...world, maps };
-        return (await platform.store.saveWorld(record)) ? record : null;
+        if (!(await platform.store.saveWorld(record))) return null;
+        WorldAccess.tell("saved", worldId);
+        return record;
     }
 
     /**
@@ -398,6 +426,8 @@ export class Worlds {
         const world = worlds.get(worldId);
         if (!world) return false;
         const plan = await Worlds.deletePlan(worldId);
+        const rewritten = [...plan.movedUp, ...plan.released, ...plan.unlinked].map((child) => child.id);
+        if (await Worlds.refused([worldId, ...rewritten], "Deleting the world")) return false;
         const byId = (id) => worlds.get(id) ?? null;
         for (const child of plan.movedUp) await platform.store.saveWorld({ ...child, parentWorldId: world.parentWorldId });
         for (const child of plan.released) {
@@ -409,7 +439,10 @@ export class Worlds {
         for (const child of plan.unlinked) await platform.store.saveWorld({ ...child, parentWorldId: null });
         for (const map of world.maps ?? []) await platform.store.deleteSavedMap(map.id);
         await platform.store.deleteSettlementMaps(worldId);
-        return platform.store.deleteWorld(worldId);
+        const deleted = await platform.store.deleteWorld(worldId);
+        for (const id of rewritten) WorldAccess.tell("saved", id);
+        WorldAccess.tell("deleted", worldId);
+        return deleted;
     }
 
     /** Drops the blobs kept with a map that its world's record no longer names. */
