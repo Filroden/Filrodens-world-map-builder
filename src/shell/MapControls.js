@@ -1,4 +1,4 @@
-import { FILRODENSWMB } from "../config.js";
+import { SHELL_CONFIG } from "./config.js";
 import { setOn } from "./aria.js";
 import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
 
@@ -17,10 +17,10 @@ import { RangeDisplay } from "../kernel/util/RangeDisplay.js";
  */
 
 /** The layers switched on and off one by one with the toggleLayer action, in the controls' order. */
-export const VIEW_LAYERS = Object.freeze([...FILRODENSWMB.STUDIO.VIEW_LAYERS, ...FILRODENSWMB.STUDIO.OVERLAY_LAYERS].filter((layer) => layer.action !== "toggleGrid").map((layer) => layer.id));
+export const VIEW_LAYERS = Object.freeze([...SHELL_CONFIG.STUDIO.VIEW_LAYERS, ...SHELL_CONFIG.STUDIO.OVERLAY_LAYERS].filter((layer) => layer.action !== "toggleGrid").map((layer) => layer.id));
 
 /** The map aids (Show's Map aids row): drawn over the map to work with, never the map's content. */
-export const MAP_AIDS = Object.freeze(FILRODENSWMB.STUDIO.OVERLAY_LAYERS.map((layer) => layer.id ?? "grid"));
+export const MAP_AIDS = Object.freeze(SHELL_CONFIG.STUDIO.OVERLAY_LAYERS.map((layer) => layer.id ?? "grid"));
 
 /** Whether all, some or none of a list of switches are on. */
 export function groupState(values) {
@@ -42,7 +42,7 @@ const ARIA_CHECKED = { on: "true", partial: "mixed", off: "false" };
 export function showStates(state) {
     const rows = {};
     for (const group of state.terrainGroups) rows[group.id] = groupState(group.items.map((item) => item.on));
-    for (const layer of FILRODENSWMB.STUDIO.VIEW_LAYERS) {
+    for (const layer of SHELL_CONFIG.STUDIO.VIEW_LAYERS) {
         const content = (state.contentGroups ?? []).find((group) => group.id === layer.id);
         rows[layer.id] = content ? content.state : state.layers[layer.id] ? "on" : "off";
     }

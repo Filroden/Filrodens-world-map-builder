@@ -6,8 +6,8 @@ import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from ".
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
 import { InfluenceView } from "./InfluenceView.js";
-import { RunCells } from "./RunCells.js";
 import { RunInputs } from "./RunInputs.js";
+import { ThematicRun } from "./ThematicRun.js";
 import { TravelView } from "./TravelView.js";
 
 /**
@@ -56,8 +56,6 @@ function routeSignature(routes) {
 
 /** The line layers' names in the menu. */
 const LINE_LABELS = Object.freeze({ trade: "FILRODENSWMB.UI.ThematicTrade" });
-/** Per studio: the source for its run and mesh (which keeps the layers' values and colours). */
-const sources = new WeakMap();
 /** Per studio: the legends folded by the user (by layer id), kept while the studio is open. */
 const folded = new WeakMap();
 /** Per studio: the trade lines and their index, with what they were made from (see #trade). */
@@ -84,38 +82,9 @@ export class ThematicView {
         return this.valid(app.uiState?.thematic);
     }
 
-    /**
-     * The source of the layers for the map's run and mesh, or null when there is no usable run.
-     * While the History tool shows an earlier age, the run as that age left it (its cultures
-     * alone; see HistoryView.thematicRun).
-     */
-    static source(app) {
-        const { run: modelRun, cells: mesh } = this.#runCells(app);
-        const cached = sources.get(app);
-        if (cached?.modelRun === modelRun && cached?.mesh === mesh) {
-            cached.source?.useCultures(app.uiState?.cultures);
-            return cached.source;
-        }
-        const source = ThematicSource.of(modelRun, mesh);
-        source?.useCultures(app.uiState?.cultures);
-        sources.set(app, { modelRun, mesh, source });
-        return source;
-    }
-
-    /** The run the layers read and the cells it is on (see RunCells), the age shown first. */
-    static #runCells(app) {
-        const past = HistoryView.thematicRun(app);
-        if (past) {
-            // An earlier age is on the run's own cells: the map's model cells, or a regional map's copy of its parent's
-            const found = RunCells.of(app);
-            return found?.inherited ? { run: past, cells: found.cells, inherited: true } : { run: past, cells: app.meshSession?.mesh ?? null, inherited: false };
-        }
-        return RunCells.of(app) ?? { run: null, cells: null, inherited: false };
-    }
-
     /** Whether the layers come from the parent's run (a regional map not generated itself). */
     static inherited(app) {
-        return this.#runCells(app).inherited && !!this.source(app);
+        return ThematicRun.runCells(app).inherited && !!ThematicRun.source(app);
     }
 
     /** The colour layer drawn now: the chosen one, when the run holds what it needs. */
@@ -123,7 +92,7 @@ export class ThematicView {
         // The Travel tool's day bands, and the Influences tool's painting, take the colour layer's place while open
         if (this.#overlaid(app)) return null;
         const { fill } = this.setting(app);
-        return fill && this.source(app)?.has(fill) ? LAYERS.get(fill) : null;
+        return fill && ThematicRun.source(app)?.has(fill) ? LAYERS.get(fill) : null;
     }
 
     /** Whether a tool's own overlay takes the colour layer's place: the Travel tool's day bands, the Influences tool's painting. */
@@ -133,7 +102,7 @@ export class ThematicView {
 
     /** Whether the trade lines are drawn: chosen, and kept by the run (a run saved before trade was kept has none). */
     static tradeShown(app) {
-        return this.setting(app).lines.includes("trade") && !!this.source(app)?.hasTrade();
+        return this.setting(app).lines.includes("trade") && !!ThematicRun.source(app)?.hasTrade();
     }
 
     /**
@@ -143,13 +112,13 @@ export class ThematicView {
      * @returns {{lines: object[], index: TradeIndex}|null}
      */
     static #trade(app) {
-        const source = this.source(app);
+        const source = ThematicRun.source(app);
         const trade = source?.trade();
         if (!trade) return null;
         const signature = routeSignature(app.mapRoutes);
         const cached = trades.get(app);
         if (cached?.source === source && cached.signature === signature) return cached;
-        const { run, cells } = this.#runCells(app);
+        const { run, cells } = ThematicRun.runCells(app);
         const userRoutes = GeneratorRevision.rules(run?.revision ?? FILRODENSWMB.GENERATOR.REVISIONS.LEGACY).userRoutes;
         const lines = tradeLines(trade, cells, app.mapRoutes, { userRoutes });
         const made = { source, signature, lines, index: new TradeIndex(lines, app.mapWidth) };
@@ -163,7 +132,7 @@ export class ThematicView {
      * @returns {string|null} A localisation key.
      */
     static unavailableReason(app) {
-        if (this.source(app)) return null;
+        if (ThematicRun.source(app)) return null;
         return app.uiState?.world?.zoom > 1 ? "FILRODENSWMB.UI.ThematicNoRunRegional" : "FILRODENSWMB.UI.ThematicNoRun";
     }
 
@@ -172,7 +141,7 @@ export class ThematicView {
      * colour layer's row, whether it can be chosen, and the note at the head of the menu.
      */
     static controlState(app) {
-        const source = this.source(app);
+        const source = ThematicRun.source(app);
         const { opacity } = this.setting(app);
         const reason = this.unavailableReason(app);
         const past = HistoryView.isPast(app);
@@ -208,7 +177,7 @@ export class ThematicView {
     /** Draws the shown layer on the canvas, or none, and brings the legend up to date. */
     static render(app) {
         const layer = this.shownLayer(app);
-        const source = this.source(app);
+        const source = ThematicRun.source(app);
         const { opacity } = this.setting(app);
         const display = this.#display(app, layer, source, opacity);
         app.canvasEngine?.renderThematic(app.meshSession, display);
@@ -247,12 +216,12 @@ export class ThematicView {
             return;
         }
         if (ThematicSource.isClassLayer(layer.id)) {
-            const culture = this.source(app).cultureAt(cell);
+            const culture = ThematicRun.source(app).cultureAt(cell);
             text.textContent = culture ? platform.i18n.format("FILRODENSWMB.UI.ThematicCultureValue", { name: culture.name, share: Math.round(culture.share * PERCENT) }) : NO_VALUE;
             this.#markClass(app, layer, culture?.index ?? -1);
             return;
         }
-        const value = this.source(app).valueAt(layer.id, cell);
+        const value = ThematicRun.source(app).valueAt(layer.id, cell);
         text.textContent = Number.isFinite(value) ? this.formatValue(app, layer, value) : NO_VALUE;
         this.#moveMarker(app, layer, value);
     }
@@ -316,7 +285,7 @@ export class ThematicView {
         const travel = TravelView.legendSignature(app);
         // Worked out once a legend is shown, since it reads the map's own items (see RunInputs)
         const stale = layer || trade ? RunInputs.stale(app) : false;
-        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, layer?.id === "culture" ? this.source(app)?.useCultures(app.uiState?.cultures) : null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), stale, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
+        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, layer?.id === "culture" ? ThematicRun.source(app)?.useCultures(app.uiState?.cultures) : null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), stale, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];
@@ -439,7 +408,7 @@ export class ThematicView {
     static #classes(app, layer, make) {
         const wrapper = make("div", "fwmb-legend-classes");
         const list = make("div", "fwmb-classes");
-        for (const culture of this.source(app).cultureClasses()) {
+        for (const culture of ThematicRun.source(app).cultureClasses()) {
             const item = make("span");
             item.dataset.thematicClass = String(culture.index);
             const swatch = make("i");
@@ -487,7 +456,7 @@ export class ThematicView {
     static withFill(app, id) {
         const setting = this.setting(app);
         const fill = id === NONE ? null : id;
-        if (fill && !this.source(app)?.has(fill)) return null;
+        if (fill && !ThematicRun.source(app)?.has(fill)) return null;
         if (fill === setting.fill) return null;
         return { ...setting, fill };
     }
@@ -500,7 +469,7 @@ export class ThematicView {
         const setting = this.setting(app);
         if (!THEMATIC.LINES.includes(id)) return null;
         const on = setting.lines.includes(id);
-        if (!on && !this.source(app)?.hasTrade()) return null;
+        if (!on && !ThematicRun.source(app)?.hasTrade()) return null;
         return { ...setting, lines: on ? setting.lines.filter((line) => line !== id) : [...setting.lines, id] };
     }
 

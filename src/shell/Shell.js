@@ -13,7 +13,7 @@
  * regions. The world bar and the regions' drawing come to the shell in step 3, the rail, panels,
  * Help and the inspector's host in step 6 (`claude/v5-s0-shell-handoff.md` §10).
  */
-import { FILRODENSWMB } from "../config.js";
+import { SHELL_PARTS } from "./config.js";
 import { platform } from "../platform/index.js";
 import { LabelFonts } from "../kernel/util/LabelFonts.js";
 import { StudioRegistry } from "./StudioRegistry.js";
@@ -90,7 +90,7 @@ export class Shell {
      * @param {HTMLElement} element
      */
     static applyTextDirection(element) {
-        const rtlLanguages = FILRODENSWMB.UI.RTL_LANGUAGES || [];
+        const rtlLanguages = SHELL_PARTS.RTL_LANGUAGES || [];
         // Falls back to "en" when the host's localisation is not ready yet (see platform.i18n.lang)
         if (!rtlLanguages.includes(platform.i18n.lang)) return;
 

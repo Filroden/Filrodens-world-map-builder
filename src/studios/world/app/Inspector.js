@@ -52,6 +52,33 @@ export class Inspector {
     /** The latest open() under way in each studio; an earlier one still being drawn gives way. */
     static #opening = new WeakMap();
 
+    /** The kinds of inspector by id (see register), so a tool can open one without importing its editor. */
+    static #kinds = new Map();
+
+    /**
+     * Registers a kind of inspector by its id, for openById (RF1: RouteTool opens routes so,
+     * since RouteEditor reads the tool's settings and the two imported each other).
+     * @param {object} kind
+     * @returns {object} The kind.
+     */
+    static register(kind) {
+        this.#kinds.set(kind.id, kind);
+        return kind;
+    }
+
+    /**
+     * Opens the inspector on an object of a registered kind (see register and open).
+     * @param {object} app
+     * @param {string} kindId
+     * @param {object} ref
+     * @param {object} [options]
+     * @returns {Promise<boolean>}
+     */
+    static openById(app, kindId, ref, options) {
+        const kind = this.#kinds.get(kindId);
+        return kind ? this.open(app, kind, ref, options) : Promise.resolve(false);
+    }
+
     /**
      * Opens the inspector on an object, replacing whatever it showed.
      *

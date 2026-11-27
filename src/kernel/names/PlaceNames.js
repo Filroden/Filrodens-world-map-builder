@@ -1,5 +1,6 @@
 import { NamesGenerator } from "../../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../../config.js";
+import { KERNEL_PARTS } from "../config.js";
 import { stageRandom } from "../random/Random.js";
 import { cleanFromList, drawName } from "./NameFilter.js";
 
@@ -74,14 +75,14 @@ export function placeName({ mapSeed, itemId, roll = 0, nameBase, descriptor = nu
  * to NAME_RETRIES; then a clean name from the base's own list.
  */
 function clean(make, base, fallback = () => cleanFromList(String(generator.nameBases[base]?.b ?? "").split(","), generator.rng)) {
-    return drawName(make, { clean: true, retries: FILRODENSWMB.GENERATOR.NAME_RETRIES, fallback });
+    return drawName(make, { clean: true, retries: KERNEL_PARTS.NAME_RETRIES, fallback });
 }
 
 /** A name base's index: the one named, else the default name style, else the first. */
 function baseIndex(nameBase) {
     const index = generator.indexOf(nameBase);
     if (index >= 0) return index;
-    return Math.max(0, generator.indexOf(FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE));
+    return Math.max(0, generator.indexOf(KERNEL_PARTS.DEFAULT_NAME_BASE));
 }
 
 /**

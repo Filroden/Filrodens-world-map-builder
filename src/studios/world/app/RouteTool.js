@@ -3,7 +3,6 @@ import { FieldSpecs } from "./FieldSpecs.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { Inspector } from "./Inspector.js";
-import { RouteEditor } from "./RouteEditor.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RouteDraft, insertWaypoint, joinRoutes, moveWaypoint, nearestLegCell, removeWaypoint, splitRoute, strokeWaypoints, waypointAt } from "../mesh/RouteEdits.js";
 import { routePolyline } from "../mesh/RoutePath.js";
@@ -251,7 +250,7 @@ export class RouteTool {
                 // The route under the pointer is picked and opens in the inspector; a click away
                 // from every route lets go and closes it
                 const route = MeshIntegration.routeAt(app, x, y, this.#hitRadius(app));
-                if (route) RouteEditor.open(app, route.id);
+                if (route) Inspector.openById(app, "route", { id: route.id });
                 else {
                     if (Inspector.current(app)?.kind.id === "route") Inspector.close(app);
                     this.select(app, null);
@@ -304,7 +303,7 @@ export class RouteTool {
         }
         if (mode !== "select" && mode !== "edit") return;
         const route = MeshIntegration.routeAt(app, x, y, this.#hitRadius(app));
-        if (route) RouteEditor.open(app, route.id);
+        if (route) Inspector.openById(app, "route", { id: route.id });
     }
 
     // ------------------------------------------------------------------ select and new
@@ -414,7 +413,7 @@ export class RouteTool {
         app._repaintVectors();
         app.view?.render(["context", "editToolbar"]);
         app.markDirty();
-        RouteEditor.open(app, route.id, { created: true });
+        Inspector.openById(app, "route", { id: route.id }, { created: true });
     }
 
     // ------------------------------------------------------------------ edit

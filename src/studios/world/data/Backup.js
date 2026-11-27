@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../../../config.js";
+import { KERNEL_PARTS } from "../../../kernel/config.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "../../../../vendor/fflate/fflate.js";
 import { IMAGE_TYPES } from "../../../kernel/data/ImageCheck.js";
 import { ImportRefusal, Sanitize } from "../../../kernel/data/Sanitize.js";
@@ -138,7 +139,7 @@ export class Backup {
                 const file = Sanitize.isId(worldId) && manifest.settlements.includes(worldId) ? entries[`${SETTLEMENTS}${worldId}.json`] : null;
                 if (!file) return [];
                 const list = parseJson(file, "damaged");
-                return Array.isArray(list) ? list.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS) : [];
+                return Array.isArray(list) ? list.slice(0, KERNEL_PARTS.MAX_SETTLEMENTS) : [];
             },
         };
     }

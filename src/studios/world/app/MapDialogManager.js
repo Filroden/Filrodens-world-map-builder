@@ -1,6 +1,5 @@
 import { FILRODENSWMB } from "../../../config.js";
 import { MapStateManager } from "./MapStateManager.js";
-import { MassEdit } from "./MassEdit.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { CanvasTransforms } from "../../../kernel/util/CanvasTransforms.js";
 import {
@@ -876,13 +875,6 @@ export class MapDialogManager {
         app.requestTerrainUpdate();
         app.view?.render(["context"]);
         app.markDirty();
-    }
-
-    // --- MASS EDIT ---
-
-    /** Mass edit of the chosen items of a kind (see MassEdit). */
-    static onMassEdit(app, _event, target) {
-        return MassEdit.open(app, target.dataset.type);
     }
 
     // --- EDIT ACTIONS ---

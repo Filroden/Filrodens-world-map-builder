@@ -7,7 +7,7 @@ import { platform } from "../../../platform/index.js";
 import { LAYERS, ThematicSource, rampLookup, scalePosition, stepOf } from "../thematic/ThematicData.js";
 import { Generation } from "./Generation.js";
 import { RunInputs } from "./RunInputs.js";
-import { ThematicView } from "./ThematicView.js";
+import { ThematicRun } from "./ThematicRun.js";
 import { VectorHistory } from "./VectorHistory.js";
 
 /**
@@ -101,7 +101,7 @@ export class InfluenceView {
 
     /** After the painting or the choices change: the overlay, and the panel (its counts and the Generate notice). */
     static #redraw(app) {
-        ThematicView.render(app);
+        app.renderThematic?.();
         app.view?.render(["context"]);
     }
 
@@ -155,7 +155,7 @@ export class InfluenceView {
     static #base(app, kind) {
         const cellCount = app.meshSession?.mesh?.cellCount ?? 0;
         const layerId = RUN_LAYER[kind];
-        const run = ThematicView.source(app);
+        const run = ThematicRun.source(app);
         if (run?.has(layerId)) {
             const bytes = run.displayBytes(layerId);
             if (bytes.length === cellCount) return { bytes, layerId, note: BASE_NOTES[kind].run };

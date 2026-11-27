@@ -27,7 +27,8 @@ function files(path, extensions) {
 
 const SOURCES = ["src", "templates", "web", "main.js", "module.json"].flatMap((path) => files(path, [".js", ".mjs", ".hbs", ".json", ".html"])).map((path) => ({ path, text: readFileSync(path, "utf8") }));
 const SOURCE = SOURCES.map((file) => file.text).join("\n");
-const CONFIG = readFileSync(join(ROOT, "src/config.js"), "utf8");
+// FILRODENSWMB's text, from every layer's part of it (RF1: src/config.js puts them together)
+const CONFIG = ["src/kernel/config.js", "src/shell/config.js", "src/platform/config.js", "src/studios/world/config.js", "src/studios/local/config.js"].map((path) => readFileSync(join(ROOT, path), "utf8")).join("\n");
 const STUDIO = readFileSync(join(ROOT, "src/studios/world/app/MapStudio.js"), "utf8");
 const DEFINITION = readFileSync(join(ROOT, "src/studios/world/definition.js"), "utf8");
 /** Every quoted word in the code, which the families below look their values up in. */

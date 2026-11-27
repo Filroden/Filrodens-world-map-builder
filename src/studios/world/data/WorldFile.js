@@ -1,4 +1,4 @@
-import { FILRODENSWMB } from "../../../config.js";
+import { KERNEL_PARTS } from "../../../kernel/config.js";
 import { ImportRefusal, Sanitize } from "../../../kernel/data/Sanitize.js";
 import { MAP_TYPES, WORLD_FORMAT } from "../../../kernel/worlds/WorldRecord.js";
 import { BLOB_HASH, RegionalRecord } from "../../../kernel/worlds/RegionalRecord.js";
@@ -128,7 +128,7 @@ export class WorldFile {
         };
         const blobs = world.blobs && typeof world.blobs === "object" && !Array.isArray(world.blobs) ? world.blobs : {};
         const blobBytes = (hash) => (typeof hash === "string" && BLOB_HASH.test(hash) && typeof blobs[hash] === "string" ? Blobs.fromBase64(blobs[hash]) : null);
-        const settlements = Array.isArray(world.settlements) ? world.settlements.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS) : [];
+        const settlements = Array.isArray(world.settlements) ? world.settlements.slice(0, KERNEL_PARTS.MAX_SETTLEMENTS) : [];
         return { name, disabledIcons, maps, world: record, blobBytes, settlements };
     }
 }

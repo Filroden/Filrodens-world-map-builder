@@ -1,4 +1,4 @@
-import { FILRODENSWMB } from "../../../config.js";
+import { WORLD_PARTS } from "../config.js";
 import { platform } from "../../../platform/index.js";
 import { Worlds } from "../../../kernel/worlds/Worlds.js";
 import { WorldRecord } from "../../../kernel/worlds/WorldRecord.js";
@@ -101,7 +101,7 @@ export class SettlementMaps {
             state.timer = null;
             const idle = globalThis.requestIdleCallback ?? ((fn) => setTimeout(fn, 0));
             idle(() => this.#refreshStates(app), { timeout: 2000 });
-        }, FILRODENSWMB.LOCAL.STATES_AFTER_MS);
+        }, WORLD_PARTS.STATES_AFTER_MS);
     }
 
     /** Asks for Out of date while it is not known (the world just opened). */

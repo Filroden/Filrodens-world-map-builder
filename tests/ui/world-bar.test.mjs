@@ -5,12 +5,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { STUDIO_SHEET, stylesheet } from "../support/stylesheets.mjs";
 import { foldLevel } from "../../src/shell/BarFold.js";
 import { WORLD_BAR_LEVELS } from "../../src/shell/WorldBarFold.js";
 import { FirstOpening } from "../../src/studios/world/app/FirstOpening.js";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const CSS = readFileSync(`${ROOT}styles/filrodens-world-map-builder.css`, "utf8");
+const CSS = stylesheet(STUDIO_SHEET);
 const TEMPLATE = readFileSync(`${ROOT}templates/shell/worldbar.hbs`, "utf8");
 const EN = JSON.parse(readFileSync(`${ROOT}languages/en.json`, "utf8"));
 

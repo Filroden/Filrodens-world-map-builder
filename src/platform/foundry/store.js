@@ -9,8 +9,6 @@
 import { FILRODENSWMB } from "../../config.js";
 import { ColorMath } from "../../kernel/util/ColorMath.js";
 import { Blobs } from "../../kernel/data/Blobs.js";
-import { TerrainVersion } from "../../studios/world/tools/TerrainVersion.js";
-import { BiomePlacement } from "../../studios/world/generation/BiomePlacement.js";
 
 /** Decimal places kept when showing a regional map's zoom (a crop's zoom need not be a whole number). */
 const ZOOM_DECIMALS = 2;
@@ -27,6 +25,23 @@ const GRID_LABELS = Object.freeze({
     hexR: "FILRODENSWMB.UI.GridHexRows",
     hexC: "FILRODENSWMB.UI.GridHexCols",
 });
+
+/**
+ * How the World studio describes a map for its journal pages (see setDescriber): its regional
+ * zoom and coastline, its engine's name and version, and a biome's placement. The World studio
+ * hands it over when it is prepared and created (WorldStudio), so the platform need not import the
+ * studio (RF1). Until then the pages are written with plain values (no zoom, the engine's id).
+ * @type {{regionalZoom: Function, usesCurrentCoastline: Function, engineNameKey: Function, engineVersion: Function, builtInPlacement: Function, customPlacement: Function}|null}
+ */
+let describer = null;
+
+/**
+ * Sets how a map is described on its journal pages (see describer).
+ * @param {object|null} next
+ */
+export function setDescriber(next) {
+    describer = next;
+}
 
 /** A compendium of the world, made when it does not exist yet. */
 async function ensurePack(name, label) {
@@ -98,7 +113,7 @@ export async function getSavedMaps() {
  * @returns {object} Fields to add to the template's data, each prefixed "journal".
  */
 function buildJournalContext(payload) {
-    // TerrainVersion reads these fields from a uiState; the saved payload keeps the wind
+    // The describer (TerrainVersion) reads these fields from a uiState; the saved payload keeps the wind
     // distance (from which an older regional map's zoom is recovered) inside its params.
     const state = {
         generationEngine: payload.generationEngine,
@@ -108,11 +123,11 @@ function buildJournalContext(payload) {
         mapWidth: payload.mapWidth,
         mapHeight: payload.mapHeight,
     };
-    const zoom = TerrainVersion.resolveWorld(state).zoom;
+    const zoom = describer?.regionalZoom(state) ?? 1;
 
     return {
         journalEngineLabel: getEngineLabel(state),
-        journalCurrentCoastline: TerrainVersion.usesCurrentCoastline(state),
+        journalCurrentCoastline: describer?.usesCurrentCoastline(state) ?? false,
         journalRegionalZoom: zoom === 1 ? null : Number(zoom.toFixed(ZOOM_DECIMALS)),
         journalColors: getJournalColors(payload),
         journalGridType: GRID_LABELS[payload.gridType] ?? payload.gridType,
@@ -188,9 +203,9 @@ function countFeatures(payload) {
  * @returns {string}
  */
 function getEngineLabel(state) {
-    const nameKey = TerrainVersion.ENGINE_NAMES[state.generationEngine];
+    const nameKey = describer?.engineNameKey(state.generationEngine) ?? null;
     if (!nameKey) return state.generationEngine ?? "";
-    return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version: TerrainVersion.getDisplayVersion(state) });
+    return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version: describer.engineVersion(state) });
 }
 
 /**
@@ -204,12 +219,12 @@ function getJournalColors(payload) {
     const builtIn = Object.entries(payload.params?.customColors || {}).map(([key, rgb]) => ({
         label: `FILRODENSWMB.BIOMES.${key}`,
         hex: ColorMath.rgbToHex(rgb),
-        placement: BiomePlacement.labelOf(BiomePlacement.placementOfBuiltIn(key)),
+        placement: describer?.builtInPlacement(key) ?? "",
     }));
     const custom = (payload.customBiomes || []).map((biome) => ({
         label: biome.name,
         hex: ColorMath.rgbToHex(biome.color),
-        placement: BiomePlacement.labelOf(BiomePlacement.placementOfCustom(biome)),
+        placement: describer?.customPlacement(biome) ?? "",
     }));
     return [...builtIn, ...custom];
 }
@@ -587,7 +602,7 @@ async function worldSummary(record, pack) {
         settingsRevision: record.settingsRevision ?? 1,
         savedAt: savedAt && !Number.isNaN(savedAt.getTime()) ? savedAt.toLocaleString(game.i18n.lang) : null,
         setup: settings.setup ?? {},
-        engineLabel: TerrainVersion.ENGINE_NAMES[settings.setup?.engine] ?? null,
+        engineLabel: describer?.engineNameKey(settings.setup?.engine) ?? null,
         areaFactor: settings.setup?.areaFactor ?? 1,
         cultures: (settings.cultures?.list ?? []).map((culture) => culture?.name).filter(Boolean),
         ages: count(settings.ages?.list),

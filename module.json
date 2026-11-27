@@ -10,7 +10,7 @@
     },
     "authors": [{ "name": "Ken Dearman" }],
     "esmodules": ["main.js"],
-    "styles": ["styles/fwmb-theme.css", "styles/filrodens-world-map-builder.css"],
+    "styles": ["styles/fwmb-fonts.css", "styles/fwmb-theme.css", "styles/filrodens-world-map-builder.css"],
     "languages": [
         { "lang": "en", "name": "English", "path": "languages/en.json" },
         { "lang": "en-GB", "name": "English (UK)", "path": "languages/en-gb.json" }

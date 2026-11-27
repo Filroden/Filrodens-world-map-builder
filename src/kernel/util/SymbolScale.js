@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../../config.js";
+import { KERNEL_PARTS } from "../config.js";
 
 /**
  * How big a map's pins and labels are drawn, beyond their own sizes.
@@ -68,7 +69,7 @@ export class SymbolScale {
      * @returns {{stroke: number, shadow: number}}
      */
     static labelHalo(sizePx) {
-        const { STROKE, STROKE_MIN, STROKE_MAX, SHADOW, SHADOW_MIN, SHADOW_MAX } = FILRODENSWMB.LABELS.HALO;
+        const { STROKE, STROKE_MIN, STROKE_MAX, SHADOW, SHADOW_MIN, SHADOW_MAX } = KERNEL_PARTS.LABEL_HALO;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
         const size = Number(sizePx) > 0 ? sizePx : 0;
         return { stroke: clamp(size * STROKE, STROKE_MIN, STROKE_MAX), shadow: clamp(size * SHADOW, SHADOW_MIN, SHADOW_MAX) };

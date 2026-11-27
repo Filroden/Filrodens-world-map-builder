@@ -1,4 +1,4 @@
-import { FILRODENSWMB } from "../../../config.js";
+import { KERNEL_PARTS } from "../../../kernel/config.js";
 import { Sanitize } from "../../../kernel/data/Sanitize.js";
 import { FRAME } from "../engine/LocalInput.js";
 import { LIES } from "../engine/CellContext.js";
@@ -162,7 +162,7 @@ function input(value) {
         id: typeof value.id === "string" && ID.test(value.id) ? value.id : refuse("the place's id"),
         name: text(value.name, MAX_NAME, "the place's name"),
         seed: text(value.seed, MAX_SEED, "the seed"),
-        population: int(value.population, 0, FILRODENSWMB.GENERATOR.USER_FIGURES.MAX_POPULATION, "the population"),
+        population: int(value.population, 0, KERNEL_PARTS.USER_FIGURES.MAX_POPULATION, "the population"),
         tier: word(value.tier, "the tier"),
         kind,
         walled: bool(value.walled, "walled"),

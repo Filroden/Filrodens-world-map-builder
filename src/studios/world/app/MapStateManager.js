@@ -298,73 +298,12 @@ export class MapStateManager {
     }
 
     /**
-     * Generates a deep-cloned snapshot of the current vector state.
-     *
-     * The custom biomes are not in it (S0 step 4): they are the world's (World › Biomes), whose
-     * changes are put back by Revert changes, not undone with the map's edits (see WorldEditors).
-     *
-     * The layer sets are included (their levels, regions and styles), but not the owner arrays
-     * of the levels: those are far larger and change by patches, which have history entries of
-     * their own (see VectorHistory).
-     *
-     * The map's styles (`uiState.custom{Route,Region,Label,Pin}Styles`) are included as well: a
-     * style edited in the inspector changes every object that follows it, so one undo step puts
-     * the style and its objects back together, and undoing a Save as… takes away the style it made.
-     */
-    static getVectorStateSnapshot(app) {
-        return {
-            tectonicFaults: platform.utils.deepClone(app.tectonicFaults),
-            activeFaultId: app.activeFaultId,
-            manualRivers: platform.utils.deepClone(app.manualRivers),
-            activeRiverId: app.activeRiverId,
-            landMasks: platform.utils.deepClone(app.landMasks || []),
-            activeLandMaskId: app.activeLandMaskId,
-            pins: platform.utils.deepClone(app.mapPins),
-            routes: platform.utils.deepClone(app.mapRoutes),
-            layerSets: platform.utils.deepClone(app.layerSets ?? []),
-            mapLabels: platform.utils.deepClone(app.mapLabels),
-            mapDecorations: platform.utils.deepClone(app.mapDecorations),
-            activeRouteId: app.activeRouteId,
-            activeRegionId: app.activeRegionId,
-            // What the last fill-in read (see Infilling.inputs), so undoing a fill-in gives back the one before
-            infill: app.infillInputs ? { ...app.infillInputs } : null,
-            styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
-        };
-    }
-
-    /**
      * Records the vector state as it is now as an undo step (see VectorHistory), before an edit
      * changes it.
      */
     static pushVectorState(app) {
         VectorHistory.push(app, VectorHistory.snapshot(app));
     }
-
-    /**
-     * Restores the vector arrays and active IDs from a history snapshot.
-     */
-    static restoreVectorStateSnapshot(app, state) {
-        app.tectonicFaults = state.tectonicFaults || app.tectonicFaults;
-        app.activeFaultId = state.activeFaultId || null;
-        app.manualRivers = state.manualRivers || app.manualRivers;
-        app.activeRiverId = state.activeRiverId || null;
-        app.landMasks = state.landMasks || app.landMasks || [];
-        app.activeLandMaskId = state.activeLandMaskId || null;
-        app.mapPins = state.pins || app.mapPins;
-        app.mapRoutes = state.routes || app.mapRoutes;
-        app.layerSets = state.layerSets || app.layerSets;
-        // The session draws from the layer sets it was given, so it is given the restored ones
-        app.meshSession?.setLayerSets(app.layerSets);
-        app.mapLabels = state.mapLabels || app.mapLabels;
-        app.mapDecorations = state.mapDecorations || app.mapDecorations;
-        app.activeRouteId = state.activeRouteId || null;
-        app.activeRegionId = state.activeRegionId || null;
-        if ("infill" in state) app.infillInputs = state.infill;
-        for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
-    }
-
-    /** The map's style lists in uiState, which the undo history keeps (see getVectorStateSnapshot). */
-    static STYLE_LISTS = Object.freeze(["customRouteStyles", "customRegionStyles", "customLabelStyles", "customPinStyles"]);
 
     /**
      * Syncs the active UI state from the DOM, then gets derived map parameters.

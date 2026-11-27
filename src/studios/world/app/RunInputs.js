@@ -2,19 +2,19 @@ import { FILRODENSWMB } from "../../../config.js";
 import { MaskSettings } from "../generation/MaskSettings.js";
 import { riverList } from "../generator/GeneratorInput.js";
 import { INFLUENCE_KINDS, NO_INFLUENCE } from "../mesh/Influences.js";
-import { Generation } from "./Generation.js";
 import { Regeneration } from "./Regeneration.js";
+import { RunSources } from "./RunSources.js";
 
 /**
  * A short fingerprint of the map's own items a generator run reads, so the run can be shown out of
  * date once any of them changes, by whatever path: drawn, deleted, edited, mass edited or undone.
  *
  * Seven kinds, each hashed on its own:
- * - routes: the routes the run's trade uses (see Generation.userRoutes);
- * - seats: the settlement pins it builds on (see Generation.seats);
- * - regions: the kept regions of the Political set it builds round (see Generation.userRegions),
+ * - routes: the routes the run's trade uses (see RunSources.userRoutes);
+ * - seats: the settlement pins it builds on (see RunSources.seats);
+ * - regions: the kept regions of the Political set it builds round (see RunSources.userRegions),
  *   each level's kept regions by land display cell, with their keys and Independent choice;
- * - cultures: the cultures those kept regions are given (see Generation.regionCultures); a run
+ * - cultures: the cultures those kept regions are given (see RunSources.regionCultures); a run
  *   saved before UC has none, and so is never marked for it;
  * - rivers: the traced rivers it reads (springs, custom rivers and the river settings all end
  *   there; see GeneratorInput.riverList);
@@ -45,10 +45,10 @@ export class RunInputs {
      */
     static of(app) {
         return {
-            routes: hashText(JSON.stringify(Generation.userRoutes(app))),
-            seats: hashText(JSON.stringify(Generation.seats(app))),
+            routes: hashText(JSON.stringify(RunSources.userRoutes(app))),
+            seats: hashText(JSON.stringify(RunSources.seats(app))),
             regions: regionsHash(app),
-            cultures: hashText(JSON.stringify(Generation.regionCultures(app))),
+            cultures: hashText(JSON.stringify(RunSources.regionCultures(app))),
             rivers: riversHash(app.currentRiverData),
             features: hashText(featureText(app)),
             influences: influencesHash(app.meshSession?.influences),
@@ -134,7 +134,7 @@ function hashText(text) {
 const NO_REGION = -1;
 
 /**
- * The kept regions of the Political set a run writes into (see Generation.userRegions), level by
+ * The kept regions of the Political set a run writes into (see RunSources.userRegions), level by
  * level: each land display cell a kept region holds, with its region, and each kept region's key
  * and Independent choice. With no such set, or one whose levels are not a chain, the hash of none.
  */

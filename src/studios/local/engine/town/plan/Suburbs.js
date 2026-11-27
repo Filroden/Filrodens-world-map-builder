@@ -9,7 +9,7 @@ import { centroid, chaikin, dist, distanceTransform, insideCuts, lerp, pointInPo
 import { gatesOf, rect, towersOf } from "../Walls.js";
 import { worshipShape } from "../MarketWorship.js";
 import { RESERVED, STREET } from "../Occupancy.js";
-import { cutRingBlocks, dryOver } from "./Plan.js";
+import { dryOver } from "../Walls.js";
 import { growFaubourgs } from "./Faubourgs.js";
 
 export const SUBURBS = Object.freeze({
@@ -66,7 +66,7 @@ export const SUBURBS = Object.freeze({
     OUTER: Object.freeze({ share: 0.4, density: 200, clear: 90, quantile: 0.8, bins: 72, corners: 24, smooth: 3 }),
 });
 
-export function buildPlanSuburbs(T, ring) {
+export function buildPlanSuburbs(T, ring, { cutRingBlocks }) {
     const { input, kind, plan, occupancy, castle, NX, NY, g, W, H } = T;
     const random = T.R("plan-suburbs");
     const share = T.wall ? T.wall.share : 0.8;
