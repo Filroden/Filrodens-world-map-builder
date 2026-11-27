@@ -24,7 +24,7 @@ Node's built-in test runner, no test framework. From the repository root:
 - `tutorial/`: the wiki's tutorial pages, played in the web studio (see [The tutorial](#the-tutorial-tutorial) below).
 - `support/`: shared helpers that are not tests. `pipeline-setup.mjs` builds a stand-in for the studio app from a saved map so the generation pipeline can run outside Foundry; `web-worker-shim.mjs` gives Node a browser-style module `Worker`. `world-locks.mjs` plays the browser's world locks and news for several fake tabs over one store (WL). `stylesheets.mjs` names the module's stylesheets in load order and the sheet each kind of rule lives in (RF1).
 
-Four checks run in headless Chromium (Playwright) and stay in `design/checks/`, run by hand: `design/checks/studio-smoke/studio-smoke-check.mjs` (the studio in a stand-in Foundry window), `design/checks/web-smoke/web-smoke-check.mjs` (the web version, from the working copy or any site address) `design/checks/mesh-render/render-check.mjs` (the region fill as drawn; it reads the fixtures from here) and `design/checks/wl-two-tabs/wl-two-tabs-check.mjs` (one window per world: two tabs on the same world).
+Three checks run in headless Chromium (Playwright) and stay in `design/checks/`, run by hand: `design/checks/style-compare/style-compare.mjs` (the web studio from the working copy and from a base, HEAD by default, compared state by state: every element's computed style and text, for refactors and stylesheet changes), `design/checks/mesh-render/render-check.mjs` (the region fill as drawn; it reads the fixtures from here) and `design/checks/wl-two-tabs/wl-two-tabs-check.mjs` (one window per world: two tabs on the same world).
 
 ## The tutorial (`tutorial/`)
 
