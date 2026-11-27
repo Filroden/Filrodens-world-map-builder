@@ -3208,6 +3208,10 @@
 .fwmb .fwmb-panel--board :is(.fwmb-panel-head, .fwmb-panel-scroll, .fwmb-panel-foot) {
     padding-inline: 1.25rem;
 }
+/* A board's action notice (a world open view only, WL) lines up with the board's content */
+.fwmb .fwmb-panel--board > .fwmb-panel-notice {
+    margin-inline: 1.25rem;
+}
 /* A board's content keeps clear of the studio's edge at its foot too, as at its sides (Ken,
    2026-11-20): the panel's scroll has no padding at its end, a panel's last section being enough */
 .fwmb .fwmb-panel--board .fwmb-panel-scroll {

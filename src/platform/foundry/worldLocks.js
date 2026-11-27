@@ -5,11 +5,13 @@
  *
  * Two world settings, registered and not shown, carry it (no socket, so no change to module.json):
  * - `worldLocks`: the holders, `{ [worldId]: { user, client, at } }`. The holder is the client (a
- *   page load), not the user, since one user may be connected from two browsers. A holder whose
- *   user is no longer connected is ignored by every client and dropped by the active GM when
- *   Foundry says the user left (userConnected), so nothing needs a heartbeat. A client that
- *   crashes while its user stays connected in another browser keeps its holder until that user
- *   leaves too (said in the wiki).
+ *   page load). A holder is live while its user is connected, **unless it is this client's own
+ *   user under another page load**: Foundry lets a user log in only once, so that can only be a
+ *   page load that has gone (Foundry closed with a world open, the studio never told). A holder
+ *   that is not live is ignored by every client, and tidied away: by the active GM when Foundry
+ *   says a user left (userConnected), and at start (ready) by each client for its own user and by
+ *   the active GM for every user not connected. So nothing needs a heartbeat, and a world is never
+ *   left locked by a client that has gone.
  * - `worldNews`: the latest news, `{ kind, worldId, client, at }`, kept apart from the holders so
  *   a save told never races a claim.
  *
@@ -39,7 +41,14 @@ const read = () => {
         return {};
     }
 };
-const live = (holder) => !!holder && !!game.users?.get(holder.user)?.active;
+/**
+ * Whether a holder stands: its user connected, and not this client's own user under another page
+ * load (one login a user, so that page load has gone).
+ */
+const live = (holder) => {
+    if (!holder || !game.users?.get(holder.user)?.active) return false;
+    return !(holder.user === game.user?.id && holder.client !== CLIENT);
+};
 const write = (holders) => game.settings.set(FILRODENSWMB.ID, LOCKS, holders);
 
 /** Calls back those waiting for a world that is free now. */
@@ -79,6 +88,34 @@ export function registerWorldLocks() {
         for (const worldId of gone) delete holders[worldId];
         write(holders).catch((error) => console.warn("FWMB | A world lock could not be dropped:", error));
     });
+    Hooks.once("ready", () => tidyAtStart());
+}
+
+/**
+ * At start, the holders no client stands behind are removed: this client's own user's from an
+ * earlier page load, and (by the active GM) those of every user not connected, left by a GM whose
+ * Foundry closed or crashed with no one else there to see it. A GM only: players cannot write a
+ * world setting, and never open the studio.
+ */
+export function tidyAtStart() {
+    if (!game.user?.isGM) return Promise.resolve(false);
+    const holders = read();
+    const activeGM = !!game.users?.activeGM?.isSelf;
+    const stale = Object.keys(holders).filter((worldId) => {
+        const holder = holders[worldId];
+        if (!holder || holder.client === CLIENT) return false;
+        if (holder.user === game.user.id) return true;
+        return activeGM && !game.users?.get(holder.user)?.active;
+    });
+    if (!stale.length) return Promise.resolve(false);
+    for (const worldId of stale) delete holders[worldId];
+    return write(holders).then(
+        () => true,
+        (error) => {
+            console.warn("FWMB | Old world locks could not be cleared:", error);
+            return false;
+        },
+    );
 }
 
 export const foundryWorldLocks = {
