@@ -71,7 +71,8 @@ test("Legacy terrain is offered only on a map made with it, chosen there", async
 });
 
 test("a saved map with no engine recorded loads as Legacy terrain, not the new default", () => {
-    const studio = read("src/studios/world/app/MapStudio.js");
-    assert.match(studio, /this\.uiState\.generationEngine = payload\.generationEngine \|\| "standard";/);
+    // Read from the file by MapSerializer.readFrame (RF2)
+    const serializer = read("src/studios/world/app/MapSerializer.js");
+    assert.match(serializer, /host\.uiState\.generationEngine = payload\.generationEngine \|\| "standard";/);
     assert.match(read("src/studios/world/ProceduralOrchestrator.js"), /app\.uiState\.generationEngine \|\| "standard"/);
 });

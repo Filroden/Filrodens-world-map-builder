@@ -7,50 +7,23 @@ import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../../../platform/index.js";
 import { VectorHistory } from "./VectorHistory.js";
+import { TerrainBuffers } from "./TerrainBuffers.js";
 
 export class MapStateManager {
     /**
-     * Allocates the memory buffers required for procedural generation.
+     * Allocates the memory buffers required for procedural generation, at the map's size (see
+     * TerrainBuffers.allocate). A stand-in app with no `terrain` (the tests') is given the fields
+     * directly.
      * @param {Object} app - The MapStudio instance.
      */
     static allocateBuffers(app) {
-        const totalPixels = app.mapWidth * app.mapHeight;
-
-        app.baseElevationData = new Float32Array(totalPixels);
-        app.currentElevationData = new Float32Array(totalPixels);
-        app.currentMoistureData = new Float32Array(totalPixels);
-        app.currentTemperatureData = new Float32Array(totalPixels);
-        app.currentBiomeOverrides = new Uint8Array(totalPixels);
-        app.currentSpringOverrides = new Uint8Array(totalPixels);
-        // How much of the surface texture the working terrain carries (see BrushLayerCache)
-        app.currentRoughness = new Uint8Array(totalPixels);
-        app.bufferRiverMap = new Uint8Array(totalPixels);
-        app.bufferWaterMask = new Float32Array(totalPixels);
-        // The river image the terrain shader draws rivers from (see RiverNetwork.rasterise)
-        app.bufferRivers = new Uint8Array(totalPixels * 4);
-
-        // The terrain's three images (see TerrainShading): the biomes on land and on the water's
-        // surface, the biomes of the beds under water, and the packed relief, depth and height
-        app.bufferSurfaceBiomes = new Uint8Array(totalPixels * 4);
-        app.bufferUnderwaterBiomes = new Uint8Array(totalPixels * 4);
-        app.bufferTerrainAux = new Uint8Array(totalPixels * 4);
-        app.bufferContours = new Uint8Array(totalPixels * 4);
-        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudio's
-        // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
-        // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
-        // outFallbackBuffer parameter for what actually gets written into it.
-        app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
-
-        // The rebuild scratch buffer and the surface texture are created on demand at the map's
-        // current size (see ProceduralOrchestrator); drop any left over from a map of a different size.
-        app.bufferScratch = null;
-        app.surfaceTexture = null;
-        app.surfaceTextureUnavailable = false;
-
-        // Fresh buffers hold nothing from any earlier generation
-        app.generationInputs = null;
-        app.generationBase = null;
-        app.currentRiverData = null;
+        if (app.terrain instanceof TerrainBuffers) {
+            app.terrain.allocate(app.mapWidth, app.mapHeight);
+            return;
+        }
+        const buffers = new TerrainBuffers();
+        buffers.allocate(app.mapWidth, app.mapHeight);
+        for (const field of TerrainBuffers.FIELDS) app[field] = buffers[field];
     }
 
     /**

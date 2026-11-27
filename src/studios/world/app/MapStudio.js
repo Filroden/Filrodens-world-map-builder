@@ -19,10 +19,12 @@ import { SpatialMath } from "../../../kernel/util/SpatialMath.js";
 import { RefreshQueue } from "../../../kernel/util/RefreshQueue.js";
 import { ColorMath } from "../../../kernel/util/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { TerrainBuffers } from "./TerrainBuffers.js";
+import { MapSerializer } from "./MapSerializer.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MassEdit } from "./MassEdit.js";
 import { bindDropdownMenus, positionPopoverMenu } from "../../../shell/dropdowns.js";
-import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons, usePinIcons, currentPinIcons } from "../../../kernel/data/pinIcons.js";
+import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, usePinIcons, currentPinIcons } from "../../../kernel/data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
@@ -37,8 +39,8 @@ import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
-import { gridDistanceOf, kmPerPxOf, scaleBarOnMap, scaleBarTick } from "../data/MapScale.js";
-import { cleanUnit, formatDistance, unitFromSaved } from "../../../kernel/data/MapUnit.js";
+import { gridDistanceOf, kmPerPxOf, scaleBarTick } from "../data/MapScale.js";
+import { cleanUnit, formatDistance } from "../../../kernel/data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
 import { HistoryView } from "./HistoryView.js";
 import { TravelView } from "./TravelView.js";
@@ -81,7 +83,6 @@ import { PinStyles } from "./PinStyles.js";
 import { GeneratePanel } from "./GeneratePanel.js";
 import { ListQuery } from "./ListQuery.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
-import { panelSettings } from "../generator/GeneratorSettings.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../../../platform/index.js";
 import { StudioView } from "../../../shell/StudioView.js";
@@ -100,10 +101,6 @@ import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { MaskSettings } from "../generation/MaskSettings.js";
-import { rebaseMap } from "../data/SymbolSizes.js";
-import { addLocalLevelOnce } from "../data/LocalLevel.js";
-import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
-import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../../../kernel/util/SymbolScale.js";
 import { nameInset } from "../canvas/MapBorder.js";
 import { DrawnDecoration } from "../../../kernel/decorations/DrawnDecoration.js";
@@ -574,6 +571,8 @@ export class MapStudio {
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
 
+        // The map's rasters and buffers, each still read and set under its own name on the studio (see TerrainBuffers)
+        this.terrain = new TerrainBuffers();
         this.baseElevationData = null;
         this.currentElevationData = null;
         this.currentBiomeOverrides = null;
@@ -3040,17 +3039,11 @@ export class MapStudio {
 
         this.uiState[name] = value;
         // A bar turned on, or made longer, stays wholly on the map
-        if (name.startsWith("cartographyScale")) this.#keepScaleBarOnMap();
+        if (name.startsWith("cartographyScale")) MapSerializer.keepScaleBarOnMap(this);
         this.#syncScaleBarFields();
         this._repaintVectors();
     }
 
-    /** Moves the scale bar in just far enough that all of it is on the map (see MapUnit.scaleBarOnMap). */
-    #keepScaleBarOnMap() {
-        const { x, y } = scaleBarOnMap(this.uiState, this.mapWidth, this.mapHeight);
-        this.uiState.cartographyScaleX = x;
-        this.uiState.cartographyScaleY = y;
-    }
 
     /**
      * The map's unit (see MapUnit): only a name, so nothing is worked out again; the scale bar's
@@ -4236,7 +4229,7 @@ export class MapStudio {
 
     /** The terrain images the painters fill, as the canvas's terrain shader takes them. */
     #terrainBuffers() {
-        return { surface: this.bufferSurfaceBiomes, underwater: this.bufferUnderwaterBiomes, aux: this.bufferTerrainAux, rivers: this.bufferRivers };
+        return this.terrain.forCanvas();
     }
 
     /**
@@ -5046,23 +5039,14 @@ export class MapStudio {
      * @param {object|null} [modelRun] - The generator's saved outputs (see platform.store.loadMapModelRun).
      */
     async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null, { generate = true, report = true } = {}) {
-        // Deep clone to sever the connection to Foundry's memory cache
-        const payload = platform.utils.deepClone(rawPayload);
+        // A copy of the saved file, its migrations run (see MapSerializer.prepare)
+        const payload = MapSerializer.prepare(rawPayload);
         // A map loaded is its world's Surface map, made; a world with no maps reads its settings
         // through here without one (see #openMaplessWorld)
         this.worldOpen = true;
         this.surfaceMade = generate;
         this.#creatingWorld = false;
         this.#terrainChoice = null;
-        // Pin and label sizes saved before the current size unit are scaled to it (see SymbolSizes).
-        // The map is not marked as changed: until it is saved, the same scaling runs on every load.
-        rebaseMap(payload);
-        // Generated names that older runs hid are given back to their styles, once (see NameLevels)
-        showNamesOnce(payload);
-        // A map saved before the Local detail level keeps what Everything showed (see LocalLevel)
-        addLocalLevelOnce(payload);
-        // Water route styles still on their old defaults take the new look (see WaterRouteStyles)
-        refreshWaterRoutesOnce(payload);
         this.modelRun = modelRun ?? null;
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method)
@@ -5071,51 +5055,8 @@ export class MapStudio {
         this.activeLevelId = null;
         this.activeRegionId = null;
 
-        this.uiState.mapSeed = payload.seed;
-        this.currentParentId = payload.parentId || null;
-
-        this.uiState.generationEngine = payload.generationEngine || "standard";
-
-        // The terrain rules this map was built with, so it regenerates exactly as it was saved.
-        // A map saved before the revision number existed has none, and reads as the legacy
-        // revision (see TerrainVersion). Only regional maps carry a world description.
-        this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
-        this.uiState.world = payload.world ?? null;
-        this.uiState.generatorStale = payload.generatorStale === true;
-        // The generator rules the map follows; a map saved before they were recorded reads as the
-        // oldest (see GeneratorRevision)
-        this.uiState.generatorRevision = GeneratorRevision.of(payload);
-        this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
-        this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
-        this.upwindMargin = payload.upwindMargin ?? null;
-        this.parentRun = payload.parentRun ?? null;
-        this.infillPending = payload.infillPending === true;
-        this.infillInputs = payload.infillInputs ?? null;
-        this.riverRoutesLaid = payload.riverRoutes === true;
-        this.shoresPlaced = payload.shoresPlaced === true;
-        this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
-        this.terrainUpgrade = null;
-
-        this.mapWidth = payload.mapWidth;
-        this.mapHeight = payload.mapHeight;
-
-        this.uiState.mapWidth = this.mapWidth;
-        this.uiState.mapHeight = this.mapHeight;
-        // New faults on this map start at its own default thickness (see FaultThickness)
-        this.uiState.faultThickness = FaultThickness.limits(this.mapWidth).default;
-        this.uiState.gridType = payload.gridType || "square";
-        // Raised to the smallest grid Foundry allows: a map saved with a smaller grid (the slider
-        // used to go down to 10) would otherwise export a scene whose grid Foundry enlarges, while
-        // its grid data describes the smaller cells
-        this.uiState.gridSize = MapStateManager.gridSizeOf(payload.gridSize || 100);
-        this.uiState.gridVisible = payload.gridVisible ?? false;
-        this.uiState.detailLevel = DetailLevel.valid(payload.detailLevel);
-        this.uiState.avoidLabelOverlaps = payload.avoidLabelOverlaps !== false;
-        this.uiState.symbolSize = SymbolScale.valid(payload.symbolSize);
-        this.uiState.hiddenLabelStyles = Array.isArray(payload.hiddenLabelStyles) ? [...payload.hiddenLabelStyles] : [];
-        this.uiState.hiddenLevels = Array.isArray(payload.hiddenLevels) ? [...payload.hiddenLevels] : [];
-        this.uiState.hideRegionFills = payload.hideRegionFills === true;
-        this.uiState.thematic = ThematicView.valid(payload.thematic);
+        // The file's frame and flags, then the buffers at its size, then the rest of the file
+        MapSerializer.readFrame(payload, this);
         this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
 
         MapStateManager.allocateBuffers(this);
@@ -5124,198 +5065,20 @@ export class MapStudio {
 
         this.brushEngine = this.#createBrushEngine();
 
-        const p = payload.params;
-        const c = p.cartography || {};
-
-        this.uiState.seaLevel = p.seaLevel;
-        this.uiState.tectonicPlates = p.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
-        this.uiState.coastlineFracture = p.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
-        this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
-        this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
-        this.uiState.coastalPlain = p.coastalPlain ?? FILRODENSWMB.GENERATION.COASTAL_PLAIN;
-        this.uiState.flatTexture = p.flatTexture === true;
-        this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
-        // Maps saved before Ocean Scale existed used Continent Scale for the sea too, so an
-        // updated map starts with the same value on both sides.
-        this.uiState.oceanScale = p.oceanScale ?? this.uiState.continentScale;
-        this.uiState.oceanRidges = p.oceanRidges ?? FILRODENSWMB.GENERATION.OCEAN_RIDGES;
-        this.uiState.globalTemp = p.globalTemp;
-        this.uiState.seasonOffset = p.seasonOffset;
-        this.uiState.latTop = p.latTop;
-        this.uiState.latBottom = p.latBottom;
-        this.uiState.globalMoisture = p.globalMoisture;
-        this.uiState.riverDensity = p.riverDensity;
-        this.uiState.springsBaked = payload.springsBaked ?? false;
-
-        this.uiState["noise.offsetX"] = p.noise.offsetX;
-        this.uiState["noise.offsetY"] = p.noise.offsetY;
-        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
-        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
-        this.uiState.windDistance = p.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-
-        // Read after the wind distance, which is what identifies a legacy regional map
-        this.legacyRootSize = TerrainVersion.isLegacyRegional(this.uiState) ? await TerrainUpgrade.resolveLegacyRootSize(payload) : null;
-
-        this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
-        this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
-        this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
-        this.uiState["noise.moisture.scale"] = 1 / p.noise.moisture.scale;
-        this.uiState["noise.moisture.octaves"] = p.noise.moisture.octaves;
-
-        this.uiState["noise.temperature.scale"] = p.noise.temperature?.scale ? 1 / p.noise.temperature.scale : FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
-
-        this.uiState.customBiomes = payload.customBiomes || [];
-        // Falls back to undefined on a map saved before this counter existed, which
-        // MapStateManager.getNextCustomBiomeId already treats as "derive it from the biomes
-        // that came back above" - see that method's own doc comment for why a deleted biome's
-        // ID must never come back into circulation, on a freshly loaded map any more than on
-        // one that's stayed open the whole time.
-        this.uiState.nextCustomBiomeId = payload.nextCustomBiomeId;
-        this.uiState.customRouteStyles = payload.customRouteStyles || [];
-        this.uiState.customLabelStyles = payload.customLabelStyles || [];
-        this.uiState.customRegionStyles = payload.customRegionStyles || [];
-        // A map saved before pin styles existed gets the default set; a map that has the key keeps its own, even emptied
-        this.uiState.customPinStyles = Array.isArray(payload.customPinStyles) ? payload.customPinStyles : null;
-        PinStyles.ensure(this);
-
-        this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
-        this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
-        this.uiState.springMoistMin = p.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
-        this.uiState.meanderJitter = p.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
-        this.uiState.riverMeander = p.hydrology?.riverMeander ?? MapStateManager.riverMeanderFromJitter(this.uiState.meanderJitter);
-        this.uiState.riverWidthScale = p.hydrology?.riverWidthScale ?? FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH;
-        this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
-        this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
-        this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
-        this.uiState.reliefShading = p.display?.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING;
-        // Maps saved before Relief Emphasis take its default
-        this.uiState.reliefEmphasis = p.display?.reliefEmphasis ?? FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS;
-        // Its slider is in the map region, drawn once, and a save reads the value back from it
+        const { history, unresolvedPins } = await MapSerializer.readContent(payload, this);
+        // The relief emphasis slider is in the map region, drawn once, and a save reads the value back from it
         this.#syncReliefEmphasisSlider();
-        this.uiState.seabedRelief = p.display?.seabedRelief ?? FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF;
-        this.uiState.waterClarity = p.display?.waterClarity ?? FILRODENSWMB.DISPLAY.WATER.CLARITY;
-        this.uiState.waterHue = p.display?.waterHue ?? FILRODENSWMB.DISPLAY.WATER.HUE;
-        this.uiState.waterSaturation = p.display?.waterSaturation ?? FILRODENSWMB.DISPLAY.WATER.SATURATION;
-        this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
-        this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
-        this.uiState.regionOpacity = p.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
-        this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
-        // A map saved before it had a unit takes it from its scale bar's text, and keeps its
-        // hand-set bar (see MapUnit.unitFromSaved)
-        this.uiState.mapUnit = unitFromSaved(payload).unit;
-        this.uiState.cartographyScaleMatchWorld = c.scaleMatchWorld === true;
-        this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
-        this.uiState.cartographyScaleValue = c.scaleValue ?? this.defaultUiState.cartographyScaleValue;
-        this.uiState.cartographyScaleMajorTicks = c.scaleMajorTicks ?? this.defaultUiState.cartographyScaleMajorTicks;
-        this.uiState.cartographyScaleMinorTicks = c.scaleMinorTicks ?? this.defaultUiState.cartographyScaleMinorTicks;
-        this.uiState.cartographyScaleX = c.scaleX ?? this.defaultUiState.cartographyScaleX;
-        this.uiState.cartographyScaleY = c.scaleY ?? this.defaultUiState.cartographyScaleY;
-        // A bar left off the map (by a regional map cut before bars were brought onto it) comes back
-        this.#keepScaleBarOnMap();
-        this.uiState.cartographyBorderEnable = c.borderEnable ?? this.defaultUiState.cartographyBorderEnable;
-        this.uiState.cartographyBorderStyle = c.borderStyle ?? this.defaultUiState.cartographyBorderStyle;
-        this.uiState.cartographyBorderColor = c.borderColor ?? this.defaultUiState.cartographyBorderColor;
-
-        // Legacy Visibility Migration
-        const migrateVisibility = (arr) => {
-            arr.forEach((item) => {
-                if (item.hidden !== undefined) {
-                    item.visibility = item.hidden ? "none" : "all";
-                    delete item.hidden; // Clean up old data
-                }
-                if (item.label?.hidden !== undefined) {
-                    item.label.visibility = item.label.hidden ? "none" : "all";
-                    delete item.label.hidden;
-                }
-            });
-        };
-
-        if (payload.mapPins) migrateVisibility(payload.mapPins);
-
-        if (payload.mapRoutes) {
-            migrateVisibility(payload.mapRoutes);
-            payload.mapRoutes.forEach((route) => {
-                if (!route.quickStyle) route.quickStyle = "custom"; // Flag old routes as custom overrides
-
-                // Heal legacy routes missing visual properties
-                route.color = route.color || "#ffffff";
-                route.thickness = route.thickness || 3;
-                route.style = route.style || "solid";
-            });
-        }
-
-        if (payload.mapLabels) migrateVisibility(payload.mapLabels);
-
-        if (payload.mapDecorations) migrateVisibility(payload.mapDecorations);
-
-        if (payload.regionLayers) {
-            payload.regionLayers.forEach((layer) => {
-                if (layer.hidden !== undefined) {
-                    layer.visibility = layer.hidden ? "none" : "all";
-                    delete layer.hidden;
-                }
-                if (layer.regions) {
-                    migrateVisibility(layer.regions);
-                    layer.regions.forEach((region) => {
-                        if (!region.quickStyle) region.quickStyle = "custom"; // Flag old regions as custom overrides
-                    });
-                }
-            });
-        }
-
-        this.customBiomeColors = p.customColors || {};
-
-        this.tectonicFaults = payload.tectonicFaults || [];
         this.tectonicFeatureCache = {};
-
-        this.manualRivers = payload.manualRivers || [];
-        if (payload.manualRivers) {
-            payload.manualRivers.forEach((river) => {
-                if (river.hidden !== undefined) {
-                    river.visibility = river.hidden ? "none" : "all";
-                    delete river.hidden;
-                }
-            });
-        }
-        // A map that a later revision would not change moves to it now (a revision 2 map with no
-        // hotspot chain or custom river to revision 3, a revision 3 top map to revision 4; see
-        // TerrainVersion.settledVersion), so anything added from here on is built by the current
-        // rules. It looks exactly as it did, so the map is not marked as changed: the move is kept
-        // with its next save, and until then it is made again on every load.
-        const settled = TerrainVersion.settledVersion(this.uiState, this.tectonicFaults, this.manualRivers);
-        if (settled !== null) this.uiState.terrainVersion = settled;
-
-        // Guarantee every pin has a valid `color` property, defaulting to white for legacy maps
-        this.mapPins = (payload.mapPins || []).map((pin) => {
-            pin.color = pin.color || "#ffffff";
-            return pin;
-        });
 
         // Custom pin icons are a world-local registry (see pinIcons.js) - a map authored in a
         // different world, then shared as a JSON import or a copied compendium entry, can
         // reference icon ids this world never registered. They still render (as the protected
         // default), so this is a heads-up rather than a blocker.
-        const { affectedPinCount } = findUnresolvedPinIcons(this.mapPins);
-        if (affectedPinCount > 0) {
-            platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+        if (unresolvedPins > 0) {
+            platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: unresolvedPins }));
         }
-
-        this.mapRoutes = payload.mapRoutes || [];
-        this.landMasks = payload.landMasks || [];
-        this.mapLabels = payload.mapLabels || [];
-        this.mapDecorations = payload.mapDecorations || [];
         // The last Name natural features report was the map before's
         FeatureNames.forget(this);
-
-        // Label widths saved in pixels (before widths were measured in characters) become
-        // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
-        // is not marked as changed: until it is saved, the same conversion runs on every load.
-        LabelWidth.migrateMap(
-            // A map saved before layer sets existed still has its region layers here; they become
-            // levels when the map's mesh session opens, keeping the labels converted now
-            { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: payload.regionLayers ?? this.regionLevels, customLabelStyles: this.uiState.customLabelStyles },
-            LabelWidth.rootFontSize(),
-        );
         this.#reportMissingFonts(payload.regionLayers ?? this.regionLevels);
 
         // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
@@ -5329,16 +5092,12 @@ export class MapStudio {
         // pinRedoStack below, which reset to empty for the same reason on the vector side.
         // Loading a map, however much paint history it carries, always starts a fresh undo
         // session: nothing is undoable until an edit is made after this load.
-        this.brushEngine.history = payload.history || [];
+        this.brushEngine.history = history;
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
-
-        // The map's own reference image, or none for a map saved without one (or before maps
-        // kept it), so the previous map's image is not left behind on this one
-        this.#applyReferenceData(payload.reference);
 
         this.defaultUiState = platform.utils.deepClone(this.uiState);
 
@@ -5352,26 +5111,7 @@ export class MapStudio {
         this.canvasEngine.resetCamera();
     }
 
-    /** The reference image as a save writes it (see _buildSavePayload), or null when there is none. */
-    #referenceData() {
-        const { referenceImage, referenceAlpha, referenceScale, referenceX, referenceY } = this.uiState;
-        return referenceImage ? { src: referenceImage, alpha: referenceAlpha, scale: referenceScale, x: referenceX, y: referenceY } : null;
-    }
 
-    /**
-     * Sets the reference image from a loaded map's saved one, or clears it (centred, full size,
-     * half opacity) when the map has none.
-     * @param {{src: string, alpha?: number, scale?: number, x?: number, y?: number}|null|undefined} reference
-     */
-    #applyReferenceData(reference) {
-        const defaults = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
-        const src = reference?.src ? Sanitize.imageSource(reference.src, { remote: true }) : null;
-        this.uiState.referenceImage = src ?? "";
-        this.uiState.referenceAlpha = Number.isFinite(reference?.alpha) && src ? reference.alpha : defaults.referenceAlpha;
-        this.uiState.referenceScale = Number.isFinite(reference?.scale) && src ? reference.scale : defaults.referenceScale;
-        this.uiState.referenceX = Number.isFinite(reference?.x) && src ? reference.x : defaults.referenceX;
-        this.uiState.referenceY = Number.isFinite(reference?.y) && src ? reference.y : defaults.referenceY;
-    }
 
     /** Stops the cancellable work under way (see runCancellable); null when there is none. */
     #cancelRunning = null;
@@ -5626,65 +5366,7 @@ export class MapStudio {
      * @returns {{payload: object, owners: Object<string, string>, modelRun: object|null}}
      */
     _buildSavePayload() {
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const payload = {
-            seed: currentSeed,
-            generationEngine: this.uiState.generationEngine,
-            terrainVersion: this.uiState.terrainVersion,
-            sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
-            nameLevels: true,
-            localLevel: true,
-            waterRoutes: true,
-            world: this.uiState.world,
-            mapUnit: cleanUnit(this.uiState.mapUnit),
-            generatorStale: this.uiState.generatorStale === true,
-            generatorRevision: GeneratorRevision.of(this.uiState),
-            generatorSettings: panelSettings(this.uiState.generatorSettings),
-            cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
-            upwindMargin: this.upwindMargin ?? null,
-            parentRun: this.parentRun ?? null,
-            infillPending: this.infillPending === true,
-            infillInputs: this.infillInputs ?? null,
-            riverRoutes: this.riverRoutesLaid === true,
-            shoresPlaced: this.shoresPlaced === true,
-            terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
-            springsBaked: this.uiState.springsBaked,
-            mapWidth: this.mapWidth,
-            mapHeight: this.mapHeight,
-            gridType: this.uiState.gridType,
-            gridSize: this.uiState.gridSize,
-            gridVisible: this.uiState.gridVisible,
-            detailLevel: DetailLevel.current(this),
-            avoidLabelOverlaps: this.uiState.avoidLabelOverlaps !== false,
-            symbolSize: SymbolScale.valid(this.uiState.symbolSize),
-            hiddenLabelStyles: [...(this.uiState.hiddenLabelStyles ?? [])],
-            hiddenLevels: [...(this.uiState.hiddenLevels ?? [])],
-            hideRegionFills: this.uiState.hideRegionFills === true,
-            thematic: ThematicView.setting(this),
-            params: params,
-            customBiomes: this.uiState.customBiomes,
-            nextCustomBiomeId: this.uiState.nextCustomBiomeId,
-            customRouteStyles: this.uiState.customRouteStyles,
-            customLabelStyles: this.uiState.customLabelStyles,
-            customRegionStyles: this.uiState.customRegionStyles,
-            customPinStyles: this.uiState.customPinStyles,
-            history: this.brushEngine?.history || [],
-            tectonicFaults: this.tectonicFaults,
-            manualRivers: this.manualRivers,
-            mapPins: this.mapPins,
-            mapRoutes: this.mapRoutes,
-            landMasks: this.landMasks,
-            mapLabels: this.mapLabels,
-            mapDecorations: this.mapDecorations,
-            // The reference image with its place, size and opacity, so it is there again when the
-            // map is opened; null when the map has none
-            reference: this.#referenceData(),
-            parentId: this.currentParentId,
-        };
-
-        // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
-        const owners = MeshIntegration.preparePayload(this, payload);
-        return { payload, owners, modelRun: this.modelRun ?? null };
+        return MapSerializer.write(this);
     }
 
     /**
@@ -6449,43 +6131,19 @@ export class MapStudio {
         MapStateManager.allocateBuffers(this);
         // A new map opens with every terrain layer on (see #terrainLayers)
         this.#setTerrainLayers(MapStudio.#allTerrainLayers(true));
-        this.defaultUiState = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
-        this.uiState = platform.utils.deepClone(this.defaultUiState);
-        // The built-in biomes' colours at their defaults, so the panel's fields read them (a world's
-        // changed colours come back with its settings below)
-        this.customBiomeColors = {};
-        Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
-            this.customBiomeColors[key] = rgb;
-        });
+        // The defaults, and the built-in biomes' colours at theirs (a world's changed colours come
+        // back with its settings below)
+        MapSerializer.blankSettings(this);
         if (world) WorldEditors.restoreWorld(this, world);
         PinStyles.ensure(this);
         this.#syncMapControls();
         this.#syncReliefEmphasisSlider();
         this.#terrainChoice = null;
 
-        // A new map is built with the current terrain rules, so there is nothing to update
-        this.terrainUpgrade = null;
-        this.legacyRootSize = null;
-        // A new map is not a crop of anything, so has no parent ground beyond its edges, nor a
-        // parent's run
-        this.upwindMargin = null;
-        this.parentRun = null;
-        this.infillPending = false;
-        this.infillInputs = null;
-        this.riverRoutesLaid = false;
-        this.shoresPlaced = false;
-
+        // Nothing drawn and nothing inherited (see MapSerializer.blankMap)
+        MapSerializer.blankMap(this);
         this.brushEngine = this.#createBrushEngine();
-        this.manualRivers = [];
-        this.tectonicFaults = [];
         this.tectonicFeatureCache = {};
-        this.mapPins = [];
-        this.mapRoutes = [];
-        this.layerSets = [];
-        this.modelRun = null;
-        this.landMasks = [];
-        this.mapLabels = [];
-        this.mapDecorations = [];
         FeatureNames.forget(this);
         this.pinHistory = [];
         this.pinRedoStack = [];
@@ -9366,3 +9024,6 @@ export class MapStudio {
         }
     }
 }
+
+// The buffers' old names on the studio, onto its TerrainBuffers (RF2)
+TerrainBuffers.expose(MapStudio);

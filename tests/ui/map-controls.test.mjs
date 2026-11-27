@@ -258,7 +258,10 @@ test("a grid type or size change turns the grid on, and the map controls follow"
 test("loading or starting a map, and switching tool, bring the map controls up to date", () => {
     const bodies = methodBodies(SOURCE);
     // A loaded map's grid setting and every terrain layer, through #setTerrainLayers
-    assert.match(bodies.get("#ingestMapPayload"), /gridVisible[\s\S]*detailLevel[\s\S]*#setTerrainLayers\(/);
+    assert.match(bodies.get("#ingestMapPayload"), /MapSerializer\.readFrame\([\s\S]*#setTerrainLayers\(/);
+    // ...after the file's frame is read, which holds the grid setting and the detail level (RF2)
+    const readFrame = readFileSync(join(ROOT, "src/studios/world/app/MapSerializer.js"), "utf8").match(/static readFrame\([\s\S]*?\n {4}\}\n/)[0];
+    assert.match(readFrame, /gridVisible[\s\S]*detailLevel/);
     assert.match(bodies.get("#setTerrainLayers"), /this\.#syncMapControls\(\)/);
     // A tool that shows its own layer when picked
     assert.match(bodies.get("#ensureToolLayerVisible"), /this\.#syncMapControls\(\)/);
