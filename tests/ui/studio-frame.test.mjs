@@ -7,11 +7,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { STUDIO_SHEET, stylesheet } from "../support/stylesheets.mjs";
 import { Window } from "happy-dom";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
-const CSS = readFileSync(join(ROOT, "styles/filrodens-world-map-builder.css"), "utf8");
+const CSS = stylesheet(STUDIO_SHEET);
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { widthClass, railFold, RAIL_FOLDS, STUDIO_WIDTH } = await import("../../src/shell/StudioLayout.js");

@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../../../config.js";
+import { KERNEL_PARTS } from "../../../kernel/config.js";
 import { Backup } from "../data/Backup.js";
 import { MapImport } from "../data/MapImport.js";
 import { MapNames } from "../data/MapNames.js";
@@ -411,7 +412,7 @@ export class MapTransfer {
         if (!local?.rules || !raws?.length) return [];
         const surfaceId = Worlds.mapOf(world);
         const cards = [];
-        for (const raw of raws.slice(0, FILRODENSWMB.LOCAL.MAX_SETTLEMENTS)) {
+        for (const raw of raws.slice(0, KERNEL_PARTS.MAX_SETTLEMENTS)) {
             const checked = local.rules.check(raw);
             if (!checked) continue;
             const record = { ...checked, id: Worlds.newSettlementId(), sourceMapId: surfaceId, revision: 1, savedAt: Worlds.now() };

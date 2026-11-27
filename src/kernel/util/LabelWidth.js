@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../../config.js";
+import { KERNEL_PARTS } from "../config.js";
 import { LabelFonts } from "./LabelFonts.js";
 
 /**
@@ -16,8 +17,9 @@ import { LabelFonts } from "./LabelFonts.js";
  * characters once, rounding up, so an existing label is never made narrower than it was and
  * none of its lines break earlier than before.
  *
- * Measuring a font needs PIXI, which only exists in Foundry. The measurement can be replaced
- * with setMeasurer so the conversions can be checked outside Foundry.
+ * Measuring a font needs PIXI, which the World studio hands in (usePixi, as DrawnDecoration is
+ * given it), since the kernel reads no host's globals. The measurement can be replaced with
+ * setMeasurer so the conversions can be checked without PIXI.
  */
 export class LabelWidth {
     // The character whose width defines one unit, as for CSS `ch`
@@ -36,12 +38,24 @@ export class LabelWidth {
     /** Width of "0" as a share of the font size, by face and family. */
     static #ratios = new Map();
     static #measurer = null;
+    /** The PIXI the fonts are measured with (see usePixi). */
+    static #pixi = null;
+
+    /**
+     * Hands in the PIXI to measure fonts with (the World studio's, when it starts).
+     * @param {object|null} pixi
+     */
+    static usePixi(pixi) {
+        if (pixi === LabelWidth.#pixi) return;
+        LabelWidth.#pixi = pixi;
+        LabelWidth.#ratios.clear();
+    }
 
     /**
      * Replaces how a font's "0" is measured. Used by checks outside Foundry.
      *
      * @param {((fontFamily: string, fontSizePx: number) => number)|null} measurer  Returns the
-     *   width in pixels of "0" at the given size, or null to use PIXI again.
+     *   width in pixels of "0" at the given size, or null to use PIXI again (see usePixi).
      */
     static setMeasurer(measurer) {
         LabelWidth.#measurer = measurer;
@@ -92,9 +106,11 @@ export class LabelWidth {
     }
 
     static #measureWithPixi(fontFamily, fontSizePx, face) {
+        const pixi = LabelWidth.#pixi;
+        if (!pixi) throw new Error("LabelWidth: no PIXI to measure fonts with (see usePixi)");
         const [fontStyle, fontWeight] = face.split(" ");
-        const style = new PIXI.TextStyle({ fontFamily, fontSize: fontSizePx, fontWeight, fontStyle });
-        return PIXI.TextMetrics.measureText(LabelWidth.#SAMPLE, style).width;
+        const style = new pixi.TextStyle({ fontFamily, fontSize: fontSizePx, fontWeight, fontStyle });
+        return pixi.TextMetrics.measureText(LabelWidth.#SAMPLE, style).width;
     }
 
     /**
@@ -130,7 +146,7 @@ export class LabelWidth {
         // Both checks are written as !(value > 0) on purpose: a missing or NaN value also fails
         // them, whereas the equivalent-looking value <= 0 would let it through
         if (!(legacyPx > 0)) return 0; // NOSONAR
-        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontPx;
+        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || KERNEL_PARTS.LABEL_UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontPx;
         if (!(charPx > 0)) return 0; // NOSONAR
         return Math.max(1, Math.ceil(legacyPx / charPx - LabelWidth.#ROUNDING_TOLERANCE));
     }
@@ -147,7 +163,7 @@ export class LabelWidth {
         if (!label || typeof label !== "object" || label.maxChars !== undefined) return false;
         if (label.maxWidth === undefined) return false;
 
-        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelFonts.family(label), Number(label.fontSize) || FILRODENSWMB.LABELS.UNSET_SIZE, rootFontPx);
+        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelFonts.family(label), Number(label.fontSize) || KERNEL_PARTS.LABEL_UNSET_SIZE, rootFontPx);
         delete label.maxWidth;
         return true;
     }

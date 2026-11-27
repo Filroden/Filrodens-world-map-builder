@@ -51,7 +51,7 @@ export class RouteEditor {
     }
 
     /** The route's kind of inspector. */
-    static KIND = Object.freeze({
+    static KIND = Inspector.register(Object.freeze({
         id: "route",
         template: "modules/filrodens-world-map-builder/templates/world/parts/inspector-route.hbs",
         find: (app, ref) => RouteEditor.#find(app, ref),
@@ -76,7 +76,7 @@ export class RouteEditor {
             saveStyle: (app, route, _ref, button) => RouteEditor.#saveStyle(app, route, button.dataset.styleType),
             placeLabel: (app, route) => InspectorFields.placeLabel(app, route),
         },
-    });
+    }));
 
     /** The template's context: the route, every choice list, and its label with its defaults filled in. */
     static #context(app, route) {

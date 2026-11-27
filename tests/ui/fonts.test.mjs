@@ -8,12 +8,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { FONTS_SHEET, stylesheet } from "../support/stylesheets.mjs";
 import { DEFAULT_LABEL_FONT, FONT_FAMILIES, FONTS_FOLDER, LABEL_FONT_CATEGORIES, fontFaces, fontLicencePath, hasStyle, hasWeight, labelFontGroups, labelFontList, labelFontNames } from "../../src/kernel/data/fonts.js";
 import { FILRODENSWMB } from "../../src/config.js";
 import { LabelFonts } from "../../src/kernel/util/LabelFonts.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const THEME = readFileSync(join(ROOT, "styles/fwmb-theme.css"), "utf8");
+const FONTS = stylesheet(FONTS_SHEET);
 
 test("every face's file and every family's licence exist", () => {
     const missing = [];
@@ -55,7 +56,7 @@ test("the stylesheet's @font-face rules are the registry's faces", () => {
     const expected = FONT_FAMILIES.flatMap((family) => fontFaces(family).map((face) => ({ family: family.name, ...face })))
         .map(key)
         .sort();
-    assert.deepEqual(declaredFaces(THEME).map(key).sort(), expected);
+    assert.deepEqual(declaredFaces(FONTS).map(key).sort(), expected);
 });
 
 test("every family carries its licence and credit", () => {

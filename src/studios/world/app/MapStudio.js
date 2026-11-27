@@ -20,6 +20,7 @@ import { RefreshQueue } from "../../../kernel/util/RefreshQueue.js";
 import { ColorMath } from "../../../kernel/util/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
+import { MassEdit } from "./MassEdit.js";
 import { bindDropdownMenus, positionPopoverMenu } from "../../../shell/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons, usePinIcons, currentPinIcons } from "../../../kernel/data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
@@ -203,7 +204,7 @@ export class MapStudio {
         toggleMassEditItem(e, t)   { this._onToggleMassEditItem(e, t); },
         massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
         massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
-        openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
+        openMassEdit(e, t)         { MassEdit.open(this, t.dataset.type); },
         massDelete(_e, t)          { MapDialogManager.massDelete(this, t.dataset.type); },
 
         // --- DIALOG MANAGER: Entity Deletion ---
@@ -550,6 +551,8 @@ export class MapStudio {
      */
     constructor(shell = null) {
         this.shell = shell;
+        // The kernel measures label fonts with the PIXI the studio draws with (see LabelWidth.usePixi)
+        LabelWidth.usePixi(globalThis.PIXI ?? null);
         // The studio's registration: its tools, stages and their order (see StudioRegistry)
         this.definition = shell?.definition ?? WORLD_DEFINITION;
         // Settlement maps arriving with a world (a file, a backup) are read by the Local studio's rules
@@ -638,7 +641,7 @@ export class MapStudio {
         this.mapDecorations = [];
         // pinHistory/pinRedoStack and globalHistoryLedger/globalRedoLedger are session-only
         // undo/redo bookkeeping, not permanent data. pinHistory holds full vector-state
-        // snapshots (see MapStateManager.getVectorStateSnapshot) taken immediately before a
+        // snapshots (see VectorHistory.getVectorStateSnapshot) taken immediately before a
         // vector edit - these are never saved with the map, since a saved map only stores each
         // vector feature's final current state, not a history of how it got there. They're
         // capped at FILRODENSWMB.LIMITS.HISTORY_MAX (see MapStateManager.pushVectorState) and
@@ -4685,6 +4688,11 @@ export class MapStudio {
         return `x ${bounds.minX}-${bounds.maxX}, y ${bounds.minY}-${bounds.maxY}, ${share.toFixed(1)}% of the map`;
     }
 
+    /** Draws the thematic layer again (InfluenceView asks for it, so it need not import ThematicView). */
+    renderThematic() {
+        ThematicView.render(this);
+    }
+
     _repaintVectors() {
         if (!this.canvasEngine || !this.#isOpen) return;
 
@@ -5999,7 +6007,7 @@ export class MapStudio {
 
         const targetSnapshot = VectorHistory.snapshotOf(entry);
         if (!targetSnapshot) return null;
-        return this.#diffVectorSnapshots(MapStateManager.getVectorStateSnapshot(this), targetSnapshot);
+        return this.#diffVectorSnapshots(VectorHistory.getVectorStateSnapshot(this), targetSnapshot);
     }
 
     /**

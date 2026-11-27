@@ -30,7 +30,6 @@ import { worshipShape } from "../MarketWorship.js";
 import { buildPlanSuburbs } from "./Suburbs.js";
 import { lesserRoad } from "./RoadsOut.js";
 import { dryOver } from "../Walls.js";
-export { dryOver };
 import { CAVE } from "../../CaveInput.js";
 import { ESTATES, estateCounts, layOutEstate, pickEstateBlocks, settleEstates } from "./Estates.js";
 
@@ -363,7 +362,8 @@ export function buildPlan(T) {
         settleEstates(T, plan.estatePicks.map(({ ground }) => layOutEstate(T, ground, "inner", random, R)));
     }
     // ------------------------------------------------------------ 9. suburbs
-    if (!cave) buildPlanSuburbs(T, ring);
+    // The ring blocks are cut here, so Suburbs is handed the cutter rather than importing Plan (RF1)
+    if (!cave) buildPlanSuburbs(T, ring, { cutRingBlocks });
     // ------------------------------------------------------------ 10. styles
     plan.styleAt = (p, n) => styleAt(T, p, n);
     // The lesser roads are roads from here on (fields, cemeteries, households read T.roads)

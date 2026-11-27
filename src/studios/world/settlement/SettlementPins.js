@@ -1,4 +1,4 @@
-import { FILRODENSWMB } from "../../../config.js";
+import { WORLD_PARTS } from "../config.js";
 
 /**
  * A settlement map follows its place through a re-run (L-surface step 2b; Ken, 2026-11-24): a run
@@ -27,7 +27,7 @@ export const SettlementPins = Object.freeze({
         const mesh = app.meshSession?.mesh ?? null;
         const siteOf = (cell) => mesh?.parentOf?.[cell] ?? cell;
         const spacing = mesh?.modelCount ? Math.sqrt(((app.mapWidth ?? 0) * (app.mapHeight ?? 0)) / mesh.modelCount) : 0;
-        const reach = spacing * FILRODENSWMB.LOCAL.FOLLOW_CELLS;
+        const reach = spacing * WORLD_PARTS.FOLLOW_CELLS;
         const towns = placed.filter((pin) => pin.generated?.kind === "town");
         const pairs = [];
         for (const old of gone) {

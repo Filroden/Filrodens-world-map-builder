@@ -3,9 +3,8 @@
 // between a great city's rings, and a few beyond the walls, larger, as worked estates (a manor
 // house with its farm buildings round a yard, a walled garden and an orchard).
 import { centroid, dist, lerp, pointInPolygon, polygonArea, segmentDistance } from "../../Geometry.js";
-import { rect } from "../Walls.js";
+import { dryOver, rect } from "../Walls.js";
 import { CELL, axes } from "./Raster.js";
-import { dryOver } from "./Plan.js";
 import { BUILDING, RESERVED, STREET } from "../Occupancy.js";
 
 export const ESTATES = Object.freeze({

@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { THEME_SHEET } from "../support/stylesheets.mjs";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SOURCES = [
@@ -66,7 +67,7 @@ function tokensOf(theme, selectorText) {
 }
 
 test("the theme's light and dark blocks, and its gold and blue (stored as teal) blocks, define the same tokens", () => {
-    const theme = files.find((file) => file.name === "styles/fwmb-theme.css").text;
+    const theme = files.find((file) => file.name === THEME_SHEET).text;
     assert.deepEqual(tokensOf(theme, '[data-fwmb-theme="light"]'), tokensOf(theme, '[data-fwmb-theme="dark"]'));
     assert.deepEqual(tokensOf(theme, '[data-fwmb-hue="teal"]'), tokensOf(theme, '[data-fwmb-hue="gold"]'));
 });
@@ -96,7 +97,7 @@ function themeTokens(css, hue, mode) {
 }
 
 test("every way of choosing a theme gives the same tokens", () => {
-    const theme = files.find((file) => file.name === "styles/fwmb-theme.css").text;
+    const theme = files.find((file) => file.name === THEME_SHEET).text;
     for (const [hue, mode] of THEMES) {
         const expected = themeTokens(theme, hue, mode);
         const rules = themeRules(theme).filter((rule) => rule.selector.includes(`theme-${mode}`) && (rule.selector.includes(`"${hue}"`) || (hue === "gold" && !rule.selector.includes('"teal"'))));
@@ -186,7 +187,7 @@ const CONTRAST_PAIRS = [
 ];
 
 test("every colour pair passes its WCAG AA contrast in all four themes", () => {
-    const theme = files.find((file) => file.name === "styles/fwmb-theme.css").text;
+    const theme = files.find((file) => file.name === THEME_SHEET).text;
     const failures = [];
     for (const [hue, mode] of THEMES) {
         const tokens = themeTokens(theme, hue, mode);

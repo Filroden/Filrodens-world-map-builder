@@ -1,7 +1,7 @@
 /**
  * The fonts the module ships (assets/fonts/), one entry per family.
  *
- * This is the one list of vendored fonts. The stylesheet's @font-face rules (styles/fwmb-theme.css)
+ * This is the one list of vendored fonts. The stylesheet's @font-face rules (styles/fwmb-fonts.css)
  * are written from the same data, and tests/ui/fonts.test.mjs checks that the two agree, that every
  * file exists, and that each family's licence sits beside its files. The credits shown in the
  * README come from it too.
