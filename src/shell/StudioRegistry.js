@@ -30,6 +30,28 @@ export const MODES = Object.freeze(["create", "explore"]);
  */
 
 /**
+ * What Inspect can read on a map type (EX1): its kinds in the list's order, and the ground, the
+ * list's last row. The shell's reader (MapReader) gathers every kind at a map point and draws the
+ * card and the held list from their rows; the studio's tool (the World studio's InspectView)
+ * draws each fold and acts on its links.
+ *
+ * @typedef {object} InspectKind
+ * @property {string} id - The kind's id ("pins", "routes", …).
+ * @property {string} icon - The mask icon's name, beside its rows.
+ * @property {function(object, number, number): object[]} at - Everything of the kind at a map point,
+ *     nearest first, each item carrying a `key` unique on the map (the list is compared by keys).
+ * @property {function(object, object): {name: string, kind: string, figure?: string, set?: string, gmOnly?: boolean}} row - An item's line on the card.
+ * @property {function(object, object, object): object} fold - An item's fold in the panel.
+ * @property {function(object, object): object|null} outline - What the map draws while its fold is hovered.
+ *
+ * @typedef {object} InspectGround
+ * @property {string} icon
+ * @property {function(object, number, number): object|null} at - The point's ground, or null off the map.
+ * @property {function(object, object): object} row
+ * @property {function(object, object, object): object} fold
+ */
+
+/**
  * @typedef {object} StageDefinition
  * @property {string} id
  * @property {string} label - Localisation key.
@@ -57,10 +79,12 @@ const fail = (studio, message) => {
  * @param {object[]} [spec.occasional] - The occasional entries at the rail's foot, in order: a
  *     registered tool ({tool}), a menu ({menu, icon, label}) or an action ({action, icon, label, host}).
  * @param {string[]} [spec.engineInHeader] - Tools whose panel header names the terrain engine.
+ * @param {Object<string, {kinds: InspectKind[], ground: InspectGround}>} [spec.inspect] - What
+ *     Inspect reads, per map type (EX1); a map type left out has nothing to inspect.
  * @returns {Readonly<object>}
  */
 export function defineStudio(spec) {
-    const { id, label, mapTypes, stages, worldStages = [], tools, occasional = [], engineInHeader = [] } = spec;
+    const { id, label, mapTypes, stages, worldStages = [], tools, occasional = [], engineInHeader = [], inspect = {} } = spec;
     if (!id) fail("?", "has no id");
     if (!label) fail(id, "has no label");
     if (!mapTypes?.length) fail(id, "has no map types");
@@ -81,6 +105,8 @@ export function defineStudio(spec) {
     for (const entry of occasional) {
         if (entry.tool && byId.get(entry.tool)?.stage !== null) fail(id, `occasional ${entry.tool} is not an occasional tool`);
     }
+
+    const inspectByType = checkInspect(id, mapTypes, inspect);
 
     // The world's tools are either mode's: the world is edited and read from the same rail
     const offered = (tool, mapType, mode) => tool.mapTypes.includes(mapType) && (mode == null || tool.mode === mode || worldStageIds.has(tool.stage));
@@ -155,7 +181,38 @@ export function defineStudio(spec) {
             if (sameStage) return sameStage.id;
             return this.railStages(mapType, mode)[0]?.tools[0]?.id ?? null;
         },
+
+        /** What Inspect reads on a map type ({kinds, ground}), or null when it reads nothing there. */
+        inspectFor(mapType) {
+            return inspectByType.get(mapType) ?? null;
+        },
     });
+}
+
+/** Checks and freezes a studio's `inspect` registration (see InspectKind), by map type. */
+function checkInspect(studio, mapTypes, inspect) {
+    const byType = new Map();
+    for (const [mapType, entry] of Object.entries(inspect)) {
+        if (!mapTypes.includes(mapType)) fail(studio, `inspect names a map type the studio does not have (${mapType})`);
+        if (!entry?.kinds?.length) fail(studio, `inspect for ${mapType} has no kinds`);
+        const ids = new Set();
+        for (const kind of entry.kinds) {
+            if (!kind?.id) fail(studio, `an inspect kind for ${mapType} has no id`);
+            if (ids.has(kind.id)) fail(studio, `inspect for ${mapType} registers ${kind.id} twice`);
+            ids.add(kind.id);
+            if (!kind.icon) fail(studio, `inspect kind ${kind.id} has no icon`);
+            for (const part of ["at", "row", "fold", "outline"]) {
+                if (typeof kind[part] !== "function") fail(studio, `inspect kind ${kind.id} has no ${part}()`);
+            }
+        }
+        const ground = entry.ground;
+        if (!ground?.icon) fail(studio, `inspect for ${mapType} has no ground`);
+        for (const part of ["at", "row", "fold"]) {
+            if (typeof ground[part] !== "function") fail(studio, `inspect's ground for ${mapType} has no ${part}()`);
+        }
+        byType.set(mapType, Object.freeze({ kinds: Object.freeze(entry.kinds.map((kind) => Object.freeze({ ...kind }))), ground: Object.freeze({ id: "ground", ...ground }) }));
+    }
+    return byType;
 }
 
 /** The studios the shell can open, by id. */

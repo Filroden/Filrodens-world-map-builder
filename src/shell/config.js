@@ -5,6 +5,12 @@
 /** Settings the shell reads that sit in the World studio's group (UI), which takes them from here. */
 export const SHELL_PARTS = Object.freeze({
     RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
+    // Inspect's map card (EX1, see MapReader): how long the pointer rests before the card shows
+    // (Ken, EX1 answer 1: a third of a second, to tune after testing), how far it may drift and
+    // still be resting, and the gap kept between the card and the pointer or the canvas's edges
+    INSPECT_REST_MS: 300,
+    INSPECT_STILL_PX: 4,
+    INSPECT_CARD_GAP_PX: 12,
 });
 
 /** The shell's own groups of FILRODENSWMB. */

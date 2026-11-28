@@ -35,6 +35,7 @@ export class CanvasHints {
      * @param {boolean} [state.pickingEventPlace]  Whether the next click sets an age's event's place (see AgeEventRows).
      * @param {string|null} [state.influenceMode]  The Influences tool's mode (see InfluencePainter).
      * @param {boolean} [state.travelPicking]  Whether a click sets the Travel tool's start (see TravelView).
+     * @param {boolean} [state.inspecting]  Whether Inspect reads the map (see InspectView).
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
      * @returns {string}  A key of CANVAS_HINTS.CONTEXTS.
@@ -47,6 +48,7 @@ export class CanvasHints {
         if (state.pickingHomeland) return "homeland";
         if (state.pickingEventPlace) return "eventPlace";
         if (state.travelPicking) return "travel";
+        if (state.inspecting) return "inspect";
         if (state.isReferenceMode) return "reference";
         if (state.isCropMode) return "crop";
         if (!state.isEditMode) return "view";

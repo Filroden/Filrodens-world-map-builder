@@ -48,9 +48,9 @@ test("the rail is the registration's: one mode's stages (every mode's when none 
         ["shape", ["scene", "terrain", "climate", "biomes", "features"]],
         ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
         ["finish", ["cartography", "export"]],
-        ["explore", ["history", "travel", "threeD"]],
+        ["explore", ["inspect", "history", "travel", "threeD"]],
     ]);
-    assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface", "explore")), [["explore", ["history", "travel", "threeD"]]]);
+    assert.deepEqual(ids(WORLD_DEFINITION.railStages("surface", "explore")), [["explore", ["inspect", "history", "travel", "threeD"]]]);
     assert.equal(WORLD_DEFINITION.railStages("surface", "create").length, 3);
     // The studio's one rail (S0 step 6, as v4's): every stage, Explore after Finish
     assert.deepEqual(WORLD_DEFINITION.railStages("surface").map((stage) => stage.id), ["shape", "populate", "finish", "explore"]);

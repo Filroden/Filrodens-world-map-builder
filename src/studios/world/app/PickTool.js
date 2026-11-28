@@ -2,12 +2,10 @@ import { Inspector } from "./Inspector.js";
 import { LabelEditor } from "./LabelEditor.js";
 import { PinEditor } from "./PinEditor.js";
 import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
+import { nearestLine } from "./LineReach.js";
 
 /** The modes of the tools that place things (pins, labels), in toolbar order. */
 export const PICK_MODES = Object.freeze(["select", "place"]);
-
-/** How near a line or outline a click must be to pick it, in screen pixels. */
-const LINE_REACH_PX = 8;
 
 /** The modes of pins and labels: the uiState key holding each one's mode, and its toolbar labels and icons. */
 const PLACERS = Object.freeze({
@@ -64,43 +62,6 @@ const PICKERS = Object.freeze({
 /** A canvas hit as a picked item. */
 function wrap(kind, hit) {
     return hit ? { kind, id: hit.entityId, hit } : null;
-}
-
-/** How far a map point lies from the segment a–b. */
-function segmentDistance(x, y, a, b) {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const length = dx * dx + dy * dy;
-    const t = length ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / length)) : 0;
-    return Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy));
-}
-
-/** The map distance LINE_REACH_PX covers at the current zoom. */
-function reach(app) {
-    return LINE_REACH_PX / (app.canvasEngine?.stage?.scale?.x || 1);
-}
-
-/**
- * The line (of the lists given, each with its kind and optionally how far beyond the line it
- * reaches, in map pixels) nearest a map point within reach, or null.
- */
-function nearestLine(app, x, y, lists) {
-    let best = null;
-    let bestDistance = Infinity;
-    for (const [kind, lines, extent] of lists) {
-        for (const line of lines ?? []) {
-            const within = Math.max(reach(app), extent?.(line) ?? 0);
-            const points = line.points ?? [];
-            for (let i = 1; i < points.length; i++) {
-                const distance = segmentDistance(x, y, points[i - 1], points[i]);
-                if (distance <= within && distance < bestDistance) {
-                    bestDistance = distance;
-                    best = { kind, id: line.id };
-                }
-            }
-        }
-    }
-    return best;
 }
 
 /** The land mask whose outline is nearest a map point within reach, or else the last one drawn that holds it. */

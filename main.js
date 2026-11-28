@@ -58,6 +58,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/world/tools-manage.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-reference.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-generate.hbs",
+        "modules/filrodens-world-map-builder/templates/world/tools-inspect.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-history.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-travel.hbs",
         "modules/filrodens-world-map-builder/templates/world/tools-threeD.hbs",

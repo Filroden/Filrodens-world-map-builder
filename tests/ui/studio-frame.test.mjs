@@ -50,7 +50,7 @@ test("the rail holds the stages in order (the optional one last), then the occas
             ["shape", ["scene", "terrain", "climate", "biomes", "features"]],
             ["populate", ["influences", "generate", "regions", "infrastructure", "labels"]],
             ["finish", ["cartography", "export"]],
-            ["explore", ["history", "travel", "threeD"]],
+            ["explore", ["inspect", "history", "travel", "threeD"]],
         ],
     );
     assert.deepEqual(

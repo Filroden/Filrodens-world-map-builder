@@ -421,14 +421,30 @@ export class MeshIntegration {
      * @returns {object|null}
      */
     static routeAt(app, x, y, radius) {
-        if (!app.meshSession) return null;
-        let best = null;
+        return this.routesAt(app, x, y, radius)[0]?.route ?? null;
+    }
+
+    /**
+     * Every route whose line passes within `radius` map pixels of a map point, nearest first, as
+     * `{ route, distance }`. Which routes count is `isShown` of a route's visibility: by default
+     * what the map's tools pick (any but a hidden one, unless Hidden is shown); Inspect gives the
+     * canvas's own rule (StudioCanvas.isDrawn), with the Everyone and GM only filters.
+     * @param {object} app
+     * @param {number} x
+     * @param {number} y
+     * @param {number} radius
+     * @param {function(string): boolean} [isShown]
+     * @returns {{route: object, distance: number}[]}
+     */
+    static routesAt(app, x, y, radius, isShown = (visibility) => this.#shown(app, visibility)) {
+        if (!app.meshSession) return [];
+        const found = [];
         for (const route of app.mapRoutes ?? []) {
-            if (!this.#shown(app, route.visibility)) continue;
+            if (!isShown(route.visibility)) continue;
             const distance = distanceToLine(app.meshSession.routeLine(route), x, y, radius);
-            if (distance <= radius && (!best || distance < best.distance)) best = { route, distance };
+            if (distance <= radius) found.push({ route, distance });
         }
-        return best?.route ?? null;
+        return found.sort((a, b) => a.distance - b.distance);
     }
 
     // ------------------------------------------------------------------ geometry for the Studio

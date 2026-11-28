@@ -19,6 +19,7 @@ import { TravelLayer } from "./TravelLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
+import { InspectOverlay } from "./InspectOverlay.js";
 import { DrawnDecoration } from "../../../kernel/decorations/DrawnDecoration.js";
 import { TouchGestures } from "./TouchGestures.js";
 import { platform } from "../../../platform/index.js";
@@ -218,6 +219,8 @@ export class StudioCanvas {
         // The Routes tool's route being placed, trace stroke and waypoint handles
         this.routeOverlays = new RouteOverlays(PIXI);
         this.homelandMarkers = new HomelandMarkers(PIXI);
+        // Inspect's marker at the held point and its hovered fold's outline (EX1)
+        this.inspectOverlay = new InspectOverlay(PIXI);
 
         // A tool that takes the primary button's presses, moves and releases itself while editing
         // (see #pointerTool), or null; read on every event, so it follows the tool in use
@@ -226,6 +229,9 @@ export class StudioCanvas {
         // A tool that takes the primary button whether or not the map is being edited, for a
         // moment's task (a culture's homeland picked on the map; see CultureMarkers), or null
         this.pickPointerTool = null;
+        // Told whenever the camera moves (a pan, the wheel, a touch gesture, a zoom button or a
+        // framing), so what sits beside the pointer can close (see MapReader)
+        this.onCameraMove = null;
 
         // Setup the Crop Tool overlay
         this.cropGraphics = new PIXI.Graphics();
@@ -256,6 +262,7 @@ export class StudioCanvas {
             ...this.regionOverlays.displayObjects,
             ...this.routeOverlays.displayObjects,
             ...this.homelandMarkers.displayObjects,
+            ...this.inspectOverlay.displayObjects,
             this.brushCursor,
         );
 
@@ -415,7 +422,9 @@ export class StudioCanvas {
             doubleClick: (e) => this.#doubleClickAt(e, canvasElement),
             isTurnableAt: (e) => this.#isTurnableAt(e, canvasElement),
             isHoldingTurnable: () => StudioCanvas.#isWheelTransformable(this.#heldWrapper()),
-            panByDefault: () => !this.isEditMode && !this.isCropMode && !this.isReferenceMode && !this.pickPointerTool,
+            // One finger pans unless a tool takes the map's presses; a tool that only wants taps
+            // (Inspect, Travel's start) says so with pansByDefault
+            panByDefault: () => !this.isEditMode && !this.isCropMode && !this.isReferenceMode && (!this.pickPointerTool || this.pickPointerTool.pansByDefault === true),
             cameraStart: () => {
                 this.#touchCameraStart = { scale: this.stage.scale.x, x: this.stage.position.x, y: this.stage.position.y };
             },
@@ -733,6 +742,7 @@ export class StudioCanvas {
         const dy = e.clientY - this.dragStart.y;
         this.stage.position.x = this.stageStart.x + dx;
         this.stage.position.y = this.stageStart.y + dy;
+        this.onCameraMove?.();
     }
 
     /**
@@ -1632,7 +1642,7 @@ export class StudioCanvas {
      * 2026-11-25.)
      */
     #workingAids() {
-        return [this.layers.reference, this.layers.landMasks, this.cropGraphics, ...this.regionOverlays.displayObjects, ...this.routeOverlays.displayObjects, ...this.homelandMarkers.displayObjects, this.brushCursor].filter(Boolean);
+        return [this.layers.reference, this.layers.landMasks, this.cropGraphics, ...this.regionOverlays.displayObjects, ...this.routeOverlays.displayObjects, ...this.homelandMarkers.displayObjects, ...this.inspectOverlay.displayObjects, this.brushCursor].filter(Boolean);
     }
 
     /** Draws with the working aids hidden (see #workingAids), and puts them back. */
@@ -2148,6 +2158,36 @@ export class StudioCanvas {
      */
     #symbolSizeScale() {
         return (Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION) * this.#symbolScale;
+    }
+
+    /** How big a pin or label of size 1 is drawn, beyond its own size (see #symbolSizeScale), for hit tests of their own. */
+    get symbolSizeScale() {
+        return this.#symbolSizeScale();
+    }
+
+    /** Whether a layer of the Show menu (VIEW_LAYERS) is drawn. */
+    isLayerShown(layerId) {
+        return this.layers?.[layerId]?.visible !== false;
+    }
+
+    /**
+     * Whether an item of a visibility is drawn on the map being worked on, under the view filters:
+     * the rule #isVisibleInCurrentPass applies in the normal pass, with a GM-only parent (a region
+     * set or level) making its children GM-only. For reading the map outside editing (Inspect).
+     * A container (a region set or level) for everyone is always entered, so its GM-only
+     * regions can still be drawn while Everyone is off.
+     * @param {string} [visibility] - "all", "gm" or "none".
+     * @param {string} [parentVisibility]
+     * @param {boolean} [isContainer]
+     * @returns {boolean}
+     */
+    isDrawn(visibility, parentVisibility = "all", isContainer = false) {
+        let vis = visibility || "all";
+        if (vis !== "none" && parentVisibility === "gm") vis = "gm";
+        if (vis === "none") return this.viewFilters.none === true;
+        if (isContainer && vis === "all") return true;
+        if (vis === "gm") return this.viewFilters.gm;
+        return this.viewFilters.all;
     }
 
     /** Which pins' names the map's detail level shows (see DetailLevel.ofName). */
@@ -3062,6 +3102,8 @@ export class StudioCanvas {
         this.regionOverlays.redraw(this.stage.scale.x);
         this.routeOverlays.redraw(this.stage.scale.x);
         this.homelandMarkers.redraw(this.stage.scale.x);
+        this.inspectOverlay.redraw(this.stage.scale.x);
+        this.onCameraMove?.();
     }
 
     /**

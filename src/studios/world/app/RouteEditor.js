@@ -87,7 +87,8 @@ export class RouteEditor {
             visibilities: RegionPanel.visibilityChoices(route.visibility),
             legModes: choices(ROUTE_MODES, LEG_MODE_LABELS, route.mode),
             transportLabel: TRANSPORT_LABELS[route.transport] ?? TRANSPORT_LABELS.road,
-            generated: GeneratedDetails.forRoute(app, route),
+            // The Generated section is a generated route's (a drawn route has no Lock to give)
+            generated: route.generated ? GeneratedDetails.forRoute(app, route) : null,
             generatedLocked: route.generated?.locked === true,
             classes: choices(ROUTE_CLASSES, CLASS_LABELS, route.class),
             strokes: choices(Object.keys(STROKE_LABELS), STROKE_LABELS, route.style ?? "solid"),

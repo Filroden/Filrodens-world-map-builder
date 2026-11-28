@@ -48,6 +48,8 @@ const FAMILIES = [
     // Each map tool's lede, by its id (definition.js's tool())
     { prefix: "FILRODENSWMB.UI.Lede", values: DEFINITION },
     "FILRODENSWMB.UI.RouteLeg",
+    // A natural feature's kind, by its id (FEATURE_KINDS; Inspect's rows)
+    "FILRODENSWMB.UI.FeatureKind",
     "FILRODENSWMB.UI.Transport",
     "FILRODENSWMB.UI.StateWord",
     "FILRODENSWMB.UI.StateStart",

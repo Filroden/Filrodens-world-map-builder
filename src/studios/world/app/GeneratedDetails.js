@@ -1,5 +1,7 @@
 import { FILRODENSWMB } from "../../../config.js";
 import { platform } from "../../../platform/index.js";
+import { cleanUnit, formatDistance } from "../../../kernel/data/MapUnit.js";
+import { kmPerPxOf } from "../data/MapScale.js";
 import { ContentRows } from "./ContentRows.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { Regeneration } from "./Regeneration.js";
@@ -107,6 +109,20 @@ export class GeneratedDetails {
     }
 
     /**
+     * Where a region sits, for Inspect's fold of a region outside the Political set (EX1): its
+     * region set's name and its level's (the tier). Worked out on reading, never saved.
+     * @param {object} set
+     * @param {object} level
+     * @returns {{label: string, value: string}[]}
+     */
+    static regionPlace(set, level) {
+        return this.#rows([
+            ["FILRODENSWMB.UI.GeneratedRegionSet", set?.name || null],
+            ["FILRODENSWMB.UI.GeneratedTier", level?.name || null],
+        ]);
+    }
+
+    /**
      * The pins, regions and routes a scene export gives journal pages, each with its page text.
      * A generated item has a page only while the map labels it at its detail level (a run makes
      * thousands of places, and a fill-in thousands more): shown, with its name drawn at that level,
@@ -158,19 +174,62 @@ export class GeneratedDetails {
     }
 
     /**
-     * A generated route's rows, or null for a route no run made: its kind and class, and what
-     * Generate again does with it.
+     * A route's rows: its kind and class (a drawn route has a class only when one is given), its
+     * length in the map's unit (see lengthOf), and for a generated route what Generate again does
+     * with it (not on a journal page or in Inspect).
      * @param {object} app
      * @param {object} route
-     * @returns {{label: string, value: string}[]|null}
+     * @param {{journal?: boolean}} [options] - journal: the rows a journal page gives, without the studio's own.
+     * @returns {{label: string, value: string}[]}
      */
-    static forRoute(app, route) {
-        if (!route.generated) return null;
+    static forRoute(app, route, { journal = false } = {}) {
         return this.#rows([
-            ["FILRODENSWMB.UI.GeneratedRouteKind", route.generated.oldRoad ? platform.i18n.localize("FILRODENSWMB.UI.RouteStyleOldRoad") : TRANSPORTS[route.transport] ? platform.i18n.localize(TRANSPORTS[route.transport]) : null],
-            ["FILRODENSWMB.UI.GeneratedRouteClass", CLASSES[route.class] ? platform.i18n.localize(CLASSES[route.class]) : null],
-            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(route)],
-        ]);
+            ["FILRODENSWMB.UI.GeneratedRouteKind", this.routeKindName(route)],
+            ["FILRODENSWMB.UI.GeneratedRouteClass", this.routeClassName(route)],
+            ["FILRODENSWMB.UI.GeneratedLength", this.lengthOf(app, route)],
+            ["FILRODENSWMB.UI.GeneratedNextRun", route.generated ? this.#fate(route) : null],
+        ], { journal });
+    }
+
+    /** A route's kind as a reader names it: an old road, or its transport (road, river route, sea lane). */
+    static routeKindName(route) {
+        if (route.generated?.oldRoad) return platform.i18n.localize("FILRODENSWMB.UI.RouteStyleOldRoad");
+        const transport = TRANSPORTS[route.transport ?? "road"];
+        return transport ? platform.i18n.localize(transport) : null;
+    }
+
+    /** A route's class (trunk, main, minor), or null for a route with none. */
+    static routeClassName(route) {
+        return CLASSES[route.class] ? platform.i18n.localize(CLASSES[route.class]) : null;
+    }
+
+    /**
+     * How long a route or a custom river is, in the map's unit ("23 km"), worked out on reading
+     * and never saved: a route along its line on the display mesh, a river along its points. Written
+     * as the scale bar and the thematic view write distances (MapUnit.formatDistance). Null for a
+     * line of fewer than two points.
+     * @param {object} app
+     * @param {object} item - A route (with legs) or a custom river (with points).
+     * @returns {string|null}
+     */
+    static lengthOf(app, item) {
+        const px = this.lengthPx(app, item);
+        if (!(px > 0)) return null;
+        const km = px * kmPerPxOf(app.uiState, app.mapHeight);
+        return platform.i18n.format("FILRODENSWMB.UI.InspectLength", { distance: formatDistance(km), unit: cleanUnit(app.uiState?.mapUnit) });
+    }
+
+    /** A route's or river's length in map pixels (see lengthOf). */
+    static lengthPx(app, item) {
+        let total = 0;
+        if (Array.isArray(item?.points)) {
+            for (let i = 1; i < item.points.length; i++) total += Math.hypot(item.points[i].x - item.points[i - 1].x, item.points[i].y - item.points[i - 1].y);
+            return total;
+        }
+        const line = app.meshSession && item?.legs ? app.meshSession.routeLine(item) : null;
+        if (!line) return 0;
+        for (let i = 2; i + 1 < line.length; i += 2) total += Math.hypot(line[i] - line[i - 2], line[i + 1] - line[i - 1]);
+        return total;
     }
 
     /** What Generate again does with an item: keeps it (an entered figure, locked, edited, or given cultures) or replaces it. */

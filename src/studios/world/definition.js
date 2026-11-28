@@ -5,7 +5,7 @@
  *
  * In S0 a world has its Surface map only. Its rail holds every stage, as v4's did (Ken, 2026-11-20,
  * undoing S0 step 3's Create and Explore modes): Shape, Populate and Finish, then Explore, whose
- * tools (History, Travel, the 3D view) read the map rather than change it (`mode: "explore"`, their
+ * tools (Inspect, History, Travel, the 3D view) read the map rather than change it (`mode: "explore"`, their
  * panels tagged read only). Reference image is an occasional tool (no stage); Worlds has no stage
  * either and opens from the world bar's name menu.
  *
@@ -14,6 +14,7 @@
  * Parts a later step builds are drawn in their places, disabled, with a tooltip (`later`).
  */
 import { defineStudio } from "../../shell/StudioRegistry.js";
+import { SURFACE_INSPECT } from "./inspect/SurfaceKinds.js";
 
 const SURFACE = ["surface"];
 
@@ -62,6 +63,7 @@ export const WORLD_DEFINITION = defineStudio({
         tool("labels", "populate", "insert-text", "FILRODENSWMB.UI.ToolLabels", { next: next("cartography", "FILRODENSWMB.UI.NextReasonLabels"), stateWord: "placing" }),
         tool("cartography", "finish", "explore", "FILRODENSWMB.UI.ToolCartography", { next: next("export", "FILRODENSWMB.UI.NextReasonCartography"), stateWord: "placing" }),
         tool("export", "finish", "png", "FILRODENSWMB.UI.ToolExport"),
+        tool("inspect", "explore", "info", "FILRODENSWMB.UI.ToolInspect", { mode: "explore" }),
         tool("history", "explore", "history", "FILRODENSWMB.UI.ToolHistory", { mode: "explore" }),
         tool("travel", "explore", "travel-explore", "FILRODENSWMB.UI.ToolTravel", { mode: "explore" }),
         // The map shown in 3D, with no panel; any other tool goes back to the flat map
@@ -92,4 +94,7 @@ export const WORLD_DEFINITION = defineStudio({
     ],
     // The engine is named in the header of the tools it shapes
     engineInHeader: ["scene", "terrain"],
+    // What Inspect reads on each map type (EX1): the Surface map's pins, routes, custom rivers,
+    // named natural features and regions, then the ground (see SurfaceKinds)
+    inspect: { surface: SURFACE_INSPECT },
 });

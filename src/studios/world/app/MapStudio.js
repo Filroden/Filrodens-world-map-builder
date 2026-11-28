@@ -19,6 +19,8 @@ import { SpatialMath } from "../../../kernel/util/SpatialMath.js";
 import { RefreshQueue } from "../../../kernel/util/RefreshQueue.js";
 import { ColorMath } from "../../../kernel/util/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { GroundReading } from "./GroundReading.js";
+import { InspectView } from "./InspectView.js";
 import { TerrainBuffers } from "./TerrainBuffers.js";
 import { MapSerializer } from "./MapSerializer.js";
 import { MapDialogManager } from "./MapDialogManager.js";
@@ -394,6 +396,12 @@ export class MapStudio {
         zoomIn(e, t)                    { if (this.inSettlement) SettlementMaps.existing(this).zoomIn(); else this._onZoomIn(e, t); },
         zoomOut(e, t)                   { if (this.inSettlement) SettlementMaps.existing(this).zoomOut(); else this._onZoomOut(e, t); },
         zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
+        // Inspect's panel (EX1; see InspectView)
+        inspectClear()                  { InspectView.letGo(this); },
+        inspectShow(_e, t)              { InspectView.show(this, t); },
+        inspectEdit(_e, t)              { InspectView.edit(this, t); },
+        inspectOpenSettlementMap(_e, t) { InspectView.openSettlementMap(this, t); },
+        inspectGoToRegion(_e, t)        { InspectView.goToRegion(this, t); },
     };
 
     /**
@@ -1105,7 +1113,8 @@ export class MapStudio {
     /** Whether a map tool has something to show on a world open view only (a run, for most of Explore). */
     #explorable(tool) {
         if (!this.surfaceMade) return false;
-        if (tool === "threeD" || tool === "export") return true;
+        // Inspect reads a hand-drawn map as well as a generated one (EX1)
+        if (tool === "threeD" || tool === "export" || tool === "inspect") return true;
         return !!(this.modelRun || this.parentRun);
     }
 
@@ -1392,7 +1401,7 @@ export class MapStudio {
         if (this.viewOnly) {
             railStages = only((id) => this.#viewOffers(id));
             if (!(this.modelRun || this.parentRun)) {
-                railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (this.definition.tool(tool.id)?.mode === "explore" && tool.id !== "threeD" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") } : tool)) }));
+                railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (this.definition.tool(tool.id)?.mode === "explore" && tool.id !== "threeD" && tool.id !== "inspect" ? { ...tool, disabled: true, tooltip: i18n.localize("FILRODENSWMB.UI.ReadByNeedsRun") } : tool)) }));
             }
         }
         if (inWorld && cutOff) railStages = railStages.map((stage) => ({ ...stage, tools: stage.tools.map((tool) => (tool.id === "worldCut" ? { ...tool, disabled: true, tooltip: cutOff } : tool)) }));
@@ -2134,6 +2143,7 @@ export class MapStudio {
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
             if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
+            if (this.activeTool === "inspect") context.inspect = InspectView.context(this);
             if (this.activeTool === "influences") context.influences = InfluenceView.context(this);
             // The climate is the world's: a held regional world reads its parent's, read only
             if (this.activeTool === "climate" && this.world?.held) context.climateHeld = platform.i18n.format("FILRODENSWMB.UI.ClimateHeld", { name: (await this.#heldSourceName()) ?? "" });
@@ -3259,39 +3269,13 @@ export class MapStudio {
             HistoryView.readout(this, x, y);
             TravelView.readout(this, x, y);
 
-            const index = y * this.mapWidth + x;
-            const elev = this.currentElevationData[index];
-            const mois = this.currentMoistureData ? this.currentMoistureData[index] : 0;
-            const temp = this.currentTemperatureData ? this.currentTemperatureData[index] : 0;
-            const seaLevel = this.uiState["seaLevel"];
-
-            // Mirrors the same priority-chain lookup the biome layer itself paints with
-            // (ProceduralEngine.createBiomesMap) - getBiomeKey() alone only ever computes the
-            // built-in default, silently ignoring a hand-painted override or a matching custom
-            // auto-generation rule, so the readout would be wrong for anything painted or
-            // rule-generated. Uses getDerivedMapParameters() directly rather than the
-            // DOM-syncing getMapParameters(), since this fires on every mouse move over the
-            // canvas and doesn't need to re-read every input's current value to answer "what
-            // biome is under the cursor right now".
-            const overrideId = this.currentBiomeOverrides ? this.currentBiomeOverrides[index] : 0;
-            const { params } = MapStateManager.getDerivedMapParameters(this.uiState, this.customBiomeColors);
-            // The biome seen from above: under water that is the surface biome (such as Pack
-            // Ice) when there is one, otherwise the bed's
-            const { visible: lookupKey } = ProceduralEngine.resolveBiomeLookup(
-                overrideId, elev, mois, temp, seaLevel, this.bufferWaterMask, index, params.customBiomeRules, params.biomePalette,
-                params.biomeSides,
-            );
-
-            // Deliberately left uncapped: a value past 100% (or below 0%) is the honest readout for
-            // elevation a user has hand-pushed past the old [0, 1] range. Normalising this against
-            // the map's discovered peak/trough instead was considered and rejected, because it would
-            // make the same stored elevation display as a different percentage purely because the
-            // map's extremes changed somewhere else - a point the user never touched could appear to
-            // move. Do not add a clamp here.
-            this.root.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
-            this.root.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
-            this.root.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
-            this.root.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
+            // The same reading Inspect's ground row gives (see GroundReading)
+            const ground = GroundReading.at(this, x, y);
+            if (!ground) return;
+            this.root.querySelector("#fwmb-readout-elev").textContent = GroundReading.percentText(ground.elevation);
+            this.root.querySelector("#fwmb-readout-mois").textContent = GroundReading.percentText(ground.moisture);
+            this.root.querySelector("#fwmb-readout-temp").textContent = GroundReading.percentText(ground.temperature);
+            this.root.querySelector("#fwmb-readout-biome").textContent = ground.biome;
         };
     }
 
@@ -3310,25 +3294,6 @@ export class MapStudio {
                 biomes: biomeList.filter((biome) => biome.placement === placement),
             }))
             .filter((group) => group.biomes.length > 0);
-    }
-
-    /**
-     * Resolves a ProceduralEngine.resolveBiomeLookup() `lookupKey` to the text a person should
-     * see. A built-in default comes back as its i18n key name (e.g. "GRASSLAND", from
-     * getBiomeKey()) and localises directly. A hand-painted or rule-matched override comes back
-     * as a numeric id instead, which can name either a built-in biome (still an i18n key, just
-     * addressed by number rather than name here) or a custom biome (a plain name the GM typed
-     * in, never localised).
-     */
-    #getBiomeDisplayName(lookupKey) {
-        if (typeof lookupKey === "number") {
-            const custom = this.uiState.customBiomes?.find((c) => c.id === lookupKey);
-            if (custom) return custom.name;
-
-            const builtInKey = Object.keys(FILRODENSWMB.BIOME_IDS).find((key) => FILRODENSWMB.BIOME_IDS[key] === lookupKey);
-            return builtInKey ? platform.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "";
-        }
-        return platform.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`);
     }
 
     #applyInitialBootState() {
@@ -3396,6 +3361,7 @@ export class MapStudio {
         AppearanceMenu.close(this.root);
         // A redraw still queued would draw into a window that is going away
         this.view?.destroy();
+        InspectView.close(this);
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
 
@@ -3468,6 +3434,7 @@ export class MapStudio {
             pickingHomeland: CultureMarkers.picking(this),
             pickingEventPlace: AgeEventRows.picking(this),
             travelPicking: TravelView.picking(this),
+            inspecting: InspectView.active(this),
         });
 
         const touch = CanvasHints.isTouchScreen(element.ownerDocument.defaultView ?? globalThis);
@@ -6622,8 +6589,9 @@ export class MapStudio {
         const kept = this.#worldMapTools.get(this.#mapToolWorldId);
         const offered = (tool) => this.#isMapTool(tool) && this.definition.offers(tool, this.mapType) && this.#viewOffers(tool) && (!this.viewOnly || this.#explorable(tool));
         if (this.viewOnly && !offered(kept) && !offered(this.activeTool) && !offered(this.#mapTool)) {
-            // View only with nothing to explore (no run): the world's overview, read only (WL)
-            const explore = this.surfaceMade && (this.modelRun || this.parentRun) ? "history" : null;
+            // View only with no Surface map: the world's overview, read only (WL); a Surface map,
+            // run or not, opens on Inspect (EX1)
+            const explore = this.surfaceMade ? "inspect" : null;
             if (!explore) {
                 this.#worldTool = "worldOverview";
                 await this.switchTool("worldOverview", { force: true });
@@ -6631,7 +6599,7 @@ export class MapStudio {
                 return;
             }
         }
-        const tool = [kept, this.activeTool, this.#mapTool].find(offered) ?? (this.viewOnly ? "history" : MapStudio.#FIRST_MAP_TOOL);
+        const tool = [kept, this.activeTool, this.#mapTool].find(offered) ?? (this.viewOnly ? "inspect" : MapStudio.#FIRST_MAP_TOOL);
         this.#mapTool = tool;
         // A world opens on its map (S0 step 4c-2): leaving Worlds may have shown the world tool
         // left, which the opening's overlay hid
@@ -6707,8 +6675,9 @@ export class MapStudio {
         this.#updateBiomeOpacity();
         this.#updateCanvasModes(newTool);
 
-        // The Travel tool takes the map's clicks for its start while it is open
+        // The Travel tool takes the map's clicks for its start while it is open, Inspect its reading
         TravelView.toolChanged(this);
+        InspectView.toolChanged(this);
 
         // 4. Paint (the world bar too when the world or a map comes to be worked on: its switcher)
         this._repaintVectors();

@@ -412,6 +412,8 @@ export const WORLD_CONFIG = {
     UI: {
         // Defined in the shell's config (SHELL_PARTS.RTL_LANGUAGES), which reads it too
         RTL_LANGUAGES: SHELL_PARTS.RTL_LANGUAGES,
+        // Inspect's map card (EX1): defined in the shell's config (SHELL_PARTS), which reads it
+        INSPECT_REST_MS: SHELL_PARTS.INSPECT_REST_MS,
         VISIBILITY_STATES: ["all", "gm", "none"],
         EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
         VECTOR_TOOLS: ["scene", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
@@ -482,6 +484,9 @@ export const WORLD_CONFIG = {
                 // The Travel tool: a click sets where the journey starts, Shift+click shows or hides
                 // the way to the pointer (see TravelView)
                 travel: ["SetTravelStart", "ToggleTravelWay"],
+                // Inspect: resting reads the map, a click holds a point, Ctrl+click clears it (see
+                // InspectView; not Escape, which Foundry keeps for its windows)
+                inspect: ["InspectRest", "InspectHold", "InspectClear"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
@@ -556,6 +561,7 @@ export const WORLD_CONFIG = {
                 ResizeHeldPin: "ResizeHeldPinTouch",
                 DropMask: "DropMaskTouch",
                 SetTravelStart: "SetTravelStartTouch",
+                InspectHold: "InspectHoldTouch",
                 PlaceHomeland: "PlaceHomelandTouch",
                 PlaceEventPlace: "PlaceEventPlaceTouch",
             },
@@ -644,6 +650,7 @@ export const WORLD_CONFIG = {
                         { caption: "FILRODENSWMB.UI.ShortcutsMove", context: "cartography" },
                     ],
                 },
+                { title: "FILRODENSWMB.UI.ToolInspect", tables: [{ caption: null, context: "inspect" }] },
                 { title: "FILRODENSWMB.UI.ToolTravel", tables: [{ caption: null, context: "travel" }] },
                 {
                     title: "FILRODENSWMB.UI.ShortcutsHolding",

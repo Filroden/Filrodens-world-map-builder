@@ -135,6 +135,8 @@ export class TravelView {
             return;
         }
         const tool = {
+            // One finger pans the map on touch; a tap still sets the start (Ken, EX1 answer 3)
+            pansByDefault: true,
             down: (x, y, event) => (event?.shiftKey ? this.toggleWay(app) : this.setStart(app, x, y)),
             move: () => {},
             up: () => {},

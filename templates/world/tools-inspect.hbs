@@ -1,0 +1,88 @@
+{{!--
+    Inspect (tool id "inspect"; see InspectView, EX1): reading the Surface map at a point. With
+    nothing held (board E1): how to read, and what can be read (the map's own Visibility and Detail
+    decide). With a point held (board E2): everything at it as folds in the list's order (pins,
+    routes, rivers, named natural features, regions under their set's heading, the ground last),
+    the first open and one open at a time (they share a name); a fold's figures, description,
+    what it lies in, and its links: Show on map, Open settlement map, Edit (not in view only, board
+    E2b). The design system's Map card.
+--}}
+{{#if inspect.held}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectHeld" title="FILRODENSWMB.UI.InspectHeld" count=inspect.count}}
+    <div class="fwmb-inspect-head">
+        <p class="fwmb-hint fwmb-flex-1">{{inspect.countLabel}}</p>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="inspectClear">{{localize "FILRODENSWMB.UI.InspectClear"}}</button>
+    </div>
+    <div class="fwmb-inspect-folds">
+        {{#each inspect.folds}}
+        {{#if this.heading}}<div class="fwmb-fold-set">{{this.heading}}</div>{{/if}}
+        <details class="fwmb-fold{{#if this.ground}} fwmb-fold--ground{{/if}}" name="fwmb-inspect-fold" data-inspect-index="{{this.index}}" {{#if this.open}}open{{/if}}>
+            <summary>
+                <span class="fwmb-chev" aria-hidden="true"></span>
+                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+                <b>{{this.name}}</b>
+                <span class="fwmb-kind">{{this.kind}}{{#if this.gmOnly}} <span class="fwmb-mc-gm">{{localize "FILRODENSWMB.UI.InspectGmOnly"}}</span>{{/if}}</span>
+            </summary>
+            <div class="fwmb-fold-body">
+                {{#if this.rows.length}}
+                <dl class="fwmb-generate-results">
+                    {{#each this.rows}}
+                    <dt>{{this.label}}</dt>
+                    <dd class="fwmb-readout">{{this.value}}{{#if this.entered}} <span class="fwmb-meta">{{localize "FILRODENSWMB.UI.InspectEntered"}}</span>{{/if}}</dd>
+                    {{/each}}
+                </dl>
+                {{/if}}
+                {{#if this.leads}}<p class="fwmb-inspect-leads">{{this.leads}}</p>{{/if}}
+                {{#if this.routes.length}}
+                <ul class="fwmb-inspect-routes">
+                    {{#each this.routes}}
+                    <li class="fwmb-inspect-route" data-inspect-route="{{this.id}}">
+                        <span class="fwmb-flex-1">{{#if this.name}}<b>{{this.name}}</b> · {{/if}}{{this.detail}}{{#if this.gmOnly}} <span class="fwmb-mc-gm">{{localize "FILRODENSWMB.UI.InspectGmOnly"}}</span>{{/if}}</span>
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="inspectShow" aria-label="{{localize 'FILRODENSWMB.UI.InspectShowOnMap'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.InspectShowOnMap'}}"><span class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></span></button>
+                        {{#if this.edit}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="inspectEdit" aria-label="{{localize 'FILRODENSWMB.UI.InspectEdit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.InspectEdit'}}"><span class="fwmb-icon fwmb-icon--edit" aria-hidden="true"></span></button>{{/if}}
+                    </li>
+                    {{/each}}
+                </ul>
+                {{/if}}
+                {{#if this.description}}<p class="fwmb-inspect-description">{{this.description}}</p>{{/if}}
+                {{#if this.note}}<p class="fwmb-hint">{{this.note}}</p>{{/if}}
+                {{#if this.within.length}}
+                <p class="fwmb-inspect-within">
+                    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.InspectIn"}}</span>
+                    {{#each this.within}}
+                    <button type="button" class="fwmb-inspect-link" data-action="inspectGoToRegion" data-inspect-region data-inspect-to="{{this.index}}" data-level-id="{{this.levelId}}" data-region-key="{{this.regionKey}}">{{this.name}}</button>
+                    {{/each}}
+                </p>
+                {{/if}}
+                {{#if this.canShow}}
+                <div class="fwmb-inspect-actions">
+                    {{#unless this.routes.length}}
+                    <button type="button" class="fwmb-btn" data-action="inspectShow"><span class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.InspectShowOnMap"}}</button>
+                    {{/unless}}
+                    {{#if this.settlementMap}}
+                    <button type="button" class="fwmb-btn" data-action="inspectOpenSettlementMap" data-settlement-id="{{this.settlementMap}}"><span class="fwmb-icon fwmb-icon--map" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.OpenSettlementMap"}}</button>
+                    {{/if}}
+                    {{#if this.canEdit}}
+                    <button type="button" class="fwmb-btn" data-action="inspectEdit"><span class="fwmb-icon fwmb-icon--edit" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.InspectEdit"}}</button>
+                    {{/if}}
+                </div>
+                {{/if}}
+            </div>
+        </details>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{else}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectNothing" title="FILRODENSWMB.UI.InspectNothingHeld"}}
+    <p class="fwmb-hint">{{#if inspect.touch}}{{localize "FILRODENSWMB.UI.InspectNothingHeldHintTouch"}}{{else}}{{localize "FILRODENSWMB.UI.InspectNothingHeldHint"}}{{/if}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{#> "modules/filrodens-world-map-builder/templates/shell/parts/section.hbs" id="inspectReads" title="FILRODENSWMB.UI.InspectWhatCanBeRead"}}
+    <dl class="fwmb-generate-results">
+        {{#each inspect.reads}}
+        <dt>{{this.label}}</dt>
+        <dd class="fwmb-readout">{{this.value}}</dd>
+        {{/each}}
+    </dl>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InspectWhatCanBeReadHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/shell/parts/section.hbs"}}
+{{/if}}
